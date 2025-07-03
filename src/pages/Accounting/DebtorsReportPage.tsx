@@ -28,7 +28,7 @@ interface Payment {
 interface Invoice {
   invoice_id: string;
   invoice_number: string;
-  date: string | number; // Handle both string and epoch timestamp
+  date: string;
   amount: number;
   payments: Payment[];
   balance: number;
@@ -96,7 +96,7 @@ const DebtorsReportPage: React.FC = () => {
             ...customer,
             invoices: customer.invoices.map((invoice: Invoice) => ({
               ...invoice,
-              date: formatDateFromTimestamp(invoice.date),
+              date: formatDate(invoice.date),
               payments: invoice.payments.map((payment: Payment) => ({
                 ...payment,
                 date: formatDateFromTimestamp(payment.date),
@@ -119,46 +119,14 @@ const DebtorsReportPage: React.FC = () => {
     }
   };
 
-  // Fixed date formatting function for epoch timestamps
-  const formatDateFromTimestamp = (date: string | number): string => {
-    try {
-      let timestamp: number;
+  // This function now handles timestamp strings correctly.
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
 
-      if (typeof date === "string") {
-        // If it's a string, try to parse it as a number first (epoch)
-        if (!isNaN(Number(date))) {
-          timestamp = Number(date);
-        } else {
-          // If it's a date string, parse it normally
-          return formatDate(date);
-        }
-      } else {
-        timestamp = date;
-      }
-
-      // Handle epoch timestamp (convert to Date)
-      const dateObj = new Date(timestamp);
-
-      // Check if the date is valid
-      if (isNaN(dateObj.getTime())) {
-        console.warn("Invalid timestamp:", date);
-        return "Invalid Date";
-      }
-
-      return dateObj.toLocaleDateString("en-GB", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      });
-    } catch (error) {
-      console.error("Error formatting timestamp:", date, error);
-      return "Invalid Date";
-    }
-  };
-
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
+    // Check if the string consists only of digits (a timestamp like "1747658034976")
+    if (/^\d+$/.test(dateString)) {
+      // Convert the string to a number before creating a Date object
+      const date = new Date(parseInt(dateString, 10));
       if (isNaN(date.getTime())) {
         return "Invalid Date";
       }
@@ -167,12 +135,38 @@ const DebtorsReportPage: React.FC = () => {
         month: "2-digit",
         year: "numeric",
       });
-    } catch (error) {
-      console.error("Error formatting date string:", dateString, error);
+    }
+
+    // Otherwise, parse it as a regular date string.
+    // This preserves the existing behavior for payment dates which are re-formatted.
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
       return "Invalid Date";
     }
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
+  const formatDateFromTimestamp = (timestamp: string | number): string => {
+    if (!timestamp) return "N/A";
+    // Handles both ISO string and Unix timestamp (in seconds)
+    const date = new Date(
+      typeof timestamp === "number" ? timestamp * 1000 : timestamp
+    );
+
+    if (isNaN(date.getTime())) {
+      return "Invalid Date";
+    }
+
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+    const year = date.getFullYear();
+
+    return `${day}/${month}/${year}`;
+  };
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
       minimumFractionDigits: 2,
@@ -574,9 +568,7 @@ const DebtorsReportPage: React.FC = () => {
                                               {invoice.invoice_number}
                                             </td>
                                             <td className="px-3 py-2">
-                                              {formatDateFromTimestamp(
-                                                invoice.date
-                                              )}
+                                              {invoice.date}
                                             </td>
                                             <td className="px-3 py-2 text-right">
                                               RM{" "}
@@ -630,9 +622,7 @@ const DebtorsReportPage: React.FC = () => {
                                                         invoice.payments.length
                                                       }
                                                     >
-                                                      {formatDateFromTimestamp(
-                                                        invoice.date
-                                                      )}
+                                                      {invoice.date}
                                                     </td>
                                                     <td
                                                       className="px-3 py-2 text-right"
@@ -656,9 +646,7 @@ const DebtorsReportPage: React.FC = () => {
                                                     "-"}
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                  {formatDateFromTimestamp(
-                                                    payment.date
-                                                  )}
+                                                  {formatDate(payment.date)}
                                                 </td>
                                                 <td className="px-3 py-2 text-right text-green-600">
                                                   RM{" "}
