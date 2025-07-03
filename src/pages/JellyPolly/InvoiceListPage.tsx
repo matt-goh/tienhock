@@ -171,6 +171,7 @@ const InvoiceListPage: React.FC = () => {
     (): InvoiceFilters => ({
       dateRange: getInitialDates(),
       salespersonId: null,
+      customerId: null,
       paymentType: null,
       invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default excludes 'cancelled'
       eInvoiceStatus: [],
@@ -183,6 +184,7 @@ const InvoiceListPage: React.FC = () => {
   const DEFAULT_FILTERS: InvoiceFilters = {
     dateRange: getInitialDates(), // This will be overridden in actual usage
     salespersonId: null,
+    customerId: null,
     paymentType: null,
     invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
     eInvoiceStatus: [], // Default e-invoice status
@@ -197,6 +199,7 @@ const InvoiceListPage: React.FC = () => {
         end: filters.dateRange.end?.getTime(),
       },
       salespersonId: filters.salespersonId?.join(","),
+      customerId: filters.customerId,
       paymentType: filters.paymentType,
       invoiceStatus: filters.invoiceStatus?.join(","),
       eInvoiceStatus: filters.eInvoiceStatus?.join(","),
@@ -350,6 +353,11 @@ const InvoiceListPage: React.FC = () => {
 
     // Check if salesperson filter is active
     if (filters.salespersonId && filters.salespersonId.length > 0) {
+      count++;
+    }
+
+    // Check if customer filter is active
+    if (filters.customerId) {
       count++;
     }
 
@@ -1237,6 +1245,23 @@ const InvoiceListPage: React.FC = () => {
                             </div>
                           </li>
                         )}
+
+                      {filters.customerId && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
+                            <IconUser size={14} className="text-sky-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-default-500 text-xs">
+                              Customer
+                            </span>
+                            <div className="font-medium break-words">
+                              {customerNames[filters.customerId] ||
+                                filters.customerId}
+                            </div>
+                          </div>
+                        </li>
+                      )}
 
                       {filters.paymentType && (
                         <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
