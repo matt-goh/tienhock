@@ -401,7 +401,7 @@ const InvoiceListPage: React.FC = () => {
     if (activeFilterCount > 0) {
       setHasViewedFilters(false);
     }
-  }, [filters]); // Reset when filters change
+  }, [filters, activeFilterCount]); // Reset when filters change
 
   // Effect to invalidate the cache when filters change
   useEffect(() => {
