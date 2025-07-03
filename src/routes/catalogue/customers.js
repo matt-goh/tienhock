@@ -204,6 +204,38 @@ export default function (pool) {
     }
   });
 
+  // Get only credit data for all customers (efficient update)
+  router.get("/credits", async (req, res) => {
+    try {
+      const query = `
+      SELECT 
+        id,
+        credit_used,
+        credit_limit
+      FROM customers 
+      ORDER BY id
+    `;
+      const result = await pool.query(query);
+
+      // Convert money-related fields to numbers
+      const creditsData = result.rows.map((customer) => ({
+        id: customer.id,
+        credit_used:
+          customer.credit_used !== null ? Number(customer.credit_used) : null,
+        credit_limit:
+          customer.credit_limit !== null ? Number(customer.credit_limit) : null,
+      }));
+
+      res.json(creditsData);
+    } catch (error) {
+      console.error("Error fetching customer credits:", error);
+      res.status(500).json({
+        message: "Error fetching customer credits",
+        error: error.message,
+      });
+    }
+  });
+
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
 
