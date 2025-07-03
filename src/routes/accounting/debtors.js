@@ -4,149 +4,111 @@ import { Router } from "express";
 export default function (pool, config) {
   const router = Router();
 
+  // GET /api/tienhock/accounting/debtors - Get debtors report grouped by salesman
   router.get("/", async (req, res) => {
     try {
       const query = `
-      WITH unpaid_invoices AS (
-        SELECT 
-          i.invoice_id,
-          i.invoice_number,
-          i.customer_id,
-          i.staff_id,
-          i.invoice_date,
-          i.total_amount,
-          COALESCE(SUM(p.amount), 0) as paid_amount,
-          i.total_amount - COALESCE(SUM(p.amount), 0) as balance
-        FROM invoices i
-        LEFT JOIN payments p ON i.invoice_id = p.invoice_id
-        WHERE i.status = 'active'
-        GROUP BY i.invoice_id
-        HAVING i.total_amount - COALESCE(SUM(p.amount), 0) > 0.01
-      ),
-      payment_details AS (
+      WITH invoice_payments AS (
+        -- Calculate total payments per invoice
         SELECT 
           p.invoice_id,
-          p.payment_id,
-          p.bank,
-          p.cheque_number,
-          p.payment_date,
-          p.amount
+          SUM(p.amount_paid) as total_paid,
+          json_agg(
+            json_build_object(
+              'payment_id', p.payment_id,
+              'payment_method', p.payment_method,
+              'payment_reference', p.payment_reference,
+              'date', p.payment_date,
+              'amount', p.amount_paid
+            ) ORDER BY p.payment_date
+          ) as payments
         FROM payments p
-        WHERE p.invoice_id IN (SELECT invoice_id FROM unpaid_invoices)
+        GROUP BY p.invoice_id
+      ),
+      unpaid_invoices AS (
+        -- Get all unpaid/partially paid invoices
+        SELECT 
+          i.id as invoice_id,
+          i.salespersonid,
+          i.customerid,
+          i.createddate,
+          i.totalamountpayable,
+          i.balance_due,
+          COALESCE(ip.total_paid, 0) as total_paid,
+          COALESCE(ip.payments, '[]'::json) as payments
+        FROM invoices i
+        LEFT JOIN invoice_payments ip ON i.id = ip.invoice_id
+        WHERE i.invoice_status IN ('Unpaid', 'overdue')
+          AND i.balance_due > 0.01
+      ),
+      customer_aggregates AS (
+        -- Aggregate by customer
+        SELECT 
+          ui.salespersonid,
+          ui.customerid,
+          c.name as customer_name,
+          c.credit_limit,
+          json_agg(
+            json_build_object(
+              'invoice_id', ui.invoice_id,
+              'invoice_number', ui.invoice_id,
+              'date', ui.createddate,
+              'amount', ui.totalamountpayable,
+              'payments', ui.payments,
+              'balance', ui.balance_due
+            ) ORDER BY ui.createddate
+          ) as invoices,
+          SUM(ui.totalamountpayable) as total_amount,
+          SUM(ui.total_paid) as total_paid,
+          SUM(ui.balance_due) as total_balance
+        FROM unpaid_invoices ui
+        JOIN customers c ON ui.customerid = c.id
+        GROUP BY ui.salespersonid, ui.customerid, c.name, c.credit_limit
       )
+      -- Final aggregation by salesman
       SELECT 
-        s.staff_id as salesman_id,
+        s.id as salesman_id,
         s.name as salesman_name,
-        c.customer_id,
-        c.name as customer_name,
-        c.credit_limit,
-        c.credit_limit - COALESCE(SUM(ui.balance), 0) as credit_balance,
-        ui.invoice_id,
-        ui.invoice_number,
-        ui.invoice_date,
-        ui.total_amount,
-        ui.balance,
-        pd.payment_id,
-        pd.bank,
-        pd.cheque_number,
-        pd.payment_date,
-        pd.amount as payment_amount
-      FROM unpaid_invoices ui
-      JOIN customers c ON ui.customer_id = c.customer_id
-      JOIN staff s ON ui.staff_id = s.staff_id
-      LEFT JOIN payment_details pd ON ui.invoice_id = pd.invoice_id
-      ORDER BY s.name, c.name, ui.invoice_date, ui.invoice_id, pd.payment_date
+        json_agg(
+          json_build_object(
+            'customer_id', ca.customerid,
+            'customer_name', ca.customer_name,
+            'invoices', ca.invoices,
+            'total_amount', ca.total_amount,
+            'total_paid', ca.total_paid,
+            'total_balance', ca.total_balance,
+            'credit_limit', ca.credit_limit,
+            'credit_balance', ca.credit_limit - ca.total_balance
+          ) ORDER BY ca.customer_name
+        ) as customers,
+        SUM(ca.total_balance) as total_balance
+      FROM customer_aggregates ca
+      JOIN staffs s ON ca.salespersonid = s.id
+      GROUP BY s.id, s.name
+      ORDER BY s.name
     `;
 
       const result = await pool.query(query);
 
-      // Transform the flat data into the nested structure
-      const salesmenMap = new Map();
-
-      result.rows.forEach((row) => {
-        // Get or create salesman
-        if (!salesmenMap.has(row.salesman_id)) {
-          salesmenMap.set(row.salesman_id, {
-            salesman_id: row.salesman_id,
-            salesman_name: row.salesman_name,
-            customers: new Map(),
-            total_balance: 0,
-          });
-        }
-        const salesman = salesmenMap.get(row.salesman_id);
-
-        // Get or create customer
-        if (!salesman.customers.has(row.customer_id)) {
-          salesman.customers.set(row.customer_id, {
-            customer_id: row.customer_id,
-            customer_name: row.customer_name,
-            credit_limit: parseFloat(row.credit_limit || 0),
-            credit_balance: parseFloat(row.credit_balance || 0),
-            invoices: new Map(),
-            total_amount: 0,
-            total_paid: 0,
-            total_balance: 0,
-          });
-        }
-        const customer = salesman.customers.get(row.customer_id);
-
-        // Get or create invoice
-        if (!customer.invoices.has(row.invoice_id)) {
-          customer.invoices.set(row.invoice_id, {
-            invoice_id: row.invoice_id,
-            invoice_number: row.invoice_number,
-            date: row.invoice_date,
-            amount: parseFloat(row.total_amount),
-            balance: parseFloat(row.balance),
-            payments: [],
-          });
-          customer.total_amount += parseFloat(row.total_amount);
-          customer.total_balance += parseFloat(row.balance);
-        }
-        const invoice = customer.invoices.get(row.invoice_id);
-
-        // Add payment if exists
-        if (row.payment_id) {
-          invoice.payments.push({
-            payment_id: row.payment_id,
-            bank: row.bank,
-            cheque_number: row.cheque_number,
-            date: row.payment_date,
-            amount: parseFloat(row.payment_amount),
-          });
-          customer.total_paid += parseFloat(row.payment_amount);
-        }
-      });
-
-      // Convert Maps to Arrays and calculate totals
-      const salesmen = [];
+      // Calculate grand totals
       let grand_total_amount = 0;
       let grand_total_paid = 0;
       let grand_total_balance = 0;
 
-      salesmenMap.forEach((salesman) => {
-        const customers = Array.from(salesman.customers.values()).map(
-          (customer) => ({
-            ...customer,
-            invoices: Array.from(customer.invoices.values()),
-          })
-        );
-
-        salesman.total_balance = customers.reduce(
-          (sum, c) => sum + c.total_balance,
-          0
-        );
-        grand_total_amount += customers.reduce(
-          (sum, c) => sum + c.total_amount,
-          0
-        );
-        grand_total_paid += customers.reduce((sum, c) => sum + c.total_paid, 0);
-        grand_total_balance += salesman.total_balance;
-
-        salesmen.push({
-          ...salesman,
-          customers,
+      const salesmen = result.rows.map((row) => {
+        const customers = row.customers || [];
+        customers.forEach((customer) => {
+          grand_total_amount += parseFloat(customer.total_amount || 0);
+          grand_total_paid += parseFloat(customer.total_paid || 0);
+          grand_total_balance += parseFloat(customer.total_balance || 0);
         });
+
+        return {
+          salesman_id: row.salesman_id,
+          salesman_name: row.salesman_name,
+          customers: customers,
+          total_balance: parseFloat(row.total_balance || 0),
+        };
       });
 
       res.json({
