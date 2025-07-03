@@ -727,7 +727,7 @@ export interface IncomeTaxRate {
 }
 
 export interface PayrollDeduction {
-  deduction_type: "epf" | "socso" | "sip";
+  deduction_type: "epf" | "socso" | "sip" | "income_tax";
   employee_amount: number;
   employer_amount: number;
   wage_amount: number;
@@ -737,6 +737,7 @@ export interface PayrollDeduction {
     employer_rate: number | string;
     age_group?: string;
     wage_ceiling_used?: number;
+    tax_category?: string; // e.g., "Single", "Married-K2-Unemployed"
   };
 }
 

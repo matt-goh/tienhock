@@ -58,9 +58,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       throw new Error("Employee payroll not found");
     const { employee_id } = payrollDetails.rows[0];
 
-    // Get employee's birthdate and nationality for contribution calculations
+    // Get employee's info (birthdate, nationality, marital status, spouse employment status, number of children)
     const employeeInfoRes = await pool.query(
-      "SELECT birthdate, nationality FROM staffs WHERE id = $1",
+      "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children FROM staffs WHERE id = $1",
       [employee_id]
     );
     if (employeeInfoRes.rows.length === 0)
@@ -83,18 +83,23 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     }));
 
     // Get all active contribution rates
-    const [epfRatesRes, socsoRatesRes, sipRatesRes] = await Promise.all([
-      pool.query("SELECT * FROM epf_rates WHERE is_active = true"),
-      pool.query(
-        "SELECT * FROM socso_rates WHERE is_active = true ORDER BY wage_from"
-      ),
-      pool.query(
-        "SELECT * FROM sip_rates WHERE is_active = true ORDER BY wage_from"
-      ),
-    ]);
+    const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
+      await Promise.all([
+        pool.query("SELECT * FROM epf_rates WHERE is_active = true"),
+        pool.query(
+          "SELECT * FROM socso_rates WHERE is_active = true ORDER BY wage_from"
+        ),
+        pool.query(
+          "SELECT * FROM sip_rates WHERE is_active = true ORDER BY wage_from"
+        ),
+        pool.query(
+          "SELECT * FROM income_tax_rates WHERE is_active = true ORDER BY wage_from"
+        ), // Add this
+      ]);
     const epfRates = epfRatesRes.rows;
     const socsoRates = socsoRatesRes.rows;
     const sipRates = sipRatesRes.rows;
+    const incomeTaxRates = incomeTaxRatesRes.rows;
 
     // 2. PERFORM CALCULATIONS (Server-side implementation of client logic)
 
@@ -235,6 +240,68 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
             employee_rate: `RM${sipRate.employee_rate}`,
             employer_rate: `RM${sipRate.employer_rate}`,
             age_group: "under_60",
+          },
+        });
+      }
+    }
+
+    // Calculate Income Tax
+    const incomeTaxRate = incomeTaxRates.find(
+      (rate) =>
+        totalGrossPay >= parseFloat(rate.wage_from) &&
+        totalGrossPay <= parseFloat(rate.wage_to)
+    );
+
+    if (incomeTaxRate) {
+      const maritalStatus = employeeInfo.maritalStatus || "Single";
+      const spouseEmploymentStatus =
+        employeeInfo.spouseEmploymentStatus || null;
+      const numberOfChildren = employeeInfo.numberOfChildren || 0;
+
+      // Determine applicable rate
+      let applicableRate = parseFloat(incomeTaxRate.base_rate);
+
+      // Single employees use base rate
+      if (maritalStatus === "Single") {
+        applicableRate = parseFloat(incomeTaxRate.base_rate);
+      } else if (maritalStatus === "Married") {
+        // Married employees use K rates based on number of children and spouse status
+        const childrenKey = Math.min(numberOfChildren, 10);
+
+        if (spouseEmploymentStatus === "Unemployed") {
+          const unemployedKey = `unemployed_spouse_k${childrenKey}`;
+          applicableRate =
+            parseFloat(incomeTaxRate[unemployedKey]) || applicableRate;
+        } else if (spouseEmploymentStatus === "Employed") {
+          const employedKey = `employed_spouse_k${childrenKey}`;
+          applicableRate =
+            parseFloat(incomeTaxRate[employedKey]) || applicableRate;
+        }
+        // If spouse employment status is not specified for married employees,
+        // fallback to base rate (though this should ideally not happen)
+      }
+
+      // Build tax category string
+      let taxCategory = maritalStatus;
+      if (maritalStatus === "Married") {
+        const childrenCount = Math.min(numberOfChildren, 10);
+        taxCategory += `-K${childrenCount}`;
+        if (spouseEmploymentStatus) {
+          taxCategory += `-${spouseEmploymentStatus}`;
+        }
+      }
+
+      if (applicableRate > 0) {
+        deductions.push({
+          deduction_type: "income_tax",
+          employee_amount: applicableRate,
+          employer_amount: 0,
+          wage_amount: totalGrossPay,
+          rate_info: {
+            rate_id: incomeTaxRate.id,
+            employee_rate: `RM${applicableRate}`,
+            employer_rate: "RM0.00",
+            tax_category: taxCategory,
           },
         });
       }
