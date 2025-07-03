@@ -1,37 +1,77 @@
 // src/pages/Accounting/DebtorsReportPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
   IconDownload,
+  IconChevronDown,
+  IconChevronRight,
   IconAlertCircle,
-  IconPhone,
+  IconUser,
+  IconCalendar,
+  IconCreditCard,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../components/Button";
-import { greenTargetApi } from "../../routes/greentarget/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { api } from "../../routes/utils/api";
 
-interface Debtor {
-  customer_id: number;
-  name: string;
-  phone_numbers: string[];
-  total_invoiced: number;
-  total_paid: number;
+interface Invoice {
+  invoice_id: number;
+  invoice_number: string;
+  date: string;
+  amount: number;
+  payments: Payment[];
   balance: number;
-  has_overdue?: boolean;
+}
+
+interface Payment {
+  payment_id: number;
+  bank?: string;
+  cheque_number?: string;
+  date: string;
+  amount: number;
+}
+
+interface Customer {
+  customer_id: string;
+  customer_name: string;
+  invoices: Invoice[];
+  total_amount: number;
+  total_paid: number;
+  total_balance: number;
+  credit_limit: number;
+  credit_balance: number;
+}
+
+interface Salesman {
+  salesman_id: string;
+  salesman_name: string;
+  customers: Customer[];
+  total_balance: number;
+}
+
+interface DebtorsData {
+  salesmen: Salesman[];
+  grand_total_amount: number;
+  grand_total_paid: number;
+  grand_total_balance: number;
+  report_date: string;
 }
 
 const DebtorsReportPage: React.FC = () => {
   const navigate = useNavigate();
-  const [debtors, setDebtors] = useState<Debtor[]>([]);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [debtorsData, setDebtorsData] = useState<DebtorsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState<{
-    field: keyof Debtor;
-    direction: "asc" | "desc";
-  }>({ field: "balance", direction: "desc" });
+  const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(
+    new Set()
+  );
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     fetchDebtors();
@@ -40,401 +80,517 @@ const DebtorsReportPage: React.FC = () => {
   const fetchDebtors = async () => {
     try {
       setLoading(true);
-      const data = await greenTargetApi.getDebtorsReport();
-      setDebtors(data);
+      const response = await api.get("/api/debtors");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch debtors data");
+      }
+
+      const data = await response.json();
+      setDebtorsData(data);
+
+      // Expand all salesmen by default
+      const salesmenIds = data.salesmen.map((s: Salesman) => s.salesman_id);
+      setExpandedSalesmen(new Set(salesmenIds));
+
       setError(null);
     } catch (err) {
-      setError("Failed to fetch debtors. Please try again later.");
+      setError("Failed to fetch debtors data. Please try again later.");
       console.error("Error fetching debtors:", err);
+      toast.error("Failed to load debtors report");
     } finally {
       setLoading(false);
     }
   };
 
-  //   // Get debtors report
-  //   router.get("/debtors", async (req, res) => {
-  //     try {
-  //       const query = `
-  //         SELECT
-  //           c.customer_id,
-  //           c.name,
-  //           /* Collect unique phone numbers as an array */
-  //           ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(ph.phone_number, '')), NULL) as phone_numbers,
-
-  //           -- Get pre-aggregated invoice and payment data from subquery
-  //           invoice_data.total_invoiced,
-  //           invoice_data.total_paid,
-  //           invoice_data.balance,
-
-  //           -- Add new field to check for overdue invoices (as a subquery)
-  //           (SELECT EXISTS(
-  //             SELECT 1 FROM greentarget.invoices oi
-  //             WHERE oi.customer_id = c.customer_id
-  //             AND oi.status = 'overdue'
-  //             AND oi.status != 'cancelled'
-  //           )) as has_overdue
-
-  //         FROM greentarget.customers c
-  //         -- Collect phone numbers from both customer and locations (existing logic)
-  //         LEFT JOIN LATERAL (
-  //           SELECT c.phone_number
-  //           UNION
-  //           SELECT l.phone_number
-  //           FROM greentarget.rentals r
-  //           JOIN greentarget.locations l ON r.location_id = l.location_id
-  //           WHERE r.customer_id = c.customer_id
-  //         ) ph ON true
-
-  //         -- Use a subquery to pre-aggregate invoice and payment data per customer
-  //         LEFT JOIN (
-  //           SELECT
-  //             i.customer_id,
-  //             SUM(CASE WHEN i.status != 'cancelled' THEN i.total_amount ELSE 0 END) as total_invoiced,
-  //             SUM(
-  //               COALESCE(
-  //                 (SELECT SUM(amount_paid)
-  //                 FROM greentarget.payments p
-  //                 WHERE p.invoice_id = i.invoice_id
-  //                 AND (p.status IS NULL OR p.status = 'active')
-  //                 ), 0
-  //               )
-  //             ) as total_paid,
-  //             SUM(CASE WHEN i.status != 'cancelled' THEN i.total_amount ELSE 0 END) -
-  //             SUM(
-  //               COALESCE(
-  //                 (SELECT SUM(amount_paid)
-  //                 FROM greentarget.payments p
-  //                 WHERE p.invoice_id = i.invoice_id
-  //                 AND (p.status IS NULL OR p.status = 'active')
-  //                 ), 0
-  //               )
-  //             ) as balance
-  //           FROM greentarget.invoices i
-  //           GROUP BY i.customer_id
-  //         ) invoice_data ON c.customer_id = invoice_data.customer_id
-
-  //         -- Group by customer for phone number aggregation
-  //         GROUP BY c.customer_id, c.name, invoice_data.total_invoiced, invoice_data.total_paid, invoice_data.balance
-
-  //         -- Filter Groups: Only include customers who have a positive outstanding balance
-  //         HAVING invoice_data.balance > 0.001 -- Use a small threshold for floating point comparison
-
-  //         -- Order by the calculated balance
-  //         ORDER BY invoice_data.balance DESC;
-  //       `;
-
-  //       const result = await pool.query(query);
-  //       // Ensure numeric types are returned correctly
-  //       const debtors = result.rows.map((debtor) => ({
-  //         ...debtor,
-  //         phone_numbers: debtor.phone_numbers || [], // Ensure phone_numbers is always an array
-  //         total_invoiced: parseFloat(debtor.total_invoiced || 0),
-  //         total_paid: parseFloat(debtor.total_paid || 0),
-  //         balance: parseFloat(debtor.balance || 0),
-  //         has_overdue: !!debtor.has_overdue,
-  //       }));
-  //       res.json(debtors);
-  //     } catch (error) {
-  //       console.error("Error fetching debtors report:", error);
-  //       res.status(500).json({
-  //         message: "Error fetching debtors report",
-  //         error: error.message,
-  //       });
-  //     }
-  //   });
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
-      style: "currency",
-      currency: "MYR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
-  const handleSort = (field: keyof Debtor) => {
-    setSortBy((prev) => {
-      if (prev.field === field) {
-        return { field, direction: prev.direction === "asc" ? "desc" : "asc" };
-      }
-      return { field, direction: "desc" };
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
     });
   };
 
-  const handlePrint = () => {
-    // This would be implemented to export data to CSV
-    toast.success("Printing functionality would be implemented here");
-  };
-
-  const handleViewInvoices = (customerId: number) => {
-    // Updated to pass both customer_id and status filters
-    navigate(
-      `/greentarget/invoices?customer_id=${customerId}&status=active,overdue`
-    );
-  };
-
-  const sortedDebtors = useMemo(() => {
-    // Basic search filtering (case-insensitive)
-    const filtered = debtors.filter(
-      (debtor) =>
-        debtor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        debtor.customer_id.toString().includes(searchTerm) ||
-        (debtor.phone_numbers &&
-          debtor.phone_numbers.some((phone) => phone.includes(searchTerm)))
-    );
-
-    // Sorting logic
-    return [...filtered].sort((a, b) => {
-      const aValue = a[sortBy.field];
-      const bValue = b[sortBy.field];
-
-      // Handle numeric and string sorting appropriately
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortBy.direction === "asc" ? aValue - bValue : bValue - aValue;
+  const toggleSalesman = (salesmanId: string) => {
+    setExpandedSalesmen((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(salesmanId)) {
+        newSet.delete(salesmanId);
+      } else {
+        newSet.add(salesmanId);
       }
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        if (sortBy.direction === "asc") {
-          return aValue.localeCompare(bValue);
-        } else {
-          return bValue.localeCompare(aValue);
-        }
-      }
-      // Fallback or handle other types if necessary
-      return 0;
+      return newSet;
     });
-  }, [debtors, sortBy, searchTerm]); // Added searchTerm dependency
+  };
 
-  // Calculate summary statistics based on *filtered and sorted* debtors
-  const totalOutstanding = useMemo(() => {
-    return sortedDebtors.reduce((sum, debtor) => sum + debtor.balance, 0);
-  }, [sortedDebtors]);
+  const toggleCustomer = (customerId: string) => {
+    setExpandedCustomers((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId);
+      } else {
+        newSet.add(customerId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCustomerClick = (customerId: string) => {
+    // Navigate to InvoiceListPage with customer filter
+    navigate(`/sales/invoice?customerId=${customerId}`);
+  };
+
+  const filterData = (data: DebtorsData): DebtorsData => {
+    if (!searchTerm) return data;
+
+    const filtered: DebtorsData = {
+      ...data,
+      salesmen: data.salesmen
+        .map((salesman) => ({
+          ...salesman,
+          customers: salesman.customers.filter(
+            (customer) =>
+              customer.customer_name
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase()) ||
+              customer.customer_id
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase())
+          ),
+        }))
+        .filter((salesman) => salesman.customers.length > 0),
+    };
+
+    // Recalculate totals
+    filtered.grand_total_balance = filtered.salesmen.reduce(
+      (sum, salesman) => sum + salesman.total_balance,
+      0
+    );
+
+    return filtered;
+  };
 
   if (loading) {
     return (
-      <div className="mt-40 w-full flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
       </div>
     );
   }
 
-  if (error) {
-    // A slightly better error display
+  if (error || !debtorsData) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <IconAlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-        <h2 className="text-lg font-medium text-default-900 mb-1">
-          Loading Error
-        </h2>
-        <p className="text-default-500">{error}</p>
-        <Button onClick={fetchDebtors} className="mt-4">
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <IconAlertCircle size={48} className="text-red-500 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Error Loading Report</h2>
+        <p className="text-gray-600 mb-4">{error || "No data available"}</p>
+        <Button onClick={fetchDebtors} variant="outline">
           Retry
         </Button>
       </div>
     );
   }
 
+  const filteredData = filterData(debtorsData);
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* --- START OF MODIFIED HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+    <div className="p-6 max-w-[1400px] mx-auto">
+      {/* Header */}
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-default-900">
-            Debtors Report
-          </h1>
-          <p className="text-default-500 mt-1">
-            {/* Show count based on filtered results */}
-            {sortedDebtors.length} customer
-            {sortedDebtors.length !== 1 ? "s" : ""} with outstanding balances
+          <h1 className="text-2xl font-bold text-gray-900">Debtors Report</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Unpaid Bills by Salesman as at {formatDate(debtorsData.report_date)}
           </p>
         </div>
-        <div className="flex flex-col md:flex-row items-stretch md:items-center space-y-3 md:space-y-0 md:space-x-3 mt-4 md:mt-0 w-full md:w-auto">
-          {/* Adjusted for better small screen layout */}
-          <div className="relative flex-grow">
-            {/* Allow search to grow */}
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
             <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none" // Added pointer-events-none
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
               size={20}
             />
             <input
               type="text"
-              placeholder="Search..."
-              className="pl-10 pr-4 py-2 border border-default-300 rounded-full focus:outline-none focus:border-default-500"
+              placeholder="Search customer..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button
-            onClick={handlePrint}
-            icon={IconDownload}
-            variant="outline"
-            className="w-full md:w-auto"
-          >
-            Print
-          </Button>
         </div>
       </div>
-      {/* --- END OF MODIFIED HEADER --- */}
 
-      {/* Summary Cards - Adjusted layout for better responsiveness */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6">
-        <div className="bg-white border border-default-200 rounded-lg p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-default-500 mb-1">
-            Number of Debtors
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600 mb-1">
+            Total Amount
           </h3>
-          <p className="text-2xl font-bold text-default-900">
-            {sortedDebtors.length}
+          <p className="text-2xl font-bold text-gray-900">
+            RM {formatCurrency(filteredData.grand_total_amount)}
           </p>
         </div>
-        <div className="bg-white border border-default-200 rounded-lg p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-default-500 mb-1">
+        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600 mb-1">Total Paid</h3>
+          <p className="text-2xl font-bold text-green-600">
+            RM {formatCurrency(filteredData.grand_total_paid)}
+          </p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <h3 className="text-sm font-medium text-gray-600 mb-1">
             Total Outstanding
           </h3>
-          <p className="text-2xl font-bold text-default-900">
-            {formatCurrency(totalOutstanding)}
+          <p className="text-2xl font-bold text-red-600">
+            RM {formatCurrency(filteredData.grand_total_balance)}
           </p>
         </div>
       </div>
 
-      {/* Debtors Table */}
-      {sortedDebtors.length === 0 ? (
-        <div className="bg-white border border-default-200 rounded-lg p-8 text-center">
-          <IconAlertCircle
-            size={48}
-            className="mx-auto mb-4 text-default-300"
-          />
-          <h2 className="text-lg font-medium text-default-900 mb-1">
-            No debtors found
+      {/* Report Content */}
+      <div ref={printRef} className="bg-white rounded-lg shadow-sm">
+        {/* Print Header (hidden on screen) */}
+        <div className="hidden print:block text-center mb-6">
+          <h1 className="text-xl font-bold">TIEN HOCK FOOD INDUSTRIES S/B</h1>
+          <h2 className="text-lg">
+            REPORT: UNPAID BILLS BY SALESMAN AS AT{" "}
+            {formatDate(debtorsData.report_date).toUpperCase()}
           </h2>
-          <p className="text-default-500">
-            {searchTerm
-              ? "No debtors match your search criteria."
-              : "All customer balances are settled or there are no customers yet."}
-          </p>
         </div>
-      ) : (
-        <div className="bg-white border border-default-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
-                <tr>
-                  <th
-                    scope="col" // Added scope for accessibility
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
-                    onClick={() => handleSort("name")}
-                  >
-                    Customer
-                    {sortBy.field === "name" && (
-                      <span className="ml-1 align-middle">
-                        {/* Adjusted alignment */}
-                        {sortBy.direction === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </th>
-                  <th
-                    scope="col" // Added scope
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider whitespace-nowrap" // Added whitespace-nowrap
-                  >
-                    Contact
-                  </th>
-                  <th
-                    scope="col" // Added scope
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
-                    onClick={() => handleSort("total_invoiced")}
-                  >
-                    Total Invoiced
-                    {sortBy.field === "total_invoiced" && (
-                      <span className="ml-1 align-middle">
-                        {/* Adjusted alignment */}
-                        {sortBy.direction === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </th>
-                  <th
-                    scope="col" // Added scope
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
-                    onClick={() => handleSort("total_paid")}
-                  >
-                    Total Paid
-                    {sortBy.field === "total_paid" && (
-                      <span className="ml-1 align-middle">
-                        {/* Adjusted alignment */}
-                        {sortBy.direction === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </th>
-                  <th
-                    scope="col" // Added scope
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
-                    onClick={() => handleSort("balance")}
-                  >
-                    Balance
-                    {sortBy.field === "balance" && (
-                      <span className="ml-1 align-middle">
-                        {/* Adjusted alignment */}
-                        {sortBy.direction === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-default-200">
-                {sortedDebtors.map((debtor) => (
-                  <tr
-                    key={debtor.customer_id}
-                    className="hover:bg-sky-50 cursor-pointer transition-colors"
-                    onClick={() => handleViewInvoices(debtor.customer_id)}
-                    title={`View invoices for ${debtor.name}`} // More descriptive title
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-default-900">
-                        {debtor.name}
-                      </div>
-                      <div className="text-sm text-default-500">
-                        ID: {debtor.customer_id}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {debtor.phone_numbers &&
-                      debtor.phone_numbers.length > 0 ? (
-                        <div className="flex flex-col space-y-1">
-                          {debtor.phone_numbers.map((phone, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center text-sm text-default-700"
-                            >
-                              <IconPhone
-                                size={16}
-                                className="mr-1.5 text-default-400 flex-shrink-0"
-                              />
-                              <span className="truncate">{phone}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-default-400 text-sm italic">
-                          No phone number
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-900">
-                      {formatCurrency(debtor.total_invoiced)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
-                      {formatCurrency(debtor.total_paid)}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${
-                        debtor.has_overdue ? "text-red-600" : "text-amber-600"
-                      }`}
-                    >
-                      {formatCurrency(debtor.balance)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+        {/* Salesmen List */}
+        {filteredData.salesmen.length === 0 ? (
+          <div className="p-8 text-center">
+            <IconAlertCircle size={48} className="mx-auto mb-4 text-gray-300" />
+            <h2 className="text-lg font-medium text-gray-900 mb-1">
+              No debtors found
+            </h2>
+            <p className="text-gray-500">
+              {searchTerm
+                ? "No customers match your search criteria."
+                : "All customer balances are settled."}
+            </p>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {filteredData.salesmen.map((salesman) => (
+              <div key={salesman.salesman_id} className="p-4">
+                {/* Salesman Header */}
+                <div
+                  className="flex items-center justify-between cursor-pointer hover:bg-gray-50 -mx-4 px-4 py-2 rounded"
+                  onClick={() => toggleSalesman(salesman.salesman_id)}
+                >
+                  <div className="flex items-center gap-2">
+                    {expandedSalesmen.has(salesman.salesman_id) ? (
+                      <IconChevronDown size={20} className="text-gray-500" />
+                    ) : (
+                      <IconChevronRight size={20} className="text-gray-500" />
+                    )}
+                    <IconUser size={20} className="text-gray-600" />
+                    <h3 className="font-semibold text-gray-900">
+                      SALESMAN: {salesman.salesman_name}
+                    </h3>
+                  </div>
+                  <span className="text-sm font-medium text-red-600">
+                    RM {formatCurrency(salesman.total_balance)}
+                  </span>
+                </div>
+
+                {/* Customers List */}
+                {expandedSalesmen.has(salesman.salesman_id) && (
+                  <div className="mt-4 ml-7 space-y-4">
+                    {salesman.customers.map((customer) => (
+                      <div
+                        key={customer.customer_id}
+                        className="border border-gray-200 rounded-lg"
+                      >
+                        {/* Customer Header */}
+                        <div
+                          className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 rounded-t-lg"
+                          onClick={() =>
+                            toggleCustomer(
+                              `${salesman.salesman_id}-${customer.customer_id}`
+                            )
+                          }
+                        >
+                          <div className="flex items-center gap-2">
+                            {expandedCustomers.has(
+                              `${salesman.salesman_id}-${customer.customer_id}`
+                            ) ? (
+                              <IconChevronDown
+                                size={16}
+                                className="text-gray-500"
+                              />
+                            ) : (
+                              <IconChevronRight
+                                size={16}
+                                className="text-gray-500"
+                              />
+                            )}
+                            <span className="font-medium text-gray-900">
+                              {customer.customer_id} - {customer.customer_name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm text-gray-600">
+                              Balance:{" "}
+                              <span className="font-semibold text-red-600">
+                                RM {formatCurrency(customer.total_balance)}
+                              </span>
+                            </span>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCustomerClick(customer.customer_id);
+                              }}
+                            >
+                              View Invoices
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Invoice Details */}
+                        {expandedCustomers.has(
+                          `${salesman.salesman_id}-${customer.customer_id}`
+                        ) && (
+                          <div className="p-3">
+                            {/* Invoice Table */}
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-gray-200">
+                                    <th className="text-left py-2 px-2 font-medium text-gray-700">
+                                      NO.
+                                    </th>
+                                    <th className="text-left py-2 px-2 font-medium text-gray-700">
+                                      REF./NO
+                                    </th>
+                                    <th className="text-left py-2 px-2 font-medium text-gray-700">
+                                      DATE
+                                    </th>
+                                    <th className="text-right py-2 px-2 font-medium text-gray-700">
+                                      AMOUNT
+                                    </th>
+                                    <th className="text-left py-2 px-2 font-medium text-gray-700">
+                                      BANK
+                                    </th>
+                                    <th className="text-left py-2 px-2 font-medium text-gray-700">
+                                      CHQ/NO
+                                    </th>
+                                    <th className="text-left py-2 px-2 font-medium text-gray-700">
+                                      DATE
+                                    </th>
+                                    <th className="text-right py-2 px-2 font-medium text-gray-700">
+                                      AMOUNT
+                                    </th>
+                                    <th className="text-right py-2 px-2 font-medium text-gray-700">
+                                      BALANCE
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {customer.invoices.map((invoice, index) => (
+                                    <React.Fragment key={invoice.invoice_id}>
+                                      {invoice.payments.length === 0 ? (
+                                        <tr className="border-b border-gray-100">
+                                          <td className="py-2 px-2">
+                                            {index + 1}
+                                          </td>
+                                          <td className="py-2 px-2">
+                                            {invoice.invoice_number}
+                                          </td>
+                                          <td className="py-2 px-2">
+                                            {formatDate(invoice.date)}
+                                          </td>
+                                          <td className="py-2 px-2 text-right">
+                                            {formatCurrency(invoice.amount)}
+                                          </td>
+                                          <td className="py-2 px-2"></td>
+                                          <td className="py-2 px-2"></td>
+                                          <td className="py-2 px-2"></td>
+                                          <td className="py-2 px-2 text-right"></td>
+                                          <td className="py-2 px-2 text-right font-medium">
+                                            {formatCurrency(invoice.balance)}
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        invoice.payments.map(
+                                          (payment, paymentIndex) => (
+                                            <tr
+                                              key={`${invoice.invoice_id}-${payment.payment_id}`}
+                                              className="border-b border-gray-100"
+                                            >
+                                              {paymentIndex === 0 && (
+                                                <>
+                                                  <td
+                                                    className="py-2 px-2"
+                                                    rowSpan={
+                                                      invoice.payments.length
+                                                    }
+                                                  >
+                                                    {index + 1}
+                                                  </td>
+                                                  <td
+                                                    className="py-2 px-2"
+                                                    rowSpan={
+                                                      invoice.payments.length
+                                                    }
+                                                  >
+                                                    {invoice.invoice_number}
+                                                  </td>
+                                                  <td
+                                                    className="py-2 px-2"
+                                                    rowSpan={
+                                                      invoice.payments.length
+                                                    }
+                                                  >
+                                                    {formatDate(invoice.date)}
+                                                  </td>
+                                                  <td
+                                                    className="py-2 px-2 text-right"
+                                                    rowSpan={
+                                                      invoice.payments.length
+                                                    }
+                                                  >
+                                                    {formatCurrency(
+                                                      invoice.amount
+                                                    )}
+                                                  </td>
+                                                </>
+                                              )}
+                                              <td className="py-2 px-2">
+                                                {payment.bank || ""}
+                                              </td>
+                                              <td className="py-2 px-2">
+                                                {payment.cheque_number || ""}
+                                              </td>
+                                              <td className="py-2 px-2">
+                                                {formatDate(payment.date)}
+                                              </td>
+                                              <td className="py-2 px-2 text-right">
+                                                {formatCurrency(payment.amount)}
+                                              </td>
+                                              {paymentIndex === 0 && (
+                                                <td
+                                                  className="py-2 px-2 text-right font-medium"
+                                                  rowSpan={
+                                                    invoice.payments.length
+                                                  }
+                                                >
+                                                  {formatCurrency(
+                                                    invoice.balance
+                                                  )}
+                                                </td>
+                                              )}
+                                            </tr>
+                                          )
+                                        )
+                                      )}
+                                    </React.Fragment>
+                                  ))}
+                                  {/* Subtotal Row */}
+                                  <tr className="border-t-2 border-gray-300 font-semibold">
+                                    <td
+                                      colSpan={3}
+                                      className="py-2 px-2 text-right"
+                                    >
+                                      SUB-TOTAL:
+                                    </td>
+                                    <td className="py-2 px-2 text-right">
+                                      {formatCurrency(customer.total_amount)}
+                                    </td>
+                                    <td colSpan={3}></td>
+                                    <td className="py-2 px-2 text-right">
+                                      {formatCurrency(customer.total_paid)}
+                                    </td>
+                                    <td className="py-2 px-2 text-right">
+                                      {formatCurrency(customer.total_balance)}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Credit Info */}
+                            <div className="mt-3 flex items-center gap-6 text-sm">
+                              <div className="flex items-center gap-2">
+                                <IconCreditCard
+                                  size={16}
+                                  className="text-gray-500"
+                                />
+                                <span className="text-gray-600">
+                                  Credit Limit:
+                                </span>
+                                <span className="font-medium">
+                                  RM {formatCurrency(customer.credit_limit)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-600">
+                                  Credit Bal:
+                                </span>
+                                <span className="font-medium text-green-600">
+                                  RM {formatCurrency(customer.credit_balance)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <IconCalendar
+                                  size={16}
+                                  className="text-gray-500"
+                                />
+                                <span className="text-gray-600">As at:</span>
+                                <span className="font-medium">
+                                  {formatDate(debtorsData.report_date)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Grand Total */}
+            <div className="p-4 bg-gray-50 border-t-2 border-gray-300">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900">GRAND TOTAL</h3>
+                <div className="flex items-center gap-8">
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">Amount</p>
+                    <p className="font-bold text-lg">
+                      RM {formatCurrency(filteredData.grand_total_amount)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">Paid</p>
+                    <p className="font-bold text-lg text-green-600">
+                      RM {formatCurrency(filteredData.grand_total_paid)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">Balance</p>
+                    <p className="font-bold text-lg text-red-600">
+                      RM {formatCurrency(filteredData.grand_total_balance)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
