@@ -6,7 +6,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -166,6 +166,8 @@ const InvoiceListPage: React.FC = () => {
     total: 0,
   });
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
+  const [searchParams] = useSearchParams();
+  const [initialParamsApplied, setInitialParamsApplied] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
@@ -318,17 +320,46 @@ const InvoiceListPage: React.FC = () => {
     [] // No dependencies needed as parameters are passed in
   );
 
-  // Effect to trigger fetch when needed (page change or manual trigger)
+  // Fetch Invoices on initial load or when filters change
   useEffect(() => {
     // Only fetch if triggered, prevents fetching on initial mount if not desired
-    if (isFetchTriggered) {
+    if (initialParamsApplied && isFetchTriggered) {
       // Pass the current state values to the fetch function
       fetchInvoices(currentPage, filters, searchTerm);
     }
     // Disable eslint warning because fetchInvoices is stable due to useCallback([])
     // and we explicitly pass the dependencies (filters, searchTerm) when calling it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFetchTriggered, currentPage]); // Only re-run when page changes or triggered manually
+  }, [isFetchTriggered, currentPage, initialParamsApplied]); // Only re-run when page changes or triggered manually
+
+  // Effect: Process customerId URL parameter ONCE after mount
+  useEffect(() => {
+    const customerIdParam = searchParams.get("customerId");
+
+    // Check if customerId param exists and we haven't applied it yet
+    if (customerIdParam && !initialParamsApplied) {
+      // Set the customer filter
+      setFilters((prev) => ({
+        ...prev,
+        customerId: customerIdParam,
+      }));
+
+      // Clear date range when viewing specific customer (as requested)
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: {
+          start: null,
+          end: null,
+        },
+      }));
+
+      // Mark initial params as processed
+      setInitialParamsApplied(true);
+    } else if (!customerIdParam && !initialParamsApplied) {
+      // No customerId param found, mark as ready
+      setInitialParamsApplied(true);
+    }
+  }, [searchParams, initialParamsApplied]);
 
   useEffect(() => {
     if (showEInvoiceDownloader && eInvoicesToDownload.length > 0) {
