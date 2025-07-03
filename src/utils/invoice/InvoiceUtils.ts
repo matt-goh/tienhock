@@ -7,6 +7,7 @@ import {
   Payment,
 } from "../../types/types";
 import { api } from "../../routes/utils/api"; // Adjust path as needed
+import { refreshCreditsCache } from "../../utils/catalogue/useCustomerCache";
 
 // Helper to ensure products have UIDs for frontend state
 const ensureProductsHaveUid = (products: any[]): ProductItem[] => {
@@ -89,10 +90,11 @@ export const createInvoice = async (
     );
 
     const response = await api.post("/api/invoices/submit", dataToSubmit); // Use the correct create endpoint
-
     if (!response || !response.invoice) {
       throw new Error("Invalid response received after creating invoice.");
     }
+
+    await refreshCreditsCache(); // Refresh customer cache
 
     // Map response back to frontend state shape
     const savedInvoice = response.invoice;
@@ -194,6 +196,8 @@ export const cancelInvoice = async (
     if (!response || (!response.invoice && !response.deletedInvoice)) {
       throw new Error("Invalid response received after cancelling invoice.");
     }
+
+    await refreshCreditsCache(); // Refresh customer cache
 
     // Use deletedInvoice if present, otherwise fall back to invoice
     const cancelledInvoice = response.deletedInvoice || response.invoice;
@@ -335,6 +339,7 @@ export const createPayment = async (
     if (!response || !response.payment) {
       throw new Error("Invalid response received after creating payment.");
     }
+    await refreshCreditsCache(); // Refresh customer cache
     return response.payment;
   } catch (error: any) {
     console.error("Error creating payment:", error);
@@ -353,6 +358,7 @@ export const confirmPayment = async (paymentId: number): Promise<Payment> => {
     if (!response || !response.payment) {
       throw new Error("Invalid response received after confirming payment.");
     }
+    await refreshCreditsCache(); // Refresh customer cache
     return response.payment;
   } catch (error: any) {
     console.error(`Error confirming payment ${paymentId}:`, error);
@@ -400,6 +406,7 @@ export const cancelPayment = async (
     if (!response || !response.payment) {
       throw new Error("Invalid response received after cancelling payment.");
     }
+    await refreshCreditsCache(); // Refresh customer cache
     return response.payment;
   } catch (error: any) {
     console.error(`Error cancelling payment ${paymentId}:`, error);

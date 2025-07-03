@@ -900,23 +900,48 @@ const CustomerFormPage: React.FC = () => {
                           className="w-full px-3 py-2 border border-default-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100"
                           disabled={isSaving}
                         />
-                        {formData.credit_limit === 0 && (
-                          <p className="text-xs text-blue-600 mt-1">
-                            Unlimited credit
-                          </p>
-                        )}
                       </div>
-                      {/* Used Credit Display */}
+                      {/* Used Credit Input */}
                       <div>
-                        <label className="block text-sm font-medium text-default-700 mb-1">
-                          Credit Used
+                        <label
+                          htmlFor="credit_used"
+                          className="block text-sm font-medium text-default-700 mb-1"
+                        >
+                          Credit Used (RM)
                         </label>
-                        <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          {/* Match height */}
-                          <span className="font-medium text-default-700">
-                            RM {Number(formData.credit_used ?? 0).toFixed(2)}
-                          </span>
-                        </div>
+                        <input
+                          id="credit_used"
+                          type="text"
+                          name="credit_used"
+                          value={formData.credit_used?.toString() ?? "0"}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Allow empty string, numbers, and one decimal point
+                            if (/^\d*\.?\d{0,2}$/.test(value) || value === "") {
+                              setFormData({
+                                ...formData,
+                                // Store as number, default to 0 if empty becomes NaN
+                                credit_used:
+                                  value === "" ? 0 : parseFloat(value) || 0,
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Format and validate on blur
+                            const numericValue = parseFloat(e.target.value);
+                            if (!isNaN(numericValue)) {
+                              setFormData({
+                                ...formData,
+                                credit_used: Math.max(0, numericValue), // Ensure non-negative
+                              });
+                            } else {
+                              setFormData({ ...formData, credit_used: 0 }); // Default to 0 if invalid
+                            }
+                          }}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2 border border-default-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100"
+                          disabled={isSaving}
+                        />
                       </div>
                       {/* Available Credit Display */}
                       <div>
