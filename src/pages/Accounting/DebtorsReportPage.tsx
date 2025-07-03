@@ -11,26 +11,25 @@ import {
   IconCalendar,
   IconCreditCard,
 } from "@tabler/icons-react";
-import toast from "react-hot-toast";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
 
-interface Invoice {
-  invoice_id: number;
-  invoice_number: string;
+interface Payment {
+  payment_id: number;
+  payment_method: string;
+  payment_reference: string | null;
   date: string;
+  amount: number;
+}
+
+interface Invoice {
+  invoice_id: string; // Changed from number to string
+  invoice_number: string;
+  date: string; // Will handle timestamp conversion
   amount: number;
   payments: Payment[];
   balance: number;
-}
-
-interface Payment {
-  payment_id: number;
-  bank?: string;
-  cheque_number?: string;
-  date: string;
-  amount: number;
 }
 
 interface Customer {
@@ -82,12 +81,28 @@ const DebtorsReportPage: React.FC = () => {
       setLoading(true);
       const response = await api.get("/api/debtors");
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch debtors data");
-      }
+      const data = response;
 
-      const data = await response.json();
-      setDebtorsData(data);
+      // Convert timestamp dates to readable format
+      const processedData = {
+        ...data,
+        salesmen: data.salesmen.map((salesman: Salesman) => ({
+          ...salesman,
+          customers: salesman.customers.map((customer: Customer) => ({
+            ...customer,
+            invoices: customer.invoices.map((invoice: Invoice) => ({
+              ...invoice,
+              date: formatTimestampDate(invoice.date),
+              payments: invoice.payments.map((payment: Payment) => ({
+                ...payment,
+                date: formatDate(payment.date),
+              })),
+            })),
+          })),
+        })),
+      };
+
+      setDebtorsData(processedData);
 
       // Expand all salesmen by default
       const salesmenIds = data.salesmen.map((s: Salesman) => s.salesman_id);
@@ -97,9 +112,22 @@ const DebtorsReportPage: React.FC = () => {
     } catch (err) {
       setError("Failed to fetch debtors data. Please try again later.");
       console.error("Error fetching debtors:", err);
-      toast.error("Failed to load debtors report");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatTimestampDate = (timestamp: string): string => {
+    try {
+      const date = new Date(parseInt(timestamp));
+      return date.toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    } catch (error) {
+      console.error("Error formatting timestamp:", timestamp);
+      return "Invalid Date";
     }
   };
 
@@ -336,7 +364,15 @@ const DebtorsReportPage: React.FC = () => {
                               />
                             )}
                             <span className="font-medium text-gray-900">
-                              {customer.customer_id} - {customer.customer_name}
+                              {customer.customer_id} -{" "}
+                              <button
+                                onClick={() =>
+                                  handleCustomerClick(customer.customer_id)
+                                }
+                                className="text-left font-semibold text-blue-600 hover:text-blue-800 underline"
+                              >
+                                {customer.customer_name}
+                              </button>
                             </span>
                           </div>
                           <div className="flex items-center gap-4">
@@ -467,11 +503,13 @@ const DebtorsReportPage: React.FC = () => {
                                                   </td>
                                                 </>
                                               )}
-                                              <td className="py-2 px-2">
-                                                {payment.bank || ""}
+                                              <td className="py-1 px-2 text-left">
+                                                {payment.payment_method?.toUpperCase() ||
+                                                  "-"}
                                               </td>
-                                              <td className="py-2 px-2">
-                                                {payment.cheque_number || ""}
+                                              <td className="py-1 px-2 text-left">
+                                                {payment.payment_reference ||
+                                                  "-"}
                                               </td>
                                               <td className="py-2 px-2">
                                                 {formatDate(payment.date)}
