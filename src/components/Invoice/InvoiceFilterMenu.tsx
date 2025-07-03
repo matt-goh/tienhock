@@ -1,3 +1,4 @@
+// src/components/Invoice/InvoiceFilterMenu.tsx
 import React, { useState, useRef, useEffect, Fragment } from "react";
 import {
   Combobox,
@@ -23,12 +24,6 @@ import {
 } from "@tabler/icons-react";
 import { InvoiceFilters } from "../../types/types"; // Adjust path if needed
 import Button from "../Button"; // Adjust path if needed
-
-interface FilterTagsProps {
-  items: string[];
-  onRemove: (itemIdToRemove: string) => void; // Changed to remove single item
-  label: string; // e.g., "Salesman", "Customer"
-}
 
 type InvoiceFilterMenuProps = {
   onFilterChange: (filters: InvoiceFilters) => void; // Changed to accept full InvoiceFilters
