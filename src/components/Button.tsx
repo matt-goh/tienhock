@@ -3,7 +3,7 @@ import React from "react";
 import { Icon } from "@tabler/icons-react";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   icon?: Icon;
   iconPosition?: "left" | "right";
   iconSize?: number;
@@ -90,15 +90,15 @@ const Button: React.FC<ButtonProps> = ({
           <Icon
             stroke={iconStroke}
             size={iconSize}
-            className="mr-2 flex-shrink-0"
+            className={`${children ? "mr-2" : ""} flex-shrink-0`}
           />
         )}
-        <span className="truncate">{children}</span>
+        {children && <span className="truncate">{children}</span>}
         {Icon && iconPosition === "right" && (
           <Icon
             stroke={iconStroke}
             size={iconSize}
-            className="ml-2 flex-shrink-0"
+            className={`${children ? "ml-2" : ""} flex-shrink-0`}
           />
         )}
       </span>

@@ -21,7 +21,7 @@ export interface EnhancedCustomerList extends Customer {
 }
 
 const CACHE_KEY = "customers_cache";
-const CACHE_DURATION = 12 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
 const CUSTOMERS_UPDATED_EVENT = "customers-updated";
 
 // Create a global function to trigger cache refresh
