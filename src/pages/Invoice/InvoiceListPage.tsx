@@ -7,7 +7,11 @@ import React, {
   useMemo,
 } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
+import {
+  ExtendedInvoiceData,
+  InvoiceFilters,
+  ProductItem,
+} from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import DateRangePicker from "../../components/DateRangePicker";
@@ -37,6 +41,7 @@ import {
   IconCircleCheck,
   IconFileInvoice,
   IconUser,
+  IconFileExport,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -65,6 +70,31 @@ const ITEMS_PER_PAGE = 50; // Number of items per page
 interface MonthOption {
   id: number;
   name: string;
+}
+
+declare global {
+  interface Window {
+    showSaveFilePicker: (
+      options?: SaveFilePickerOptions
+    ) => Promise<FileSystemFileHandle>;
+  }
+
+  interface SaveFilePickerOptions {
+    suggestedName?: string;
+    types?: {
+      description?: string;
+      accept?: Record<string, string[]>;
+    }[];
+  }
+
+  interface FileSystemFileHandle {
+    createWritable(): Promise<FileSystemWritableFileStream>;
+  }
+
+  interface FileSystemWritableFileStream extends WritableStream {
+    write(data: any): Promise<void>;
+    close(): Promise<void>;
+  }
 }
 
 // --- Helper Functions ---
@@ -120,6 +150,92 @@ const isInvoiceDateEligibleForEinvoice = (
   return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
 };
 
+/**
+ * Formats an array of invoice data into a string that matches the legacy
+ * SLS_*.txt file format for export.
+ * @param invoices - An array of ExtendedInvoiceData objects.
+ * @returns A string with each invoice formatted as a line, separated by newlines.
+ */
+const formatInvoicesForExport = (invoices: ExtendedInvoiceData[]): string => {
+  const lines = invoices.map((invoice) => {
+    // 1. Format date (dd/MM/yyyy)
+    const dateObj = new Date(Number(invoice.createddate));
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const year = dateObj.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+
+    // 2. Format time (hh:mm am/pm)
+    const formattedTime = dateObj
+      .toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+      .toLowerCase();
+
+    // 3. Format total amount (with comma separator, e.g., 1,234.56)
+    const totalAmountString = (invoice.totalamountpayable || 0).toLocaleString(
+      "en-US",
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        useGrouping: true,
+      }
+    );
+
+    // 4. Map payment type to character
+    const typeChar = invoice.paymenttype === "CASH" ? "C" : "I";
+
+    // 5. Format order details string
+    const orderDetailsString = (invoice.products || [])
+      .filter((p) => !p.issubtotal && !p.istotal) // Ensure only product rows are included
+      .map((p: ProductItem) => {
+        const code = p.code || "";
+        const qty = p.quantity || 0;
+        // Price and total are multiplied by 100 and stored as integers
+        const price = Math.round((p.price || 0) * 100);
+        const total = Math.round(parseFloat(p.total) * 100);
+        const foc = p.freeProduct || 0;
+        const returned = p.returnProduct || 0;
+        return `${code}&&${qty}&&${price}&&${total}&&${foc}&&${returned}`;
+      })
+      .join("&E&");
+
+    // 6. Assemble the amount fields (7 fields total, as per legacy format)
+    const amountFields = [
+      totalAmountString,
+      "0.00",
+      totalAmountString,
+      "0.00",
+      totalAmountString,
+      "0.00",
+      totalAmountString,
+    ].join("|");
+
+    // 7. Use customer ID for the customer field
+    const customerField = invoice.customerid;
+
+    // 8. Assemble the final line string for the invoice, ending with "&E&"
+    return (
+      [
+      invoice.id,
+      invoice.id, // orderno is same as invoiceno
+      formattedDate,
+      typeChar,
+      customerField,
+      invoice.salespersonid,
+      amountFields,
+      formattedTime,
+      orderDetailsString,
+      ].join("|") + "&E&"
+    );
+    });
+
+    // Join all invoice lines with a newline and add a trailing newline for compatibility.
+    return lines.join("\n") + (lines.length > 0 ? "\n" : "");
+};
+
 // --- Component ---
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -128,6 +244,7 @@ const InvoiceListPage: React.FC = () => {
   // --- State ---
   const [invoices, setInvoices] = useState<ExtendedInvoiceData[]>([]); // Data for the CURRENT page
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false); // New state for export
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
     new Set()
@@ -1024,6 +1141,104 @@ const InvoiceListPage: React.FC = () => {
     setShowEInvoiceDownloader(true);
   };
 
+  // Bulk Export Handler (New Function)
+  const handleBulkExport = async () => {
+    if (selectedInvoiceIds.size === 0) {
+      toast.error("No invoices selected for export");
+      return;
+    }
+
+    // Check for File System Access API support
+    if (!("showSaveFilePicker" in window)) {
+      toast.error(
+        "Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge."
+      );
+      return;
+    }
+
+    setIsExporting(true);
+    const toastId = toast.loading(
+      `Preparing ${selectedInvoiceIds.size} invoices for export...`
+    );
+
+    try {
+      const selectedIds = Array.from(selectedInvoiceIds);
+
+      // Fetch full data for all selected invoices
+      const BATCH_SIZE = 50;
+      let completeInvoices: ExtendedInvoiceData[] = [];
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
+        toast.loading(`Loading invoice data (${i}/${selectedIds.length})...`, {
+          id: toastId,
+        });
+        const batchInvoices = await getInvoicesByIds(batchIds);
+        completeInvoices = completeInvoices.concat(batchInvoices);
+      }
+
+      if (completeInvoices.length === 0) {
+        throw new Error("Could not fetch required invoice details for export.");
+      }
+
+      // Perform a robust check to ensure all invoices belong to the same salesman
+      const firstSalesmanId = completeInvoices[0]?.salespersonid;
+      if (!firstSalesmanId) {
+        throw new Error(
+          "Could not determine salesman ID from selected invoices."
+        );
+      }
+      const allHaveSameSalesman = completeInvoices.every(
+        (inv) => inv.salespersonid === firstSalesmanId
+      );
+      if (!allHaveSameSalesman) {
+        throw new Error(
+          "All selected invoices must belong to the same salesman for export."
+        );
+      }
+
+      toast.loading(`Generating data for salesman ${firstSalesmanId}...`, {
+        id: toastId,
+      });
+
+      // Format data into the required text format
+      const fileContent = formatInvoicesForExport(completeInvoices);
+
+      // Use File System Access API to save the file
+      const suggestedName = `SLS_${firstSalesmanId.substring(0, 3)}1.txt`;
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [
+          {
+        description: "Sales Text File",
+        accept: { "text/plain": [".txt"] },
+          },
+        ],
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(fileContent);
+      await writable.close();
+
+      toast.success(
+        `Successfully exported ${completeInvoices.length} invoices to ${handle.name}`,
+        { id: toastId }
+      );
+    } catch (error) {
+      // Don't show toast for user cancellation of the save dialog
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast.dismiss(toastId);
+        return;
+      }
+      console.error("Error during bulk export:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to export invoices.",
+        { id: toastId }
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Bulk Download PDF Handler
   const handleBulkDownload = async () => {
     if (selectedInvoiceIds.size === 0) {
@@ -1041,9 +1256,7 @@ const InvoiceListPage: React.FC = () => {
 
       // Process in chunks of 50 to avoid overwhelming the server
       const BATCH_SIZE = 50;
-      let completeInvoices:
-        | any[]
-        | ((prevState: ExtendedInvoiceData[]) => ExtendedInvoiceData[]) = [];
+      let completeInvoices: ExtendedInvoiceData[] = [];
 
       for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
         const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
@@ -1110,9 +1323,7 @@ const InvoiceListPage: React.FC = () => {
 
       // Process in chunks of 50 to avoid overwhelming the server
       const BATCH_SIZE = 50;
-      let completeInvoices:
-        | any[]
-        | ((prevState: ExtendedInvoiceData[]) => ExtendedInvoiceData[]) = [];
+      let completeInvoices: ExtendedInvoiceData[] = [];
 
       for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
         const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
@@ -1512,7 +1723,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkCancel();
                   }}
                   icon={IconBan}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Cancel Selected Invoices"
                   title="Cancel"
                 >
@@ -1528,7 +1739,7 @@ const InvoiceListPage: React.FC = () => {
                       handleBatchSyncCancellation();
                     }}
                     icon={IconRefresh}
-                    disabled={isLoading}
+                    disabled={isLoading || isExporting}
                     aria-label="Sync Cancellation Status"
                     title="Sync Cancellation Status"
                   >
@@ -1544,7 +1755,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkSubmitEInvoice();
                   }}
                   icon={IconSend}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Submit Selected for E-Invoice"
                   title="Submit e-Invoice"
                 >
@@ -1560,7 +1771,7 @@ const InvoiceListPage: React.FC = () => {
                       handleDownloadValidEInvoices();
                     }}
                     icon={IconFileDownload}
-                    disabled={isLoading}
+                    disabled={isLoading || isExporting}
                     aria-label="e-Invoice"
                     title="Download e-Invoice"
                   >
@@ -1572,10 +1783,24 @@ const InvoiceListPage: React.FC = () => {
                   variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();
+                    handleBulkExport();
+                  }}
+                  icon={IconFileExport}
+                  disabled={isLoading || isExporting}
+                  aria-label="Export Selected Invoices"
+                  title="Export"
+                >
+                  Export
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     handleBulkDownload();
                   }}
                   icon={IconFileDownload}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Download Selected Invoices"
                   title="Download PDF"
                 >
@@ -1589,7 +1814,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkPrint();
                   }}
                   icon={IconPrinter}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Print Selected Invoices"
                   title="Print PDF"
                 >
@@ -1603,7 +1828,7 @@ const InvoiceListPage: React.FC = () => {
               icon={IconFiles}
               variant="outline"
               color="amber"
-              disabled={isLoading}
+              disabled={isLoading || isExporting}
               size="sm"
               title="Consolidated Invoice"
               aria-label="Consolidated Invoice"
@@ -1614,7 +1839,7 @@ const InvoiceListPage: React.FC = () => {
               onClick={handleRefresh}
               icon={IconRefresh}
               variant="outline"
-              disabled={isLoading}
+              disabled={isLoading || isExporting}
               size="sm"
               title="Refresh Invoices"
               aria-label="Refresh Invoices"
