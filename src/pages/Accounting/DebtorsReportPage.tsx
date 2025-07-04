@@ -13,10 +13,12 @@ import {
   IconRefresh,
   IconCalendarDollar,
   IconCurrencyDollar,
+  IconPhone,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
+import { useCompany } from "../../contexts/CompanyContext";
 
 interface Payment {
   payment_id: number;
@@ -38,6 +40,7 @@ interface Invoice {
 interface Customer {
   customer_id: string;
   customer_name: string;
+  phone_number?: string;
   invoices: Invoice[];
   total_amount: number;
   total_paid: number;
@@ -63,6 +66,7 @@ interface DebtorsData {
 
 const DebtorsReportPage: React.FC = () => {
   const navigate = useNavigate();
+  const { activeCompany } = useCompany();
   const printRef = useRef<HTMLDivElement>(null);
   const [debtorsData, setDebtorsData] = useState<DebtorsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -168,6 +172,7 @@ const DebtorsReportPage: React.FC = () => {
 
     return `${day}/${month}/${year}`;
   };
+
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
       minimumFractionDigits: 2,
@@ -281,25 +286,25 @@ const DebtorsReportPage: React.FC = () => {
   const filteredData = filterData(debtorsData);
 
   return (
-    <div className="max-w-7xl w-full mx-6">
+    <div className="max-w-7xl w-full m-6">
       {/* Header Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-default-700 flex items-center gap-3">
                 <IconCalendarDollar
                   size={28}
                   stroke={2.5}
-                  className="text-default-800"
+                  className="text-default-700"
                 />
                 Debtors Report
               </h1>
               <div className="flex items-center gap-2 mt-2">
                 <IconCalendar size={16} className="text-gray-500" />
                 <span className="text-gray-600">Report Date:</span>
-                <span className="font-medium text-gray-900">
-                  {formatDateFromTimestamp(debtorsData.report_date)}
+                <span className="font-medium text-default-800">
+                  {debtorsData.report_date}
                 </span>
               </div>
             </div>
@@ -455,32 +460,58 @@ const DebtorsReportPage: React.FC = () => {
                           className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                           onClick={() => toggleCustomer(customer.customer_id)}
                         >
-                          <div className="flex items-center gap-3">
-                            {expandedCustomers.has(customer.customer_id) ? (
-                              <IconChevronDown
+                          <div className="flex items-center gap-12">
+                            <div className="flex items-center gap-3.5">
+                              {expandedCustomers.has(customer.customer_id) ? (
+                                <IconChevronDown
+                                  size={16}
+                                  className="text-gray-500"
+                                />
+                              ) : (
+                                <IconChevronRight
+                                  size={16}
+                                  className="text-gray-500"
+                                />
+                              )}
+                              <IconBuildingStore
                                 size={16}
-                                className="text-gray-500"
+                                className="text-sky-600"
                               />
-                            ) : (
-                              <IconChevronRight
-                                size={16}
-                                className="text-gray-500"
-                              />
-                            )}
-                            <IconBuildingStore
-                              size={16}
-                              className="text-sky-600"
-                            />
-                            <div>
-                              <h4 className="font-medium text-gray-900">
-                                {customer.customer_name}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                ID: {customer.customer_id} •{" "}
-                                {customer.invoices.length} invoice
-                                {customer.invoices.length !== 1 ? "s" : ""}
-                              </p>
+                              <div>
+                                <span
+                                  className="font-medium text-gray-900 hover:underline cursor-pointer"
+                                  title={
+                                    customer.customer_name ||
+                                    customer.customer_id
+                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(
+                                      `/catalogue/customer/${customer.customer_id}`
+                                    );
+                                  }}
+                                >
+                                  {customer.customer_name ||
+                                    customer.customer_id}
+                                </span>
+                                <p className="text-sm text-gray-600">
+                                  ID: {customer.customer_id} •{" "}
+                                  {customer.invoices.length} invoice
+                                  {customer.invoices.length !== 1 ? "s" : ""}
+                                </p>
+                              </div>
                             </div>
+                            {customer.phone_number && (
+                              <div className="flex items-center gap-2 text-default-600">
+                                <IconPhone
+                                  size={16}
+                                  className="text-default-600"
+                                />
+                                <span className="font-semibold">
+                                  {customer.phone_number}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-6">
                             <div className="text-right">
@@ -503,7 +534,7 @@ const DebtorsReportPage: React.FC = () => {
 
                         {/* Customer Details */}
                         {expandedCustomers.has(customer.customer_id) && (
-                          <div className="border-t border-gray-200 p-4 bg-gray-50">
+                          <div className="border-t border-gray-200 p-4">
                             {/* Customer Summary */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                               <div>
@@ -578,7 +609,23 @@ const DebtorsReportPage: React.FC = () => {
                                   {customer.invoices.map((invoice, index) => (
                                     <React.Fragment key={invoice.invoice_id}>
                                       {invoice.payments.length === 0 ? (
-                                        <tr className="hover:bg-gray-50">
+                                        <tr
+                                          className="hover:bg-gray-50 cursor-pointer"
+                                          onClick={() => {
+                                            const basePath =
+                                              activeCompany.id === "jellypolly"
+                                                ? "/jellypolly"
+                                                : "";
+                                            navigate(
+                                              `${basePath}/sales/invoice/${invoice.invoice_id}`,
+                                              {
+                                                state: {
+                                                  showPaymentForm: true,
+                                                },
+                                              }
+                                            );
+                                          }}
+                                        >
                                           <td className="px-3 py-2">
                                             {index + 1}
                                           </td>
@@ -612,7 +659,28 @@ const DebtorsReportPage: React.FC = () => {
                                           (payment, paymentIndex) => (
                                             <tr
                                               key={`${invoice.invoice_id}-${payment.payment_id}`}
-                                              className="hover:bg-gray-50"
+                                              className={`hover:bg-gray-50 ${
+                                                invoice.balance !== 0
+                                                  ? "cursor-pointer"
+                                                  : ""
+                                              }`}
+                                              onClick={() => {
+                                                if (invoice.balance !== 0) {
+                                                  const basePath =
+                                                    activeCompany.id ===
+                                                    "jellypolly"
+                                                      ? "/jellypolly"
+                                                      : "";
+                                                  navigate(
+                                                    `${basePath}/sales/invoice/${invoice.invoice_id}`,
+                                                    {
+                                                      state: {
+                                                        showPaymentForm: true,
+                                                      },
+                                                    }
+                                                  );
+                                                }
+                                              }}
                                             >
                                               {paymentIndex === 0 && (
                                                 <>
@@ -654,8 +722,14 @@ const DebtorsReportPage: React.FC = () => {
                                                 </>
                                               )}
                                               <td className="px-3 py-2">
-                                                {payment.payment_method?.toUpperCase() ||
-                                                  "-"}
+                                                {payment.payment_method
+                                                  ? payment.payment_method
+                                                      .charAt(0)
+                                                      .toUpperCase() +
+                                                    payment.payment_method.slice(
+                                                      1
+                                                    )
+                                                  : "-"}
                                               </td>
                                               <td className="px-3 py-2">
                                                 {payment.payment_reference ||

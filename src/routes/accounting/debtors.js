@@ -49,6 +49,7 @@ export default function (pool, config) {
           ui.salespersonid,
           ui.customerid,
           c.name as customer_name,
+          c.phone_number,
           c.credit_limit,
           MAX(ui.createddate) as latest_invoice_date, -- For ordering customers
           json_agg(
@@ -66,7 +67,7 @@ export default function (pool, config) {
           SUM(ui.balance_due) as total_balance
         FROM unpaid_invoices ui
         JOIN customers c ON ui.customerid = c.id
-        GROUP BY ui.salespersonid, ui.customerid, c.name, c.credit_limit
+        GROUP BY ui.salespersonid, ui.customerid, c.name, c.phone_number, c.credit_limit
       )
       -- Final aggregation by salesman
       SELECT 
@@ -76,10 +77,11 @@ export default function (pool, config) {
           json_build_object(
         'customer_id', ca.customerid,
         'customer_name', ca.customer_name,
+        'phone_number', ca.phone_number,
         'invoices', ca.invoices,
         'total_amount', ca.total_amount,
         'total_paid', ca.total_paid,
-        'total_balance', ca.total_balance - ca.total_paid,
+        'total_balance', ca.total_amount - ca.total_paid,
         'credit_limit', ca.credit_limit,
         'credit_balance', ca.credit_limit - ca.total_balance + ca.total_paid
           ) ORDER BY ca.latest_invoice_date DESC

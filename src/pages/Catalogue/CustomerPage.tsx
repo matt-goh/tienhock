@@ -8,6 +8,7 @@ import {
   IconPlus,
   IconCheck,
   IconChevronDown,
+  IconBuildingStore,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import CustomerCard from "../../components/Catalogue/CustomerCard";
@@ -278,7 +279,12 @@ const CustomerPage: React.FC = () => {
     <div className="relative w-full mx-20 -mt-8 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-6">
-          <h1 className="text-2xl text-default-700 font-bold">
+          <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
+            <IconBuildingStore
+              size={28}
+              stroke={2.5}
+              className="text-default-700"
+            />
             Customers ({filteredCustomers.length})
           </h1>
         </div>

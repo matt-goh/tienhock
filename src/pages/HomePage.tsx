@@ -6,7 +6,7 @@ import {
   IconListDetails,
   IconUserDollar,
   IconChevronRight,
-  IconReceiptDollar,
+  IconReportMoney,
 } from "@tabler/icons-react";
 import TienHockLogo from "../utils/TienHockLogo";
 import GreenTargetLogo from "../utils/GreenTargetLogo";
@@ -77,7 +77,7 @@ const HomePage: React.FC = () => {
 
         switch (category.name) {
           case "Accounting":
-            icon = IconReceiptDollar;
+            icon = IconReportMoney;
             description = "Manage financial records and transactions";
             break;
           case "Payroll":
