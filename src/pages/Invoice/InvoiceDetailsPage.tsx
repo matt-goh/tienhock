@@ -213,6 +213,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(
     null
   );
+  const [isClearingEInvoice, setIsClearingEInvoice] = useState(false);
+  const [showClearEInvoiceConfirm, setShowClearEInvoiceConfirm] =
+    useState(false);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<{
@@ -545,6 +548,56 @@ const InvoiceDetailsPage: React.FC = () => {
       });
     }
     setCustomerQuery("");
+  };
+
+  // Clear E-Invoice Status Handler
+  const handleClearEInvoiceClick = () => {
+    if (!invoiceData) return;
+
+    // Check if there's e-invoice data to clear
+    if (
+      !invoiceData.uuid &&
+      !invoiceData.submission_uid &&
+      !invoiceData.einvoice_status
+    ) {
+      toast.error("No e-invoice data to clear");
+      return;
+    }
+
+    setShowClearEInvoiceConfirm(true);
+  };
+
+  const handleConfirmClearEInvoice = async () => {
+    if (!invoiceData || isClearingEInvoice) return;
+
+    setIsClearingEInvoice(true);
+    setShowClearEInvoiceConfirm(false);
+    const toastId = toast.loading("Clearing e-invoice status...");
+
+    try {
+      const response = await api.post(
+        `/api/einvoice/clear-status/${invoiceData.id}`
+      );
+
+      if (response.success) {
+        toast.success("E-invoice status cleared successfully", { id: toastId });
+        await fetchDetails(); // Refresh invoice data
+      } else {
+        toast.error(response.message || "Failed to clear e-invoice status", {
+          id: toastId,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error clearing e-invoice status:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to clear e-invoice status",
+        { id: toastId }
+      );
+    } finally {
+      setIsClearingEInvoice(false);
+    }
   };
 
   // --- Payment Form Handling ---
@@ -919,6 +972,20 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
               </Button>
             )}
+          {invoiceData.einvoice_status === "pending" && (
+            <Button
+              variant="outline"
+              color="orange"
+              onClick={handleClearEInvoiceClick}
+              disabled={isClearingEInvoice || isCancelled}
+              title="Clear E-Invoice Pending Status"
+            >
+              <span className="flex items-center gap-1">
+                <IconRefresh size={16} />
+                {isClearingEInvoice ? "Clearing..." : "Clear Status"}
+              </span>
+            </Button>
+          )}
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
@@ -1551,6 +1618,15 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText={
           isCancellingPayment ? "Cancelling..." : "Cancel Payment"
         }
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={showClearEInvoiceConfirm}
+        onClose={() => setShowClearEInvoiceConfirm(false)}
+        onConfirm={handleConfirmClearEInvoice}
+        title="Clear E-Invoice Status"
+        message={`Are you sure you want to clear the e-invoice pending status for Invoice #${invoiceData?.id}? This will remove the UUID, submission UID, validation date, and status, allowing the invoice to be resubmitted.`}
+        confirmButtonText={isClearingEInvoice ? "Clearing..." : "Clear Status"}
         variant="danger"
       />
       {/* Print PDF Overlay */}
