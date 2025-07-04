@@ -7,7 +7,7 @@ import {
   IconCalendarEvent,
   IconCalculator,
   IconCash,
-  IconReceiptDollar,
+  IconReportMoney,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
@@ -159,7 +159,7 @@ export const TienHockSidebarData: SidebarItem[] = [
   },
   {
     name: "Accounting",
-    icon: IconReceiptDollar,
+    icon: IconReportMoney,
     subItems: [
       {
         name: "Debtors",
