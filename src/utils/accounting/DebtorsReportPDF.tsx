@@ -11,165 +11,189 @@ import {
 // Create styles
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    padding: 40,
     fontFamily: "Helvetica",
-    fontSize: 9,
-    lineHeight: 1.4,
+    fontSize: 10,
+    lineHeight: 1.5,
   },
   companyHeader: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 8,
     textAlign: "left",
+    letterSpacing: 0.5,
   },
   reportTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Helvetica",
-    marginBottom: 20,
+    marginBottom: 25,
     textAlign: "left",
-    color: "#4B5563",
+    color: "#333333",
+    letterSpacing: 0.3,
   },
   salesmanSection: {
-    marginBottom: 25,
+    marginBottom: 30,
   },
   salesmanHeader: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 15,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    color: "#111827",
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: "#000000",
+    color: "#000000",
+    letterSpacing: 0.3,
   },
   customerSection: {
-    marginBottom: 20,
-    marginLeft: 10,
+    marginBottom: 25,
+    marginLeft: 0,
   },
   customerHeader: {
-    marginBottom: 8,
-    paddingBottom: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#E5E7EB",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#CCCCCC",
+  },
+  customerNameBlock: {
+    flex: 1,
   },
   customerName: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    color: "#1F2937",
-    marginBottom: 2,
+    color: "#000000",
+    marginBottom: 3,
+    letterSpacing: 0.2,
   },
   customerInfo: {
-    fontSize: 8,
-    color: "#6B7280",
-  },
-  creditInfoBox: {
+    fontSize: 9,
+    color: "#555555",
     flexDirection: "row",
-    gap: 30,
-    marginBottom: 10,
-    backgroundColor: "#F9FAFB",
-    padding: 8,
-    borderRadius: 4,
+    gap: 15,
   },
-  creditInfoItem: {
+  creditInfoBlock: {
+    alignItems: "flex-end",
+  },
+  creditInfoRow: {
     flexDirection: "row",
-    gap: 5,
+    gap: 8,
+    marginBottom: 2,
   },
   creditLabel: {
-    fontSize: 8,
-    color: "#6B7280",
+    fontSize: 9,
+    color: "#666666",
   },
   creditValue: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
-    color: "#1F2937",
+    color: "#000000",
+    minWidth: 70,
+    textAlign: "right",
   },
   table: {
     display: "flex",
-    marginBottom: 5,
+    marginBottom: 8,
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#F3F4F6",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    backgroundColor: "#F5F5F5",
+    paddingVertical: 8,
+    paddingHorizontal: 0,
     fontFamily: "Helvetica-Bold",
-    fontSize: 8,
-    color: "#374151",
+    fontSize: 9,
+    color: "#000000",
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    borderTopColor: "#000000",
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: "#000000",
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 5,
-    paddingHorizontal: 4,
-    fontSize: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 0,
+    fontSize: 9,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: "#E0E0E0",
   },
-  // Updated column widths to match DebtorsReportPage
-  colNo: { width: "5%", paddingLeft: 2 },
-  colInvoiceNo: { width: "12%", paddingLeft: 2 },
-  colDate: { width: "10%", paddingLeft: 2 },
-  colAmount: { width: "12%", textAlign: "right", paddingRight: 5 },
-  colPayMethod: { width: "12%", paddingLeft: 2 },
-  colReference: { width: "12%", paddingLeft: 2 },
-  colPayDate: { width: "10%", paddingLeft: 2 },
-  colPaidAmount: { width: "12%", textAlign: "right", paddingRight: 5 },
-  colBalance: { width: "15%", textAlign: "right", paddingRight: 2 },
+  // Column widths optimized for better space utilization
+  colNo: { width: "6%", paddingLeft: 4, textAlign: "center" },
+  colInvoiceNo: { width: "11%", paddingLeft: 4 },
+  colDate: { width: "10%", paddingLeft: 4 },
+  colAmount: { width: "13%", textAlign: "right", paddingRight: 8 },
+  colPayMethod: { width: "10%", paddingLeft: 4, textAlign: "center" },
+  colReference: { width: "14%", paddingLeft: 4 },
+  colPayDate: { width: "10%", paddingLeft: 4 },
+  colPaidAmount: { width: "13%", textAlign: "right", paddingRight: 8 },
+  colBalance: { width: "13%", textAlign: "right", paddingRight: 4 },
   subtotalRow: {
     flexDirection: "row",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
     fontFamily: "Helvetica-Bold",
-    fontSize: 8,
-    backgroundColor: "#F9FAFB",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    fontSize: 9,
+    backgroundColor: "#F8F8F8",
+    borderTopWidth: 2,
+    borderTopColor: "#000000",
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: "#000000",
     marginTop: -0.5,
   },
   grandTotalSection: {
-    marginTop: 30,
-    paddingTop: 15,
-    borderTopWidth: 2,
-    borderTopColor: "#1F2937",
+    marginTop: 40,
+    paddingTop: 20,
+    borderTopWidth: 3,
+    borderTopColor: "#000000",
   },
   grandTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 4,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: "#F0F0F0",
+    borderWidth: 1,
+    borderColor: "#000000",
   },
   grandTotalLabel: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Helvetica-Bold",
-    color: "#1F2937",
+    color: "#000000",
+    letterSpacing: 0.5,
   },
   grandTotalItem: {
     alignItems: "center",
   },
   grandTotalTitle: {
-    fontSize: 8,
-    color: "#6B7280",
-    marginBottom: 2,
+    fontSize: 9,
+    color: "#666666",
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   grandTotalValue: {
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Helvetica-Bold",
-    color: "#1F2937",
+    color: "#000000",
   },
   pageNumber: {
     position: "absolute",
-    fontSize: 8,
-    bottom: 20,
+    fontSize: 9,
+    bottom: 25,
     left: 0,
     right: 0,
     textAlign: "center",
-    color: "#9CA3AF",
+    color: "#666666",
+  },
+  // New styles for better organization
+  invoiceCell: {
+    fontSize: 9,
+  },
+  dashedLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#CCCCCC",
+    borderStyle: "dashed",
+    marginVertical: 2,
   },
 });
 
@@ -249,36 +273,39 @@ const DebtorsReportPDF: React.FC<DebtorsReportPDFProps> = ({
               >
                 {/* Customer Header with Credit Info */}
                 <View style={styles.customerHeader}>
-                  <Text style={styles.customerName}>
-                    {customer.customer_name || customer.customer_id}
-                  </Text>
-                  <Text style={styles.customerInfo}>
-                    ID: {customer.customer_id} • {customer.invoices.length}{" "}
-                    Invoice{customer.invoices.length !== 1 ? "s" : ""}
-                    {customer.phone_number &&
-                      ` • Tel: ${customer.phone_number}`}
-                  </Text>
-                </View>
+                  <View style={styles.customerNameBlock}>
+                    <Text style={styles.customerName}>
+                      {customer.customer_id} -{" "}
+                      {customer.customer_name || "UNNAMED"}
+                    </Text>
+                    <View style={styles.customerInfo}>
+                      <Text>
+                        {customer.invoices.length} Invoice
+                        {customer.invoices.length !== 1 ? "s" : ""}
+                      </Text>
+                      {customer.phone_number && (
+                        <Text>Tel: {customer.phone_number}</Text>
+                      )}
+                    </View>
+                  </View>
 
-                {/* Credit Info Box */}
-                <View style={styles.creditInfoBox}>
-                  <View style={styles.creditInfoItem}>
-                    <Text style={styles.creditLabel}>Credit Limit:</Text>
-                    <Text style={styles.creditValue}>
-                      {formatCurrency(customer.credit_limit)}
-                    </Text>
-                  </View>
-                  <View style={styles.creditInfoItem}>
-                    <Text style={styles.creditLabel}>Credit Balance:</Text>
-                    <Text style={styles.creditValue}>
-                      {formatCurrency(customer.credit_balance)}
-                    </Text>
-                  </View>
-                  <View style={styles.creditInfoItem}>
-                    <Text style={styles.creditLabel}>Outstanding:</Text>
-                    <Text style={[styles.creditValue, { color: "#DC2626" }]}>
-                      {formatCurrency(customer.total_balance)}
-                    </Text>
+                  <View style={styles.creditInfoBlock}>
+                    <View style={styles.creditInfoRow}>
+                      <Text style={styles.creditLabel}>Credit Limit:</Text>
+                      <Text style={styles.creditValue}>
+                        {formatCurrency(customer.credit_limit || 0)}
+                      </Text>
+                    </View>
+                    <View style={styles.creditInfoRow}>
+                      <Text style={styles.creditLabel}>Credit Bal:</Text>
+                      <Text style={styles.creditValue}>
+                        {formatCurrency(customer.credit_balance || 0)}
+                      </Text>
+                    </View>
+                    <View style={styles.creditInfoRow}>
+                      <Text style={styles.creditLabel}>As at:</Text>
+                      <Text style={styles.creditValue}>{data.report_date}</Text>
+                    </View>
                   </View>
                 </View>
 
