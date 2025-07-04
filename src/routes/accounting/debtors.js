@@ -14,15 +14,17 @@ export default function (pool, config) {
           p.invoice_id,
           SUM(p.amount_paid) as total_paid,
           json_agg(
-            json_build_object(
-              'payment_id', p.payment_id,
-              'payment_method', p.payment_method,
-              'payment_reference', p.payment_reference,
-              'date', p.payment_date,
-              'amount', p.amount_paid
-            ) ORDER BY p.payment_date
+        json_build_object(
+          'payment_id', p.payment_id,
+          'payment_method', p.payment_method,
+          'payment_reference', p.payment_reference,
+          'date', p.payment_date,
+          'amount', p.amount_paid,
+          'status', p.status
+        ) ORDER BY p.payment_date
           ) as payments
         FROM payments p
+        WHERE p.status NOT IN ('cancelled', 'pending')
         GROUP BY p.invoice_id
       ),
       unpaid_invoices AS (
@@ -48,15 +50,16 @@ export default function (pool, config) {
           ui.customerid,
           c.name as customer_name,
           c.credit_limit,
+          MAX(ui.createddate) as latest_invoice_date, -- For ordering customers
           json_agg(
-            json_build_object(
-              'invoice_id', ui.invoice_id,
-              'invoice_number', ui.invoice_id,
-              'date', ui.createddate,
-              'amount', ui.totalamountpayable,
-              'payments', ui.payments,
-              'balance', ui.balance_due
-            ) ORDER BY ui.createddate
+        json_build_object(
+          'invoice_id', ui.invoice_id,
+          'invoice_number', ui.invoice_id,
+          'date', ui.createddate,
+          'amount', ui.totalamountpayable,
+          'payments', ui.payments,
+          'balance', ui.balance_due
+        ) ORDER BY ui.createddate
           ) as invoices,
           SUM(ui.totalamountpayable) as total_amount,
           SUM(ui.total_paid) as total_paid,
@@ -71,22 +74,22 @@ export default function (pool, config) {
         s.name as salesman_name,
         json_agg(
           json_build_object(
-            'customer_id', ca.customerid,
-            'customer_name', ca.customer_name,
-            'invoices', ca.invoices,
-            'total_amount', ca.total_amount,
-            'total_paid', ca.total_paid,
-            'total_balance', ca.total_balance,
-            'credit_limit', ca.credit_limit,
-            'credit_balance', ca.credit_limit - ca.total_balance
-          ) ORDER BY ca.customer_name
+        'customer_id', ca.customerid,
+        'customer_name', ca.customer_name,
+        'invoices', ca.invoices,
+        'total_amount', ca.total_amount,
+        'total_paid', ca.total_paid,
+        'total_balance', ca.total_balance - ca.total_paid,
+        'credit_limit', ca.credit_limit,
+        'credit_balance', ca.credit_limit - ca.total_balance + ca.total_paid
+          ) ORDER BY ca.latest_invoice_date DESC
         ) as customers,
         SUM(ca.total_balance) as total_balance
       FROM customer_aggregates ca
       JOIN staffs s ON ca.salespersonid = s.id
       GROUP BY s.id, s.name
-      ORDER BY s.name
-    `;
+      ORDER BY SUM(ca.total_balance) DESC
+        `;
 
       const result = await pool.query(query);
 

@@ -510,12 +510,9 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsUpdatingCustomer(true);
     try {
-      await api.put(
-        `/api/invoices/${invoiceData?.id}/customer`,
-        {
-          customerid: selectedCustomer.id,
-        }
-      );
+      await api.put(`/api/invoices/${invoiceData?.id}/customer`, {
+        customerid: selectedCustomer.id,
+      });
 
       toast.success("Customer updated successfully");
       setIsEditingCustomer(false);
@@ -884,13 +881,17 @@ const InvoiceDetailsPage: React.FC = () => {
               invoiceData.invoice_status.slice(1)}
           </span>
           {eInvoiceStatusInfo && EInvoiceIcon && (
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
+            <a
+              href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
               title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
             >
               <EInvoiceIcon size={14} className="mr-1" />
               e-Invoice: {eInvoiceStatusInfo.text}
-            </span>
+            </a>
           )}
           {/* Add Consolidated Status Badge */}
           {consolidatedStatusInfo && ConsolidatedIcon && (
