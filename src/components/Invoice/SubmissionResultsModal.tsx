@@ -105,13 +105,13 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
   if (results) {
     if (isPendingUpdateResponse) {
       themeColor =
-        results.overallStatus === "Valid"
+        results.overallStatus === "Valid" || results.overallStatus === "Success"
           ? "emerald"
           : results.overallStatus === "Partial"
           ? "amber"
           : "rose";
       ThemeIcon =
-        results.overallStatus === "Valid"
+        results.overallStatus === "Valid" || results.overallStatus === "Success"
           ? IconCheck
           : results.overallStatus === "Partial"
           ? IconRefreshAlert
