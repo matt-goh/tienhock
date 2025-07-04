@@ -483,7 +483,7 @@ export async function EInvoiceTemplate(rawInvoiceData, customerData) {
         <cbc:ID schemeID="TTX">-</cbc:ID>
       </cac:PartyIdentification>
       <cac:PostalAddress>
-        <cbc:CityName>${escapeXml(customerData.city || "")}</cbc:CityName>
+        <cbc:CityName>${escapeXml(customerData.city || "KOTA KINABALU")}</cbc:CityName>
         <cbc:PostalZone></cbc:PostalZone>
         <cbc:CountrySubentityCode>${escapeXml(
           customerData.state || ""
