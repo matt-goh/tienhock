@@ -12,6 +12,9 @@ import {
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 
+// Accounting related imports
+import DebtorsReportPage from "./Accounting/DebtorsReportPage";
+
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
 import InvoiceFormPage from "./Invoice/InvoiceFormPage";
@@ -157,7 +160,13 @@ export const TienHockSidebarData: SidebarItem[] = [
   {
     name: "Accounting",
     icon: IconReceiptDollar,
-    subItems: [],
+    subItems: [
+      {
+        name: "Debtors",
+        path: "/sales/debtors",
+        component: DebtorsReportPage,
+      },
+    ],
   },
   {
     name: "Payroll",

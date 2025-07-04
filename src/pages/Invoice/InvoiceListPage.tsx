@@ -6,7 +6,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -166,12 +166,15 @@ const InvoiceListPage: React.FC = () => {
     total: 0,
   });
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
+  const [searchParams] = useSearchParams();
+  const [initialParamsApplied, setInitialParamsApplied] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo(
     (): InvoiceFilters => ({
       dateRange: getInitialDates(),
       salespersonId: null,
+      customerId: null,
       paymentType: null,
       invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default excludes 'cancelled'
       eInvoiceStatus: [],
@@ -184,6 +187,7 @@ const InvoiceListPage: React.FC = () => {
   const DEFAULT_FILTERS: InvoiceFilters = {
     dateRange: getInitialDates(), // This will be overridden in actual usage
     salespersonId: null,
+    customerId: null,
     paymentType: null,
     invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
     eInvoiceStatus: [], // Default e-invoice status
@@ -198,6 +202,7 @@ const InvoiceListPage: React.FC = () => {
         end: filters.dateRange.end?.getTime(),
       },
       salespersonId: filters.salespersonId?.join(","),
+      customerId: filters.customerId,
       paymentType: filters.paymentType,
       invoiceStatus: filters.invoiceStatus?.join(","),
       eInvoiceStatus: filters.eInvoiceStatus?.join(","),
@@ -315,17 +320,46 @@ const InvoiceListPage: React.FC = () => {
     [] // No dependencies needed as parameters are passed in
   );
 
-  // Effect to trigger fetch when needed (page change or manual trigger)
+  // Fetch Invoices on initial load or when filters change
   useEffect(() => {
     // Only fetch if triggered, prevents fetching on initial mount if not desired
-    if (isFetchTriggered) {
+    if (initialParamsApplied && isFetchTriggered) {
       // Pass the current state values to the fetch function
       fetchInvoices(currentPage, filters, searchTerm);
     }
     // Disable eslint warning because fetchInvoices is stable due to useCallback([])
     // and we explicitly pass the dependencies (filters, searchTerm) when calling it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFetchTriggered, currentPage]); // Only re-run when page changes or triggered manually
+  }, [isFetchTriggered, currentPage, initialParamsApplied]); // Only re-run when page changes or triggered manually
+
+  // Effect: Process customerId URL parameter ONCE after mount
+  useEffect(() => {
+    const customerIdParam = searchParams.get("customerId");
+
+    // Check if customerId param exists and we haven't applied it yet
+    if (customerIdParam && !initialParamsApplied) {
+      // Set the customer filter
+      setFilters((prev) => ({
+        ...prev,
+        customerId: customerIdParam,
+      }));
+
+      // Clear date range when viewing specific customer (as requested)
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: {
+          start: null,
+          end: null,
+        },
+      }));
+
+      // Mark initial params as processed
+      setInitialParamsApplied(true);
+    } else if (!customerIdParam && !initialParamsApplied) {
+      // No customerId param found, mark as ready
+      setInitialParamsApplied(true);
+    }
+  }, [searchParams, initialParamsApplied]);
 
   useEffect(() => {
     if (showEInvoiceDownloader && eInvoicesToDownload.length > 0) {
@@ -351,6 +385,11 @@ const InvoiceListPage: React.FC = () => {
 
     // Check if salesperson filter is active
     if (filters.salespersonId && filters.salespersonId.length > 0) {
+      count++;
+    }
+
+    // Check if customer filter is active
+    if (filters.customerId) {
       count++;
     }
 
@@ -394,7 +433,7 @@ const InvoiceListPage: React.FC = () => {
     if (activeFilterCount > 0) {
       setHasViewedFilters(false);
     }
-  }, [filters]); // Reset when filters change
+  }, [filters, activeFilterCount]); // Reset when filters change
 
   // Effect to invalidate the cache when filters change
   useEffect(() => {
@@ -1214,7 +1253,7 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Daily Print Button */}
               <InvoiceDailyPrintMenu filters={filters} />
-              
+
               {/* Today Button */}
               <Button
                 onClick={handleTodayClick}
@@ -1272,6 +1311,23 @@ const InvoiceListPage: React.FC = () => {
                             </div>
                           </li>
                         )}
+
+                      {filters.customerId && (
+                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
+                            <IconUser size={14} className="text-sky-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-default-500 text-xs">
+                              Customer
+                            </span>
+                            <div className="font-medium break-words">
+                              {customerNames[filters.customerId] ||
+                                filters.customerId}
+                            </div>
+                          </div>
+                        </li>
+                      )}
 
                       {filters.paymentType && (
                         <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
