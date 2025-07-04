@@ -8,6 +8,8 @@ import {
   IconPlus,
   IconCheck,
   IconChevronDown,
+  IconBuildingStore,
+  IconRefresh,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import CustomerCard from "../../components/Catalogue/CustomerCard";
@@ -34,7 +36,10 @@ const ITEMS_PER_PAGE = 20;
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
   const { customers, isLoading, error } = useCustomersCache();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    // Retrieve saved search term from sessionStorage
+    return sessionStorage.getItem("customerSearchTerm") || "";
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
   const [selectedSalesman, setSelectedSalesman] =
@@ -45,6 +50,10 @@ const CustomerPage: React.FC = () => {
   );
   const { salesmen: salesmenData } = useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.setItem("customerSearchTerm", searchTerm);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (salesmenData.length > 0) {
@@ -271,7 +280,12 @@ const CustomerPage: React.FC = () => {
     <div className="relative w-full mx-20 -mt-8 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-6">
-          <h1 className="text-2xl text-default-700 font-bold">
+          <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
+            <IconBuildingStore
+              size={28}
+              stroke={2.5}
+              className="text-default-700"
+            />
             Customers ({filteredCustomers.length})
           </h1>
         </div>
@@ -299,6 +313,21 @@ const CustomerPage: React.FC = () => {
             )}
           </div>
           {renderSalesmanListbox()}
+          <Button
+            onClick={async () => {
+              try {
+                await refreshCustomersCache();
+                toast.success("Refreshed customer list");
+              } catch (error) {
+                toast.error("Failed to refresh customers");
+              }
+            }}
+            variant="outline"
+            title="Refresh Customers"
+            icon={IconRefresh}
+          >
+            Refresh
+          </Button>
           <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
             Branch
           </Button>

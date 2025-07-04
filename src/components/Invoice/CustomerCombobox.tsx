@@ -152,7 +152,7 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                   <ComboboxOption
                     key={option.id}
                     className={({ active }) =>
-                      `relative cursor-default select-none py-2 pl-3 pr-10 ${
+                      `relative cursor-pointer select-none py-2 pl-3 pr-10 ${
                         active ? "bg-sky-100 text-sky-900" : "text-gray-900"
                       }`
                     }

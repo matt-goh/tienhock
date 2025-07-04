@@ -21,7 +21,7 @@ export interface EnhancedCustomerList extends Customer {
 }
 
 const CACHE_KEY = "customers_cache";
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
 const CUSTOMERS_UPDATED_EVENT = "customers-updated";
 
 // Create a global function to trigger cache refresh
@@ -49,10 +49,76 @@ export const refreshCustomersCache = async () => {
   }
 };
 
+// Create a global function to trigger credit-only cache refresh
+export const refreshCreditsCache = async () => {
+  try {
+    // Fetch only credit data
+    const creditsData = await api.get("/api/customers/credits");
+
+    // Get existing cache
+    const cachedData = localStorage.getItem(CACHE_KEY);
+    if (!cachedData) {
+      console.warn("No existing customer cache found, skipping credit update");
+      return;
+    }
+
+    const existingCache: CachedCustomers = JSON.parse(cachedData);
+
+    // Create a lookup map for quick credit updates
+    const creditsMap = new Map<
+      string,
+      { credit_used: number | null; credit_limit: number | null }
+    >();
+    creditsData.forEach(
+      (credit: {
+        id: string;
+        credit_used: number | null;
+        credit_limit: number | null;
+      }) => {
+        creditsMap.set(credit.id, {
+          credit_used: credit.credit_used,
+          credit_limit: credit.credit_limit,
+        });
+      }
+    );
+
+    // Update only credit fields in existing cache
+    const updatedCustomers = existingCache.data.map((customer) => {
+      const creditUpdate = creditsMap.get(customer.id);
+      if (creditUpdate) {
+        return {
+          ...customer,
+          credit_used: creditUpdate.credit_used ?? undefined,
+          credit_limit: creditUpdate.credit_limit ?? undefined,
+        };
+      }
+      return customer;
+    });
+
+    // Update cache with new credit data
+    const updatedCacheData: CachedCustomers = {
+      data: updatedCustomers,
+      timestamp: existingCache.timestamp, // Keep original timestamp since we're only updating credits
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(updatedCacheData));
+
+    // Dispatch event to notify subscribers
+    window.dispatchEvent(
+      new CustomEvent(CUSTOMERS_UPDATED_EVENT, { detail: updatedCustomers })
+    );
+
+    console.log("Credit cache updated successfully");
+  } catch (error) {
+    console.error("Error refreshing credits cache:", error);
+  }
+};
+
 // Expose this to make it globally available
 if (typeof window !== "undefined") {
   // @ts-ignore
   window.refreshCustomersCache = refreshCustomersCache;
+  // @ts-ignore
+  window.refreshCreditsCache = refreshCreditsCache;
 }
 
 export const useCustomersCache = () => {
@@ -152,5 +218,6 @@ export const useCustomersCache = () => {
     error,
     invalidateCache,
     refreshCustomers,
+    refreshCreditsCache,
   };
 };

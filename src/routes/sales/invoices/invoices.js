@@ -95,7 +95,7 @@ export default function (pool, config) {
     }
   };
 
-  // GET /api/invoices - List Invoices (Updated Schema)
+  // GET /api/invoices - List Invoices
   router.get("/", async (req, res) => {
     try {
       const {
@@ -104,6 +104,7 @@ export default function (pool, config) {
         startDate,
         endDate,
         salesman,
+        customerId,
         paymentType,
         invoiceStatus,
         eInvoiceStatus,
@@ -162,6 +163,11 @@ export default function (pool, config) {
         const salesmanParam = `$${filterParamCounter++}`;
         filterParams.push(salesman.split(","));
         whereClause += ` AND i.salespersonid = ANY(${salesmanParam})`;
+      }
+      if (customerId) {
+        const customerParam = `$${filterParamCounter++}`;
+        filterParams.push(customerId);
+        whereClause += ` AND i.customerid = ${customerParam}`;
       }
       if (paymentType) {
         const paymentTypeParam = `$${filterParamCounter++}`;
@@ -336,6 +342,7 @@ export default function (pool, config) {
         startDate,
         endDate,
         salesman,
+        customerId,
         paymentType,
         invoiceStatus,
         eInvoiceStatus,
@@ -365,6 +372,12 @@ export default function (pool, config) {
       if (salesman) {
         whereClause += ` AND salespersonid = ANY($${filterParamCounter++})`;
         filterParams.push(salesman.split(","));
+      }
+
+      // Apply customer ID filter
+      if (customerId) {
+        whereClause += ` AND customerid = $${filterParamCounter++}`;
+        filterParams.push(customerId);
       }
 
       // Apply payment type filter
@@ -2600,6 +2613,176 @@ export default function (pool, config) {
         message: "Error cancelling invoice and payments",
         error: error.message,
       }); // Updated error message
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /api/invoices/:id/customer - Update customer for invoice
+  router.put("/:id/customer", async (req, res) => {
+    const { id } = req.params;
+    const { customerid } = req.body;
+
+    // Validation
+    if (!customerid) {
+      return res.status(400).json({
+        message: "Customer ID is required",
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. First, get the current invoice to check einvoice_status
+      const invoiceCheckQuery = `
+      SELECT id, customerid, einvoice_status, invoice_status 
+      FROM invoices 
+      WHERE id = $1
+    `;
+      const invoiceResult = await client.query(invoiceCheckQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          message: "Invoice not found",
+        });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // 2. Validate that einvoice_status is null
+      if (invoice.einvoice_status !== null) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Cannot change customer for invoices with e-invoice status. Only invoices without e-invoice submission can be modified.",
+          currentEInvoiceStatus: invoice.einvoice_status,
+        });
+      }
+
+      // 3. Validate that the invoice is not cancelled
+      if (invoice.invoice_status === "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Cannot change customer for cancelled invoices",
+        });
+      }
+
+      // 4. Check if the new customer exists
+      const customerCheckQuery = `
+      SELECT id, name FROM customers WHERE id = $1
+    `;
+      const customerResult = await client.query(customerCheckQuery, [
+        customerid,
+      ]);
+
+      if (customerResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Customer with ID '${customerid}' not found`,
+        });
+      }
+
+      // 5. Update the invoice with the new customer
+      const updateQuery = `
+      UPDATE invoices 
+      SET customerid = $1
+      WHERE id = $2
+      RETURNING *
+    `;
+      const updateResult = await client.query(updateQuery, [customerid, id]);
+
+      await client.query("COMMIT");
+
+      // 6. Return success response
+      res.json({
+        message: "Customer updated successfully",
+        invoice: {
+          id: updateResult.rows[0].id,
+          customerid: updateResult.rows[0].customerid,
+          customerName: customerResult.rows[0].name,
+          oldCustomerId: invoice.customerid,
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating invoice customer:", error);
+      res.status(500).json({
+        message: "Error updating invoice customer",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /api/invoices/:id/salesman - Update invoice salesman
+  router.put("/:id/salesman", async (req, res) => {
+    const { id } = req.params;
+    const { salespersonid } = req.body;
+
+    if (!salespersonid) {
+      return res.status(400).json({ message: "Salesperson ID is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT einvoice_status FROM invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      // Only allow salesman change if einvoice_status is null
+      if (invoiceCheck.rows[0].einvoice_status !== null) {
+        throw new Error("Cannot change salesman for submitted e-invoices");
+      }
+
+      // Verify salesperson exists
+      const staffCheck = await client.query(
+        "SELECT id FROM staffs WHERE id = $1",
+        [salespersonid]
+      );
+
+      if (staffCheck.rows.length === 0) {
+        throw new Error("Salesperson not found");
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE invoices 
+      SET salespersonid = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [salespersonid, id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Salesman updated successfully",
+        invoiceId: id,
+        salespersonid: salespersonid,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating salesman:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating salesman" });
     } finally {
       client.release();
     }

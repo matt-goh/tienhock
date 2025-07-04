@@ -147,6 +147,11 @@ export const getInvoices = async (
       params.append("salesman", filters.salespersonId.join(","));
     }
 
+    // Add customer filter
+    if (filters.customerId) {
+      params.append("customerId", filters.customerId);
+    }
+
     // Add payment type filter
     if (filters.paymentType) {
       params.append("paymentType", filters.paymentType);

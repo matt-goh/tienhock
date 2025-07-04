@@ -1868,5 +1868,83 @@ export default function (pool, config) {
     }
   });
 
+  // POST /api/einvoice/clear-status/:id - Clear e-invoice pending status
+  router.post("/clear-status/:id", async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists
+      const invoiceQuery = `
+      SELECT id, einvoice_status, uuid, submission_uid 
+      FROM invoices 
+      WHERE id = $1 
+      FOR UPDATE
+    `;
+      const invoiceResult = await client.query(invoiceQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found",
+        });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // Check if invoice has e-invoice data to clear
+      if (
+        !invoice.uuid &&
+        !invoice.submission_uid &&
+        !invoice.einvoice_status
+      ) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: "Invoice has no e-invoice data to clear",
+        });
+      }
+
+      // Clear e-invoice fields
+      const clearQuery = `
+      UPDATE invoices 
+      SET uuid = NULL, 
+          submission_uid = NULL, 
+          datetime_validated = NULL, 
+          einvoice_status = NULL
+      WHERE id = $1
+    `;
+
+      await client.query(clearQuery, [id]);
+      await client.query("COMMIT");
+
+      res.json({
+        success: true,
+        message: `E-invoice pending status cleared for invoice #${id}`,
+        clearedFields: {
+          uuid: invoice.uuid || null,
+          submission_uid: invoice.submission_uid || null,
+          einvoice_status: invoice.einvoice_status || null,
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(
+        `Error clearing e-invoice status for invoice ${id}:`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        message: "Failed to clear e-invoice pending status",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }

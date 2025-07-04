@@ -57,7 +57,8 @@ const PayrollProcessingPage: React.FC = () => {
 
   const { jobs, loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
-  const { epfRates, socsoRates, sipRates } = useContributionRatesCache();
+  const { epfRates, socsoRates, sipRates, incomeTaxRates } =
+    useContributionRatesCache();
 
   useEffect(() => {
     Promise.all([fetchPayrollDetails(), fetchEligibleEmployees()])
@@ -228,7 +229,8 @@ const PayrollProcessingPage: React.FC = () => {
                 staffs, // Pass staffs for age/nationality lookup
                 epfRates,
                 socsoRates,
-                sipRates
+                sipRates,
+                incomeTaxRates
               );
 
             // Save to the server (including deductions)

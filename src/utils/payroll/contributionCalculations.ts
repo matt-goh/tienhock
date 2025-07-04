@@ -1,5 +1,5 @@
 // src/utils/payroll/contributionCalculations.ts
-import { EPFRate, SOCSORRate, SIPRate } from "../../types/types";
+import { EPFRate, SOCSORRate, SIPRate, IncomeTaxRate } from "../../types/types";
 
 // Helper to determine employee type based on nationality and age
 export const getEmployeeType = (nationality: string, age: number): string => {
@@ -170,5 +170,82 @@ export const calculateSIP = (
   return {
     employee: Math.round(sipRate.employee_rate * 100) / 100,
     employer: Math.round(sipRate.employer_rate * 100) / 100,
+  };
+};
+
+// Helper to find applicable income tax rate
+export const findIncomeTaxRate = (
+  incomeTaxRates: IncomeTaxRate[],
+  wageAmount: number
+): IncomeTaxRate | null => {
+  return (
+    incomeTaxRates.find(
+      (rate) => wageAmount >= rate.wage_from && wageAmount <= rate.wage_to
+    ) || null
+  );
+};
+
+// Helper to get the applicable tax rate based on employee's status
+export const getApplicableIncomeTaxRate = (
+  incomeTaxRate: IncomeTaxRate,
+  maritalStatus: string,
+  spouseEmploymentStatus: string | null,
+  numberOfChildren: number
+): number => {
+  // Single employees use base rate
+  if (maritalStatus === "Single") {
+    return incomeTaxRate.base_rate;
+  }
+
+  // Married employees use K rates based on spouse employment status
+  const childrenKey = Math.min(numberOfChildren, 10); // Cap at K10
+  const keyName = `k${childrenKey}`; // k0 for no children, k1 for 1 child, etc.
+  
+  if (spouseEmploymentStatus === "Unemployed") {
+    const unemployedKey = `unemployed_spouse_${keyName}` as keyof IncomeTaxRate;
+    return Number(incomeTaxRate[unemployedKey]) || incomeTaxRate.base_rate;
+  } else if (spouseEmploymentStatus === "Employed") {
+    const employedKey = `employed_spouse_${keyName}` as keyof IncomeTaxRate;
+    return Number(incomeTaxRate[employedKey]) || incomeTaxRate.base_rate;
+  }
+
+  // If married but spouse employment status is not specified, use base rate as fallback
+  return incomeTaxRate.base_rate;
+};
+
+// Calculate income tax
+export const calculateIncomeTax = (
+  incomeTaxRate: IncomeTaxRate,
+  wageAmount: number,
+  maritalStatus: string,
+  spouseEmploymentStatus: string | null,
+  numberOfChildren: number
+): { employee: number; employer: number; taxCategory: string } => {
+  if (!incomeTaxRate) return { employee: 0, employer: 0, taxCategory: "" };
+
+  const applicableRate = getApplicableIncomeTaxRate(
+    incomeTaxRate,
+    maritalStatus,
+    spouseEmploymentStatus,
+    numberOfChildren
+  );
+
+  // Income tax is only paid by employee, not employer
+  const employeeTax = Math.round(applicableRate * 100) / 100;
+
+  // Build tax category string for display
+  let taxCategory = maritalStatus;
+  if (maritalStatus === "Married") {
+    const childrenCount = Math.min(numberOfChildren, 10);
+    taxCategory += `-K${childrenCount}`;
+    if (spouseEmploymentStatus) {
+      taxCategory += `-${spouseEmploymentStatus}`;
+    }
+  }
+
+  return {
+    employee: employeeTax,
+    employer: 0,
+    taxCategory,
   };
 };

@@ -45,6 +45,15 @@ const StaffFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  const maritalStatusOptions = [
+    { id: "Single", name: "Single" },
+    { id: "Married", name: "Married" },
+  ];
+
+  const spouseEmploymentOptions = [
+    { id: "Employed", name: "Employed" },
+    { id: "Unemployed", name: "Unemployed" },
+  ];
   const [formData, setFormData] = useState<Employee>({
     id: "",
     name: "",
@@ -69,6 +78,9 @@ const StaffFormPage: React.FC = () => {
     agama: "",
     dateResigned: "",
     newId: "",
+    maritalStatus: "Single",
+    spouseEmploymentStatus: "",
+    numberOfChildren: 0,
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     ...formData,
@@ -280,6 +292,9 @@ const StaffFormPage: React.FC = () => {
         birthdate: data.birthdate || "",
         dateJoined: data.dateJoined || "",
         dateResigned: data.dateResigned || "",
+        maritalStatus: data.maritalStatus || "Single",
+        spouseEmploymentStatus: data.spouseEmploymentStatus || "",
+        numberOfChildren: data.numberOfChildren || 0,
       };
 
       // Preserve modified fields from current formData
@@ -580,7 +595,7 @@ const StaffFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-10">
+    <div className="container mx-auto px-4 pb-10 -mt-8">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
@@ -1172,6 +1187,29 @@ const StaffFormPage: React.FC = () => {
                   {renderInput("incomeTaxNo", "Income Tax Number")}
                   {renderInput("socsoNo", "SOCSO Number")}
                   {renderListbox("document", "Document", documentOptions)}
+                </div>
+                <div className="border-t border-default-200 pt-6 mt-6">
+                  <h3 className="text-base font-medium text-default-800 mb-4">
+                    Income Tax Information
+                  </h3>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                    {renderListbox(
+                      "maritalStatus",
+                      "Marital Status",
+                      maritalStatusOptions
+                    )}
+                    {formData.maritalStatus === "Married" &&
+                      renderListbox(
+                        "spouseEmploymentStatus",
+                        "Spouse Employment Status",
+                        spouseEmploymentOptions
+                      )}
+                    {renderInput(
+                      "numberOfChildren",
+                      "Number of Children",
+                      "number"
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="space-y-6 mt-5">

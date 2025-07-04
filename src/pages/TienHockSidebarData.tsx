@@ -1,4 +1,4 @@
-//src/pages/TienHockSidebarData.tsx
+// src/pages/TienHockSidebarData.tsx
 import {
   IconBookmark,
   IconFileInvoice,
@@ -7,9 +7,13 @@ import {
   IconCalendarEvent,
   IconCalculator,
   IconCash,
+  IconReportMoney,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
+
+// Accounting related imports
+import DebtorsReportPage from "./Accounting/DebtorsReportPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -137,7 +141,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "EPF, SOCSO & SIP",
+    name: "Contribution Rates",
     path: "/payroll/contribution-rates",
     component: ContributionRatesPage,
     icon: IconCalculator,
@@ -152,6 +156,17 @@ export const TienHockSidebarData: SidebarItem[] = [
     icon: IconBookmark,
     subItems: [],
     defaultOpen: true,
+  },
+  {
+    name: "Accounting",
+    icon: IconReportMoney,
+    subItems: [
+      {
+        name: "Debtors",
+        path: "/sales/debtors",
+        component: DebtorsReportPage,
+      },
+    ],
   },
   {
     name: "Payroll",

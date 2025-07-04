@@ -1,3 +1,4 @@
+// src/components/Invoice/InvoiceFilterMenu.tsx
 import React, { useState, useRef, useEffect, Fragment } from "react";
 import {
   Combobox,
@@ -21,17 +22,13 @@ import {
   IconX,
   IconTrash,
 } from "@tabler/icons-react";
-import { InvoiceFilters } from "../../types/types"; // Adjust path if needed
-import Button from "../Button"; // Adjust path if needed
-
-interface FilterTagsProps {
-  items: string[];
-  onRemove: (itemIdToRemove: string) => void; // Changed to remove single item
-  label: string; // e.g., "Salesman", "Customer"
-}
+import { InvoiceFilters } from "../../types/types";
+import Button from "../Button";
+import { CustomerCombobox } from "./CustomerCombobox";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 
 type InvoiceFilterMenuProps = {
-  onFilterChange: (filters: InvoiceFilters) => void; // Changed to accept full InvoiceFilters
+  onFilterChange: (filters: InvoiceFilters) => void;
   currentFilters: InvoiceFilters;
   salesmanOptions: Array<{ id: string; name: string }>;
   onMouseEnter?: () => void;
@@ -61,6 +58,14 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     Array<{ id: string; name: string }>
   >([]);
 
+  const { customers, isLoading: isLoadingCustomers } = useCustomersCache();
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [displayedCustomers, setDisplayedCustomers] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [customerPage, setCustomerPage] = useState(1);
+  const CUSTOMERS_PER_PAGE = 50;
+
   const invoiceStatusOptions = [
     { id: "paid", name: "Paid" },
     { id: "Unpaid", name: "Unpaid" },
@@ -84,6 +89,25 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     );
     setCachedSalesmanOptions(uniqueSalesmen);
   }, [salesmanOptions]);
+
+  useEffect(() => {
+    const filtered = customerQuery
+      ? customers.filter(
+          (c) =>
+            c.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
+            c.id.toLowerCase().includes(customerQuery.toLowerCase())
+        )
+      : customers;
+
+    const startIndex = 0;
+    const endIndex = customerPage * CUSTOMERS_PER_PAGE;
+    setDisplayedCustomers(
+      filtered.slice(startIndex, endIndex).map((c) => ({
+        id: c.id,
+        name: c.name,
+      }))
+    );
+  }, [customers, customerQuery, customerPage]);
 
   // --- Effect to reset pendingFilters when menu opens or external filters change ---
   useEffect(() => {
@@ -122,6 +146,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       // Reset to initial/default state, keep date range from *original* filters
       dateRange: currentFilters.dateRange, // Preserve date range from applied filters
       salespersonId: null,
+      customerId: null,
       paymentType: null,
       invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
       eInvoiceStatus: [], // Default e-invoice status
@@ -318,6 +343,41 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                         ))}
                       </div>
                     )}
+                </div>
+
+                {/* Customer Filter */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Customer
+                  </label>
+                  <CustomerCombobox
+                    name="customer"
+                    label=""
+                    value={
+                      pendingFilters.customerId
+                        ? {
+                            id: pendingFilters.customerId,
+                            name:
+                              customers.find(
+                                (c) => c.id === pendingFilters.customerId
+                              )?.name || pendingFilters.customerId,
+                          }
+                        : null
+                    }
+                    onChange={(selected) =>
+                      handlePendingFilterChange(
+                        "customerId",
+                        selected?.id || null
+                      )
+                    }
+                    options={displayedCustomers}
+                    query={customerQuery}
+                    setQuery={setCustomerQuery}
+                    onLoadMore={() => setCustomerPage((prev) => prev + 1)}
+                    hasMore={displayedCustomers.length < customers.length}
+                    isLoading={isLoadingCustomers}
+                    placeholder="Search or select customer..."
+                  />
                 </div>
 
                 {/* Payment Type Filter */}
