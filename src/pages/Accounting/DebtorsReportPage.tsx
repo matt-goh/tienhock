@@ -19,6 +19,8 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
 import { useCompany } from "../../contexts/CompanyContext";
+import { generateDebtorsReportPDF } from "../../utils/accounting/DebtorsReportPDF";
+import toast from "react-hot-toast";
 
 interface Payment {
   payment_id: number;
@@ -208,14 +210,22 @@ const DebtorsReportPage: React.FC = () => {
     navigate(`/sales/invoice?customerId=${customerId}`);
   };
 
-  const handlePrint = (): void => {
-    if (printRef.current) {
-      const printContent = printRef.current.innerHTML;
-      const originalContent = document.body.innerHTML;
-      document.body.innerHTML = printContent;
-      window.print();
-      document.body.innerHTML = originalContent;
-      window.location.reload();
+  const handlePrint = async (): Promise<void> => {
+    if (!debtorsData) return;
+
+    try {
+      // Show loading toast
+      const loadingToast = toast.loading("Generating PDF...");
+
+      // Generate and print PDF
+      await generateDebtorsReportPDF(filteredData, "print");
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      toast.success("Print dialog opened");
+    } catch (error) {
+      console.error("Error printing report:", error);
+      toast.error("Failed to generate PDF");
     }
   };
 
@@ -322,6 +332,7 @@ const DebtorsReportPage: React.FC = () => {
                 onClick={handlePrint}
                 className="flex-col gap-2"
                 icon={IconDownload}
+                disabled={loading}
               >
                 Print Report
               </Button>
