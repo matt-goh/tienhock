@@ -46,6 +46,7 @@ import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
@@ -235,6 +236,11 @@ const InvoiceDetailsPage: React.FC = () => {
   const [hasMoreCustomers, setHasMoreCustomers] = useState<boolean>(true);
   const { customers } = useCustomersCache();
   const CUSTOMERS_PER_PAGE = 50;
+  // Salesman edit states
+  const [isEditingSalesman, setIsEditingSalesman] = useState(false);
+  const [selectedSalesman, setSelectedSalesman] = useState<string>("");
+  const [isUpdatingSalesman, setIsUpdatingSalesman] = useState(false);
+  const { salesmen, isLoading: isLoadingSalesmen } = useSalesmanCache();
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
@@ -532,6 +538,39 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsUpdatingCustomer(false);
     }
+  };
+
+  const handleSalesmanUpdate = async (): Promise<void> => {
+    if (!selectedSalesman || selectedSalesman === invoiceData?.salespersonid) {
+      setIsEditingSalesman(false);
+      return;
+    }
+
+    setIsUpdatingSalesman(true);
+    try {
+      await api.put(`/api/invoices/${invoiceData?.id}/salesman`, {
+        salespersonid: selectedSalesman,
+      });
+
+      toast.success("Salesman updated successfully");
+      setIsEditingSalesman(false);
+      setSelectedSalesman("");
+
+      // Refresh invoice data
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating salesman:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update salesman";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingSalesman(false);
+    }
+  };
+
+  const handleOpenSalesmanEdit = () => {
+    setIsEditingSalesman(true);
+    setSelectedSalesman(invoiceData?.salespersonid || "");
   };
 
   // Function to handle opening the edit modal
@@ -1188,20 +1227,37 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Salesman
               </span>
-              <span
-                className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
-                title={invoiceData.salespersonid}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/catalogue/staff/${invoiceData.salespersonid}`);
-                }}
-              >
-                {invoiceData.salespersonid}
-              </span>
+              <div className="flex items-center">
+                <span
+                  className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                  title={invoiceData.salespersonid}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/catalogue/staff/${invoiceData.salespersonid}`);
+                  }}
+                >
+                  {salesmen.find((s) => s.id === invoiceData.salespersonid)
+                    ?.name || invoiceData.salespersonid}
+                </span>
+                {/* Show pencil icon only if einvoice_status is null and on hover */}
+                {invoiceData.einvoice_status === null && (
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenSalesmanEdit();
+                    }}
+                    title="Edit salesman"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex flex-col">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
@@ -1690,6 +1746,63 @@ const InvoiceDetailsPage: React.FC = () => {
                 icon={isUpdatingCustomer ? undefined : IconPencil}
               >
                 {isUpdatingCustomer ? "Updating..." : "Update Customer"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Salesman Edit Modal */}
+      {isEditingSalesman && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Salesman
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingSalesman(false);
+                  setSelectedSalesman("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingSalesman}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <FormListbox
+                name="salesman"
+                label="Select New Salesman"
+                value={selectedSalesman}
+                onChange={(value) => setSelectedSalesman(value as string)}
+                options={salesmen.map((s) => ({
+                  id: s.id,
+                  name: s.name || s.id,
+                }))}
+                placeholder="Select a salesman..."
+                disabled={isUpdatingSalesman || isLoadingSalesmen}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingSalesman(false);
+                  setSelectedSalesman("");
+                }}
+                disabled={isUpdatingSalesman}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleSalesmanUpdate}
+                disabled={isUpdatingSalesman || !selectedSalesman}
+              >
+                {isUpdatingSalesman ? "Updating..." : "Update Salesman"}
               </Button>
             </div>
           </div>
