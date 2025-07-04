@@ -9,6 +9,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconBuildingStore,
+  IconRefresh,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import CustomerCard from "../../components/Catalogue/CustomerCard";
@@ -312,6 +313,21 @@ const CustomerPage: React.FC = () => {
             )}
           </div>
           {renderSalesmanListbox()}
+          <Button
+            onClick={async () => {
+              try {
+                await refreshCustomersCache();
+                toast.success("Refreshed customer list");
+              } catch (error) {
+                toast.error("Failed to refresh customers");
+              }
+            }}
+            variant="outline"
+            title="Refresh Customers"
+            icon={IconRefresh}
+          >
+            Refresh
+          </Button>
           <Button onClick={() => setIsBranchModalOpen(true)} variant="outline">
             Branch
           </Button>
