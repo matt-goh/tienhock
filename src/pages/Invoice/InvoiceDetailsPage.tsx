@@ -615,10 +615,7 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentFormData((prev) => ({
       ...prev,
       payment_method: value as Payment["payment_method"],
-      payment_reference:
-        value === "cash" || value === "online"
-          ? undefined
-          : prev.payment_reference, // Clear ref if not needed
+      payment_reference: value === "cash" ? undefined : prev.payment_reference, // Clear ref if not needed
     }));
   };
 
@@ -670,8 +667,7 @@ const InvoiceDetailsPage: React.FC = () => {
       payment_date: paymentFormData.payment_date,
       payment_method: paymentFormData.payment_method,
       payment_reference:
-        paymentFormData.payment_method === "cash" ||
-        paymentFormData.payment_method === "online"
+        paymentFormData.payment_method === "cash"
           ? undefined
           : paymentFormData.payment_reference?.trim() || undefined,
       notes: paymentFormData.notes?.trim() || undefined,
