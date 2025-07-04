@@ -1,5 +1,5 @@
 // src/pages/Invoice/InvoiceDetailsPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ExtendedInvoiceData,
@@ -39,10 +39,15 @@ import {
   IconRefresh,
   IconFiles,
   IconPrinter,
+  IconPencil,
+  IconX,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 
@@ -209,7 +214,33 @@ const InvoiceDetailsPage: React.FC = () => {
   const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(
     null
   );
+  const [isClearingEInvoice, setIsClearingEInvoice] = useState(false);
+  const [showClearEInvoiceConfirm, setShowClearEInvoiceConfirm] =
+    useState(false);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [customerQuery, setCustomerQuery] = useState<string>("");
+  const [isUpdatingCustomer, setIsUpdatingCustomer] = useState<boolean>(false);
+
+  // Pagination state for customer loading
+  const [displayedCustomers, setDisplayedCustomers] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [customerPage, setCustomerPage] = useState<number>(1);
+  const [isLoadingMoreCustomers, setIsLoadingMoreCustomers] =
+    useState<boolean>(false);
+  const [hasMoreCustomers, setHasMoreCustomers] = useState<boolean>(true);
+  const { customers } = useCustomersCache();
+  const CUSTOMERS_PER_PAGE = 50;
+  // Salesman edit states
+  const [isEditingSalesman, setIsEditingSalesman] = useState(false);
+  const [selectedSalesman, setSelectedSalesman] = useState<string>("");
+  const [isUpdatingSalesman, setIsUpdatingSalesman] = useState(false);
+  const { salesmen, isLoading: isLoadingSalesmen } = useSalesmanCache();
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
@@ -270,6 +301,49 @@ const InvoiceDetailsPage: React.FC = () => {
   useEffect(() => {
     fetchDetails();
   }, [fetchDetails]); // fetchDetails dependency is stable due to useCallback
+
+  // Initialize displayed customers when customers cache loads
+  useEffect(() => {
+    if (customers.length > 0) {
+      const initialCustomers = customers
+        .slice(0, CUSTOMERS_PER_PAGE)
+        .map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+        }));
+      setDisplayedCustomers(initialCustomers);
+      setHasMoreCustomers(customers.length > CUSTOMERS_PER_PAGE);
+      setCustomerPage(1);
+    }
+  }, [customers]);
+
+  // Filter customers based on query
+  const filteredCustomers = useMemo(() => {
+    if (!customerQuery.trim()) {
+      return displayedCustomers;
+    }
+
+    // Filter from all customers (not just displayed ones) when searching
+    const filtered = customers
+      .filter(
+        (customer) =>
+          customer.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
+          customer.id.toLowerCase().includes(customerQuery.toLowerCase())
+      )
+      .map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+      }));
+
+    return filtered;
+  }, [customers, displayedCustomers, customerQuery]);
+
+  // Customer options for the combobox
+  const customerOptions = customers.map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+    phone_number: customer.phone_number,
+  }));
 
   // --- Actions ---
 
@@ -411,6 +485,160 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  // Load more customers function
+  const handleLoadMoreCustomers = useCallback(() => {
+    if (isLoadingMoreCustomers || !hasMoreCustomers) return;
+
+    setIsLoadingMoreCustomers(true);
+
+    // Simulate loading delay (remove in production if not needed)
+    setTimeout(() => {
+      const nextPage = customerPage + 1;
+      const startIndex = (nextPage - 1) * CUSTOMERS_PER_PAGE;
+      const endIndex = startIndex + CUSTOMERS_PER_PAGE;
+
+      const moreCustomers = customers
+        .slice(startIndex, endIndex)
+        .map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+        }));
+
+      setDisplayedCustomers((prev) => [...prev, ...moreCustomers]);
+      setCustomerPage(nextPage);
+      setHasMoreCustomers(endIndex < customers.length);
+      setIsLoadingMoreCustomers(false);
+    }, 300);
+  }, [customers, customerPage, isLoadingMoreCustomers, hasMoreCustomers]);
+
+  const handleCustomerUpdate = async (): Promise<void> => {
+    if (!selectedCustomer || selectedCustomer.id === invoiceData?.customerid) {
+      setIsEditingCustomer(false);
+      return;
+    }
+
+    setIsUpdatingCustomer(true);
+    try {
+      await api.put(`/api/invoices/${invoiceData?.id}/customer`, {
+        customerid: selectedCustomer.id,
+      });
+
+      toast.success("Customer updated successfully");
+      setIsEditingCustomer(false);
+      setSelectedCustomer(null);
+      setCustomerQuery("");
+
+      // Refresh invoice data to get updated customer details including TIN
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update customer";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingCustomer(false);
+    }
+  };
+
+  const handleSalesmanUpdate = async (): Promise<void> => {
+    if (!selectedSalesman || selectedSalesman === invoiceData?.salespersonid) {
+      setIsEditingSalesman(false);
+      return;
+    }
+
+    setIsUpdatingSalesman(true);
+    try {
+      await api.put(`/api/invoices/${invoiceData?.id}/salesman`, {
+        salespersonid: selectedSalesman,
+      });
+
+      toast.success("Salesman updated successfully");
+      setIsEditingSalesman(false);
+      setSelectedSalesman("");
+
+      // Refresh invoice data
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating salesman:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update salesman";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingSalesman(false);
+    }
+  };
+
+  const handleOpenSalesmanEdit = () => {
+    setIsEditingSalesman(true);
+    setSelectedSalesman(invoiceData?.salespersonid || "");
+  };
+
+  // Function to handle opening the edit modal
+  const handleOpenCustomerEdit = () => {
+    setIsEditingCustomer(true);
+    // Set the current customer as selected
+    const currentCustomer = customers.find(
+      (c) => c.id === invoiceData?.customerid
+    );
+    if (currentCustomer) {
+      setSelectedCustomer({
+        id: currentCustomer.id,
+        name: currentCustomer.name,
+      });
+    }
+    setCustomerQuery("");
+  };
+
+  // Clear E-Invoice Status Handler
+  const handleClearEInvoiceClick = () => {
+    if (!invoiceData) return;
+
+    // Check if there's e-invoice data to clear
+    if (
+      !invoiceData.uuid &&
+      !invoiceData.submission_uid &&
+      !invoiceData.einvoice_status
+    ) {
+      toast.error("No e-invoice data to clear");
+      return;
+    }
+
+    setShowClearEInvoiceConfirm(true);
+  };
+
+  const handleConfirmClearEInvoice = async () => {
+    if (!invoiceData || isClearingEInvoice) return;
+
+    setIsClearingEInvoice(true);
+    setShowClearEInvoiceConfirm(false);
+    const toastId = toast.loading("Clearing e-invoice status...");
+
+    try {
+      const response = await api.post(
+        `/api/einvoice/clear-status/${invoiceData.id}`
+      );
+
+      if (response.success) {
+        toast.success("E-invoice status cleared successfully", { id: toastId });
+        await fetchDetails(); // Refresh invoice data
+      } else {
+        toast.error(response.message || "Failed to clear e-invoice status", {
+          id: toastId,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error clearing e-invoice status:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to clear e-invoice status",
+        { id: toastId }
+      );
+    } finally {
+      setIsClearingEInvoice(false);
+    }
+  };
+
   // --- Payment Form Handling ---
   const handlePaymentFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -426,10 +654,7 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentFormData((prev) => ({
       ...prev,
       payment_method: value as Payment["payment_method"],
-      payment_reference:
-        value === "cash" || value === "online"
-          ? undefined
-          : prev.payment_reference, // Clear ref if not needed
+      payment_reference: value === "cash" ? undefined : prev.payment_reference, // Clear ref if not needed
     }));
   };
 
@@ -481,8 +706,7 @@ const InvoiceDetailsPage: React.FC = () => {
       payment_date: paymentFormData.payment_date,
       payment_method: paymentFormData.payment_method,
       payment_reference:
-        paymentFormData.payment_method === "cash" ||
-        paymentFormData.payment_method === "online"
+        paymentFormData.payment_method === "cash"
           ? undefined
           : paymentFormData.payment_reference?.trim() || undefined,
       notes: paymentFormData.notes?.trim() || undefined,
@@ -745,13 +969,17 @@ const InvoiceDetailsPage: React.FC = () => {
               invoiceData.invoice_status.slice(1)}
           </span>
           {eInvoiceStatusInfo && EInvoiceIcon && (
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
+            <a
+              href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
               title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
             >
               <EInvoiceIcon size={14} className="mr-1" />
               e-Invoice: {eInvoiceStatusInfo.text}
-            </span>
+            </a>
           )}
           {/* Add Consolidated Status Badge */}
           {consolidatedStatusInfo && ConsolidatedIcon && (
@@ -779,6 +1007,20 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
               </Button>
             )}
+          {invoiceData.einvoice_status === "pending" && (
+            <Button
+              variant="outline"
+              color="orange"
+              onClick={handleClearEInvoiceClick}
+              disabled={isClearingEInvoice || isCancelled}
+              title="Clear E-Invoice Pending Status"
+            >
+              <span className="flex items-center gap-1">
+                <IconRefresh size={16} />
+                {isClearingEInvoice ? "Clearing..." : "Clear Status"}
+              </span>
+            </Button>
+          )}
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
@@ -954,35 +1196,68 @@ const InvoiceDetailsPage: React.FC = () => {
             Invoice Details
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Customer
               </span>
-              <span
-                className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
-                title={`${invoiceData.customerName} (${invoiceData.customerid})`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/catalogue/customer/${invoiceData.customerid}`);
-                }}
-              >
-                {invoiceData.customerName || invoiceData.customerid}
-              </span>
+              <div className="flex items-center">
+                <span
+                  className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                  title={`${invoiceData.customerName} (${invoiceData.customerid})`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/catalogue/customer/${invoiceData.customerid}`);
+                  }}
+                >
+                  {invoiceData.customerName || invoiceData.customerid}
+                </span>
+                {/* Show pencil icon only if einvoice_status is null and on hover */}
+                {invoiceData.einvoice_status === null && (
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenCustomerEdit();
+                    }}
+                    title="Edit customer"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Salesman
               </span>
-              <span
-                className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
-                title={invoiceData.salespersonid}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/catalogue/staff/${invoiceData.salespersonid}`);
-                }}
-              >
-                {invoiceData.salespersonid}
-              </span>
+              <div className="flex items-center">
+                <span
+                  className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                  title={invoiceData.salespersonid}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/catalogue/staff/${invoiceData.salespersonid}`);
+                  }}
+                >
+                  {salesmen.find((s) => s.id === invoiceData.salespersonid)
+                    ?.name || invoiceData.salespersonid}
+                </span>
+                {/* Show pencil icon only if einvoice_status is null and on hover */}
+                {invoiceData.einvoice_status === null && (
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenSalesmanEdit();
+                    }}
+                    title="Edit salesman"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex flex-col">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
@@ -1397,6 +1672,15 @@ const InvoiceDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
+      <ConfirmationDialog
+        isOpen={showClearEInvoiceConfirm}
+        onClose={() => setShowClearEInvoiceConfirm(false)}
+        onConfirm={handleConfirmClearEInvoice}
+        title="Clear E-Invoice Status"
+        message={`Are you sure you want to clear the e-invoice pending status for Invoice #${invoiceData?.id}? This will remove the UUID, submission UID, validation date, and status, allowing the invoice to be resubmitted.`}
+        confirmButtonText={isClearingEInvoice ? "Clearing..." : "Clear Status"}
+        variant="danger"
+      />
       {/* Print PDF Overlay */}
       {isPrinting && invoiceData && (
         <PrintPDFOverlay
@@ -1404,6 +1688,125 @@ const InvoiceDetailsPage: React.FC = () => {
           customerNames={customerNamesForPDF}
           onComplete={handlePrintComplete}
         />
+      )}
+      {/* Customer Edit Modal */}
+      {isEditingCustomer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Customer
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingCustomer(false);
+                  setSelectedCustomer(null);
+                  setCustomerQuery("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingCustomer}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <CustomerCombobox
+                name="customer"
+                label="Select New Customer"
+                value={selectedCustomer}
+                onChange={setSelectedCustomer}
+                options={filteredCustomers}
+                query={customerQuery}
+                setQuery={setCustomerQuery}
+                onLoadMore={handleLoadMoreCustomers}
+                hasMore={hasMoreCustomers && !customerQuery.trim()} // Hide load more when searching
+                isLoading={isLoadingMoreCustomers}
+                placeholder="Search customers by name or ID..."
+                disabled={isUpdatingCustomer}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingCustomer(false);
+                  setSelectedCustomer(null);
+                  setCustomerQuery("");
+                }}
+                disabled={isUpdatingCustomer}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleCustomerUpdate}
+                disabled={isUpdatingCustomer || !selectedCustomer}
+                icon={isUpdatingCustomer ? undefined : IconPencil}
+              >
+                {isUpdatingCustomer ? "Updating..." : "Update Customer"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Salesman Edit Modal */}
+      {isEditingSalesman && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Salesman
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingSalesman(false);
+                  setSelectedSalesman("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingSalesman}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <FormListbox
+                name="salesman"
+                label="Select New Salesman"
+                value={selectedSalesman}
+                onChange={(value) => setSelectedSalesman(value as string)}
+                options={salesmen.map((s) => ({
+                  id: s.id,
+                  name: s.name || s.id,
+                }))}
+                placeholder="Select a salesman..."
+                disabled={isUpdatingSalesman || isLoadingSalesmen}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingSalesman(false);
+                  setSelectedSalesman("");
+                }}
+                disabled={isUpdatingSalesman}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleSalesmanUpdate}
+                disabled={isUpdatingSalesman || !selectedSalesman}
+              >
+                {isUpdatingSalesman ? "Updating..." : "Update Salesman"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

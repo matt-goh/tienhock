@@ -432,6 +432,9 @@ export interface Employee {
   agama: string;
   dateResigned: string;
   newId: string;
+  maritalStatus: string;
+  spouseEmploymentStatus: string;
+  numberOfChildren: number;
   updatedAt?: string;
 }
 
@@ -452,6 +455,7 @@ export interface InvoiceFilters {
     end: Date | null;
   };
   salespersonId: string[] | null;
+  customerId: string | null;
   paymentType: string | null;
   invoiceStatus: string[];
   eInvoiceStatus: string[];
@@ -689,8 +693,42 @@ export interface SIPRate {
   updated_at: string;
 }
 
+export interface IncomeTaxRate {
+  id: number;
+  wage_from: number;
+  wage_to: number;
+  base_rate: number;
+  // Unemployed spouse rates
+  unemployed_spouse_k0: number;
+  unemployed_spouse_k1: number;
+  unemployed_spouse_k2: number;
+  unemployed_spouse_k3: number;
+  unemployed_spouse_k4: number;
+  unemployed_spouse_k5: number;
+  unemployed_spouse_k6: number;
+  unemployed_spouse_k7: number;
+  unemployed_spouse_k8: number;
+  unemployed_spouse_k9: number;
+  unemployed_spouse_k10: number;
+  // Employed spouse rates
+  employed_spouse_k0: number;
+  employed_spouse_k1: number;
+  employed_spouse_k2: number;
+  employed_spouse_k3: number;
+  employed_spouse_k4: number;
+  employed_spouse_k5: number;
+  employed_spouse_k6: number;
+  employed_spouse_k7: number;
+  employed_spouse_k8: number;
+  employed_spouse_k9: number;
+  employed_spouse_k10: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PayrollDeduction {
-  deduction_type: "epf" | "socso" | "sip";
+  deduction_type: "epf" | "socso" | "sip" | "income_tax";
   employee_amount: number;
   employer_amount: number;
   wage_amount: number;
@@ -700,6 +738,7 @@ export interface PayrollDeduction {
     employer_rate: number | string;
     age_group?: string;
     wage_ceiling_used?: number;
+    tax_category?: string; // e.g., "Single", "Married-K2-Unemployed"
   };
 }
 

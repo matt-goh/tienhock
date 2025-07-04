@@ -7,6 +7,7 @@ import {
   EPFRate,
   SOCSORRate,
   SIPRate,
+  IncomeTaxRate,
   PayrollDeduction,
 } from "../../types/types";
 import {
@@ -18,6 +19,8 @@ import {
   calculateSOCSO,
   calculateSIP,
   getEPFWageCeiling,
+  findIncomeTaxRate,
+  calculateIncomeTax,
 } from "./contributionCalculations";
 import { groupItemsByType } from "./payrollUtils";
 
@@ -277,6 +280,7 @@ export class PayrollCalculationService {
    * @param epfRates Array of EPF rates
    * @param socsoRates Array of SOCSO rates
    * @param sipRates Array of SIP rates
+   * @param incomeTaxRates Array of Income Tax rates (optional, default is empty)
    * @returns Array of calculated deductions
    */
   static calculateContributions(
@@ -285,7 +289,8 @@ export class PayrollCalculationService {
     staffs: any[],
     epfRates: EPFRate[],
     socsoRates: SOCSORRate[],
-    sipRates: SIPRate[]
+    sipRates: SIPRate[],
+    incomeTaxRates: IncomeTaxRate[] = []
   ): PayrollDeduction[] {
     const deductions: PayrollDeduction[] = [];
 
@@ -393,6 +398,38 @@ export class PayrollCalculationService {
       }
     }
 
+    // 4. Calculate Income Tax (using total gross pay)
+    const incomeTaxRate = findIncomeTaxRate(incomeTaxRates, totalGrossPay);
+    if (incomeTaxRate) {
+      // Get employee's income tax information
+      const maritalStatus = employee.maritalStatus || "Single";
+      const spouseEmploymentStatus = employee.spouseEmploymentStatus || null;
+      const numberOfChildren = employee.numberOfChildren || 0;
+
+      const incomeTaxContribution = calculateIncomeTax(
+        incomeTaxRate,
+        totalGrossPay,
+        maritalStatus,
+        spouseEmploymentStatus,
+        numberOfChildren
+      );
+
+      if (incomeTaxContribution.employee > 0) {
+        deductions.push({
+          deduction_type: "income_tax",
+          employee_amount: incomeTaxContribution.employee,
+          employer_amount: 0,
+          wage_amount: totalGrossPay,
+          rate_info: {
+            rate_id: incomeTaxRate.id,
+            employee_rate: `RM${incomeTaxContribution.employee}`,
+            employer_rate: "RM0.00",
+            tax_category: incomeTaxContribution.taxCategory,
+          },
+        });
+      }
+    }
+
     return deductions;
   }
 
@@ -408,6 +445,7 @@ export class PayrollCalculationService {
    * @param epfRates Array of EPF rates
    * @param socsoRates Array of SOCSO rates
    * @param sipRates Array of SIP rates
+   * @param incomeTaxRates Array of Income Tax rates (optional, default is empty)
    * @returns Processed employee payroll with deductions
    */
   static processEmployeePayrollWithDeductions(
@@ -420,7 +458,8 @@ export class PayrollCalculationService {
     staffs: any[],
     epfRates: EPFRate[],
     socsoRates: SOCSORRate[],
-    sipRates: SIPRate[]
+    sipRates: SIPRate[],
+    incomeTaxRates: IncomeTaxRate[] = []
   ): EmployeePayroll & { deductions: PayrollDeduction[] } {
     // First calculate the basic payroll (without deductions)
     const basePayroll = this.processEmployeePayroll(
@@ -439,7 +478,8 @@ export class PayrollCalculationService {
       staffs,
       epfRates,
       socsoRates,
-      sipRates
+      sipRates,
+      incomeTaxRates
     );
 
     // Calculate total employee deductions

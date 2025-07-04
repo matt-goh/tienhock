@@ -11,7 +11,7 @@ interface InvoicePDFProps {
   companyContext?: "tienhock" | "jellypolly";
 }
 
-const ROWS_PER_PAGE = 32;
+const ROWS_PER_PAGE = 30;
 const HEADER_ROWS = 2;
 const TABLE_HEADER_ROWS = 2;
 const SUMMARY_ROWS = 3;
@@ -624,10 +624,9 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
       {pdfPages.map(
         (
           pageInvoices,
-          pageIndex // Changed variable name here
+          pageIndex
         ) => (
-          <Page key={`page-${pageIndex}`} size="LETTER" style={styles.page}>
-            {/* ... Header rendering remains the same ... */}
+          <Page key={`page-${pageIndex}`} size="A4" style={styles.page}>
             {pageIndex === 0 && (
               <View style={styles.header}>
                 <Image src={TienHockLogo} style={styles.logo} />
@@ -659,7 +658,6 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
 
             {/* Check if this is the last page of the entire document */}
             {pageIndex === pdfPages.length - 1 && (
-              // ... Summary rendering remains the same ...
               <View style={styles.summary}>
                 {/* Header Row */}
                 <View style={styles.summaryHeaderRow}>

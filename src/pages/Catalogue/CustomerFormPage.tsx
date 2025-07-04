@@ -155,8 +155,8 @@ const CustomerFormPage: React.FC = () => {
         throw new Error(`Customer with ID ${id} not found in cache`);
       }
 
-      // Set customer form data
-      setFormData({
+      // Create the form data object
+      const fetchedFormData = {
         ...cachedCustomer,
         // Ensure values have proper defaults
         closeness: cachedCustomer.closeness || "Local",
@@ -171,19 +171,25 @@ const CustomerFormPage: React.FC = () => {
         id_type: cachedCustomer.id_type || "",
         credit_limit: cachedCustomer.credit_limit ?? 3000,
         credit_used: cachedCustomer.credit_used ?? 0,
-      });
+      };
 
-      initialFormDataRef.current = { ...formData };
+      // Set customer form data
+      setFormData(fetchedFormData);
+
+      // IMPORTANT: Set initial ref to the fetched data, not current formData
+      initialFormDataRef.current = { ...fetchedFormData };
 
       // Set custom products
       if (
         cachedCustomer.customProducts &&
         cachedCustomer.customProducts.length > 0
       ) {
-        setCustomProducts(cachedCustomer.customProducts);
-        initialCustomProductsRef.current = JSON.parse(
+        // Create a deep copy of customProducts for accurate comparison
+        const fetchedProducts = JSON.parse(
           JSON.stringify(cachedCustomer.customProducts)
         );
+        setCustomProducts(fetchedProducts);
+        initialCustomProductsRef.current = fetchedProducts;
         setOriginalProductIds(
           new Set(cachedCustomer.customProducts.map((p) => p.product_id))
         );
@@ -193,7 +199,7 @@ const CustomerFormPage: React.FC = () => {
         setOriginalProductIds(new Set());
       }
 
-      // Set branch info
+      // Set branch info (rest of the code remains the same)
       if (
         cachedCustomer.branchInfo &&
         cachedCustomer.branchInfo.isInBranchGroup !== undefined &&
@@ -232,14 +238,16 @@ const CustomerFormPage: React.FC = () => {
       if (!isLoading) {
         fetchFromCache();
       }
-      // Don't set loading to false here, as we're now waiting for fetchFromCache
     } else {
-      // For new customer, ensure initial refs are set for change detection
-      initialFormDataRef.current = { ...formData };
-      initialCustomProductsRef.current = [...customProducts];
-      setLoading(false); // Not loading if creating new
+      // For new customer, ensure initial refs are set to the current empty form state
+      // Use deep copies to avoid reference issues
+      initialFormDataRef.current = JSON.parse(JSON.stringify(formData));
+      initialCustomProductsRef.current = JSON.parse(
+        JSON.stringify(customProducts)
+      );
+      setLoading(false);
     }
-  }, [isEditMode, fetchFromCache, isLoading]); // Add isLoading to dependencies
+  }, [isEditMode, fetchFromCache, isLoading]);
 
   // --- Populate Salesmen Options ---
   useEffect(() => {
@@ -892,23 +900,48 @@ const CustomerFormPage: React.FC = () => {
                           className="w-full px-3 py-2 border border-default-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100"
                           disabled={isSaving}
                         />
-                        {formData.credit_limit === 0 && (
-                          <p className="text-xs text-blue-600 mt-1">
-                            Unlimited credit
-                          </p>
-                        )}
                       </div>
-                      {/* Used Credit Display */}
+                      {/* Used Credit Input */}
                       <div>
-                        <label className="block text-sm font-medium text-default-700 mb-1">
-                          Credit Used
+                        <label
+                          htmlFor="credit_used"
+                          className="block text-sm font-medium text-default-700 mb-1"
+                        >
+                          Credit Used (RM)
                         </label>
-                        <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          {/* Match height */}
-                          <span className="font-medium text-default-700">
-                            RM {Number(formData.credit_used ?? 0).toFixed(2)}
-                          </span>
-                        </div>
+                        <input
+                          id="credit_used"
+                          type="text"
+                          name="credit_used"
+                          value={formData.credit_used?.toString() ?? "0"}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Allow empty string, numbers, and one decimal point
+                            if (/^\d*\.?\d{0,2}$/.test(value) || value === "") {
+                              setFormData({
+                                ...formData,
+                                // Store as number, default to 0 if empty becomes NaN
+                                credit_used:
+                                  value === "" ? 0 : parseFloat(value) || 0,
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Format and validate on blur
+                            const numericValue = parseFloat(e.target.value);
+                            if (!isNaN(numericValue)) {
+                              setFormData({
+                                ...formData,
+                                credit_used: Math.max(0, numericValue), // Ensure non-negative
+                              });
+                            } else {
+                              setFormData({ ...formData, credit_used: 0 }); // Default to 0 if invalid
+                            }
+                          }}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2 border border-default-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100"
+                          disabled={isSaving}
+                        />
                       </div>
                       {/* Available Credit Display */}
                       <div>

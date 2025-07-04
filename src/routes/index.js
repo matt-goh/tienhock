@@ -35,6 +35,9 @@ import banksRouter from "./catalogue/entities/banks.js";
 import racesRouter from "./catalogue/entities/races.js";
 import agamaRouter from "./catalogue/entities/agama.js";
 
+// Accounting routes
+import debtorsRouter from "./accounting/debtors.js";
+
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
 import paymentsRouter from "./sales/invoices/payments.js";
@@ -119,6 +122,9 @@ export default function setupRoutes(app, pool) {
 
   // User routes
   app.use("/api/bookmarks", sidebarRouter(pool));
+
+  // Accounting routes
+  app.use("/api/debtors", debtorsRouter(pool));
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));

@@ -632,6 +632,32 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   </View>
                 </View>
               ))}
+
+            {/* Income Tax Deduction */}
+            {payroll.deductions
+              .filter((d) => d.deduction_type === "income_tax")
+              .map((deduction, index) => (
+                <View key="deduction-income-tax" style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>Income Tax (Pekerja)</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({deduction.employee_amount.toFixed(2)})</Text>
+                  </View>
+                </View>
+              ))}
           </>
         )}
 

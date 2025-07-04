@@ -240,29 +240,40 @@ const PaySlipPreview: React.FC<PaySlipPreviewProps> = ({
             <div className="border-t border-default-200 pt-2">
               <h3 className="font-medium text-default-800 mb-3">Deductions</h3>
               <div className="space-y-3">
-                {payroll.deductions.map((deduction, index) => {
-                  const deductionName = deduction.deduction_type.toUpperCase();
-                  return (
-                    <div key={index} className="grid grid-cols-2 gap-8">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-default-600">
-                          {deductionName} (Employer):
-                        </span>
-                        <span className="text-sm font-medium">
-                          {formatCurrency(deduction.employer_amount)}
-                        </span>
+                {payroll.deductions
+                  .sort((a, b) => {
+                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
+                    return (
+                      order.indexOf(a.deduction_type) -
+                      order.indexOf(b.deduction_type)
+                    );
+                  })
+                  .map((deduction, index) => {
+                    const deductionName =
+                      deduction.deduction_type === "income_tax"
+                        ? "Income Tax"
+                        : deduction.deduction_type.toUpperCase();
+                    return (
+                      <div key={index} className="grid grid-cols-2 gap-8">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-default-600">
+                            {deductionName} (Employer):
+                          </span>
+                          <span className="text-sm font-medium">
+                            {formatCurrency(deduction.employer_amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-default-600">
+                            {deductionName} (Employee):
+                          </span>
+                          <span className="text-sm font-medium text-rose-600">
+                            -{formatCurrency(deduction.employee_amount)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-default-600">
-                          {deductionName} (Employee):
-                        </span>
-                        <span className="text-sm font-medium text-rose-600">
-                          -{formatCurrency(deduction.employee_amount)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 <div className="border-t border-default-200 pt-2 mt-3">
                   <div className="flex justify-between font-medium">
                     <span className="text-default-700">

@@ -289,51 +289,68 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             <h2 className="text-lg font-medium text-default-800 mb-4">
               Deductions Summary
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {payroll.deductions.map((deduction, index) => {
-                const deductionName = deduction.deduction_type.toUpperCase();
-                return (
-                  <div key={index} className="border rounded-lg p-4">
-                    <h3 className="text-sm font-medium text-default-700 mb-2">
-                      {deductionName}
-                    </h3>
-                    <div className="space-y-2">
-                      <div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-default-600">Employee:</span>
-                          <span className="font-medium text-default-900">
-                            {formatCurrency(deduction.employee_amount)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-default-600">Employer:</span>
-                          <span className="font-medium text-default-900">
-                            {formatCurrency(deduction.employer_amount)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="border-t border-default-200 pt-2 mt-2">
-                        <div className="flex justify-between text-xs text-default-500">
-                          <span>Employee Rate:</span>
-                          <span>{deduction.rate_info.employee_rate}</span>
-                        </div>
-                        <div className="flex justify-between text-xs text-default-500">
-                          <span>Employer Rate:</span>
-                          <span>{deduction.rate_info.employer_rate}</span>
-                        </div>
-                        {deduction.rate_info.age_group && (
-                          <div className="flex justify-between text-xs text-default-500">
-                            <span>Age Group:</span>
-                            <span className="capitalize">
-                              {deduction.rate_info.age_group.replace(/_/g, " ")}
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {payroll.deductions
+                .sort((a, b) => {
+                  const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
+                  const aIndex = order.indexOf(a.deduction_type.toUpperCase());
+                  const bIndex = order.indexOf(b.deduction_type.toUpperCase());
+                  return (
+                    (aIndex === -1 ? 999 : aIndex) -
+                    (bIndex === -1 ? 999 : bIndex)
+                  );
+                })
+                .map((deduction, index) => {
+                  const deductionType = deduction.deduction_type.toUpperCase();
+                  const deductionName =
+                    deductionType === "INCOME_TAX"
+                      ? "Income Tax"
+                      : deductionType;
+                  return (
+                    <div key={index} className="border rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-default-700 mb-2">
+                        {deductionName}
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-default-600">Employee:</span>
+                            <span className="font-medium text-default-900">
+                              {formatCurrency(deduction.employee_amount)}
                             </span>
                           </div>
-                        )}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-default-600">Employer:</span>
+                            <span className="font-medium text-default-900">
+                              {formatCurrency(deduction.employer_amount)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="border-t border-default-200 pt-2 mt-2">
+                          <div className="flex justify-between text-xs text-default-500">
+                            <span>Employee Rate:</span>
+                            <span>{deduction.rate_info.employee_rate}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-default-500">
+                            <span>Employer Rate:</span>
+                            <span>{deduction.rate_info.employer_rate}</span>
+                          </div>
+                          {deduction.rate_info.age_group && (
+                            <div className="flex justify-between text-xs text-default-500">
+                              <span>Age Group:</span>
+                              <span className="capitalize">
+                                {deduction.rate_info.age_group.replace(
+                                  /_/g,
+                                  " "
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         )}
@@ -435,53 +452,64 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                        <tfoot className="bg-default-50 border-t-2 border-default-200">
+                      <tfoot className="bg-default-50 border-t-2 border-default-200">
                         <tr>
                           <td
-                          colSpan={3}
-                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
+                            colSpan={3}
+                            className="px-6 py-3 text-right text-sm font-medium text-default-600"
                           >
-                          Total Base Pay
-                          {(() => {
-                            // Group base items by hours to find average rate
-                            const baseGroupedByHours = groupedItems["Base"]
-                            .filter(item => item.rate_unit === "Hour")
-                            .reduce((acc, item) => {
-                              const existing = acc.find(group => group.hours === item.quantity);
-                              if (existing) {
-                              existing.amount += item.amount;
-                              } else {
-                              acc.push({ hours: item.quantity, amount: item.amount });
+                            Total Base Pay
+                            {(() => {
+                              // Group base items by hours to find average rate
+                              const baseGroupedByHours = groupedItems["Base"]
+                                .filter((item) => item.rate_unit === "Hour")
+                                .reduce((acc, item) => {
+                                  const existing = acc.find(
+                                    (group) => group.hours === item.quantity
+                                  );
+                                  if (existing) {
+                                    existing.amount += item.amount;
+                                  } else {
+                                    acc.push({
+                                      hours: item.quantity,
+                                      amount: item.amount,
+                                    });
+                                  }
+                                  return acc;
+                                }, [] as { hours: number; amount: number }[]);
+
+                              if (baseGroupedByHours.length > 0) {
+                                // Find the hour group with the maximum hours (latest/most hours)
+                                const maxHoursGroup = baseGroupedByHours.reduce(
+                                  (maxGroup, currentGroup) => {
+                                    return currentGroup.hours > maxGroup.hours
+                                      ? currentGroup
+                                      : maxGroup;
+                                  },
+                                  baseGroupedByHours[0]
+                                );
+
+                                // Calculate rate using the maximum hours group
+                                const averageBaseRate =
+                                  maxHoursGroup && maxHoursGroup.hours > 0
+                                    ? baseTotal / maxHoursGroup.hours
+                                    : 0;
+
+                                return (
+                                  <div className="text-xs text-default-500 mt-1">
+                                    Avg Rate: {formatCurrency(averageBaseRate)}
+                                    /hour
+                                  </div>
+                                );
                               }
-                              return acc;
-                            }, [] as { hours: number; amount: number }[]);
-
-                            if (baseGroupedByHours.length > 0) {
-                            // Find the hour group with the maximum hours (latest/most hours)
-                            const maxHoursGroup = baseGroupedByHours.reduce((maxGroup, currentGroup) => {
-                              return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
-                            }, baseGroupedByHours[0]);
-
-                            // Calculate rate using the maximum hours group
-                            const averageBaseRate =
-                              maxHoursGroup && maxHoursGroup.hours > 0
-                              ? baseTotal / maxHoursGroup.hours
-                              : 0;
-
-                            return (
-                              <div className="text-xs text-default-500 mt-1">
-                              Avg Rate: {formatCurrency(averageBaseRate)}/hour
-                              </div>
-                            );
-                            }
-                            return null;
-                          })()}
+                              return null;
+                            })()}
                           </td>
                           <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
-                          {formatCurrency(baseTotal)}
+                            {formatCurrency(baseTotal)}
                           </td>
                         </tr>
-                        </tfoot>
+                      </tfoot>
                     </table>
                   </div>
                 </div>
