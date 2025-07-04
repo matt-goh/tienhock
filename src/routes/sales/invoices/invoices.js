@@ -2717,5 +2717,76 @@ export default function (pool, config) {
     }
   });
 
+  // PUT /api/invoices/:id/salesman - Update invoice salesman
+  router.put("/:id/salesman", async (req, res) => {
+    const { id } = req.params;
+    const { salespersonid } = req.body;
+
+    if (!salespersonid) {
+      return res.status(400).json({ message: "Salesperson ID is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT einvoice_status FROM invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      // Only allow salesman change if einvoice_status is null
+      if (invoiceCheck.rows[0].einvoice_status !== null) {
+        throw new Error("Cannot change salesman for submitted e-invoices");
+      }
+
+      // Verify salesperson exists
+      const staffCheck = await client.query(
+        "SELECT id FROM staffs WHERE id = $1",
+        [salespersonid]
+      );
+
+      if (staffCheck.rows.length === 0) {
+        throw new Error("Salesperson not found");
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE invoices 
+      SET salespersonid = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [salespersonid, id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Salesman updated successfully",
+        invoiceId: id,
+        salespersonid: salespersonid,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating salesman:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating salesman" });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }
