@@ -8,478 +8,445 @@ import {
   pdf,
 } from "@react-pdf/renderer";
 
-// Create styles
+// A refined color palette focusing on text and borders for a classic report look
+const colors = {
+  textPrimary: "#0f172a", // Dark Slate
+  textSecondary: "#475569", // Medium Slate
+  textMuted: "#64748b", // Light Slate
+  borderDark: "#334155",
+  border: "#cbd5e1",
+  borderLight: "#e2e8f0",
+  success: "#166534", // Dark Green
+  danger: "#b91c1c", // Dark Red
+};
+
+// Styles re-architected for hierarchy without background colors
 const styles = StyleSheet.create({
+  // Page and Document Structure
   page: {
-    padding: 40,
+    paddingTop: 35,
+    paddingBottom: 40,
+    paddingHorizontal: 35,
     fontFamily: "Helvetica",
-    fontSize: 10,
-    lineHeight: 1.5,
+    fontSize: 9,
+    color: colors.textPrimary,
   },
-  companyHeader: {
+  pageNumber: {
+    position: "absolute",
+    fontSize: 8,
+    bottom: 20,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    color: colors.textMuted,
+  },
+
+  // Report Header
+  reportHeader: {
+    marginBottom: 25,
+  },
+  companyName: {
     fontSize: 16,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
-    textAlign: "left",
-    letterSpacing: 0.5,
+    color: colors.textPrimary,
+    marginBottom: 4,
   },
   reportTitle: {
     fontSize: 12,
     fontFamily: "Helvetica",
-    marginBottom: 25,
-    textAlign: "left",
-    color: "#333333",
-    letterSpacing: 0.3,
+    color: colors.textSecondary,
   },
+
+  // Salesman Section
   salesmanSection: {
-    marginBottom: 30,
+    marginBottom: 25,
   },
   salesmanHeader: {
-    fontSize: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: "#000000",
-    color: "#000000",
-    letterSpacing: 0.3,
+    paddingBottom: 8,
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.borderDark,
+    marginBottom: 15,
   },
+  salesmanName: {
+    color: colors.textPrimary,
+  },
+  salesmanTotal: {
+    fontSize: 10,
+    fontFamily: "Helvetica",
+    color: colors.textSecondary,
+  },
+
+  // Customer Section
   customerSection: {
-    marginBottom: 25,
-    marginLeft: 0,
+    marginBottom: 20,
+    paddingLeft: 5, // A subtle indent for customers
   },
   customerHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
     paddingBottom: 8,
+    marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#CCCCCC",
-  },
-  customerNameBlock: {
-    flex: 1,
-  },
-  customerName: {
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    color: "#000000",
-    marginBottom: 3,
-    letterSpacing: 0.2,
+    borderBottomColor: colors.border,
   },
   customerInfo: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  customerNameText: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 4,
+  },
+  customerMetaText: {
     fontSize: 9,
-    color: "#555555",
-    flexDirection: "row",
-    gap: 15,
+    color: colors.textMuted,
   },
-  creditInfoBlock: {
-    alignItems: "flex-end",
+  customerCreditInfo: {
+    flexShrink: 0,
+    width: "35%",
   },
-  creditInfoRow: {
+  creditRow: {
     flexDirection: "row",
-    gap: 8,
+    justifyContent: "space-between",
     marginBottom: 2,
+    fontSize: 9,
   },
   creditLabel: {
-    fontSize: 9,
-    color: "#666666",
+    color: colors.textMuted,
   },
   creditValue: {
-    fontSize: 9,
     fontFamily: "Helvetica-Bold",
-    color: "#000000",
-    minWidth: 70,
     textAlign: "right",
   },
+
+  // Invoice Table
   table: {
-    display: "flex",
-    marginBottom: 8,
+    width: "100%",
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#F5F5F5",
-    paddingVertical: 8,
-    paddingHorizontal: 0,
-    fontFamily: "Helvetica-Bold",
-    fontSize: 9,
-    color: "#000000",
+    paddingVertical: 5,
+    paddingHorizontal: 4,
     borderTopWidth: 1,
-    borderTopColor: "#000000",
     borderBottomWidth: 1,
-    borderBottomColor: "#000000",
+    borderColor: colors.borderDark,
+    fontFamily: "Helvetica-Bold",
+    fontSize: 8,
+    textTransform: "uppercase",
+    color: colors.textSecondary,
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 6,
-    paddingHorizontal: 0,
-    fontSize: 9,
+    paddingVertical: 5,
+    paddingHorizontal: 4,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: colors.borderLight,
   },
-  // Column widths optimized for better space utilization
-  colNo: { width: "6%", paddingLeft: 4, textAlign: "center" },
-  colInvoiceNo: { width: "11%", paddingLeft: 4 },
-  colDate: { width: "10%", paddingLeft: 4 },
-  colAmount: { width: "13%", textAlign: "right", paddingRight: 8 },
-  colPayMethod: { width: "10%", paddingLeft: 4, textAlign: "center" },
-  colReference: { width: "14%", paddingLeft: 4 },
-  colPayDate: { width: "10%", paddingLeft: 4 },
-  colPaidAmount: { width: "13%", textAlign: "right", paddingRight: 8 },
+
+  // Table Column Widths
+  colNo: { width: "5%" },
+  colInvoiceNo: { width: "12%" },
+  colDate: { width: "10%" },
+  colAmount: { width: "12%", textAlign: "right", paddingRight: 4 },
+  colPayMethod: { width: "10%", textAlign: "center" },
+  colReference: { width: "15%" },
+  colPayDate: { width: "10%" },
+  colPaidAmount: { width: "13%", textAlign: "right", paddingRight: 4 },
   colBalance: { width: "13%", textAlign: "right", paddingRight: 4 },
+
+  bold: { fontFamily: "Helvetica-Bold" },
+
+  // Subtotal and Grand Total
   subtotalRow: {
     flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     fontFamily: "Helvetica-Bold",
-    fontSize: 9,
-    backgroundColor: "#F8F8F8",
-    borderTopWidth: 2,
-    borderTopColor: "#000000",
-    borderBottomWidth: 1,
-    borderBottomColor: "#000000",
-    marginTop: -0.5,
+    borderTopWidth: 1.5,
+    borderTopColor: colors.borderDark,
+    marginTop: -0.5, // Overlap the last row's border
+    marginBottom: 10,
   },
   grandTotalSection: {
-    marginTop: 40,
-    paddingTop: 20,
-    borderTopWidth: 3,
-    borderTopColor: "#000000",
+    marginTop: 30,
+    paddingTop: 15,
+    borderTopWidth: 2,
+    borderTopColor: colors.textPrimary,
   },
   grandTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: "#F0F0F0",
-    borderWidth: 1,
-    borderColor: "#000000",
+    alignItems: "center",
+    paddingVertical: 4,
   },
   grandTotalLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    color: "#000000",
-    letterSpacing: 0.5,
-  },
-  grandTotalItem: {
-    alignItems: "center",
-  },
-  grandTotalTitle: {
-    fontSize: 9,
-    color: "#666666",
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
+    color: colors.textSecondary,
   },
   grandTotalValue: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    color: "#000000",
-  },
-  pageNumber: {
-    position: "absolute",
-    fontSize: 9,
-    bottom: 25,
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    color: "#666666",
-  },
-  // New styles for better organization
-  invoiceCell: {
-    fontSize: 9,
-  },
-  dashedLine: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#CCCCCC",
-    borderStyle: "dashed",
-    marginVertical: 2,
+    color: colors.textPrimary,
   },
 });
 
-interface DebtorsReportPDFProps {
-  data: any;
-  companyName?: string;
-}
+// --- Helper Functions ---
 
-const DebtorsReportPDF: React.FC<DebtorsReportPDFProps> = ({
-  data,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
-}) => {
-  // Helper function to format currency
-  const formatCurrency = (amount: number): string => {
-    return `RM ${amount.toLocaleString("en-MY", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
+const formatCurrency = (amount: number): string => {
+  if (amount === 0) return "0.00";
+  return amount.toLocaleString("en-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
 
-  // Helper function to format date
-  const formatDate = (dateString: string): string => {
-    if (!dateString || dateString === "N/A") return "-";
-
-    if (/^\d+$/.test(dateString)) {
-      const date = new Date(parseInt(dateString, 10));
-      return date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-    }
-
-    const date = new Date(dateString);
+const formatDate = (dateString: string): string => {
+  if (!dateString || dateString === "N/A") return "-";
+  try {
+    const date = new Date(
+      /^\d+$/.test(dateString) ? parseInt(dateString, 10) : dateString
+    );
+    if (isNaN(date.getTime())) return "-";
     return date.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
-  };
+  } catch (e) {
+    return "-";
+  }
+};
 
-  // Format payment method
-  const formatPaymentMethod = (method: string): string => {
-    if (!method) return "-";
-    return method.charAt(0).toUpperCase() + method.slice(1);
-  };
+const formatPaymentMethod = (method: string): string => {
+  if (!method) return "-";
+  return method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
+};
 
-  return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <Text style={styles.companyHeader}>{companyName}</Text>
-        <Text style={styles.reportTitle}>
-          Unpaid Bills by Salesman as at {data.report_date}
+// --- PDF Components ---
+
+const InvoiceRow = ({ invoice, index }: { invoice: any; index: number }) => (
+  <>
+    <View style={styles.tableRow} wrap={false}>
+      <Text style={styles.colNo}>{index + 1}</Text>
+      <Text style={styles.colInvoiceNo}>{invoice.invoice_number}</Text>
+      <Text style={styles.colDate}>{formatDate(invoice.date)}</Text>
+      <Text style={styles.colAmount}>{formatCurrency(invoice.amount)}</Text>
+      <Text style={styles.colPayMethod}>
+        {formatPaymentMethod(invoice.payments[0]?.payment_method)}
+      </Text>
+      <Text style={styles.colReference}>
+        {invoice.payments[0]?.payment_reference || "-"}
+      </Text>
+      <Text style={styles.colPayDate}>
+        {formatDate(invoice.payments[0]?.date)}
+      </Text>
+      <Text style={[styles.colPaidAmount, { color: colors.success }]}>
+        {invoice.payments[0] ? formatCurrency(invoice.payments[0].amount) : "-"}
+      </Text>
+      <Text
+        style={[
+          styles.colBalance,
+          styles.bold,
+          { color: invoice.balance > 0 ? colors.danger : colors.success },
+        ]}
+      >
+        {formatCurrency(invoice.balance)}
+      </Text>
+    </View>
+    {invoice.payments.slice(1).map((payment: any) => (
+      <View key={payment.payment_id} style={styles.tableRow} wrap={false}>
+        <Text style={styles.colNo}></Text>
+        <Text style={styles.colInvoiceNo}></Text>
+        <Text style={styles.colDate}></Text>
+        <Text style={styles.colAmount}></Text>
+        <Text style={styles.colPayMethod}>
+          {formatPaymentMethod(payment.payment_method)}
         </Text>
+        <Text style={styles.colReference}>
+          {payment.payment_reference || "-"}
+        </Text>
+        <Text style={styles.colPayDate}>{formatDate(payment.date)}</Text>
+        <Text style={[styles.colPaidAmount, { color: colors.success }]}>
+          {formatCurrency(payment.amount)}
+        </Text>
+        <Text style={styles.colBalance}></Text>
+      </View>
+    ))}
+  </>
+);
 
-        {/* Salesmen Sections */}
-        {data.salesmen.map((salesman: any, salesmanIndex: number) => (
+const CustomerSection = ({
+  customer,
+  reportDate,
+}: {
+  customer: any;
+  reportDate: string;
+}) => (
+  <View style={styles.customerSection} wrap={false}>
+    <View style={styles.customerHeader}>
+      <View style={styles.customerInfo}>
+        <Text style={styles.customerNameText}>
+          {customer.customer_id} -{" "}
+          {customer.customer_name || "UNNAMED CUSTOMER"}
+        </Text>
+        <Text style={styles.customerMetaText}>
+          {customer.invoices.length} Invoice
+          {customer.invoices.length !== 1 ? "s" : ""}
+          {customer.phone_number && `  •  Tel: ${customer.phone_number}`}
+        </Text>
+      </View>
+      <View style={styles.customerCreditInfo}>
+        <View style={styles.creditRow}>
+          <Text style={styles.creditLabel}>Credit Limit:</Text>
+          <Text style={styles.creditValue}>
+            {formatCurrency(customer.credit_limit || 0)}
+          </Text>
+        </View>
+        <View style={styles.creditRow}>
+          <Text style={styles.creditLabel}>Outstanding:</Text>
+          <Text style={[styles.creditValue, { color: colors.danger }]}>
+            {formatCurrency(customer.credit_balance || 0)}
+          </Text>
+        </View>
+        <View style={styles.creditRow}>
+          <Text style={styles.creditLabel}>As at:</Text>
+          <Text style={styles.creditValue}>{reportDate}</Text>
+        </View>
+      </View>
+    </View>
+    <View style={styles.table}>
+      <View style={styles.tableHeader}>
+        <Text style={styles.colNo}>#</Text>
+        <Text style={styles.colInvoiceNo}>Invoice No.</Text>
+        <Text style={styles.colDate}>Date</Text>
+        <Text style={styles.colAmount}>Amount</Text>
+        <Text style={styles.colPayMethod}>Payment</Text>
+        <Text style={styles.colReference}>Reference</Text>
+        <Text style={styles.colPayDate}>Paid Date</Text>
+        <Text style={styles.colPaidAmount}>Paid</Text>
+        <Text style={styles.colBalance}>Balance</Text>
+      </View>
+      {customer.invoices.map((invoice: any, index: number) => (
+        <InvoiceRow key={invoice.invoice_id} invoice={invoice} index={index} />
+      ))}
+    </View>
+    <View style={styles.subtotalRow}>
+      <Text style={{ flex: 1, paddingLeft: 4 }}>
+        Subtotal for {customer.customer_id}
+      </Text>
+      <Text style={[styles.colAmount, { flexShrink: 0 }]}>
+        {formatCurrency(customer.total_amount)}
+      </Text>
+      <Text
+        style={{
+          width:
+            styles.colPayMethod.width +
+            styles.colReference.width +
+            styles.colPayDate.width,
+          flexShrink: 0,
+        }}
+      ></Text>
+      <Text
+        style={[styles.colPaidAmount, { color: colors.success, flexShrink: 0 }]}
+      >
+        {formatCurrency(customer.total_paid)}
+      </Text>
+      <Text
+        style={[styles.colBalance, { color: colors.danger, flexShrink: 0 }]}
+      >
+        {formatCurrency(customer.total_balance)}
+      </Text>
+    </View>
+  </View>
+);
+
+const DebtorsReportPDF: React.FC<{ data: any; companyName?: string }> = ({
+  data,
+  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+}) => {
+  return (
+    <Document title={`Tien Hock Debtors Report ${data.report_date}`}>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.reportHeader}>
+          <Text style={styles.companyName}>{companyName}</Text>
+          <Text style={styles.reportTitle}>
+            Unpaid Bills by Salesman as at {data.report_date}
+          </Text>
+        </View>
+        {data.salesmen.map((salesman: any, index: number) => (
           <View
             key={salesman.salesman_id}
             style={styles.salesmanSection}
-            wrap={false}
-            break={salesmanIndex > 0 && salesmanIndex % 2 === 0}
+            break={index > 0}
           >
-            <Text style={styles.salesmanHeader}>
-              {salesman.salesman_name} • {salesman.customers.length} Customer
-              {salesman.customers.length !== 1 ? "s" : ""} • Total Outstanding:{" "}
-              {formatCurrency(salesman.total_balance)}
-            </Text>
-
-            {/* Customers */}
+            <View style={styles.salesmanHeader}>
+              <Text style={styles.salesmanName}>{salesman.salesman_name}</Text>
+              <Text style={styles.salesmanTotal}>
+                Total Outstanding: {formatCurrency(salesman.total_balance)}
+              </Text>
+            </View>
             {salesman.customers.map((customer: any) => (
-              <View
+              <CustomerSection
                 key={customer.customer_id}
-                style={styles.customerSection}
-                wrap={false}
-              >
-                {/* Customer Header with Credit Info */}
-                <View style={styles.customerHeader}>
-                  <View style={styles.customerNameBlock}>
-                    <Text style={styles.customerName}>
-                      {customer.customer_id} -{" "}
-                      {customer.customer_name || "UNNAMED"}
-                    </Text>
-                    <View style={styles.customerInfo}>
-                      <Text>
-                        {customer.invoices.length} Invoice
-                        {customer.invoices.length !== 1 ? "s" : ""}
-                      </Text>
-                      {customer.phone_number && (
-                        <Text>Tel: {customer.phone_number}</Text>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={styles.creditInfoBlock}>
-                    <View style={styles.creditInfoRow}>
-                      <Text style={styles.creditLabel}>Credit Limit:</Text>
-                      <Text style={styles.creditValue}>
-                        {formatCurrency(customer.credit_limit || 0)}
-                      </Text>
-                    </View>
-                    <View style={styles.creditInfoRow}>
-                      <Text style={styles.creditLabel}>Credit Bal:</Text>
-                      <Text style={styles.creditValue}>
-                        {formatCurrency(customer.credit_balance || 0)}
-                      </Text>
-                    </View>
-                    <View style={styles.creditInfoRow}>
-                      <Text style={styles.creditLabel}>As at:</Text>
-                      <Text style={styles.creditValue}>{data.report_date}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Invoice Table */}
-                <View style={styles.table}>
-                  {/* Table Header */}
-                  <View style={styles.tableHeader}>
-                    <Text style={styles.colNo}>#</Text>
-                    <Text style={styles.colInvoiceNo}>Invoice No.</Text>
-                    <Text style={styles.colDate}>Date</Text>
-                    <Text style={styles.colAmount}>Amount</Text>
-                    <Text style={styles.colPayMethod}>Payment</Text>
-                    <Text style={styles.colReference}>Reference</Text>
-                    <Text style={styles.colPayDate}>Paid Date</Text>
-                    <Text style={styles.colPaidAmount}>Paid Amount</Text>
-                    <Text style={styles.colBalance}>Balance</Text>
-                  </View>
-
-                  {/* Invoice Rows */}
-                  {customer.invoices.map((invoice: any, index: number) => {
-                    if (invoice.payments.length === 0) {
-                      return (
-                        <View key={invoice.invoice_id} style={styles.tableRow}>
-                          <Text style={styles.colNo}>{index + 1}</Text>
-                          <Text style={styles.colInvoiceNo}>
-                            {invoice.invoice_number}
-                          </Text>
-                          <Text style={styles.colDate}>
-                            {formatDate(invoice.date)}
-                          </Text>
-                          <Text style={styles.colAmount}>
-                            {formatCurrency(invoice.amount)}
-                          </Text>
-                          <Text style={styles.colPayMethod}>-</Text>
-                          <Text style={styles.colReference}>-</Text>
-                          <Text style={styles.colPayDate}>-</Text>
-                          <Text style={styles.colPaidAmount}>-</Text>
-                          <Text
-                            style={[styles.colBalance, { color: "#DC2626" }]}
-                          >
-                            {formatCurrency(invoice.balance)}
-                          </Text>
-                        </View>
-                      );
-                    }
-
-                    return invoice.payments.map(
-                      (payment: any, payIndex: number) => (
-                        <View
-                          key={`${invoice.invoice_id}-${payment.payment_id}`}
-                          style={styles.tableRow}
-                        >
-                          {payIndex === 0 ? (
-                            <>
-                              <Text style={styles.colNo}>{index + 1}</Text>
-                              <Text style={styles.colInvoiceNo}>
-                                {invoice.invoice_number}
-                              </Text>
-                              <Text style={styles.colDate}>
-                                {formatDate(invoice.date)}
-                              </Text>
-                              <Text style={styles.colAmount}>
-                                {formatCurrency(invoice.amount)}
-                              </Text>
-                            </>
-                          ) : (
-                            <>
-                              <Text style={styles.colNo}></Text>
-                              <Text style={styles.colInvoiceNo}></Text>
-                              <Text style={styles.colDate}></Text>
-                              <Text style={styles.colAmount}></Text>
-                            </>
-                          )}
-                          <Text style={styles.colPayMethod}>
-                            {formatPaymentMethod(payment.payment_method)}
-                          </Text>
-                          <Text style={styles.colReference}>
-                            {payment.payment_reference || "-"}
-                          </Text>
-                          <Text style={styles.colPayDate}>
-                            {formatDate(payment.date)}
-                          </Text>
-                          <Text
-                            style={[styles.colPaidAmount, { color: "#059669" }]}
-                          >
-                            {formatCurrency(payment.amount)}
-                          </Text>
-                          {payIndex === 0 && (
-                            <Text
-                              style={[
-                                styles.colBalance,
-                                {
-                                  color:
-                                    invoice.balance > 0 ? "#DC2626" : "#059669",
-                                },
-                              ]}
-                            >
-                              {formatCurrency(invoice.balance)}
-                            </Text>
-                          )}
-                          {payIndex > 0 && (
-                            <Text style={styles.colBalance}></Text>
-                          )}
-                        </View>
-                      )
-                    );
-                  })}
-
-                  {/* Customer Subtotal */}
-                  <View style={styles.subtotalRow}>
-                    <Text
-                      style={[styles.colNo, { fontFamily: "Helvetica" }]}
-                    ></Text>
-                    <Text style={[styles.colInvoiceNo, styles.colDate]}>
-                      Subtotal
-                    </Text>
-                    <Text style={styles.colAmount}>
-                      {formatCurrency(customer.total_amount)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.colPayMethod,
-                        styles.colReference,
-                        styles.colPayDate,
-                      ]}
-                    ></Text>
-                    <Text style={[styles.colPaidAmount, { color: "#059669" }]}>
-                      {formatCurrency(customer.total_paid)}
-                    </Text>
-                    <Text style={[styles.colBalance, { color: "#DC2626" }]}>
-                      {formatCurrency(customer.total_balance)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
+                customer={customer}
+                reportDate={data.report_date}
+              />
             ))}
           </View>
         ))}
-
-        {/* Grand Total */}
-        <View style={styles.grandTotalSection}>
+        <View style={styles.grandTotalSection} break>
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>GRAND TOTAL</Text>
-            <View style={styles.grandTotalItem}>
-              <Text style={styles.grandTotalTitle}>Total Amount</Text>
-              <Text style={styles.grandTotalValue}>
-                {formatCurrency(data.grand_total_amount)}
-              </Text>
-            </View>
-            <View style={styles.grandTotalItem}>
-              <Text style={styles.grandTotalTitle}>Total Paid</Text>
-              <Text style={[styles.grandTotalValue, { color: "#059669" }]}>
-                {formatCurrency(data.grand_total_paid)}
-              </Text>
-            </View>
-            <View style={styles.grandTotalItem}>
-              <Text style={styles.grandTotalTitle}>Total Outstanding</Text>
-              <Text style={[styles.grandTotalValue, { color: "#DC2626" }]}>
-                {formatCurrency(data.grand_total_balance)}
-              </Text>
-            </View>
+            <Text style={styles.grandTotalLabel}>Grand Total Amount</Text>
+            <Text style={styles.grandTotalValue}>
+              {formatCurrency(data.grand_total_amount)}
+            </Text>
+          </View>
+          <View style={styles.grandTotalRow}>
+            <Text style={styles.grandTotalLabel}>Grand Total Paid</Text>
+            <Text style={[styles.grandTotalValue, { color: colors.success }]}>
+              {formatCurrency(data.grand_total_paid)}
+            </Text>
+          </View>
+          <View style={[styles.grandTotalRow, { marginTop: 4 }]}>
+            <Text
+              style={[
+                styles.grandTotalLabel,
+                { fontSize: 14, color: colors.textPrimary },
+              ]}
+            >
+              TOTAL OUTSTANDING
+            </Text>
+            <Text
+              style={[
+                styles.grandTotalValue,
+                { fontSize: 14, color: colors.danger },
+              ]}
+            >
+              {formatCurrency(data.grand_total_balance)}
+            </Text>
           </View>
         </View>
-
         <Text
           style={styles.pageNumber}
           render={({ pageNumber, totalPages }) =>
             `Page ${pageNumber} of ${totalPages}`
           }
+          fixed
         />
       </Page>
     </Document>
   );
 };
+
+// --- PDF Generation Function ---
 
 export const generateDebtorsReportPDF = async (
   data: any,
@@ -488,7 +455,6 @@ export const generateDebtorsReportPDF = async (
   try {
     const doc = <DebtorsReportPDF data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
-
     if (action === "download") {
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
@@ -502,34 +468,25 @@ export const generateDebtorsReportPDF = async (
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } else {
-      // Print
       const url = URL.createObjectURL(pdfBlob);
       const printFrame = document.createElement("iframe");
       printFrame.style.display = "none";
       document.body.appendChild(printFrame);
-
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
           try {
             printFrame.contentWindow.print();
           } catch (e) {
             console.error("Print failed:", e);
-          } finally {
-            // Cleanup
-            const cleanup = () => {
-              window.removeEventListener("focus", cleanupFocus);
-              if (document.body.contains(printFrame)) {
-                document.body.removeChild(printFrame);
-              }
-              URL.revokeObjectURL(url);
-            };
-
-            const cleanupFocus = () => {
-              setTimeout(cleanup, 100);
-            };
-
-            window.addEventListener("focus", cleanupFocus);
           }
+          const cleanup = () => {
+            if (document.body.contains(printFrame)) {
+              document.body.removeChild(printFrame);
+            }
+            URL.revokeObjectURL(url);
+            window.removeEventListener("focus", cleanup);
+          };
+          window.addEventListener("focus", cleanup, { once: true });
         }
       };
       printFrame.src = url;
