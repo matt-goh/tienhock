@@ -83,7 +83,7 @@ export default function (pool, config) {
         'total_paid', ca.total_paid,
         'total_balance', ca.total_amount - ca.total_paid,
         'credit_limit', ca.credit_limit,
-        'credit_balance', ca.credit_limit - ca.total_balance + ca.total_paid
+        'credit_balance', ca.credit_limit - ca.total_balance
           ) ORDER BY ca.latest_invoice_date DESC
         ) as customers,
         SUM(ca.total_balance) as total_balance
