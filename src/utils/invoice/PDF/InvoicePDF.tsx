@@ -658,7 +658,6 @@ const InvoicePDF: React.FC<InvoicePDFProps> = ({
 
             {/* Check if this is the last page of the entire document */}
             {pageIndex === pdfPages.length - 1 && (
-              // ... Summary rendering remains the same ...
               <View style={styles.summary}>
                 {/* Header Row */}
                 <View style={styles.summaryHeaderRow}>

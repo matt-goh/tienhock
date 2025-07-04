@@ -126,7 +126,8 @@ const DebtorsReportPage: React.FC = () => {
     }
   };
 
-  // This function now handles timestamp strings correctly.
+  // Format date strings or timestamps to "DD/MM/YYYY"
+  // Handles both ISO date strings and numeric timestamps
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
 

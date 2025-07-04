@@ -6,7 +6,10 @@ import {
   View,
   StyleSheet,
   pdf,
+  Image,
 } from "@react-pdf/renderer";
+import TienHockLogo from "../tienhock.png";
+import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 
 // A refined color palette focusing on text and borders for a classic report look
 const colors = {
@@ -18,15 +21,20 @@ const colors = {
   borderLight: "#e2e8f0",
   success: "#166534", // Dark Green
   danger: "#b91c1c", // Dark Red
+  header: {
+    companyName: "#1e293b",
+    companyDetails: "#334155",
+  },
 };
 
 // Styles re-architected for hierarchy without background colors
 const styles = StyleSheet.create({
-  // Page and Document Structure
+  // Page and Document Structure - matching InvoicePDF
   page: {
-    paddingTop: 35,
-    paddingBottom: 40,
-    paddingHorizontal: 35,
+    paddingTop: 15,
+    paddingBottom: 15,
+    paddingLeft: 30,
+    paddingRight: 30,
     fontFamily: "Helvetica",
     fontSize: 9,
     color: colors.textPrimary,
@@ -41,25 +49,35 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Report Header
-  reportHeader: {
-    marginBottom: 25,
+  // Report Header - matching InvoicePDF style
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    gap: 15,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  logo: {
+    width: 45,
+    height: 45,
   },
   companyName: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Helvetica-Bold",
-    color: colors.textPrimary,
-    marginBottom: 4,
+    color: colors.header.companyName,
   },
   reportTitle: {
-    fontSize: 12,
-    fontFamily: "Helvetica",
-    color: colors.textSecondary,
+    fontSize: 10,
+    marginTop: 4,
+    color: colors.header.companyDetails,
+    lineHeight: 1,
   },
 
   // Salesman Section
   salesmanSection: {
-    marginBottom: 25,
+    marginBottom: 6,
   },
   salesmanHeader: {
     flexDirection: "row",
@@ -67,33 +85,32 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    paddingBottom: 8,
+    paddingBottom: 6,
+    paddingLeft: 5,
     borderBottomWidth: 1.5,
     borderBottomColor: colors.borderDark,
-    marginBottom: 15,
+    marginBottom: 6,
   },
   salesmanName: {
     color: colors.textPrimary,
   },
   salesmanTotal: {
     fontSize: 10,
-    fontFamily: "Helvetica",
+    fontFamily: "Helvetica-Bold",
     color: colors.textSecondary,
   },
 
   // Customer Section
   customerSection: {
-    marginBottom: 20,
-    paddingLeft: 5, // A subtle indent for customers
+    marginBottom: 8,
+    marginLeft: 5,
+    borderBottom: `1pt solid ${colors.borderDark}`,
   },
   customerHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingBottom: 8,
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingBottom: 4,
   },
   customerInfo: {
     flex: 1,
@@ -166,35 +183,65 @@ const styles = StyleSheet.create({
   // Subtotal and Grand Total
   subtotalRow: {
     flexDirection: "row",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 2,
     fontFamily: "Helvetica-Bold",
-    borderTopWidth: 1.5,
+    borderTopWidth: 1,
     borderTopColor: colors.borderDark,
-    marginTop: -0.5, // Overlap the last row's border
-    marginBottom: 10,
+    marginBottom: 4,
   },
+
+  // Updated grand total section for more formal look
   grandTotalSection: {
-    marginTop: 30,
-    paddingTop: 15,
-    borderTopWidth: 2,
-    borderTopColor: colors.textPrimary,
+    paddingTop: 4,
+  },
+  grandTotalContent: {
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+    borderRadius: 8,
+    padding: 15,
   },
   grandTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingBottom: 6,
+    paddingHorizontal: 10,
   },
   grandTotalLabel: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
+    fontSize: 11,
+    fontFamily: "Helvetica",
     color: colors.textSecondary,
   },
   grandTotalValue: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
     color: colors.textPrimary,
+    textAlign: "right",
+  },
+  grandTotalDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginVertical: 5,
+  },
+  grandTotalFinalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 2,
+    paddingHorizontal: 10,
+    marginTop: 5,
+  },
+  grandTotalFinalLabel: {
+    fontSize: 13,
+    fontFamily: "Helvetica-Bold",
+    color: colors.textPrimary,
+    textTransform: "uppercase",
+  },
+  grandTotalFinalValue: {
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    color: colors.danger,
   },
 });
 
@@ -208,21 +255,36 @@ const formatCurrency = (amount: number): string => {
   });
 };
 
-const formatDate = (dateString: string): string => {
-  if (!dateString || dateString === "N/A") return "-";
-  try {
-    const date = new Date(
-      /^\d+$/.test(dateString) ? parseInt(dateString, 10) : dateString
-    );
-    if (isNaN(date.getTime())) return "-";
+// Format date strings or timestamps to "DD/MM/YYYY"
+// Handles both ISO date strings and numeric timestamps
+const formatDate = (dateString: string) => {
+  if (!dateString) return "-";
+
+  // Check if the string consists only of digits (a timestamp like "1747658034976")
+  if (/^\d+$/.test(dateString)) {
+    // Convert the string to a number before creating a Date object
+    const date = new Date(parseInt(dateString, 10));
+    if (isNaN(date.getTime())) {
+      return "Invalid Date";
+    }
     return date.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
-  } catch (e) {
-    return "-";
   }
+
+  // Otherwise, parse it as a regular date string.
+  // This preserves the existing behavior for payment dates which are re-formatted.
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return "Invalid Date";
+  }
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 };
 
 const formatPaymentMethod = (method: string): string => {
@@ -237,7 +299,7 @@ const InvoiceRow = ({ invoice, index }: { invoice: any; index: number }) => (
     <View style={styles.tableRow} wrap={false}>
       <Text style={styles.colNo}>{index + 1}</Text>
       <Text style={styles.colInvoiceNo}>{invoice.invoice_number}</Text>
-      <Text style={styles.colDate}>{formatDate(invoice.date)}</Text>
+      <Text style={styles.colDate}>{invoice.date}</Text>
       <Text style={styles.colAmount}>{formatCurrency(invoice.amount)}</Text>
       <Text style={styles.colPayMethod}>
         {formatPaymentMethod(invoice.payments[0]?.payment_method)}
@@ -311,8 +373,8 @@ const CustomerSection = ({
           </Text>
         </View>
         <View style={styles.creditRow}>
-          <Text style={styles.creditLabel}>Outstanding:</Text>
-          <Text style={[styles.creditValue, { color: colors.danger }]}>
+          <Text style={styles.creditLabel}>Credit Balance:</Text>
+          <Text style={[styles.creditValue, { color: colors.success }]}>
             {formatCurrency(customer.credit_balance || 0)}
           </Text>
         </View>
@@ -339,28 +401,32 @@ const CustomerSection = ({
       ))}
     </View>
     <View style={styles.subtotalRow}>
-      <Text style={{ flex: 1, paddingLeft: 4 }}>
+      <Text
+        style={{
+          width: "27%", // colNo + colInvoiceNo + colDate
+          paddingLeft: 4,
+        }}
+      >
         Subtotal for {customer.customer_id}
       </Text>
-      <Text style={[styles.colAmount, { flexShrink: 0 }]}>
+      <Text style={[styles.colAmount]}>
         {formatCurrency(customer.total_amount)}
       </Text>
       <Text
         style={{
-          width:
-            styles.colPayMethod.width +
-            styles.colReference.width +
-            styles.colPayDate.width,
-          flexShrink: 0,
+          width: "35%", // colPayMethod + colReference + colPayDate
         }}
       ></Text>
       <Text
-        style={[styles.colPaidAmount, { color: colors.success, flexShrink: 0 }]}
+        style={[
+          styles.colPaidAmount,
+          { color: colors.success, paddingLeft: -3 },
+        ]}
       >
         {formatCurrency(customer.total_paid)}
       </Text>
       <Text
-        style={[styles.colBalance, { color: colors.danger, flexShrink: 0 }]}
+        style={[styles.colBalance, { color: colors.danger, paddingLeft: -4 }]}
       >
         {formatCurrency(customer.total_balance)}
       </Text>
@@ -370,17 +436,22 @@ const CustomerSection = ({
 
 const DebtorsReportPDF: React.FC<{ data: any; companyName?: string }> = ({
   data,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = TIENHOCK_INFO.name,
 }) => {
   return (
     <Document title={`Tien Hock Debtors Report ${data.report_date}`}>
       <Page size="A4" style={styles.page}>
-        <View style={styles.reportHeader}>
-          <Text style={styles.companyName}>{companyName}</Text>
-          <Text style={styles.reportTitle}>
-            Unpaid Bills by Salesman as at {data.report_date}
-          </Text>
+        {/* Header with logo and company name - matching InvoicePDF style */}
+        <View style={styles.header}>
+          <Image src={TienHockLogo} style={styles.logo} />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.companyName}>{companyName}</Text>
+            <Text style={styles.reportTitle}>
+              Unpaid Bills by Salesmen as at {data.report_date}
+            </Text>
+          </View>
         </View>
+
         {data.salesmen.map((salesman: any, index: number) => (
           <View
             key={salesman.salesman_id}
@@ -402,38 +473,34 @@ const DebtorsReportPDF: React.FC<{ data: any; companyName?: string }> = ({
             ))}
           </View>
         ))}
-        <View style={styles.grandTotalSection} break>
-          <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>Grand Total Amount</Text>
-            <Text style={styles.grandTotalValue}>
-              {formatCurrency(data.grand_total_amount)}
-            </Text>
-          </View>
-          <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>Grand Total Paid</Text>
-            <Text style={[styles.grandTotalValue, { color: colors.success }]}>
-              {formatCurrency(data.grand_total_paid)}
-            </Text>
-          </View>
-          <View style={[styles.grandTotalRow, { marginTop: 4 }]}>
-            <Text
-              style={[
-                styles.grandTotalLabel,
-                { fontSize: 14, color: colors.textPrimary },
-              ]}
-            >
-              TOTAL OUTSTANDING
-            </Text>
-            <Text
-              style={[
-                styles.grandTotalValue,
-                { fontSize: 14, color: colors.danger },
-              ]}
-            >
-              {formatCurrency(data.grand_total_balance)}
-            </Text>
+
+        {/* Updated grand total section - no longer forces page break */}
+        <View style={styles.grandTotalSection}>
+          <View style={styles.grandTotalContent}>
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>Total Invoice Amount</Text>
+              <Text style={styles.grandTotalValue}>
+                RM {formatCurrency(data.grand_total_amount)}
+              </Text>
+            </View>
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>Total Amount Paid</Text>
+              <Text style={[styles.grandTotalValue, { color: colors.success }]}>
+                RM {formatCurrency(data.grand_total_paid)}
+              </Text>
+            </View>
+            <View style={styles.grandTotalDivider}></View>
+            <View style={styles.grandTotalFinalRow}>
+              <Text style={styles.grandTotalFinalLabel}>
+                Total Outstanding Balance
+              </Text>
+              <Text style={styles.grandTotalFinalValue}>
+                RM {formatCurrency(data.grand_total_balance)}
+              </Text>
+            </View>
           </View>
         </View>
+
         <Text
           style={styles.pageNumber}
           render={({ pageNumber, totalPages }) =>
