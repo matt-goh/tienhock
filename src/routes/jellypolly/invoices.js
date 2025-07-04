@@ -40,6 +40,7 @@ export default function (pool, config) {
         startDate,
         endDate,
         salesman,
+        customerId,
         paymentType,
         invoiceStatus,
         eInvoiceStatus,
@@ -92,6 +93,11 @@ export default function (pool, config) {
         const salesmanParam = `$${filterParamCounter++}`;
         filterParams.push(salesman.split(","));
         whereClause += ` AND i.salespersonid = ANY(${salesmanParam})`;
+      }
+      if (customerId) {
+        const customerParam = `$${filterParamCounter++}`;
+        filterParams.push(customerId);
+        whereClause += ` AND i.customerid = ${customerParam}`;
       }
       if (paymentType) {
         const paymentTypeParam = `$${filterParamCounter++}`;
@@ -243,6 +249,7 @@ export default function (pool, config) {
         startDate,
         endDate,
         salesman,
+        customerId,
         paymentType,
         invoiceStatus,
         eInvoiceStatus,
@@ -272,6 +279,12 @@ export default function (pool, config) {
       if (salesman) {
         whereClause += ` AND salespersonid = ANY($${filterParamCounter++})`;
         filterParams.push(salesman.split(","));
+      }
+
+      // Apply customer ID filter
+      if (customerId) {
+        whereClause += ` AND customerid = $${filterParamCounter++}`;
+        filterParams.push(customerId);
       }
 
       // Apply payment type filter

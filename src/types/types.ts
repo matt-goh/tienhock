@@ -455,6 +455,7 @@ export interface InvoiceFilters {
     end: Date | null;
   };
   salespersonId: string[] | null;
+  customerId: string | null;
   paymentType: string | null;
   invoiceStatus: string[];
   eInvoiceStatus: string[];
