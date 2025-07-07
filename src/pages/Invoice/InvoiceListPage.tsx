@@ -172,7 +172,7 @@ const formatInvoicesForExport = (invoices: ExtendedInvoiceData[]): string => {
         minute: "2-digit",
         hour12: true,
       })
-      .toLowerCase();
+      .toUpperCase();
 
     // 3. Format total amount (with comma separator, e.g., 1,234.56)
     const totalAmountString = (invoice.totalamountpayable || 0).toLocaleString(
@@ -233,7 +233,7 @@ const formatInvoicesForExport = (invoices: ExtendedInvoiceData[]): string => {
     });
 
     // Join all invoice lines with a newline and add a trailing newline for compatibility.
-    return lines.join("\n") + (lines.length > 0 ? "\n" : "");
+    return lines.join("\r\n") + (lines.length > 0 ? "\r\n" : "");
 };
 
 // --- Component ---
