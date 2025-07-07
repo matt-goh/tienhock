@@ -53,8 +53,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
-    gap: 15,
+    marginBottom: 8,
+    gap: 12,
   },
   headerTextContainer: {
     flex: 1,
@@ -96,6 +96,7 @@ const styles = StyleSheet.create({
   },
   salesmanTotal: {
     fontSize: 10,
+    paddingRight: 8,
     fontFamily: "Helvetica-Bold",
     color: colors.textSecondary,
   },
@@ -111,6 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     paddingBottom: 4,
+    paddingRight: 8,
   },
   customerInfo: {
     flex: 1,
