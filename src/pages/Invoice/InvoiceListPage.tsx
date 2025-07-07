@@ -219,21 +219,21 @@ const formatInvoicesForExport = (invoices: ExtendedInvoiceData[]): string => {
     // 8. Assemble the final line string for the invoice, ending with "&E&"
     return (
       [
-      invoice.id,
-      invoice.id, // orderno is same as invoiceno
-      formattedDate,
-      typeChar,
-      customerField,
-      invoice.salespersonid,
-      amountFields,
-      formattedTime,
-      orderDetailsString,
+        invoice.id,
+        invoice.id, // orderno is same as invoiceno
+        formattedDate,
+        typeChar,
+        customerField,
+        invoice.salespersonid,
+        amountFields,
+        formattedTime,
+        orderDetailsString,
       ].join("|") + "&E&"
     );
-    });
+  });
 
-    // Join all invoice lines with a newline and add a trailing newline for compatibility.
-    return lines.join("\r\n") + (lines.length > 0 ? "\r\n" : "");
+  // Join all invoice lines with a newline and add a trailing newline for compatibility.
+  return lines.join("\r\n") + (lines.length > 0 ? "\r\n" : "");
 };
 
 // --- Component ---
@@ -1141,7 +1141,7 @@ const InvoiceListPage: React.FC = () => {
     setShowEInvoiceDownloader(true);
   };
 
-  // Bulk Export Handler (New Function)
+  // Bulk Export Handler
   const handleBulkExport = async () => {
     if (selectedInvoiceIds.size === 0) {
       toast.error("No invoices selected for export");
@@ -1180,37 +1180,24 @@ const InvoiceListPage: React.FC = () => {
         throw new Error("Could not fetch required invoice details for export.");
       }
 
-      // Perform a robust check to ensure all invoices belong to the same salesman
-      const firstSalesmanId = completeInvoices[0]?.salespersonid;
-      if (!firstSalesmanId) {
-        throw new Error(
-          "Could not determine salesman ID from selected invoices."
-        );
-      }
-      const allHaveSameSalesman = completeInvoices.every(
-        (inv) => inv.salespersonid === firstSalesmanId
+      toast.loading(
+        `Generating export data for ${completeInvoices.length} invoices...`,
+        {
+          id: toastId,
+        }
       );
-      if (!allHaveSameSalesman) {
-        throw new Error(
-          "All selected invoices must belong to the same salesman for export."
-        );
-      }
-
-      toast.loading(`Generating data for salesman ${firstSalesmanId}...`, {
-        id: toastId,
-      });
 
       // Format data into the required text format
       const fileContent = formatInvoicesForExport(completeInvoices);
 
-      // Use File System Access API to save the file
-      const suggestedName = `SLS_${firstSalesmanId.substring(0, 3)}1.txt`;
+      // Use File System Access API to save the file with fixed filename
+      const suggestedName = `SLS1.txt`;
       const handle = await window.showSaveFilePicker({
         suggestedName,
         types: [
           {
-        description: "Sales Text File",
-        accept: { "text/plain": [".txt"] },
+            description: "Sales Text File",
+            accept: { "text/plain": [".txt"] },
           },
         ],
       });
