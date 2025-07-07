@@ -30,19 +30,24 @@ export async function validateCustomerIdentity(
     };
   }
 
-  // Check phone number and show warning if missing
-  let hasPhoneWarning = false;
+  // Check phone number and address - both required for validation
   if (!customer.phone_number || customer.phone_number.trim() === "") {
-    toast(" Phone number is needed for e-Invoice compliance", {
-      icon: "⚠️",
-      style: {
-        borderLeft: "4px solid #f59e0b",
-        backgroundColor: "#fef3c7",
-      },
-      duration: 4000,
-    });
-    hasPhoneWarning = true;
+    toast.error("Phone number is required for e-Invoice compliance");
+    return {
+      isValid: false,
+      message: "Phone number is required",
+    };
   }
+
+  if (!customer.address || customer.address.trim() === "") {
+    toast.error("Address is required for e-Invoice compliance");
+    return {
+      isValid: false,
+      message: "Address is required",
+    };
+  }
+
+  let hasPhoneWarning = false;
 
   try {
     const response = await api.get(

@@ -208,7 +208,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
         <p className="flex flex-col w-auto font-medium">
           <span
             className="w-auto truncate text-default-800 hover:underline cursor-pointer"
-            title={invoice.customerName || invoice.customerid}
+            title={`${invoice.customerName} (${invoice.customerid})`}
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/catalogue/customer/${invoice.customerid}`);
@@ -249,12 +249,13 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               invoiceStatusStyle.label === "Unpaid" ||
               invoiceStatusStyle.label === "Overdue"
             ) {
-                e.stopPropagation();
-                // Navigate directly to details page with payment form open
-                const basePath = activeCompany.id === "jellypolly" ? "/jellypolly" : "";
-                navigate(`${basePath}/sales/invoice/${invoice.id}`, {
+              e.stopPropagation();
+              // Navigate directly to details page with payment form open
+              const basePath =
+                activeCompany.id === "jellypolly" ? "/jellypolly" : "";
+              navigate(`${basePath}/sales/invoice/${invoice.id}`, {
                 state: { showPaymentForm: true },
-                });
+              });
             }
           }}
         >
