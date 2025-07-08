@@ -241,6 +241,19 @@ const InvoiceDetailsPage: React.FC = () => {
   const [selectedSalesman, setSelectedSalesman] = useState<string>("");
   const [isUpdatingSalesman, setIsUpdatingSalesman] = useState(false);
   const { salesmen, isLoading: isLoadingSalesmen } = useSalesmanCache();
+  // Payment type edit states
+  const [isEditingPaymentType, setIsEditingPaymentType] =
+    useState<boolean>(false);
+  const [selectedPaymentType, setSelectedPaymentType] = useState<
+    "CASH" | "INVOICE"
+  >("INVOICE");
+  const [isUpdatingPaymentType, setIsUpdatingPaymentType] =
+    useState<boolean>(false);
+
+  // Date/time edit states
+  const [isEditingDateTime, setIsEditingDateTime] = useState<boolean>(false);
+  const [selectedDateTime, setSelectedDateTime] = useState<string>("");
+  const [isUpdatingDateTime, setIsUpdatingDateTime] = useState<boolean>(false);
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
@@ -587,6 +600,116 @@ const InvoiceDetailsPage: React.FC = () => {
       });
     }
     setCustomerQuery("");
+  };
+
+  // Payment Type Update Handlers
+  const handlePaymentTypeUpdate = async (): Promise<void> => {
+    if (
+      !selectedPaymentType ||
+      selectedPaymentType === invoiceData?.paymenttype
+    ) {
+      setIsEditingPaymentType(false);
+      return;
+    }
+
+    setIsUpdatingPaymentType(true);
+    const toastId = toast.loading("Updating payment type...");
+
+    try {
+      const response = await api.put(
+        `/api/invoices/${invoiceData?.id}/paymenttype`,
+        {
+          paymenttype: selectedPaymentType,
+        }
+      );
+
+      const changeType = `${invoiceData?.paymenttype} to ${selectedPaymentType}`;
+
+      if (selectedPaymentType === "CASH") {
+        toast.success(
+          `Payment type updated to CASH - automatic payment created`,
+          { id: toastId }
+        );
+      } else {
+        toast.success(
+          `Payment type updated to INVOICE - automatic payment cancelled`,
+          { id: toastId }
+        );
+      }
+
+      setIsEditingPaymentType(false);
+      setSelectedPaymentType("INVOICE");
+
+      // Refresh invoice data to show updated payment records
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating payment type:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to update payment type";
+      toast.error(errorMessage, { id: toastId });
+    } finally {
+      setIsUpdatingPaymentType(false);
+    }
+  };
+
+  const handleOpenPaymentTypeEdit = (): void => {
+    setIsEditingPaymentType(true);
+    setSelectedPaymentType(invoiceData?.paymenttype || "INVOICE");
+  };
+
+  // Date/Time Update Handlers
+  const handleDateTimeUpdate = async (): Promise<void> => {
+    if (!selectedDateTime) {
+      setIsEditingDateTime(false);
+      return;
+    }
+
+    // Convert datetime-local to epoch timestamp
+    const timestamp = new Date(selectedDateTime).getTime().toString();
+
+    if (timestamp === invoiceData?.createddate) {
+      setIsEditingDateTime(false);
+      return;
+    }
+
+    setIsUpdatingDateTime(true);
+    try {
+      await api.put(`/api/invoices/${invoiceData?.id}/datetime`, {
+        createddate: timestamp,
+      });
+
+      toast.success("Date/time updated successfully");
+      setIsEditingDateTime(false);
+      setSelectedDateTime("");
+
+      // Refresh invoice data
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating date/time:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update date/time";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingDateTime(false);
+    }
+  };
+
+  const handleOpenDateTimeEdit = (): void => {
+    setIsEditingDateTime(true);
+
+    // Convert epoch timestamp to datetime-local format
+    if (invoiceData?.createddate) {
+      const date = new Date(parseInt(invoiceData.createddate));
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+
+      setSelectedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
   };
 
   // Clear E-Invoice Status Handler
@@ -1259,30 +1382,65 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex flex-col">
+            {/* Date/Time with edit functionality */}
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Date / Time
               </span>
-              <span className="flex text-gray-900 font-medium gap-2">
-                <span>{formatDisplayDate(createdDate)}</span>
-                <span className="text-gray-600">
-                  {parseDatabaseTimestamp(
-                    invoiceData.createddate
-                  ).date?.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  }) || ""}
+              <div className="flex items-center">
+                <span className="flex text-gray-900 font-medium gap-2">
+                  <span>{formatDisplayDate(createdDate)}</span>
+                  <span className="text-gray-600">
+                    {parseDatabaseTimestamp(
+                      invoiceData.createddate
+                    ).date?.toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    }) || ""}
+                  </span>
                 </span>
-              </span>
+                {/* Show pencil icon only if einvoice_status is null and on hover */}
+                {invoiceData.einvoice_status === null && (
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenDateTimeEdit();
+                    }}
+                    title="Edit date/time"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col">
+
+            {/* Payment Type with edit functionality */}
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Payment Type
               </span>
-              <span className="text-gray-900 font-medium capitalize">
-                {invoiceData.paymenttype.toLowerCase()}
-              </span>
+              <div className="flex items-center">
+                <span className="text-gray-900 font-medium capitalize">
+                  {invoiceData.paymenttype.toLowerCase()}
+                </span>
+                {/* Show pencil icon only if einvoice_status is null and on hover */}
+                {invoiceData.einvoice_status === null && (
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenPaymentTypeEdit();
+                    }}
+                    title="Edit payment type"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="md:col-span-2 flex flex-col">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
@@ -1803,6 +1961,146 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={isUpdatingSalesman || !selectedSalesman}
               >
                 {isUpdatingSalesman ? "Updating..." : "Update Salesman"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Payment Type Edit Modal */}
+      {isEditingPaymentType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Payment Type
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingPaymentType(false);
+                  setSelectedPaymentType("INVOICE");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingPaymentType}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <FormListbox
+                name="paymenttype"
+                label="Select Payment Type"
+                value={selectedPaymentType}
+                onChange={(value) =>
+                  setSelectedPaymentType(value as "CASH" | "INVOICE")
+                }
+                options={[
+                  { id: "CASH", name: "Cash" },
+                  { id: "INVOICE", name: "Invoice" },
+                ]}
+                placeholder="Select payment type..."
+                disabled={isUpdatingPaymentType}
+              />
+            </div>
+
+            {/* Warning message about automatic payment handling */}
+            {selectedPaymentType !== invoiceData?.paymenttype && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start">
+                  <IconAlertTriangle
+                    size={16}
+                    className="text-amber-600 mt-0.5 mr-2 flex-shrink-0"
+                  />
+                  <div className="text-sm text-amber-800">
+                    {selectedPaymentType === "CASH" ? (
+                      <span>
+                        <strong>Note:</strong> Changing to CASH will
+                        automatically create a payment record for the full
+                        amount and mark the invoice as paid. You may cancel the
+                        payment after this if needed.
+                      </span>
+                    ) : (
+                      <span>
+                        <strong>Note:</strong> Changing to INVOICE will cancel
+                        any automatic CASH payment and restore the full balance
+                        due.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingPaymentType(false);
+                  setSelectedPaymentType("INVOICE");
+                }}
+                disabled={isUpdatingPaymentType}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handlePaymentTypeUpdate}
+                disabled={isUpdatingPaymentType || !selectedPaymentType}
+              >
+                {isUpdatingPaymentType ? "Updating..." : "Update Payment Type"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Date/Time Edit Modal */}
+      {isEditingDateTime && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Date & Time
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingDateTime(false);
+                  setSelectedDateTime("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingDateTime}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <FormInput
+                name="datetime"
+                label="Date & Time"
+                type="datetime-local"
+                value={selectedDateTime}
+                onChange={(e) => setSelectedDateTime(e.target.value)}
+                disabled={isUpdatingDateTime}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingDateTime(false);
+                  setSelectedDateTime("");
+                }}
+                disabled={isUpdatingDateTime}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleDateTimeUpdate}
+                disabled={isUpdatingDateTime || !selectedDateTime}
+              >
+                {isUpdatingDateTime ? "Updating..." : "Update Date & Time"}
               </Button>
             </div>
           </div>
