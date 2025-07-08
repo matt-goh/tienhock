@@ -2618,6 +2618,86 @@ export default function (pool, config) {
     }
   });
 
+  // PUT /api/invoices/:id/uuid - Update invoice UUID manually
+  router.put("/:id/uuid", async (req, res) => {
+    const { id } = req.params;
+    const { uuid } = req.body;
+
+    if (!uuid || !uuid.trim()) {
+      return res.status(400).json({ message: "UUID is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT invoice_status, einvoice_status FROM invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      const currentInvoice = invoiceCheck.rows[0];
+
+      // Only allow UUID setting for invoices with null einvoice_status
+      if (currentInvoice.einvoice_status !== null) {
+        throw new Error(
+          "Can only set UUID for invoices with null e-invoice status"
+        );
+      }
+
+      // Prevent changes for cancelled invoices
+      if (currentInvoice.invoice_status === "cancelled") {
+        throw new Error("Cannot set UUID for cancelled invoices");
+      }
+
+      // Check if UUID already exists in system
+      const uuidCheck = await client.query(
+        "SELECT id FROM invoices WHERE uuid = $1 AND id != $2",
+        [uuid.trim(), id]
+      );
+
+      if (uuidCheck.rows.length > 0) {
+        throw new Error("This UUID is already assigned to another invoice");
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE invoices 
+      SET uuid = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [uuid.trim(), id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "UUID updated successfully",
+        invoiceId: id,
+        uuid: uuid.trim(),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating UUID:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating UUID" });
+    } finally {
+      client.release();
+    }
+  });
+
   // PUT /api/invoices/:id/customer - Update customer for invoice
   router.put("/:id/customer", async (req, res) => {
     const { id } = req.params;

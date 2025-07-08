@@ -265,6 +265,10 @@ const InvoiceDetailsPage: React.FC = () => {
     type: "customer" | "datetime";
     data: any;
   } | null>(null);
+  // UUID edit states
+  const [isEditingUUID, setIsEditingUUID] = useState<boolean>(false);
+  const [selectedUUID, setSelectedUUID] = useState<string>("");
+  const [isUpdatingUUID, setIsUpdatingUUID] = useState<boolean>(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -887,6 +891,40 @@ const InvoiceDetailsPage: React.FC = () => {
     }));
   };
 
+  // UUID Update Handlers
+  const handleUUIDUpdate = async (): Promise<void> => {
+    if (!selectedUUID.trim() || !invoiceData) {
+      setIsEditingUUID(false);
+      return;
+    }
+
+    setIsUpdatingUUID(true);
+    try {
+      await api.put(`/api/invoices/${invoiceData.id}/uuid`, {
+        uuid: selectedUUID.trim(),
+      });
+
+      toast.success("UUID updated successfully");
+      setIsEditingUUID(false);
+      setSelectedUUID("");
+
+      // Refresh invoice data
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating UUID:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update UUID";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingUUID(false);
+    }
+  };
+
+  const handleOpenUUIDEdit = (): void => {
+    setIsEditingUUID(true);
+    setSelectedUUID(invoiceData?.uuid || "");
+  };
+
   const validatePaymentForm = (): boolean => {
     if (!paymentFormData.payment_date) {
       toast.error("Payment date is required");
@@ -1482,7 +1520,6 @@ const InvoiceDetailsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-            {/* Date/Time with edit functionality */}
             <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Date / Time
@@ -1536,7 +1573,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div className="md:col-span-2 flex flex-col">
+            <div className="flex flex-col">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Balance Due
               </span>
@@ -1564,6 +1601,34 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
               </div>
             </div>
+            {/* Manual UUID Input - Only show for null einvoice_status and on hover */}
+            {invoiceData.einvoice_status === null && (
+              <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300">
+              <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
+                Manual UUID (Hover to Edit)
+              </span>
+              <div className="flex items-center">
+                <span className="text-gray-600 font-mono text-sm break-all">
+                {invoiceData.uuid || "No UUID set"}
+                </span>
+                <button
+                className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenUUIDEdit();
+                }}
+                title="Set UUID manually"
+                disabled={isLoading}
+                >
+                <IconPencil size={14} className="text-sky-600" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Use this to manually set UUID if e-invoice submission didn't
+                record it properly
+              </p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -2195,6 +2260,80 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={isUpdatingDateTime || !selectedDateTime}
               >
                 {isUpdatingDateTime ? "Updating..." : "Update Date & Time"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* UUID Edit Modal */}
+      {isEditingUUID && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Set Manual UUID
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingUUID(false);
+                  setSelectedUUID("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingUUID}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <FormInput
+                name="uuid"
+                label="UUID"
+                type="text"
+                value={selectedUUID}
+                onChange={(e) => setSelectedUUID(e.target.value)}
+                disabled={isUpdatingUUID}
+                placeholder="Enter UUID (e.g., 4RKA7KDV6JM3HVTSQ9S60MZJ10)"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the UUID from MyInvois if the system failed to record it
+                automatically
+              </p>
+            </div>
+
+            {/* Warning message */}
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start">
+                <IconAlertTriangle
+                  size={16}
+                  className="text-amber-600 mt-0.5 mr-2 flex-shrink-0"
+                />
+                <div className="text-sm text-amber-800">
+                  <strong>Warning:</strong> Only use this if the e-invoice was
+                  successfully submitted to MyInvois but the UUID wasn't
+                  recorded. Setting an incorrect UUID may cause issues with
+                  e-invoice operations.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingUUID(false);
+                  setSelectedUUID("");
+                }}
+                disabled={isUpdatingUUID}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleUUIDUpdate}
+                disabled={isUpdatingUUID || !selectedUUID.trim()}
+              >
+                {isUpdatingUUID ? "Updating..." : "Set UUID"}
               </Button>
             </div>
           </div>
