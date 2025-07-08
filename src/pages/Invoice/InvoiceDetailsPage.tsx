@@ -254,11 +254,17 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isEditingDateTime, setIsEditingDateTime] = useState<boolean>(false);
   const [selectedDateTime, setSelectedDateTime] = useState<string>("");
   const [isUpdatingDateTime, setIsUpdatingDateTime] = useState<boolean>(false);
-  // E-Invoice submission handler
+  // E-Invoice handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
   const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showEInvoiceCancelConfirm, setShowEInvoiceCancelConfirm] =
+    useState<boolean>(false);
+  const [eInvoiceCancelAction, setEInvoiceCancelAction] = useState<{
+    type: "customer" | "datetime";
+    data: any;
+  } | null>(null);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -530,18 +536,52 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
+    // Check if this requires e-invoice cancellation confirmation
+    const requiresConfirmation =
+      invoiceData?.einvoice_status !== null &&
+      invoiceData?.einvoice_status !== "cancelled";
+
+    if (requiresConfirmation) {
+      // Show confirmation dialog first
+      setEInvoiceCancelAction({
+        type: "customer",
+        data: { customerid: selectedCustomer.id },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    // Proceed directly if no confirmation needed
+    await performCustomerUpdate(false);
+  };
+
+  const performCustomerUpdate = async (
+    confirmEInvoiceCancellation: boolean
+  ): Promise<void> => {
+    if (!selectedCustomer) return;
+
     setIsUpdatingCustomer(true);
     try {
-      await api.put(`/api/invoices/${invoiceData?.id}/customer`, {
-        customerid: selectedCustomer.id,
-      });
+      const response = await api.put(
+        `/api/invoices/${invoiceData?.id}/customer`,
+        {
+          customerid: selectedCustomer.id,
+          confirmEInvoiceCancellation,
+        }
+      );
 
       toast.success("Customer updated successfully");
+      if (response.einvoiceCleared) {
+        toast(
+          "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
+        );
+      }
+
       setIsEditingCustomer(false);
       setSelectedCustomer(null);
       setCustomerQuery("");
 
-      // Refresh invoice data to get updated customer details including TIN
+      // Refresh invoice data
       await fetchDetails();
     } catch (error) {
       console.error("Error updating customer:", error);
@@ -623,8 +663,6 @@ const InvoiceDetailsPage: React.FC = () => {
         }
       );
 
-      const changeType = `${invoiceData?.paymenttype} to ${selectedPaymentType}`;
-
       if (selectedPaymentType === "CASH") {
         toast.success(
           `Payment type updated to CASH - automatic payment created`,
@@ -661,26 +699,63 @@ const InvoiceDetailsPage: React.FC = () => {
 
   // Date/Time Update Handlers
   const handleDateTimeUpdate = async (): Promise<void> => {
-    if (!selectedDateTime) {
+    if (!selectedDateTime || !invoiceData) {
       setIsEditingDateTime(false);
       return;
     }
 
     // Convert datetime-local to epoch timestamp
-    const timestamp = new Date(selectedDateTime).getTime().toString();
+    const newTimestamp = new Date(selectedDateTime).getTime();
+    const currentTimestamp = parseInt(invoiceData.createddate);
 
-    if (timestamp === invoiceData?.createddate) {
+    if (newTimestamp === currentTimestamp) {
       setIsEditingDateTime(false);
       return;
     }
 
+    // Check if this requires e-invoice cancellation confirmation
+    const requiresConfirmation =
+      invoiceData?.einvoice_status !== null &&
+      invoiceData?.einvoice_status !== "cancelled";
+
+    if (requiresConfirmation) {
+      // Show confirmation dialog first
+      setEInvoiceCancelAction({
+        type: "datetime",
+        data: { createddate: newTimestamp.toString() },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    // Proceed directly if no confirmation needed
+    await performDateTimeUpdate(false);
+  };
+
+  const performDateTimeUpdate = async (
+    confirmEInvoiceCancellation: boolean
+  ): Promise<void> => {
+    if (!selectedDateTime || !invoiceData) return;
+
+    const newTimestamp = new Date(selectedDateTime).getTime();
+
     setIsUpdatingDateTime(true);
     try {
-      await api.put(`/api/invoices/${invoiceData?.id}/datetime`, {
-        createddate: timestamp,
-      });
+      const response = await api.put(
+        `/api/invoices/${invoiceData.id}/datetime`,
+        {
+          createddate: newTimestamp.toString(),
+          confirmEInvoiceCancellation,
+        }
+      );
 
       toast.success("Date/time updated successfully");
+      if (response.einvoiceCleared) {
+        toast(
+          "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
+        );
+      }
+
       setIsEditingDateTime(false);
       setSelectedDateTime("");
 
@@ -709,6 +784,37 @@ const InvoiceDetailsPage: React.FC = () => {
       const minutes = String(date.getMinutes()).padStart(2, "0");
 
       setSelectedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
+  };
+
+  const handleConfirmEInvoiceCancellation = async (): Promise<void> => {
+    if (!eInvoiceCancelAction) return;
+
+    setShowEInvoiceCancelConfirm(false);
+
+    try {
+      if (eInvoiceCancelAction.type === "customer") {
+        await performCustomerUpdate(true);
+      } else if (eInvoiceCancelAction.type === "datetime") {
+        await performDateTimeUpdate(true);
+      }
+    } finally {
+      setEInvoiceCancelAction(null);
+    }
+  };
+
+  const handleCancelEInvoiceCancellation = (): void => {
+    setShowEInvoiceCancelConfirm(false);
+    setEInvoiceCancelAction(null);
+
+    // Reset any editing states
+    if (eInvoiceCancelAction?.type === "customer") {
+      setIsEditingCustomer(false);
+      setSelectedCustomer(null);
+      setCustomerQuery("");
+    } else if (eInvoiceCancelAction?.type === "datetime") {
+      setIsEditingDateTime(false);
+      setSelectedDateTime("");
     }
   };
 
@@ -1334,20 +1440,17 @@ const InvoiceDetailsPage: React.FC = () => {
                 >
                   {invoiceData.customerName || invoiceData.customerid}
                 </span>
-                {/* Show pencil icon only if einvoice_status is null and on hover */}
-                {invoiceData.einvoice_status === null && (
-                  <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenCustomerEdit();
-                    }}
-                    title="Edit customer"
-                    disabled={isLoading}
-                  >
-                    <IconPencil size={14} className="text-sky-600" />
-                  </button>
-                )}
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenCustomerEdit();
+                  }}
+                  title="Edit customer"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
               </div>
             </div>
             <div className="flex flex-col group">
@@ -1366,20 +1469,17 @@ const InvoiceDetailsPage: React.FC = () => {
                   {salesmen.find((s) => s.id === invoiceData.salespersonid)
                     ?.name || invoiceData.salespersonid}
                 </span>
-                {/* Show pencil icon only if einvoice_status is null and on hover */}
-                {invoiceData.einvoice_status === null && (
-                  <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenSalesmanEdit();
-                    }}
-                    title="Edit salesman"
-                    disabled={isLoading}
-                  >
-                    <IconPencil size={14} className="text-sky-600" />
-                  </button>
-                )}
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenSalesmanEdit();
+                  }}
+                  title="Edit salesman"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
               </div>
             </div>
             {/* Date/Time with edit functionality */}
@@ -1400,20 +1500,17 @@ const InvoiceDetailsPage: React.FC = () => {
                     }) || ""}
                   </span>
                 </span>
-                {/* Show pencil icon only if einvoice_status is null and on hover */}
-                {invoiceData.einvoice_status === null && (
-                  <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenDateTimeEdit();
-                    }}
-                    title="Edit date/time"
-                    disabled={isLoading}
-                  >
-                    <IconPencil size={14} className="text-sky-600" />
-                  </button>
-                )}
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDateTimeEdit();
+                  }}
+                  title="Edit date/time"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
               </div>
             </div>
 
@@ -1426,20 +1523,17 @@ const InvoiceDetailsPage: React.FC = () => {
                 <span className="text-gray-900 font-medium capitalize">
                   {invoiceData.paymenttype.toLowerCase()}
                 </span>
-                {/* Show pencil icon only if einvoice_status is null and on hover */}
-                {invoiceData.einvoice_status === null && (
-                  <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenPaymentTypeEdit();
-                    }}
-                    title="Edit payment type"
-                    disabled={isLoading}
-                  >
-                    <IconPencil size={14} className="text-sky-600" />
-                  </button>
-                )}
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenPaymentTypeEdit();
+                  }}
+                  title="Edit payment type"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
               </div>
             </div>
             <div className="md:col-span-2 flex flex-col">
@@ -2106,6 +2200,22 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* E-Invoice Cancellation Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showEInvoiceCancelConfirm}
+        onClose={handleCancelEInvoiceCancellation}
+        onConfirm={handleConfirmEInvoiceCancellation}
+        title="Cancel E-Invoice Required"
+        message={`This invoice has been submitted to MyInvois (Status: ${
+          invoiceData?.einvoice_status
+        }). Changing ${
+          eInvoiceCancelAction?.type === "customer"
+            ? "customer information"
+            : "date/time"
+        } will cancel the e-invoice at MyInvois. You will need to resubmit the e-invoice after making all necessary changes. Do you want to continue?`}
+        confirmButtonText="Cancel E-Invoice & Continue"
+        variant="danger"
+      />
     </div>
   );
 };
