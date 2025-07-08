@@ -719,8 +719,13 @@ const CustomerFormPage: React.FC = () => {
         {/* Wrap form in a div to handle potential saving overlay */}
         <div className="relative">
           {isSaving && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50 rounded-b-lg">
-              <LoadingSpinner hideText /> Saving...
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+              <div className="flex items-center space-x-3 bg-white px-6 py-4 rounded-lg shadow-lg border border-default-200">
+                <LoadingSpinner hideText />
+                <span className="text-sm font-medium text-default-700">
+                  Saving customer...
+                </span>
+              </div>
             </div>
           )}
 
