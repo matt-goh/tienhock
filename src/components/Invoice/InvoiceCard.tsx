@@ -227,7 +227,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             {invoice.salespersonid}
           </span>
         </p>
-        <p className="text-lg font-semibold text-default-900">
+        <p className="w-fit text-lg font-semibold text-default-900">
           {`RM ${invoice.totalamountpayable.toFixed(2)}`}
         </p>
       </div>
@@ -245,11 +245,11 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               : ""
           }`}
           onClick={(e) => {
+            e.stopPropagation();
             if (
               invoiceStatusStyle.label === "Unpaid" ||
               invoiceStatusStyle.label === "Overdue"
             ) {
-              e.stopPropagation();
               // Navigate directly to details page with payment form open
               const basePath =
                 activeCompany.id === "jellypolly" ? "/jellypolly" : "";
