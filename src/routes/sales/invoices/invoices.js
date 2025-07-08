@@ -2621,7 +2621,7 @@ export default function (pool, config) {
   // PUT /api/invoices/:id/customer - Update customer for invoice
   router.put("/:id/customer", async (req, res) => {
     const { id } = req.params;
-    const { customerid } = req.body;
+    const { customerid, confirmEInvoiceCancellation } = req.body;
 
     // Validation
     if (!customerid) {
@@ -2634,9 +2634,9 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
 
-      // 1. First, get the current invoice to check einvoice_status
+      // 1. First, get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, customerid, einvoice_status, invoice_status 
+      SELECT id, customerid, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated
       FROM invoices 
       WHERE id = $1
     `;
@@ -2651,17 +2651,7 @@ export default function (pool, config) {
 
       const invoice = invoiceResult.rows[0];
 
-      // 2. Validate that einvoice_status is null
-      if (invoice.einvoice_status !== null) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message:
-            "Cannot change customer for invoices with e-invoice status. Only invoices without e-invoice submission can be modified.",
-          currentEInvoiceStatus: invoice.einvoice_status,
-        });
-      }
-
-      // 3. Validate that the invoice is not cancelled
+      // 2. Validate that the invoice is not cancelled
       if (invoice.invoice_status === "cancelled") {
         await client.query("ROLLBACK");
         return res.status(400).json({
@@ -2669,7 +2659,63 @@ export default function (pool, config) {
         });
       }
 
-      // 4. Check if the new customer exists
+      // 3. Check if this is critical e-Invoice data change
+      const requiresConfirmation =
+        invoice.einvoice_status !== null &&
+        invoice.einvoice_status !== "cancelled";
+
+      if (requiresConfirmation && !confirmEInvoiceCancellation) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Customer change requires e-Invoice cancellation confirmation",
+          requiresConfirmation: true,
+          currentEInvoiceStatus: invoice.einvoice_status,
+        });
+      }
+
+      // 4. If confirmation provided, attempt to cancel e-invoice via API and clear fields
+      if (requiresConfirmation && confirmEInvoiceCancellation) {
+        let apiCancellationSuccess = false;
+
+        // Try to cancel via MyInvois API if UUID exists
+        if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+          try {
+            // Using the API client logic you provided
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${invoice.uuid}/state`,
+              { status: "cancelled", reason: "Customer information updated" }
+            );
+            apiCancellationSuccess = true;
+          } catch (cancelError) {
+            console.error(
+              `Error cancelling e-invoice ${invoice.uuid} via API:`,
+              cancelError
+            );
+            if (cancelError.status === 400) {
+              console.warn(
+                `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
+              );
+              apiCancellationSuccess = true;
+            }
+          }
+        }
+
+        // Clear e-invoice fields regardless of API result
+        const clearEInvoiceQuery = `
+        UPDATE invoices 
+        SET uuid = NULL, 
+            submission_uid = NULL, 
+            long_id = NULL,
+            datetime_validated = NULL, 
+            einvoice_status = NULL
+        WHERE id = $1
+      `;
+        await client.query(clearEInvoiceQuery, [id]);
+      }
+
+      // 5. Check if the new customer exists
       const customerCheckQuery = `
       SELECT id, name FROM customers WHERE id = $1
     `;
@@ -2684,7 +2730,7 @@ export default function (pool, config) {
         });
       }
 
-      // 5. Update the invoice with the new customer
+      // 6. Update the invoice with the new customer
       const updateQuery = `
       UPDATE invoices 
       SET customerid = $1
@@ -2695,7 +2741,7 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
 
-      // 6. Return success response
+      // 7. Return success response
       res.json({
         message: "Customer updated successfully",
         invoice: {
@@ -2704,6 +2750,7 @@ export default function (pool, config) {
           customerName: customerResult.rows[0].name,
           oldCustomerId: invoice.customerid,
         },
+        einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -2733,7 +2780,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT einvoice_status FROM invoices WHERE id = $1",
+        "SELECT invoice_status FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -2741,9 +2788,9 @@ export default function (pool, config) {
         throw new Error("Invoice not found");
       }
 
-      // Only allow salesman change if einvoice_status is null
-      if (invoiceCheck.rows[0].einvoice_status !== null) {
-        throw new Error("Cannot change salesman for submitted e-invoices");
+      // Only prevent changes for cancelled invoices
+      if (invoiceCheck.rows[0].invoice_status === "cancelled") {
+        throw new Error("Cannot change salesman for cancelled invoices");
       }
 
       // Verify salesperson exists
@@ -2806,7 +2853,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT einvoice_status, paymenttype, balance_due, totalamountpayable FROM invoices WHERE id = $1",
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -2814,12 +2861,13 @@ export default function (pool, config) {
         throw new Error("Invoice not found");
       }
 
-      // Only allow payment type change if einvoice_status is null
-      if (invoiceCheck.rows[0].einvoice_status !== null) {
-        throw new Error("Cannot change payment type for submitted e-invoices");
+      const currentInvoice = invoiceCheck.rows[0];
+
+      // Only prevent changes for cancelled invoices
+      if (currentInvoice.invoice_status === "cancelled") {
+        throw new Error("Cannot change payment type for cancelled invoices");
       }
 
-      const currentInvoice = invoiceCheck.rows[0];
       const currentPaymentType = currentInvoice.paymenttype;
 
       // If no change in payment type, return early
@@ -2839,57 +2887,36 @@ export default function (pool, config) {
         const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
         const insertPaymentQuery = `
-        INSERT INTO payments (
-          invoice_id, 
-          amount_paid, 
-          payment_date, 
-          payment_method, 
-          notes, 
-          status,
-          created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        INSERT INTO payments (invoice_id, payment_date, payment_method, amount_paid, notes, status)
+        VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active')
         RETURNING payment_id
       `;
 
-        const paymentResult = await client.query(insertPaymentQuery, [
-          id,
-          paymentAmount,
-          today,
-          "cash",
-          "Automatic payment for CASH invoice",
-          "confirmed",
-        ]);
-
-        if (paymentResult.rows.length === 0) {
-          throw new Error("Failed to create automatic payment");
-        }
+        await client.query(insertPaymentQuery, [id, today, paymentAmount]);
 
         // Update invoice to CASH type with zero balance and paid status
         const updateInvoiceQuery = `
         UPDATE invoices 
-        SET paymenttype = $1, balance_due = $2, invoice_status = $3
-        WHERE id = $4
+        SET paymenttype = $1, balance_due = 0, invoice_status = $2
+        WHERE id = $3
         RETURNING id
       `;
 
-        await client.query(updateInvoiceQuery, ["CASH", 0, "paid", id]);
+        await client.query(updateInvoiceQuery, ["CASH", "Paid", id]);
       }
       // Handle CASH to INVOICE conversion
       else if (currentPaymentType === "CASH" && paymenttype === "INVOICE") {
-        // Find and cancel automatic CASH payment
+        // Find and cancel the automatic payment if it exists
         const findPaymentQuery = `
-        SELECT payment_id, amount_paid FROM payments 
-        WHERE invoice_id = $1 
-        AND notes = $2 
-        AND status != 'cancelled'
-        ORDER BY created_at DESC
+        SELECT payment_id FROM payments 
+        WHERE invoice_id = $1 AND payment_method = 'cash' 
+        AND notes LIKE '%Automatic payment%' 
+        AND (status IS NULL OR status = 'active')
+        ORDER BY payment_date DESC 
         LIMIT 1
       `;
 
-        const paymentResult = await client.query(findPaymentQuery, [
-          id,
-          "Automatic payment for CASH invoice",
-        ]);
+        const paymentResult = await client.query(findPaymentQuery, [id]);
 
         if (paymentResult.rows.length > 0) {
           const payment = paymentResult.rows[0];
@@ -2950,7 +2977,7 @@ export default function (pool, config) {
   // PUT /api/invoices/:id/datetime - Update invoice date/time
   router.put("/:id/datetime", async (req, res) => {
     const { id } = req.params;
-    const { createddate } = req.body;
+    const { createddate, confirmEInvoiceCancellation } = req.body;
 
     if (!createddate) {
       return res.status(400).json({ message: "Created date is required" });
@@ -2969,7 +2996,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT einvoice_status FROM invoices WHERE id = $1",
+        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -2977,9 +3004,69 @@ export default function (pool, config) {
         throw new Error("Invoice not found");
       }
 
-      // Only allow date change if einvoice_status is null
-      if (invoiceCheck.rows[0].einvoice_status !== null) {
-        throw new Error("Cannot change date/time for submitted e-invoices");
+      const invoice = invoiceCheck.rows[0];
+
+      // Validate that the invoice is not cancelled
+      if (invoice.invoice_status === "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Cannot change date/time for cancelled invoices",
+        });
+      }
+
+      // Check if this requires e-Invoice cancellation confirmation
+      const requiresConfirmation =
+        invoice.einvoice_status !== null &&
+        invoice.einvoice_status !== "cancelled";
+
+      if (requiresConfirmation && !confirmEInvoiceCancellation) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Date/time change requires e-Invoice cancellation confirmation",
+          requiresConfirmation: true,
+          currentEInvoiceStatus: invoice.einvoice_status,
+        });
+      }
+
+      // If confirmation provided, attempt to cancel e-invoice and clear fields
+      if (requiresConfirmation && confirmEInvoiceCancellation) {
+        let apiCancellationSuccess = false;
+
+        // Try to cancel via MyInvois API if UUID exists
+        if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+          try {
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${invoice.uuid}/state`,
+              { status: "cancelled", reason: "Invoice date/time updated" }
+            );
+            apiCancellationSuccess = true;
+          } catch (cancelError) {
+            console.error(
+              `Error cancelling e-invoice ${invoice.uuid} via API:`,
+              cancelError
+            );
+            if (cancelError.status === 400) {
+              console.warn(
+                `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
+              );
+              apiCancellationSuccess = true;
+            }
+          }
+        }
+
+        // Clear e-invoice fields regardless of API result
+        const clearEInvoiceQuery = `
+        UPDATE invoices 
+        SET uuid = NULL, 
+            submission_uid = NULL, 
+            long_id = NULL,
+            datetime_validated = NULL, 
+            einvoice_status = NULL
+        WHERE id = $1
+      `;
+        await client.query(clearEInvoiceQuery, [id]);
       }
 
       // Update the invoice
@@ -3002,6 +3089,7 @@ export default function (pool, config) {
         message: "Date/time updated successfully",
         invoiceId: id,
         createddate: createddate,
+        einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
       });
     } catch (error) {
       await client.query("ROLLBACK");
