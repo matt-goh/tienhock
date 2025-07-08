@@ -2788,5 +2788,231 @@ export default function (pool, config) {
     }
   });
 
+  // PUT /api/invoices/:id/paymenttype - Update invoice payment type
+  router.put("/:id/paymenttype", async (req, res) => {
+    const { id } = req.params;
+    const { paymenttype } = req.body;
+
+    if (!paymenttype || !["CASH", "INVOICE"].includes(paymenttype)) {
+      return res
+        .status(400)
+        .json({ message: "Valid payment type (CASH or INVOICE) is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT einvoice_status, paymenttype, balance_due, totalamountpayable FROM invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      // Only allow payment type change if einvoice_status is null
+      if (invoiceCheck.rows[0].einvoice_status !== null) {
+        throw new Error("Cannot change payment type for submitted e-invoices");
+      }
+
+      const currentInvoice = invoiceCheck.rows[0];
+      const currentPaymentType = currentInvoice.paymenttype;
+
+      // If no change in payment type, return early
+      if (currentPaymentType === paymenttype) {
+        await client.query("COMMIT");
+        return res.json({
+          message: "Payment type unchanged",
+          invoiceId: id,
+          paymenttype: paymenttype,
+        });
+      }
+
+      // Handle INVOICE to CASH conversion
+      if (currentPaymentType === "INVOICE" && paymenttype === "CASH") {
+        // Create automatic payment for the full amount
+        const paymentAmount = currentInvoice.totalamountpayable;
+        const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+
+        const insertPaymentQuery = `
+        INSERT INTO payments (
+          invoice_id, 
+          amount_paid, 
+          payment_date, 
+          payment_method, 
+          notes, 
+          status,
+          created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        RETURNING payment_id
+      `;
+
+        const paymentResult = await client.query(insertPaymentQuery, [
+          id,
+          paymentAmount,
+          today,
+          "cash",
+          "Automatic payment for CASH invoice",
+          "confirmed",
+        ]);
+
+        if (paymentResult.rows.length === 0) {
+          throw new Error("Failed to create automatic payment");
+        }
+
+        // Update invoice to CASH type with zero balance and paid status
+        const updateInvoiceQuery = `
+        UPDATE invoices 
+        SET paymenttype = $1, balance_due = $2, invoice_status = $3
+        WHERE id = $4
+        RETURNING id
+      `;
+
+        await client.query(updateInvoiceQuery, ["CASH", 0, "paid", id]);
+      }
+      // Handle CASH to INVOICE conversion
+      else if (currentPaymentType === "CASH" && paymenttype === "INVOICE") {
+        // Find and cancel automatic CASH payment
+        const findPaymentQuery = `
+        SELECT payment_id, amount_paid FROM payments 
+        WHERE invoice_id = $1 
+        AND notes = $2 
+        AND status != 'cancelled'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+
+        const paymentResult = await client.query(findPaymentQuery, [
+          id,
+          "Automatic payment for CASH invoice",
+        ]);
+
+        if (paymentResult.rows.length > 0) {
+          const payment = paymentResult.rows[0];
+
+          // Cancel the automatic payment
+          const cancelPaymentQuery = `
+          UPDATE payments 
+          SET status = 'cancelled', notes = CONCAT(notes, ' - Cancelled due to payment type change')
+          WHERE payment_id = $1
+        `;
+
+          await client.query(cancelPaymentQuery, [payment.payment_id]);
+        }
+
+        // Update invoice to INVOICE type with full balance and unpaid status
+        const updateInvoiceQuery = `
+        UPDATE invoices 
+        SET paymenttype = $1, balance_due = $2, invoice_status = $3
+        WHERE id = $4
+        RETURNING id
+      `;
+
+        await client.query(updateInvoiceQuery, [
+          "INVOICE",
+          currentInvoice.totalamountpayable,
+          "Unpaid",
+          id,
+        ]);
+      }
+
+      await client.query("COMMIT");
+
+      // Get updated invoice data for response
+      const updatedInvoiceQuery = `
+      SELECT paymenttype, balance_due, invoice_status FROM invoices WHERE id = $1
+    `;
+      const updatedResult = await client.query(updatedInvoiceQuery, [id]);
+      const updatedInvoice = updatedResult.rows[0];
+
+      res.json({
+        message: "Payment type updated successfully",
+        invoiceId: id,
+        paymenttype: updatedInvoice.paymenttype,
+        balance_due: parseFloat(updatedInvoice.balance_due),
+        invoice_status: updatedInvoice.invoice_status,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating payment type:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating payment type" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /api/invoices/:id/datetime - Update invoice date/time
+  router.put("/:id/datetime", async (req, res) => {
+    const { id } = req.params;
+    const { createddate } = req.body;
+
+    if (!createddate) {
+      return res.status(400).json({ message: "Created date is required" });
+    }
+
+    // Validate that createddate is a valid epoch timestamp
+    const timestamp = parseInt(createddate);
+    if (isNaN(timestamp) || timestamp <= 0) {
+      return res.status(400).json({ message: "Invalid timestamp format" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT einvoice_status FROM invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      // Only allow date change if einvoice_status is null
+      if (invoiceCheck.rows[0].einvoice_status !== null) {
+        throw new Error("Cannot change date/time for submitted e-invoices");
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE invoices 
+      SET createddate = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [createddate, id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Date/time updated successfully",
+        invoiceId: id,
+        createddate: createddate,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating date/time:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating date/time" });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }
