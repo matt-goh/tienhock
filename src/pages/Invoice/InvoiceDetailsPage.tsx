@@ -50,6 +50,8 @@ import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import LineItemsTable from "../../components/Invoice/LineItemsTable";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -269,6 +271,14 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isEditingUUID, setIsEditingUUID] = useState<boolean>(false);
   const [selectedUUID, setSelectedUUID] = useState<string>("");
   const [isUpdatingUUID, setIsUpdatingUUID] = useState<boolean>(false);
+  // Order details edit states
+  const { products: productsCache, isLoading: productsLoading } =
+    useProductsCache();
+  const [isEditingOrderDetails, setIsEditingOrderDetails] =
+    useState<boolean>(false);
+  const [editedProducts, setEditedProducts] = useState<ProductItem[]>([]);
+  const [isUpdatingOrderDetails, setIsUpdatingOrderDetails] =
+    useState<boolean>(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -801,6 +811,8 @@ const InvoiceDetailsPage: React.FC = () => {
         await performCustomerUpdate(true);
       } else if (eInvoiceCancelAction.type === "datetime") {
         await performDateTimeUpdate(true);
+      } else if (eInvoiceCancelAction.type === "orderdetails") {
+        await performOrderDetailsUpdate(true);
       }
     } finally {
       setEInvoiceCancelAction(null);
@@ -819,6 +831,9 @@ const InvoiceDetailsPage: React.FC = () => {
     } else if (eInvoiceCancelAction?.type === "datetime") {
       setIsEditingDateTime(false);
       setSelectedDateTime("");
+    } else if (eInvoiceCancelAction?.type === "orderdetails") {
+      setIsEditingOrderDetails(false);
+      setEditedProducts([]);
     }
   };
 
@@ -870,6 +885,145 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsClearingEInvoice(false);
     }
+  };
+
+  // Order Details Update Handlers
+  const handleOrderDetailsUpdate = async (): Promise<void> => {
+    if (!editedProducts || !invoiceData) {
+      setIsEditingOrderDetails(false);
+      return;
+    }
+
+    // Check if this requires e-invoice cancellation confirmation
+    const requiresConfirmation =
+      invoiceData?.einvoice_status !== null &&
+      invoiceData?.einvoice_status !== "cancelled";
+
+    if (requiresConfirmation) {
+      // Show confirmation dialog first
+      setEInvoiceCancelAction({
+        type: "orderdetails" as any,
+        data: { products: editedProducts },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    // Proceed directly if no confirmation needed
+    await performOrderDetailsUpdate(false);
+  };
+
+  const performOrderDetailsUpdate = async (
+    confirmEInvoiceCancellation: boolean
+  ): Promise<void> => {
+    if (!editedProducts || !invoiceData) return;
+
+    setIsUpdatingOrderDetails(true);
+    try {
+      const response = await api.put(
+        `/api/invoices/${invoiceData.id}/order-details`,
+        {
+          products: editedProducts,
+          confirmEInvoiceCancellation,
+        }
+      );
+
+      toast.success("Order details updated successfully");
+      if (response.einvoiceCleared) {
+        toast(
+          "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
+        );
+      }
+
+      setIsEditingOrderDetails(false);
+      setEditedProducts([]);
+
+      // Refresh invoice data
+      await fetchDetails();
+    } catch (error) {
+      console.error("Error updating order details:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to update order details";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingOrderDetails(false);
+    }
+  };
+
+  const handleOpenOrderDetailsEdit = (): void => {
+    setIsEditingOrderDetails(true);
+    // Deep copy the products to avoid modifying the original
+    setEditedProducts(
+      invoiceData?.products.map((product) => ({
+        ...product,
+        uid: product.uid || crypto.randomUUID(),
+      })) || []
+    );
+  };
+
+  const handleLineItemsChange = useCallback((updatedItems: ProductItem[]) => {
+    const itemsWithUid = updatedItems.map((item) => ({
+      ...item,
+      uid: item.uid || crypto.randomUUID(),
+    }));
+
+    let runningTotal = 0;
+    const recalculatedItems = itemsWithUid.map((item) => {
+      if (!item.issubtotal && !item.istotal) {
+        const itemTotal = parseFloat(item.total || "0");
+        runningTotal += itemTotal;
+        return item;
+      } else if (item.issubtotal) {
+        return { ...item, total: runningTotal.toFixed(2) };
+      }
+      return item;
+    });
+
+    setEditedProducts(recalculatedItems);
+  }, []);
+
+  const handleAddOrderDetailRow = () => {
+    if (!editedProducts) return;
+    const newRow: ProductItem = {
+      uid: crypto.randomUUID(),
+      code: "",
+      description: "",
+      quantity: 1,
+      price: 0,
+      freeProduct: 0,
+      returnProduct: 0,
+      tax: 0,
+      total: "0.00",
+      issubtotal: false,
+    };
+    handleLineItemsChange([...editedProducts, newRow]);
+  };
+
+  const handleAddOrderDetailSubtotal = () => {
+    if (!editedProducts) return;
+    let runningTotal = 0;
+    for (let i = editedProducts.length - 1; i >= 0; i--) {
+      const item = editedProducts[i];
+      if (item.issubtotal) break;
+      if (!item.istotal) {
+        runningTotal += parseFloat(item.total || "0");
+      }
+    }
+    const subtotalRow: ProductItem = {
+      uid: crypto.randomUUID(),
+      code: "SUBTOTAL",
+      description: "Subtotal",
+      quantity: 0,
+      price: 0,
+      freeProduct: 0,
+      returnProduct: 0,
+      tax: 0,
+      total: runningTotal.toFixed(2),
+      issubtotal: true,
+    };
+    handleLineItemsChange([...editedProducts, subtotalRow]);
   };
 
   // --- Payment Form Handling ---
@@ -1604,39 +1758,52 @@ const InvoiceDetailsPage: React.FC = () => {
             {/* Manual UUID Input - Only show for null einvoice_status and on hover */}
             {invoiceData.einvoice_status === null && (
               <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300">
-              <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
-                Manual UUID (Hover to Edit)
-              </span>
-              <div className="flex items-center">
-                <span className="text-gray-600 font-mono text-sm break-all">
-                {invoiceData.uuid || "No UUID set"}
+                <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
+                  Manual UUID
                 </span>
-                <button
-                className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenUUIDEdit();
-                }}
-                title="Set UUID manually"
-                disabled={isLoading}
-                >
-                <IconPencil size={14} className="text-sky-600" />
-                </button>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">
-                Use this to manually set UUID if e-invoice submission didn't
-                record it properly
-              </p>
+                <div className="flex items-center">
+                  <span className="text-gray-600 font-mono text-sm break-all">
+                    {invoiceData.uuid || "No UUID set"}
+                  </span>
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenUUIDEdit();
+                    }}
+                    title="Set UUID manually"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Use this to manually set UUID if e-invoice submission didn't
+                  record it properly
+                </p>
               </div>
             )}
           </div>
         </section>
 
         {/* Line Items Display */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
-          <h2 className="text-lg font-semibold mb-3 text-gray-800">
-            Line Items
-          </h2>
+        <section className="p-4 group border rounded-lg bg-white shadow-sm">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold text-gray-800  flex items-center">
+              Line Items
+            </h2>
+            <button
+              className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenOrderDetailsEdit();
+              }}
+              title="Edit line items"
+              disabled={isLoading}
+            >
+              <IconPencil size={16} className="text-sky-600" />
+            </button>
+          </div>
           <LineItemsDisplayTable items={invoiceData.products} />
         </section>
 
@@ -2006,6 +2173,95 @@ const InvoiceDetailsPage: React.FC = () => {
           onComplete={handlePrintComplete}
         />
       )}
+      {/* Order Details Edit Modal */}
+      {isEditingOrderDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Edit Line Items
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingOrderDetails(false);
+                  setEditedProducts([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingOrderDetails}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 px-6 py-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm text-gray-600">
+                  Modify the line items for this invoice
+                </span>
+                <div>
+                  <Button
+                    onClick={handleAddOrderDetailSubtotal}
+                    variant="outline"
+                    size="sm"
+                    className="mr-2"
+                    disabled={isUpdatingOrderDetails}
+                  >
+                    Add Subtotal
+                  </Button>
+                  <Button
+                    onClick={handleAddOrderDetailRow}
+                    variant="outline"
+                    size="sm"
+                    disabled={isUpdatingOrderDetails}
+                  >
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+
+              <LineItemsTable
+                items={editedProducts}
+                onItemsChange={handleLineItemsChange}
+                customerProducts={[]} // You may want to fetch customer products if needed
+                productsCache={productsCache.map((product) => ({
+                  uid: crypto.randomUUID(),
+                  id: product.id,
+                  code: product.id,
+                  description: product.description,
+                  price: product.price_per_unit,
+                  quantity: 1,
+                  freeProduct: 0,
+                  returnProduct: 0,
+                  tax: 0,
+                  total: "0.00",
+                  issubtotal: false,
+                }))}
+                readOnly={isUpdatingOrderDetails}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingOrderDetails(false);
+                  setEditedProducts([]);
+                }}
+                disabled={isUpdatingOrderDetails}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleOrderDetailsUpdate}
+                disabled={isUpdatingOrderDetails || editedProducts.length === 0}
+              >
+                {isUpdatingOrderDetails ? "Updating..." : "Update Line Items"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Customer Edit Modal */}
       {isEditingCustomer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2340,6 +2596,7 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
       )}
       {/* E-Invoice Cancellation Confirmation Dialog */}
+      {/* E-Invoice Cancellation Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showEInvoiceCancelConfirm}
         onClose={handleCancelEInvoiceCancellation}
@@ -2350,7 +2607,11 @@ const InvoiceDetailsPage: React.FC = () => {
         }). Changing ${
           eInvoiceCancelAction?.type === "customer"
             ? "customer information"
-            : "date/time"
+            : eInvoiceCancelAction?.type === "datetime"
+            ? "date/time"
+            : eInvoiceCancelAction?.type === "orderdetails"
+            ? "line items"
+            : "invoice data"
         } will cancel the e-invoice at MyInvois. You will need to resubmit the e-invoice after making all necessary changes. Do you want to continue?`}
         confirmButtonText="Cancel E-Invoice & Continue"
         variant="danger"
