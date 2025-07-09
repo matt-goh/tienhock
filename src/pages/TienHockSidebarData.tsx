@@ -4,9 +4,6 @@ import {
   IconFileInvoice,
   IconListDetails,
   IconUserDollar,
-  IconCalendarEvent,
-  IconCalculator,
-  IconCash,
   IconReportMoney,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
@@ -28,6 +25,7 @@ import DailyLogListPage from "./Payroll/DailyLogListPage";
 import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
+import CutiManagementPage from "./Payroll/CutiManagementPage";
 import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
@@ -58,6 +56,48 @@ import BasicPage from "./Catalogue/BasicPage";
 // Function to generate payroll subitems for each job type
 const generatePayrollSubItems = (): SidebarItem[] => {
   const payrollSubItems: SidebarItem[] = [];
+
+  // Add Monthly Payrolls
+  payrollSubItems.push({
+    name: "Monthly Payrolls",
+    path: "/payroll/monthly-payrolls",
+    component: MonthlyPayrollsPage,
+    subItems: [
+      {
+        name: "Payroll List",
+        path: "/payroll/monthly-payrolls/list",
+        component: MonthlyPayrollsPage,
+      },
+      {
+        name: "Payroll Details",
+        path: "/payroll/monthly-payrolls/:id",
+        component: MonthlyPayrollDetailsPage,
+      },
+      {
+        name: "Process Payroll",
+        path: "/payroll/monthly-payrolls/:id/process",
+        component: PayrollProcessingPage,
+      },
+      {
+        name: "Employee Payroll Details",
+        path: "/payroll/employee-payroll/:id",
+        component: EmployeePayrollDetailsPage,
+      },
+    ],
+  });
+
+  payrollSubItems.push({
+    name: "Cuti Management",
+    path: "/payroll/cuti-management",
+    component: CutiManagementPage,
+    subItems: [
+      {
+        name: "Holiday Calendar",
+        path: "/payroll/holiday-calendar",
+        component: HolidayCalendarPage,
+      },
+    ],
+  });
 
   // Add each production type dynamically
   Object.values(JOB_CONFIGS).forEach((jobConfig) => {
@@ -96,55 +136,16 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     });
   });
 
-  // Add Monthly Payrolls
-  payrollSubItems.push({
-    name: "Monthly Payrolls",
-    path: "/payroll/monthly-payrolls",
-    component: MonthlyPayrollsPage,
-    subItems: [
-      {
-        name: "Payroll List",
-        path: "/payroll/monthly-payrolls/list",
-        component: MonthlyPayrollsPage,
-      },
-      {
-        name: "Payroll Details",
-        path: "/payroll/monthly-payrolls/:id",
-        component: MonthlyPayrollDetailsPage,
-      },
-      {
-        name: "Process Payroll",
-        path: "/payroll/monthly-payrolls/:id/process",
-        component: PayrollProcessingPage,
-      },
-      {
-        name: "Employee Payroll Details",
-        path: "/payroll/employee-payroll/:id",
-        component: EmployeePayrollDetailsPage,
-      },
-    ],
-  });
-
   payrollSubItems.push({
     name: "Mid-month Pay",
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
-    icon: IconCash,
-  });
-
-  // Add Holiday Calendar at the end
-  payrollSubItems.push({
-    name: "Holiday Calendar",
-    path: "/payroll/holiday-calendar",
-    component: HolidayCalendarPage,
-    icon: IconCalendarEvent,
   });
 
   payrollSubItems.push({
     name: "Contribution Rates",
     path: "/payroll/contribution-rates",
     component: ContributionRatesPage,
-    icon: IconCalculator,
   });
 
   return payrollSubItems;
