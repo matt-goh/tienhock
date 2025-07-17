@@ -3215,7 +3215,7 @@ export default function (pool, config) {
         RETURNING id
       `;
 
-        await client.query(updateInvoiceQuery, ["CASH", "Paid", id]);
+        await client.query(updateInvoiceQuery, ["CASH", "paid", id]);
       }
       // Handle CASH to INVOICE conversion
       else if (currentPaymentType === "CASH" && paymenttype === "INVOICE") {
