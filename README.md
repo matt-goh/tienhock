@@ -1,6 +1,6 @@
 # Tien Hock ERP System
 
-A comprehensive desktop ERP application built with Electron, React, and Node.js, designed for managing business operations at Tien Hock.
+A comprehensive desktop ERP application built with React and Node, designed for managing business operations at Tien Hock.
 
 ## Overview
 
