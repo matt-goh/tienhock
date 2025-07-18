@@ -75,6 +75,12 @@ interface DailyLogEntryPageProps {
   jobType?: string;
 }
 
+type LeaveType = "cuti_umum" | "cuti_sakit";
+interface LeaveEntry {
+  selected: boolean;
+  leaveType: LeaveType;
+}
+
 const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   mode = "create",
   existingWorkLog,
@@ -108,6 +114,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   >({});
   const [ikutBagCounts, setIkutBagCounts] = useState<
     Record<string, { muatMee: number; muatBihun: number }> // rowKey -> bag counts
+  >({});
+  const [leaveEmployees, setLeaveEmployees] = useState<
+    Record<string, LeaveEntry>
   >({});
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
@@ -270,6 +279,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
   }, [availableEmployees, jobs, JOB_IDS]);
 
+  const uniqueEmployees = useMemo(() => {
+    const seen = new Set<string>();
+    return expandedEmployees.filter((emp) => {
+      const duplicate = seen.has(emp.id);
+      seen.add(emp.id);
+      return !duplicate;
+    });
+  }, [expandedEmployees]);
+
   // Add new computed values for SALESMAN specific views
   const salesmanEmployees = useMemo(() => {
     if (jobConfig?.id !== "SALESMAN") return [];
@@ -346,6 +364,47 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     }
   }, [holidays, formData.logDate]);
+
+  const handleLeaveSelection = (employeeId: string) => {
+    setLeaveEmployees((prev) => {
+      const isCurrentlySelected = prev[employeeId]?.selected;
+      const newSelectedState = !isCurrentlySelected;
+
+      // If an employee is selected for leave, ensure they are deselected from the working list.
+      if (newSelectedState) {
+        setEmployeeSelectionState((prevSelection) => {
+          const newSelectedJobs = { ...prevSelection.selectedJobs };
+          if (newSelectedJobs[employeeId]) {
+            delete newSelectedJobs[employeeId]; // Deselect from all jobs
+          }
+          return {
+            ...prevSelection,
+            selectedJobs: newSelectedJobs,
+          };
+        });
+      }
+
+      return {
+        ...prev,
+        [employeeId]: {
+          ...prev[employeeId],
+          selected: newSelectedState,
+          // Default to 'cuti_umum' when first selected
+          leaveType: prev[employeeId]?.leaveType || "cuti_umum",
+        },
+      };
+    });
+  };
+
+  const handleLeaveTypeChange = (employeeId: string, leaveType: LeaveType) => {
+    setLeaveEmployees((prev) => ({
+      ...prev,
+      [employeeId]: {
+        ...prev[employeeId],
+        leaveType,
+      },
+    }));
+  };
 
   // Handle hours blur event
   const handleHoursBlur = (rowKey: string | undefined) => {
@@ -604,12 +663,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleSaveForm = async () => {
+    const leaveEntries = Object.entries(leaveEmployees)
+      .filter(([_, leaveData]) => leaveData.selected)
+      .map(([employeeId, leaveData]) => ({
+        employeeId: employeeId,
+        leaveType: leaveData.leaveType,
+      }));
+
     const allSelectedEmployees = Object.entries(
       employeeSelectionState.selectedJobs
     ).filter(([_, jobTypes]) => jobTypes.length > 0);
 
-    if (allSelectedEmployees.length === 0) {
-      toast.error("Please select at least one employee");
+    if (allSelectedEmployees.length === 0 && leaveEntries.length === 0) {
+      toast.error("Please select at least one employee for work or leave.");
       return;
     }
 
@@ -676,6 +742,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       contextData: formData.contextData,
       status: "Submitted",
       employeeEntries: selectedEmployeeData,
+      leaveEntries: leaveEntries,
     };
 
     setIsSaving(true);
@@ -1441,6 +1508,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 checkedColor="text-sky-600"
                                 ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
                                 buttonClassName="p-1 rounded-lg"
+                                disabled={
+                                  isSaving || leaveEmployees[row.id]?.selected
+                                }
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
@@ -1657,7 +1727,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     step="0.5"
                                     min="0"
                                     max="24"
-                                    disabled={!isSelected}
+                                    disabled={
+                                      !isSelected ||
+                                      isSaving ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
                                     placeholder={isSelected ? "0" : "-"}
                                   />
                                 </div>
@@ -1814,6 +1888,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     checkedColor="text-sky-600"
                                     ariaLabel={`Select employee ${row.name}`}
                                     buttonClassName="p-1 rounded-lg"
+                                    disabled={
+                                      isSaving ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
                                   />
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
@@ -1998,7 +2076,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         ? "disabled:text-default-300 disabled:cursor-not-allowed"
                                         : ""
                                     }
-                                    disabled={!isSelected}
+                                    disabled={
+                                      !isSelected ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
                                     onClick={() => handleManageActivities(row)}
                                   />
                                 </td>
@@ -2013,6 +2094,91 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </>
           )}
         </div>
+
+        {formData.dayType === "Umum" && (
+          <div className="border-t border-default-200 pt-6 mt-8">
+            <h2 className="text-lg font-semibold text-default-700 mb-2">
+              Public Holiday Leave Recording
+            </h2>
+            <p className="text-sm text-default-500 mb-4">
+              Select employees on paid leave for this public holiday. Their pay
+              is based on their normal day rate.
+            </p>
+
+            <div className="bg-white rounded-lg border shadow-sm">
+              <table className="min-w-full divide-y divide-default-200">
+                <thead className="bg-default-50">
+                  <tr>
+                    <th scope="col" className="w-16 px-6 py-3 text-left">
+                      {/* Optional: Add a select-all checkbox here if needed */}
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
+                      Employee
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
+                      Leave Type
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-default-200">
+                  {uniqueEmployees.map((employee) => (
+                    <tr key={`leave-${employee.id}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Checkbox
+                          checked={
+                            leaveEmployees[employee.id]?.selected || false
+                          }
+                          onChange={() => handleLeaveSelection(employee.id)}
+                          size={20}
+                          checkedColor="text-amber-600"
+                          ariaLabel={`Select ${employee.name} for leave`}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-default-900">
+                          {employee.name}
+                        </div>
+                        <div className="text-xs text-default-500">
+                          {employee.id}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {leaveEmployees[employee.id]?.selected && (
+                          <div className="w-48">
+                            <FormListbox
+                              name={`leaveType-${employee.id}`}
+                              value={
+                                leaveEmployees[employee.id]?.leaveType ||
+                                "cuti_umum"
+                              }
+                              onChange={(value) =>
+                                handleLeaveTypeChange(
+                                  employee.id,
+                                  value as LeaveType
+                                )
+                              }
+                              options={[
+                                { id: "cuti_umum", name: "Cuti Umum" },
+                                { id: "cuti_sakit", name: "Cuti Sakit" },
+                              ]}
+                              disabled={!leaveEmployees[employee.id]?.selected}
+                            />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="border-t border-default-200 pt-4 mt-4 flex justify-end space-x-3">
