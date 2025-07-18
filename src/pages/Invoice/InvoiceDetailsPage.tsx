@@ -1371,7 +1371,14 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
       )}
       <BackButton
-        onClick={() => navigate("/sales/invoice")}
+        onClick={() => {
+          // Check if we came from the list page
+          if (location.state?.fromList) {
+            navigate(-1); // Use browser back to preserve state
+          } else {
+            navigate("/sales/invoice");
+          }
+        }}
         disabled={isLoading}
       />
       {/* Header Area */}
