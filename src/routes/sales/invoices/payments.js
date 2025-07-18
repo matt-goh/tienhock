@@ -351,7 +351,7 @@ export default function (pool) {
         FROM payments p
         JOIN invoices i ON p.invoice_id = i.id
         WHERE p.payment_id = $1 
-          AND (p.status IS NULL OR p.status = 'active')
+          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
         FOR UPDATE OF i -- Lock the associated invoice row
       `;
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
