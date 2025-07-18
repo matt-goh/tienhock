@@ -1533,7 +1533,10 @@ const InvoiceListPage: React.FC = () => {
 
             {/* Search Input and Daily Button */}
             <div className="flex items-center gap-2 w-full sm:flex-1 md:max-w-md">
-              <div className="relative flex-1">
+              <div
+                className="relative flex-1"
+                title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
+              >
                 <IconSearch
                   className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
                   size={18}
