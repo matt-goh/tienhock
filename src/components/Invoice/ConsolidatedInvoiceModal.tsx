@@ -606,7 +606,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         </div>
                         <div className="mb-1">
                           <strong>Next window starts:</strong>{" "}
-                          {windowInfo.nextWindowStart?.toLocaleDateString() || "N/A"}
+                            {windowInfo.nextWindowStart?.toLocaleDateString("en-GB") || "N/A"}
                         </div>
                         <div>
                           Auto-consolidation runs during the first 7 days of
