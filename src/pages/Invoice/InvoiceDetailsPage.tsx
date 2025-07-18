@@ -52,6 +52,7 @@ import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -1166,14 +1167,21 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsConfirmingPayment(true);
     setShowConfirmPaymentDialog(false);
-    const toastId = toast.loading("Confirming payment...");
+    const toastId = toast.loading("Confirming payment(s)...");
 
     try {
-      await confirmPayment(paymentToConfirm.payment_id);
-      toast.success("Payment confirmed successfully.", { id: toastId });
+      const confirmedPayments = await confirmPayment(
+        paymentToConfirm.payment_id
+      );
+      const successMessage =
+        confirmedPayments.length > 1
+          ? `${confirmedPayments.length} payments confirmed successfully.`
+          : "Payment confirmed successfully.";
+      toast.success(successMessage, { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
     } catch (error) {
-      toast.error("Failed to confirm payment.", { id: toastId });
+      // The error toast is already handled by InvoiceUtils
+      toast.dismiss(toastId); // Dismiss the loading toast
     } finally {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
@@ -2012,12 +2020,20 @@ const InvoiceDetailsPage: React.FC = () => {
                         {formatDisplayDate(new Date(p.payment_date))}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-sm font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
                           {p.payment_method.replace("_", " ")}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600">
-                        {p.payment_reference || "-"}
+                        <div className="flex items-center">
+                          <span>{p.payment_reference || "-"}</span>
+                          {p.payment_reference && (
+                            <LinkedPaymentsTooltip
+                              paymentReference={p.payment_reference}
+                              currentInvoiceId={invoiceId}
+                            />
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span
