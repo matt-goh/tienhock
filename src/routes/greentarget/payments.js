@@ -267,7 +267,7 @@ export default function (pool) {
         SELECT p.*, i.customer_id, i.balance_due 
         FROM greentarget.payments p 
         JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
-        WHERE p.payment_id = $1 AND (p.status IS NULL OR p.status = 'active')
+          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
         FOR UPDATE OF i
       `;
       const paymentResult = await client.query(paymentQuery, [payment_id]);
