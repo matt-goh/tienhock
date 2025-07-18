@@ -49,7 +49,7 @@ export default function (pool) {
 
       // Only include active payments by default
       if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active')`;
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
       }
 
       query += " ORDER BY p.payment_date DESC, p.created_at DESC";
@@ -353,7 +353,7 @@ export default function (pool) {
         FROM jellypolly.payments p
         JOIN jellypolly.invoices i ON p.invoice_id = i.id
         WHERE p.payment_id = $1 
-          AND (p.status IS NULL OR p.status = 'active')
+          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
         FOR UPDATE OF i -- Lock the associated invoice row
       `;
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);

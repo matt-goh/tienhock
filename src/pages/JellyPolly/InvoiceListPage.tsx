@@ -6,7 +6,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -59,6 +59,7 @@ import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidat
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFiltersJP_v2"; // Use a unique key
+const SESSION_STORAGE_KEY = "invoiceListStateJP"; // For complete state persistence
 const ITEMS_PER_PAGE = 50; // Number of items per page
 
 interface MonthOption {
@@ -119,6 +120,51 @@ const isInvoiceDateEligibleForEinvoice = (
   return !isNaN(invoiceTimestamp) && invoiceTimestamp >= cutoffTimestamp;
 };
 
+// --- Session State Management ---
+const saveStateToSession = (state: {
+  page: number;
+  filters: InvoiceFilters;
+  searchTerm: string;
+}) => {
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error("Failed to save state to session storage", e);
+  }
+};
+
+const getStateFromSession = (): {
+  page: number;
+  filters: InvoiceFilters;
+  searchTerm: string;
+} | null => {
+  try {
+    const saved = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Convert date strings back to Date objects
+      if (parsed.filters?.dateRange) {
+        if (parsed.filters.dateRange.start) {
+          parsed.filters.dateRange.start = new Date(
+            parsed.filters.dateRange.start
+          );
+        }
+        if (parsed.filters.dateRange.end) {
+          parsed.filters.dateRange.end = new Date(parsed.filters.dateRange.end);
+        }
+      }
+      return parsed;
+    }
+  } catch (e) {
+    console.error("Failed to restore state from session storage", e);
+  }
+  return null;
+};
+
+const clearSessionState = () => {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+};
+
 // --- Component ---
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -131,10 +177,13 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
     new Set()
   );
-  const [currentPage, setCurrentPage] = useState(1);
+  const savedSessionState = getStateFromSession();
+  const [currentPage, setCurrentPage] = useState(savedSessionState?.page || 1);
   const [totalItems, setTotalItems] = useState(0); // TOTAL items matching filters (from backend)
   const [totalPages, setTotalPages] = useState(1); // TOTAL pages (from backend)
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(
+    savedSessionState?.searchTerm || ""
+  );
   const [isFetchTriggered, setIsFetchTriggered] = useState(true); // Trigger fetch on load/change
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showEInvoiceConfirm, setShowEInvoiceConfirm] = useState(false);
@@ -165,20 +214,24 @@ const InvoiceListPage: React.FC = () => {
     total: 0,
   });
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
+  const [searchParams] = useSearchParams();
+  const [initialParamsApplied, setInitialParamsApplied] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
-  const initialFilters = useMemo(
-    (): InvoiceFilters => ({
+  const initialFilters = useMemo((): InvoiceFilters => {
+    if (savedSessionState?.filters) {
+      return savedSessionState.filters;
+    }
+    return {
       dateRange: getInitialDates(),
       salespersonId: null,
       customerId: null,
       paymentType: null,
-      invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default excludes 'cancelled'
+      invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"],
       eInvoiceStatus: [],
       consolidation: "all",
-    }),
-    []
-  );
+    };
+  }, [savedSessionState]);
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
 
   const DEFAULT_FILTERS: InvoiceFilters = {
@@ -409,6 +462,79 @@ const InvoiceListPage: React.FC = () => {
     cachedSelectAllIdsRef.current = { ids: [], hash: "", total: 0 };
   }, [filters, searchTerm]);
 
+  // Fetch Invoices on initial load or when filters change
+  useEffect(() => {
+    // Only fetch if triggered, prevents fetching on initial mount if not desired
+    if (initialParamsApplied && isFetchTriggered) {
+      // Pass the current state values to the fetch function
+      fetchInvoices(currentPage, filters, searchTerm);
+    }
+    // Disable eslint warning because fetchInvoices is stable due to useCallback([])
+    // and we explicitly pass the dependencies (filters, searchTerm) when calling it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFetchTriggered, currentPage, initialParamsApplied]); // Only re-run when page changes or triggered manually
+
+  // Effect: Process customerId URL parameter ONCE after mount
+  useEffect(() => {
+    const customerIdParam = searchParams.get("customerId");
+
+    // Check if customerId param exists and we haven't applied it yet
+    if (customerIdParam && !initialParamsApplied) {
+      // Set the customer filter
+      setFilters((prev) => ({
+        ...prev,
+        customerId: customerIdParam,
+      }));
+
+      // Clear date range when viewing specific customer (as requested)
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: {
+          start: null,
+          end: null,
+        },
+      }));
+
+      // Mark initial params as processed
+      setInitialParamsApplied(true);
+    } else if (!customerIdParam && !initialParamsApplied) {
+      // No customerId param found, mark as ready
+      setInitialParamsApplied(true);
+    }
+  }, [searchParams, initialParamsApplied]);
+
+  // Effect to save state to session storage whenever it changes
+  useEffect(() => {
+    if (initialParamsApplied) {
+      saveStateToSession({
+        page: currentPage,
+        filters,
+        searchTerm,
+      });
+    }
+  }, [currentPage, filters, searchTerm, initialParamsApplied]);
+
+  // Clear session state when navigating away from the app entirely
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      clearSessionState();
+    };
+
+    // Listen for route changes
+    if (location.pathname.includes("/sales/invoice")) {
+      window.addEventListener("beforeunload", handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Clear session state when component unmounts and not navigating to another invoice page
+      const currentPath = window.location.pathname;
+      if (!currentPath.includes("/sales/invoice")) {
+        clearSessionState();
+      }
+    };
+  }, [location, navigate]);
+
   // Filter Change Handler - Receives the COMPLETE, new filter state to apply
   const handleApplyFilters = useCallback(
     (newAppliedFilters: InvoiceFilters) => {
@@ -528,6 +654,20 @@ const InvoiceListPage: React.FC = () => {
       handleSearchBlur();
       // Optionally blur the input
       event.currentTarget.blur();
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    // Update the ref to trigger search on next blur
+    lastSearchTermRef.current = "";
+    // Trigger search immediately if there was a search term
+    if (searchTerm.trim()) {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      }
+      setIsFetchTriggered(true);
+      setSelectedInvoiceIds(new Set());
     }
   };
 
@@ -691,7 +831,10 @@ const InvoiceListPage: React.FC = () => {
     navigate("/jellypolly/sales/invoice/new");
   const handleViewDetails = (invoiceId: string) =>
     navigate(`/jellypolly/sales/invoice/${invoiceId}`, {
-      state: { previousPath: location.pathname + location.search },
+      state: {
+        previousPath: location.pathname + location.search,
+        fromList: true,
+      },
     });
 
   // --- Bulk Actions ---
@@ -1184,19 +1327,33 @@ const InvoiceListPage: React.FC = () => {
 
             {/* Search Input */}
             <div className="relative w-full sm:flex-1 md:max-w-md">
-              <IconSearch
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full h-[42px] pl-11 pr-4 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onBlur={handleSearchBlur}
-                onKeyDown={handleSearchKeyDown}
-              />
+              <div
+                className="relative flex-1"
+                title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
+              >
+                <IconSearch
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 pointer-events-none"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="w-full h-[42px] pl-11 pr-10 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  onBlur={handleSearchBlur}
+                  onKeyDown={handleSearchKeyDown}
+                />
+                {searchTerm && (
+                  <button
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                    onClick={handleClearSearch}
+                    title="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Filter Menu Button */}

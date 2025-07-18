@@ -37,7 +37,7 @@ export default function (pool) {
 
       // Only include active payments by default
       if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active')`;
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
       }
 
       query += " ORDER BY p.payment_date DESC";
@@ -267,7 +267,7 @@ export default function (pool) {
         SELECT p.*, i.customer_id, i.balance_due 
         FROM greentarget.payments p 
         JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
-        WHERE p.payment_id = $1 AND (p.status IS NULL OR p.status = 'active')
+          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
         FOR UPDATE OF i
       `;
       const paymentResult = await client.query(paymentQuery, [payment_id]);

@@ -357,19 +357,23 @@ export const createPayment = async (
 };
 
 // CONFIRM Payment (mark pending payment as paid)
-export const confirmPayment = async (paymentId: number): Promise<Payment> => {
+export const confirmPayment = async (paymentId: number): Promise<Payment[]> => {
   try {
     const response = await api.put(`/api/payments/${paymentId}/confirm`);
-    if (!response || !response.payment) {
-      throw new Error("Invalid response received after confirming payment.");
+    // The backend now returns { message: string, payments: Payment[] }
+    if (!response || !response.payments || !Array.isArray(response.payments)) {
+      throw new Error("Invalid response received after confirming payment(s).");
     }
     await refreshCreditsCache(); // Refresh customer cache
-    return response.payment;
+
+    // The calling component will handle the success toast.
+
+    return response.payments;
   } catch (error: any) {
     console.error(`Error confirming payment ${paymentId}:`, error);
     const errorMessage =
       error.response?.data?.message ||
-      (error instanceof Error ? error.message : "Failed to confirm payment");
+      (error instanceof Error ? error.message : "Failed to confirm payment(s)");
     toast.error(errorMessage);
     throw new Error(errorMessage);
   }
