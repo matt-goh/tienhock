@@ -16,6 +16,7 @@ import DebtorsReportPage from "./Accounting/DebtorsReportPage";
 import InvoiceListPage from "./Invoice/InvoiceListPage";
 import InvoiceFormPage from "./Invoice/InvoiceFormPage";
 import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
+import PaymentPage from "./Payments/PaymentPage";
 
 // Sales related imports
 import SalesSummaryPage from "./Sales/SalesSummaryPage";
@@ -26,7 +27,6 @@ import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
-import HolidayCalendarPage from "./Payroll/HolidayCalendarPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
 import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
@@ -90,13 +90,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Cuti Management",
     path: "/payroll/cuti-management",
     component: CutiManagementPage,
-    subItems: [
-      {
-        name: "Holiday Calendar",
-        path: "/payroll/holiday-calendar",
-        component: HolidayCalendarPage,
-      },
-    ],
   });
 
   // Add each production type dynamically
@@ -202,6 +195,11 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Sales Summary",
         path: "/sales/summary",
         component: SalesSummaryPage,
+      },
+      {
+        name: "Payments",
+        path: "/sales/payments",
+        component: PaymentPage,
       },
     ],
   },

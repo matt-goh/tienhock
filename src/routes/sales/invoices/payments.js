@@ -26,7 +26,6 @@ export default function (pool) {
   const router = Router();
 
   // --- GET /api/payments (Get Payments) ---
-  // Added filtering by invoice_id
   router.get("/", async (req, res) => {
     const { invoice_id, include_cancelled } = req.query; // Add new parameter
 
@@ -49,7 +48,7 @@ export default function (pool) {
 
       // Only include active payments by default
       if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active')`;
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
       }
 
       query += " ORDER BY p.payment_date DESC, p.created_at DESC";
@@ -68,6 +67,130 @@ export default function (pool) {
       res
         .status(500)
         .json({ message: "Error fetching payments", error: error.message });
+    }
+  });
+
+  // --- GET /api/payments/all (Get All Payments with filters) ---
+  router.get("/all", async (req, res) => {
+    const {
+      startDate,
+      endDate,
+      paymentMethod,
+      status,
+      search,
+      include_cancelled = "true",
+    } = req.query;
+
+    try {
+      let query = `
+      SELECT
+        p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+        p.payment_method, p.payment_reference, p.internal_reference,
+        p.notes, p.created_at, p.status, p.cancellation_date,
+        i.customerid, i.salespersonid, c.name as customer_name
+      FROM payments p
+      JOIN invoices i ON p.invoice_id = i.id
+      LEFT JOIN customers c ON i.customerid = c.id
+      WHERE 1=1
+    `;
+
+      const queryParams = [];
+      let paramCounter = 1;
+
+      // Date filter
+      if (startDate && endDate) {
+        queryParams.push(
+          new Date(parseInt(startDate)),
+          new Date(parseInt(endDate))
+        );
+        query += ` AND p.payment_date BETWEEN $${paramCounter++} AND $${paramCounter++}`;
+      }
+
+      // Payment method filter
+      if (paymentMethod) {
+        queryParams.push(paymentMethod);
+        query += ` AND p.payment_method = $${paramCounter++}`;
+      }
+
+      // Status filter
+      if (status) {
+        if (status === "active") {
+          query += ` AND (p.status = 'active' OR p.status = 'pending')`;
+        } else {
+          queryParams.push(status);
+          query += ` AND p.status = $${paramCounter++}`;
+        }
+      } else if (include_cancelled !== "true") {
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
+      }
+
+      // Search filter
+      if (search) {
+        queryParams.push(`%${search}%`);
+        const searchParam = `$${paramCounter++}`;
+        query += ` AND (
+        p.invoice_id ILIKE ${searchParam} OR
+        p.payment_reference ILIKE ${searchParam} OR
+        CAST(p.amount_paid AS TEXT) ILIKE ${searchParam} OR
+        c.name ILIKE ${searchParam}
+      )`;
+      }
+
+      query += " ORDER BY p.payment_date DESC, p.created_at DESC";
+
+      const result = await pool.query(query, queryParams);
+
+      // Parse amount_paid to number before sending
+      const payments = result.rows.map((p) => ({
+        ...p,
+        amount_paid: parseFloat(p.amount_paid || 0),
+      }));
+
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching all payments:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching payments", error: error.message });
+    }
+  });
+
+  // --- GET /api/payments/by-reference/:reference (Get payments by reference) ---
+  router.get("/by-reference/:reference", async (req, res) => {
+    const { reference } = req.params;
+
+    if (!reference) {
+      return res.status(400).json({ message: "Payment reference is required" });
+    }
+
+    try {
+      const query = `
+        SELECT
+          p.payment_id,
+          p.invoice_id,
+          p.amount_paid,
+          c.name as customer_name
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        LEFT JOIN customers c ON i.customerid = c.id
+        WHERE p.payment_reference = $1
+          AND (p.status IS NULL OR p.status != 'cancelled')
+        ORDER BY i.createddate DESC
+      `;
+      const result = await pool.query(query, [reference]);
+
+      const payments = result.rows.map((p) => ({
+        ...p,
+        amount_paid: parseFloat(p.amount_paid || 0),
+      }));
+
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching payments by reference:", error);
+      res.status(500).json({
+        message: "Error fetching payments by reference",
+        error: error.message,
+      });
     }
   });
 
@@ -231,101 +354,151 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // 1. Get Payment details & Lock Invoice Row
-      const paymentQuery = `
-      SELECT p.*, i.customerid, i.paymenttype, i.invoice_status, i.balance_due
-      FROM payments p
-      JOIN invoices i ON p.invoice_id = i.id
-      WHERE p.payment_id = $1 AND p.status = 'pending'
-      FOR UPDATE OF i -- Lock the associated invoice row
-    `;
-      const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
+      // 1. Get the initial payment to find its reference
+      const initialPaymentQuery = `SELECT payment_reference FROM payments WHERE payment_id = $1 AND status = 'pending'`;
+      const initialPaymentResult = await client.query(initialPaymentQuery, [
+        paymentIdNum,
+      ]);
 
-      if (paymentResult.rows.length === 0) {
+      if (initialPaymentResult.rows.length === 0) {
+        // Check if it was already confirmed to provide a better message
+        const alreadyConfirmedCheck = await client.query(
+          "SELECT payment_reference FROM payments WHERE payment_id = $1 AND status = 'active'",
+          [paymentIdNum]
+        );
+        if (alreadyConfirmedCheck.rows.length > 0) {
+          throw new Error(
+            `Payment ${paymentIdNum} has already been confirmed.`
+          );
+        }
         throw new Error(
           `Payment ${paymentIdNum} not found or not in pending status.`
         );
       }
-      const payment = paymentResult.rows[0];
-      const {
-        invoice_id,
-        amount_paid,
-        customerid,
-        paymenttype,
-        invoice_status,
-      } = payment;
-      const paidAmount = parseFloat(amount_paid || 0);
+      const { payment_reference } = initialPaymentResult.rows[0];
 
-      // Prevent confirming payment if invoice is cancelled
-      if (invoice_status === "cancelled") {
-        throw new Error(
-          `Cannot confirm payment for a cancelled invoice (${invoice_id}).`
-        );
-      }
+      let paymentsToConfirm = [];
 
-      // 2. Update payment status to active
-      const updatePaymentQuery = `
-      UPDATE payments 
-      SET status = 'active'
-      WHERE payment_id = $1
-      RETURNING *
-    `;
-      const updateResult = await client.query(updatePaymentQuery, [
-        paymentIdNum,
-      ]);
-      const confirmedPayment = updateResult.rows[0];
-
-      // 3. Update Invoice balance and status (same logic as original payment creation)
-      const currentBalance = parseFloat(payment.balance_due || 0);
-      const newBalance = Math.max(0, currentBalance - paidAmount);
-      const finalNewBalance = parseFloat(newBalance.toFixed(2));
-
-      let newStatus;
-      if (finalNewBalance <= 0) {
-        newStatus = "paid";
+      // 2. Find all payments to confirm (single or batch)
+      if (payment_reference) {
+        // Batch confirmation
+        const batchPaymentQuery = `
+        SELECT p.*, i.customerid, i.paymenttype, i.invoice_status, i.balance_due
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        WHERE p.payment_reference = $1 AND p.status = 'pending'
+        FOR UPDATE OF i, p -- Lock both associated invoice and payment rows
+      `;
+        const batchResult = await client.query(batchPaymentQuery, [
+          payment_reference,
+        ]);
+        paymentsToConfirm = batchResult.rows;
       } else {
-        if (invoice_status === "overdue") {
-          newStatus = "overdue";
-        } else {
-          newStatus = "Unpaid";
-        }
+        // Single confirmation
+        const singlePaymentQuery = `
+        SELECT p.*, i.customerid, i.paymenttype, i.invoice_status, i.balance_due
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        WHERE p.payment_id = $1 AND p.status = 'pending'
+        FOR UPDATE OF i, p
+      `;
+        const singleResult = await client.query(singlePaymentQuery, [
+          paymentIdNum,
+        ]);
+        paymentsToConfirm = singleResult.rows;
       }
 
-      const updateInvoiceQuery = `
-      UPDATE invoices
-      SET balance_due = $1, invoice_status = $2
-      WHERE id = $3
-    `;
-      await client.query(updateInvoiceQuery, [
-        finalNewBalance,
-        newStatus,
-        invoice_id,
-      ]);
+      if (paymentsToConfirm.length === 0) {
+        throw new Error(`No pending payments found to confirm.`);
+      }
 
-      // 4. Update Customer Credit if it was an INVOICE payment
-      if (paymenttype === "INVOICE") {
-        await updateCustomerCredit(
-          client,
+      const confirmedPayments = [];
+
+      // 3. Process each payment
+      for (const payment of paymentsToConfirm) {
+        const {
+          invoice_id,
+          amount_paid,
           customerid,
-          -paidAmount // Reduce credit used
-        );
+          paymenttype,
+          invoice_status,
+        } = payment;
+        const paidAmount = parseFloat(amount_paid || 0);
+
+        if (invoice_status === "cancelled") {
+          console.warn(
+            `Skipping confirmation for payment ${payment.payment_id} as its invoice ${invoice_id} is cancelled.`
+          );
+          continue;
+        }
+
+        // 4. Update payment status to active
+        const updatePaymentQuery = `
+        UPDATE payments
+        SET status = 'active'
+        WHERE payment_id = $1
+        RETURNING *
+      `;
+        const updateResult = await client.query(updatePaymentQuery, [
+          payment.payment_id,
+        ]);
+        const confirmedPaymentData = updateResult.rows[0];
+
+        // 5. Update Invoice balance and status
+        const currentBalance = parseFloat(payment.balance_due || 0);
+        const newBalance = Math.max(0, currentBalance - paidAmount);
+        const finalNewBalance = parseFloat(newBalance.toFixed(2));
+
+        let newStatus;
+        if (finalNewBalance <= 0) {
+          newStatus = "paid";
+        } else {
+          newStatus = invoice_status === "overdue" ? "overdue" : "Unpaid";
+        }
+
+        const updateInvoiceQuery = `
+        UPDATE invoices
+        SET balance_due = $1, invoice_status = $2
+        WHERE id = $3
+      `;
+        await client.query(updateInvoiceQuery, [
+          finalNewBalance,
+          newStatus,
+          invoice_id,
+        ]);
+
+        // 6. Update Customer Credit if it was an INVOICE payment
+        if (paymenttype === "INVOICE") {
+          await updateCustomerCredit(
+            client,
+            customerid,
+            -paidAmount // Reduce credit used
+          );
+        }
+
+        confirmedPayments.push({
+          ...confirmedPaymentData,
+          amount_paid: parseFloat(confirmedPaymentData.amount_paid || 0),
+        });
       }
 
       await client.query("COMMIT");
 
+      const message =
+        confirmedPayments.length > 1
+          ? `${confirmedPayments.length} payments confirmed successfully.`
+          : "Payment confirmed successfully.";
+
       res.json({
-        message: "Payment confirmed successfully",
-        payment: {
-          ...confirmedPayment,
-          amount_paid: parseFloat(confirmedPayment.amount_paid || 0),
-        },
+        message,
+        payments: confirmedPayments, // Return an array of payments
       });
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("Error confirming payment:", error);
+      console.error("Error confirming payment(s):", error);
       res
         .status(500)
-        .json({ message: "Error confirming payment", error: error.message });
+        .json({ message: "Error confirming payment(s)", error: error.message });
     } finally {
       client.release();
     }
@@ -351,7 +524,7 @@ export default function (pool) {
         FROM payments p
         JOIN invoices i ON p.invoice_id = i.id
         WHERE p.payment_id = $1 
-          AND (p.status IS NULL OR p.status = 'active')
+          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
         FOR UPDATE OF i -- Lock the associated invoice row
       `;
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);

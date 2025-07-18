@@ -1,6 +1,6 @@
 //src/pages/JellyPolly/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ExtendedInvoiceData,
   InvoiceData,
@@ -147,6 +147,7 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const invoiceId = id || "";
 
@@ -161,13 +162,15 @@ const InvoiceDetailsPage: React.FC = () => {
   // Action States
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(
+    location.state?.showPaymentForm || false
+  );
   const [paymentFormData, setPaymentFormData] = useState<
     Omit<Payment, "payment_id" | "invoice_id" | "created_at">
   >({
     amount_paid: 0,
     payment_date: new Date().toISOString().split("T")[0], // Default to today
-    payment_method: "cash",
+    payment_method: "cheque", // Default method
     payment_reference: undefined,
     notes: undefined,
     internal_reference: undefined, // Not managed by frontend
@@ -403,10 +406,7 @@ const InvoiceDetailsPage: React.FC = () => {
     setPaymentFormData((prev) => ({
       ...prev,
       payment_method: value as Payment["payment_method"],
-      payment_reference:
-        value === "cash"
-          ? undefined
-          : prev.payment_reference, // Clear ref if not needed
+      payment_reference: value === "cash" ? undefined : prev.payment_reference, // Clear ref if not needed
     }));
   };
 
@@ -702,7 +702,14 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
       )}
       <BackButton
-        onClick={() => navigate("/jellypolly/sales/invoice")}
+        onClick={() => {
+          // Check if we came from the list page
+          if (location.state?.fromList) {
+            navigate(-1); // Use browser back to preserve state
+          } else {
+            navigate("/jellypolly/sales/invoice");
+          }
+        }}
         disabled={isLoading}
       />
       {/* Header Area */}

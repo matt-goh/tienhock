@@ -395,6 +395,8 @@ export interface CustomProduct {
 export interface Payment {
   payment_id: number;
   invoice_id: string;
+  customerid?: string;
+  customer_name?: string;
   payment_date: string;
   amount_paid: number;
   payment_method: "cash" | "cheque" | "bank_transfer" | "online";

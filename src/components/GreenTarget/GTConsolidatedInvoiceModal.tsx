@@ -606,7 +606,7 @@ const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
                         </div>
                         <div className="mb-1">
                           <strong>Next window starts:</strong>{" "}
-                          {windowInfo.nextWindowStart?.toLocaleDateString() ||
+                          {windowInfo.nextWindowStart?.toLocaleDateString("en-GB") ||
                             "N/A"}
                         </div>
                         <div>

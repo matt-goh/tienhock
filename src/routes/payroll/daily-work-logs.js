@@ -199,11 +199,15 @@ export default function (pool) {
       contextData,
       status,
       employeeEntries,
+      leaveEntries, // New field for leave data
     } = req.body;
 
-    if (!employeeEntries || employeeEntries.length === 0) {
+    if (
+      (!employeeEntries || employeeEntries.length === 0) &&
+      (!leaveEntries || leaveEntries.length === 0)
+    ) {
       return res.status(400).json({
-        message: "At least one employee entry is required",
+        message: "At least one employee entry or leave entry is required",
       });
     }
 
@@ -212,8 +216,8 @@ export default function (pool) {
 
       // Check if the work log exists and is not processed
       const checkQuery = `
-        SELECT status FROM daily_work_logs WHERE id = $1
-      `;
+      SELECT status FROM daily_work_logs WHERE id = $1
+    `;
       const checkResult = await pool.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -246,18 +250,22 @@ export default function (pool) {
         id,
       ]);
 
-      // Delete existing entries (cascade will delete activities)
+      // Clear out old leave records and work entries associated with this work log
+      await pool.query("DELETE FROM leave_records WHERE work_log_id = $1", [
+        id,
+      ]);
       await pool.query(
         "DELETE FROM daily_work_log_entries WHERE work_log_id = $1",
         [id]
       );
 
       // Insert updated employee entries and activities
-      for (const entry of employeeEntries) {
-        const { employeeId, jobType, hours, activities } = entry;
+      if (employeeEntries && employeeEntries.length > 0) {
+        for (const entry of employeeEntries) {
+          const { employeeId, jobType, hours, activities } = entry;
 
-        // Insert employee entry
-        const entryQuery = `
+          // Insert employee entry
+          const entryQuery = `
           INSERT INTO daily_work_log_entries (
             work_log_id, employee_id, job_id, total_hours,
             following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
@@ -265,35 +273,33 @@ export default function (pool) {
           RETURNING id
         `;
 
-        const entryResult = await pool.query(entryQuery, [
-          id,
-          employeeId,
-          jobType,
-          hours,
-          entry.followingSalesmanId || null,
-          entry.muatMeeBags || 0,
-          entry.muatBihunBags || 0,
-          entry.locationType || "Local",
-        ]);
+          const entryResult = await pool.query(entryQuery, [
+            id,
+            employeeId,
+            jobType,
+            hours,
+            entry.followingSalesmanId || null,
+            entry.muatMeeBags || 0,
+            entry.muatBihunBags || 0,
+            entry.locationType || "Local",
+          ]);
 
-        const entryId = entryResult.rows[0].id;
+          const entryId = entryResult.rows[0].id;
 
-        // Insert activities for this employee entry
-        if (activities && activities.length > 0) {
-          for (const activity of activities) {
-            if (activity.isSelected) {
-              let hoursApplied = null;
-
-              if (activity.rateUnit === "Hour") {
-                // For overtime activities, only apply to hours beyond 8
-                if (activity.payType === "Overtime") {
-                  hoursApplied = Math.max(0, hours - 8);
-                } else {
-                  hoursApplied = hours;
+          // Insert activities for this employee entry
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                let hoursApplied = null;
+                if (activity.rateUnit === "Hour") {
+                  if (activity.payType === "Overtime") {
+                    hoursApplied = Math.max(0, hours - 8);
+                  } else {
+                    hoursApplied = hours;
+                  }
                 }
-              }
 
-              const activityQuery = `
+                const activityQuery = `
                 INSERT INTO daily_work_log_activities (
                   log_entry_id, pay_code_id, hours_applied, 
                   units_produced, rate_used, calculated_amount,
@@ -301,19 +307,44 @@ export default function (pool) {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
-              await pool.query(activityQuery, [
-                entryId,
-                activity.payCodeId,
-                hoursApplied,
-                activity.unitsProduced
-                  ? parseFloat(activity.unitsProduced)
-                  : null,
-                parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount),
-                false,
-              ]);
+                await pool.query(activityQuery, [
+                  entryId,
+                  activity.payCodeId,
+                  hoursApplied,
+                  activity.unitsProduced
+                    ? parseFloat(activity.unitsProduced)
+                    : null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  false,
+                ]);
+              }
             }
           }
+        }
+      }
+
+      // Insert updated leave records if any
+      if (
+        leaveEntries &&
+        Array.isArray(leaveEntries) &&
+        leaveEntries.length > 0
+      ) {
+        for (const leave of leaveEntries) {
+          const { employeeId, leaveType } = leave;
+
+          const leaveQuery = `
+            INSERT INTO leave_records (
+              employee_id, leave_date, leave_type, work_log_id, days_taken, status
+            ) VALUES ($1, $2, $3, $4, $5, 'approved')
+          `;
+          await pool.query(leaveQuery, [
+            employeeId,
+            logDate,
+            leaveType,
+            id, // Use the existing work log ID from params
+            1.0,
+          ]);
         }
       }
 
@@ -382,11 +413,15 @@ export default function (pool) {
       contextData,
       status,
       employeeEntries,
+      leaveEntries, // New field for leave data
     } = req.body;
 
-    if (!employeeEntries || employeeEntries.length === 0) {
+    if (
+      (!employeeEntries || employeeEntries.length === 0) &&
+      (!leaveEntries || leaveEntries.length === 0)
+    ) {
       return res.status(400).json({
-        message: "At least one employee entry is required",
+        message: "At least one employee entry or leave entry is required",
       });
     }
 
@@ -412,12 +447,13 @@ export default function (pool) {
 
       const workLogId = workLogResult.rows[0].id;
 
-      // Insert employee entries and activities
-      for (const entry of employeeEntries) {
-        const { employeeId, jobType, hours, activities } = entry;
+      // Insert employee entries and activities for working employees
+      if (employeeEntries && employeeEntries.length > 0) {
+        for (const entry of employeeEntries) {
+          const { employeeId, jobType, hours, activities } = entry;
 
-        // Insert employee entry
-        const entryQuery = `
+          // Insert employee entry
+          const entryQuery = `
           INSERT INTO daily_work_log_entries (
             work_log_id, employee_id, job_id, total_hours, 
             following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
@@ -425,38 +461,33 @@ export default function (pool) {
           RETURNING id
         `;
 
-        const entryResult = await pool.query(entryQuery, [
-          workLogId,
-          employeeId,
-          jobType,
-          hours,
-          entry.followingSalesmanId || null,
-          entry.muatMeeBags || 0,
-          entry.muatBihunBags || 0,
-          entry.locationType || "Local",
-        ]);
+          const entryResult = await pool.query(entryQuery, [
+            workLogId,
+            employeeId,
+            jobType,
+            hours,
+            entry.followingSalesmanId || null,
+            entry.muatMeeBags || 0,
+            entry.muatBihunBags || 0,
+            entry.locationType || "Local",
+          ]);
 
-        const entryId = entryResult.rows[0].id;
+          const entryId = entryResult.rows[0].id;
 
-        // Insert activities for this employee entry
-        if (activities && activities.length > 0) {
-          for (const activity of activities) {
-            if (activity.isSelected) {
-              // Determine hours_applied based on the rate unit and activity type
-              let hoursApplied = null;
-
-              // Only set hours_applied for Hour-based activities
-              if (activity.rateUnit === "Hour") {
-                // For overtime activities, only apply to hours beyond 8
-                if (activity.payType === "Overtime") {
-                  hoursApplied = Math.max(0, hours - 8);
-                } else {
-                  hoursApplied = hours;
+          // Insert activities for this employee entry
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                let hoursApplied = null;
+                if (activity.rateUnit === "Hour") {
+                  if (activity.payType === "Overtime") {
+                    hoursApplied = Math.max(0, hours - 8);
+                  } else {
+                    hoursApplied = hours;
+                  }
                 }
-              }
 
-              // Trust the calculated amount from the frontend
-              const activityQuery = `
+                const activityQuery = `
                 INSERT INTO daily_work_log_activities (
                   log_entry_id, pay_code_id, hours_applied, 
                   units_produced, rate_used, calculated_amount,
@@ -464,19 +495,46 @@ export default function (pool) {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
-              await pool.query(activityQuery, [
-                entryId,
-                activity.payCodeId,
-                hoursApplied,
-                activity.unitsProduced
-                  ? parseFloat(activity.unitsProduced)
-                  : null,
-                parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount), // Use frontend calculation
-                false,
-              ]);
+                await pool.query(activityQuery, [
+                  entryId,
+                  activity.payCodeId,
+                  hoursApplied,
+                  activity.unitsProduced
+                    ? parseFloat(activity.unitsProduced)
+                    : null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  false,
+                ]);
+              }
             }
           }
+        }
+      }
+
+      // Insert leave records if any
+      if (
+        leaveEntries &&
+        Array.isArray(leaveEntries) &&
+        leaveEntries.length > 0
+      ) {
+        for (const leave of leaveEntries) {
+          const { employeeId, leaveType } = leave;
+
+          // Note: amount_paid is defaulted to 0 in the schema.
+          // It can be calculated later during payroll processing.
+          const leaveQuery = `
+            INSERT INTO leave_records (
+              employee_id, leave_date, leave_type, work_log_id, days_taken, status
+            ) VALUES ($1, $2, $3, $4, $5, 'approved')
+          `;
+          await pool.query(leaveQuery, [
+            employeeId,
+            logDate,
+            leaveType,
+            workLogId,
+            1.0, // Assuming full day leave for now
+          ]);
         }
       }
 
