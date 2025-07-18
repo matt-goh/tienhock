@@ -197,7 +197,7 @@ const InvoiceDetailsPage: React.FC = () => {
   >({
     amount_paid: 0,
     payment_date: new Date().toISOString().split("T")[0], // Default to today
-    payment_method: "cash",
+    payment_method: "cheque", // Default method
     payment_reference: undefined,
     notes: undefined,
     internal_reference: undefined, // Not managed by frontend
