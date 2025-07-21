@@ -107,7 +107,6 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
       </span>
 
       {isVisible &&
-        totalCount > 0 &&
         createPortal(
           <div
             className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
@@ -144,7 +143,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                 <div className="flex justify-center items-center h-24">
                   <LoadingSpinner />
                 </div>
-              ) : (
+              ) : totalCount > 0 ? (
                 <div className="space-y-1">
                   {otherLinkedPayments.map((paymentInfo) => (
                     <div
@@ -172,6 +171,10 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : (
+                <div className="text-center text-default-500 text-sm py-4">
+                  No linked invoices found for this payment reference.
                 </div>
               )}
             </div>
