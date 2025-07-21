@@ -2716,7 +2716,7 @@ export default function (pool, config) {
 
       // 1. Get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype
+      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable
       FROM invoices 
       WHERE id = $1
     `;
@@ -2730,6 +2730,7 @@ export default function (pool, config) {
       }
 
       const invoice = invoiceResult.rows[0];
+      const oldTotal = parseFloat(invoice.totalamountpayable || 0);
 
       // 2. Validate that the invoice is not cancelled
       if (invoice.invoice_status === "cancelled") {
@@ -2828,63 +2829,160 @@ export default function (pool, config) {
         }
       }
 
-      // 8. Update invoice totals and recalculate balance_due properly
+      // 8. Calculate new totals
       const totalPayable = subtotal + taxTotal;
+      const newTotal = parseFloat(totalPayable.toFixed(2));
 
-      // First, get current payments to calculate new balance
-      const paymentsQuery = `
-  SELECT COALESCE(SUM(amount_paid), 0) as total_paid
-  FROM payments 
-  WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')
-`;
-      const paymentsResult = await client.query(paymentsQuery, [id]);
-      const totalPaid = parseFloat(paymentsResult.rows[0].total_paid || 0);
+      // Get current payments breakdown
+      const paymentsBreakdownQuery = `
+      SELECT 
+        COALESCE(SUM(CASE WHEN (status IS NULL OR status = 'active') THEN amount_paid ELSE 0 END), 0) as active_paid,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_paid ELSE 0 END), 0) as pending_amount,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN (status IS NULL OR status = 'active') THEN 1 END) as active_count
+      FROM payments 
+      WHERE invoice_id = $1 AND status != 'cancelled'
+    `;
+      const paymentsBreakdownResult = await client.query(
+        paymentsBreakdownQuery,
+        [id]
+      );
+      const {
+        active_paid: activePaid,
+        pending_amount: pendingAmount,
+        pending_count: pendingCount,
+        active_count: activeCount,
+      } = paymentsBreakdownResult.rows[0];
 
-      // Calculate new balance_due
+      const totalActivePaid = parseFloat(activePaid || 0);
+      const totalPendingAmount = parseFloat(pendingAmount || 0);
+
+      // 9. Cancel ALL pending payments when order details change (regardless of payment type)
+      let cancelledPendingCount = 0;
+      if (pendingCount > 0) {
+        const cancelPendingQuery = `
+        UPDATE payments 
+        SET status = 'cancelled', 
+            cancellation_date = NOW(),
+            cancellation_reason = $1
+        WHERE invoice_id = $2 AND status = 'pending'
+        RETURNING payment_id, amount_paid
+      `;
+
+        const cancelledPending = await client.query(cancelPendingQuery, [
+          `Order details updated - pending payments cancelled due to invoice changes`,
+          id,
+        ]);
+
+        cancelledPendingCount = cancelledPending.rows.length;
+        console.log(
+          `Cancelled ${cancelledPendingCount} pending payments for invoice ${id} due to order details update`
+        );
+      }
+
+      // 10. Calculate new balance_due based on payment type
       let newBalanceDue;
       if (invoice.paymenttype === "CASH") {
         // CASH invoices should always have zero balance
         newBalanceDue = 0;
       } else {
-        // For INVOICE types, calculate: new_total - total_paid
-        newBalanceDue = Math.max(0, totalPayable - totalPaid);
+        // For INVOICE types, calculate: new_total - active_paid (excluding pending)
+        newBalanceDue = Math.max(0, newTotal - totalActivePaid);
 
-        // If there's an overpayment situation, we keep balance at 0
-        // but we could log this for manual review
-        if (totalPayable < totalPaid) {
+        // Log overpayment situations
+        if (newTotal < totalActivePaid) {
           console.warn(
-            `Invoice ${id}: New total (${totalPayable}) is less than amount paid (${totalPaid}). ` +
+            `Invoice ${id}: New total (${newTotal}) is less than active payments (${totalActivePaid}). ` +
               `Setting balance to 0 but this may require manual adjustment.`
           );
         }
       }
 
+      // 11. Update invoice totals
       const updateInvoiceQuery = `
-  UPDATE invoices 
-  SET total_excluding_tax = $1,
-      tax_amount = $2,
-      totalamountpayable = $3,
-      balance_due = $4
-  WHERE id = $5
-  RETURNING *
-`;
+      UPDATE invoices 
+      SET total_excluding_tax = $1,
+          tax_amount = $2,
+          totalamountpayable = $3,
+          balance_due = $4
+      WHERE id = $5
+      RETURNING *
+    `;
 
       const updateResult = await client.query(updateInvoiceQuery, [
         parseFloat(subtotal.toFixed(2)),
         parseFloat(taxTotal.toFixed(2)),
-        parseFloat(totalPayable.toFixed(2)),
+        newTotal,
         parseFloat(newBalanceDue.toFixed(2)),
         id,
       ]);
 
-      // 9. Update customer credit if this is an INVOICE type
-      if (invoice.paymenttype === "INVOICE") {
-        // Get the old total from the original invoice data
-        const oldQuery = `SELECT totalamountpayable FROM invoices WHERE id = $1`;
-        const oldResult = await client.query(oldQuery, [id]);
-        const oldTotal = parseFloat(oldResult.rows[0]?.totalamountpayable || 0);
+      // 12. Handle CASH invoice payment adjustments
+      let cancelledActiveCount = 0;
+      let newPaymentCreated = false;
+      if (invoice.paymenttype === "CASH") {
+        // For CASH invoices, adjust active payments to match the new total
+        if (Math.abs(newTotal - totalActivePaid) > 0.001) {
+          // Only if there's a meaningful difference
+          // Cancel all existing active payments
+          if (activeCount > 0) {
+            const cancelActiveQuery = `
+            UPDATE payments 
+            SET status = 'cancelled', 
+                cancellation_date = NOW(),
+                cancellation_reason = $1
+            WHERE invoice_id = $2 AND (status IS NULL OR status = 'active')
+            RETURNING payment_id, amount_paid
+          `;
 
-        const newTotal = parseFloat(totalPayable.toFixed(2));
+            const cancelledActive = await client.query(cancelActiveQuery, [
+              `Order details updated - amount changed from ${totalActivePaid.toFixed(
+                2
+              )} to ${newTotal.toFixed(2)}`,
+              id,
+            ]);
+
+            cancelledActiveCount = cancelledActive.rows.length;
+          }
+
+          // Create new payment for the updated amount (if amount > 0)
+          if (newTotal > 0) {
+            const insertNewPaymentQuery = `
+            INSERT INTO payments (
+              invoice_id, payment_date, amount_paid, payment_method,
+              payment_reference, notes, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING payment_id
+          `;
+
+            const newPaymentResult = await client.query(insertNewPaymentQuery, [
+              id,
+              new Date().toISOString().split("T")[0], // Today's date
+              newTotal,
+              "cash",
+              null,
+              "Automatic payment - order details updated",
+              "active",
+            ]);
+
+            newPaymentCreated = true;
+            console.log(
+              `Created new payment of ${newTotal.toFixed(
+                2
+              )} for CASH invoice ${id} after order details update`
+            );
+          }
+
+          console.log(
+            `Adjusted payments for CASH invoice ${id}: cancelled ${cancelledActiveCount} active payments, created new payment for ${newTotal.toFixed(
+              2
+            )}`
+          );
+        }
+      }
+
+      // 13. Update customer credit if this is an INVOICE type
+      if (invoice.paymenttype === "INVOICE") {
         const creditAdjustment = newTotal - oldTotal;
 
         if (Math.abs(creditAdjustment) > 0.001) {
@@ -2898,7 +2996,7 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
 
-      // 10. Return response with additional balance information
+      // 14. Return response with detailed payment information
       res.json({
         message: "Order details updated successfully",
         invoice: {
@@ -2914,9 +3012,20 @@ export default function (pool, config) {
         },
         einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
         paymentInfo: {
-          totalPaid: totalPaid,
+          oldTotal: oldTotal,
+          newTotal: newTotal,
+          totalActivePaid: totalActivePaid,
           newBalance: parseFloat(newBalanceDue.toFixed(2)),
-          overpayment: totalPayable < totalPaid ? totalPaid - totalPayable : 0,
+          overpayment:
+            newTotal < totalActivePaid ? totalActivePaid - newTotal : 0,
+          paymentsAdjusted: {
+            pendingCancelled: cancelledPendingCount,
+            activeCancelled: cancelledActiveCount,
+            newPaymentCreated: newPaymentCreated,
+            cashPaymentAdjusted:
+              invoice.paymenttype === "CASH" &&
+              Math.abs(newTotal - totalActivePaid) > 0.001,
+          },
         },
       });
     } catch (error) {
