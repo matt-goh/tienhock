@@ -1473,10 +1473,13 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={
                   isLoading ||
                   isSubmittingEInvoice ||
-                  !isEligibleForEinvoiceByDate
+                  (invoiceData.einvoice_status !== "pending" &&
+                    !isEligibleForEinvoiceByDate)
                 }
                 title={
-                  !isEligibleForEinvoiceByDate
+                  invoiceData.einvoice_status === "pending"
+                    ? "Update pending e-Invoice"
+                    : !isEligibleForEinvoiceByDate
                     ? "Invoice must be within the last 3 days to submit"
                     : "Submit for e-Invoicing"
                 }
