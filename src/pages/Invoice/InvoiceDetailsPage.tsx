@@ -1443,20 +1443,21 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
               </Button>
             )}
-          {invoiceData.einvoice_status === "pending" && (
-            <Button
-              variant="outline"
-              color="orange"
-              onClick={handleClearEInvoiceClick}
-              disabled={isClearingEInvoice || isCancelled}
-              title="Clear E-Invoice Pending Status"
-            >
-              <span className="flex items-center gap-1">
-                <IconRefresh size={16} />
-                {isClearingEInvoice ? "Clearing..." : "Clear Status"}
-              </span>
-            </Button>
-          )}
+          {invoiceData.einvoice_status === "pending" ||
+            (invoiceData.einvoice_status === "invalid" && (
+              <Button
+                variant="outline"
+                color="orange"
+                onClick={handleClearEInvoiceClick}
+                disabled={isClearingEInvoice || isCancelled}
+                title="Clear E-Invoice Pending Status"
+              >
+                <span className="flex items-center gap-1">
+                  <IconRefresh size={16} />
+                  {isClearingEInvoice ? "Clearing..." : "Clear Status"}
+                </span>
+              </Button>
+            ))}
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
@@ -1472,10 +1473,13 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={
                   isLoading ||
                   isSubmittingEInvoice ||
-                  !isEligibleForEinvoiceByDate
+                  (invoiceData.einvoice_status !== "pending" &&
+                    !isEligibleForEinvoiceByDate)
                 }
                 title={
-                  !isEligibleForEinvoiceByDate
+                  invoiceData.einvoice_status === "pending"
+                    ? "Update pending e-Invoice"
+                    : !isEligibleForEinvoiceByDate
                     ? "Invoice must be within the last 3 days to submit"
                     : "Submit for e-Invoicing"
                 }
@@ -2002,19 +2006,6 @@ const InvoiceDetailsPage: React.FC = () => {
                           ? "bg-yellow-50"
                           : ""
                       }`}
-                      title={
-                        isCancelled
-                          ? "Cannot modify payment for cancelled invoice"
-                          : p.status === "cancelled"
-                          ? p.cancellation_date
-                            ? `Cancelled on ${formatDisplayDate(
-                                new Date(p.cancellation_date)
-                              )}`
-                            : "Payment cancelled"
-                          : p.status === "pending"
-                          ? "Payment pending confirmation"
-                          : "Payment confirmed"
-                      }
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         {formatDisplayDate(new Date(p.payment_date))}
@@ -2027,7 +2018,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600">
                         <div className="flex items-center">
                           <span>{p.payment_reference || "-"}</span>
-                          {p.payment_reference && (
+                          {p.payment_reference && p.status != "cancelled" && (
                             <LinkedPaymentsTooltip
                               paymentReference={p.payment_reference}
                               currentInvoiceId={invoiceId}
