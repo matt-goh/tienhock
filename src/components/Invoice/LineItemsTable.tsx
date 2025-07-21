@@ -12,7 +12,7 @@ import {
 import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 
 interface LineItemsTableProps {
-  items: ProductItem[]; // Still uses ProductItem for row data structure
+  items: ProductItem[];
   onItemsChange: (items: ProductItem[]) => void;
   customerProducts: CustomProduct[];
   productsCache: ProductItem[]; // Expect Product[] from cache hook
