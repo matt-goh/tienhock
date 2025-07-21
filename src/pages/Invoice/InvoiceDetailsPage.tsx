@@ -424,16 +424,6 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
-    const isEligibleDate = isInvoiceDateEligibleForEinvoice(
-      invoiceData.createddate
-    );
-    if (!isEligibleDate) {
-      toast.error(
-        "Cannot submit e-invoice: Invoice must be created within the last 3 days."
-      );
-      return;
-    }
-
     // Show confirmation dialog
     setShowSubmitEInvoiceConfirm(true);
   };
