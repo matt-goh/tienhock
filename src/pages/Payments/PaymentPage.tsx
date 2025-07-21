@@ -73,7 +73,7 @@ const PaymentPage: React.FC = () => {
       end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
     },
     paymentMethod: null,
-    status: "active", // Default to active payments
+    status: "pending", // Default to pending payments
     searchTerm: "",
   });
 
