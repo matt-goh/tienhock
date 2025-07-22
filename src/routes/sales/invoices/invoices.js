@@ -2617,7 +2617,26 @@ export default function (pool, config) {
       ]);
 
       await client.query("COMMIT");
-      res.status(200).json({});
+
+      // Format and return the final cancelled invoice data
+      const finalCancelledInvoice = updateResult.rows[0];
+      res.status(200).json({
+        message:
+          "Invoice and associated active payments cancelled successfully",
+        deletedInvoice: {
+          // using deletedInvoice to match the old format for mobile app to work
+          ...finalCancelledInvoice,
+          total_excluding_tax: parseFloat(
+            finalCancelledInvoice.total_excluding_tax || 0
+          ),
+          tax_amount: parseFloat(finalCancelledInvoice.tax_amount || 0),
+          rounding: parseFloat(finalCancelledInvoice.rounding || 0),
+          totalamountpayable: parseFloat(
+            finalCancelledInvoice.totalamountpayable || 0
+          ),
+          balance_due: parseFloat(finalCancelledInvoice.balance_due || 0), // Should be 0 now
+        },
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error cancelling invoice and payments:", error); // Updated log message
