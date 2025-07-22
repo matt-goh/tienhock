@@ -566,48 +566,56 @@ export default function (pool) {
       ]);
       const cancelledPayment = updateResult.rows[0];
 
-      // 3. Update Invoice balance and status
-      // Get current balance *after* locking
-      const currentInvoiceState = await client.query(
-        "SELECT balance_due, invoice_status FROM invoices WHERE id = $1",
-        [invoice_id]
-      );
-      const currentBalance = parseFloat(
-        currentInvoiceState.rows[0].balance_due || 0
-      );
-      const currentStatus = currentInvoiceState.rows[0].invoice_status;
+      // 3. Update Invoice balance and status (only for active payments)
+      // Pending payments never affected the balance, so don't adjust it when cancelling
+      if (payment.status === "active" || payment.status === null) {
+        // Get current balance *after* locking
+        const currentInvoiceState = await client.query(
+          "SELECT balance_due, invoice_status FROM invoices WHERE id = $1",
+          [invoice_id]
+        );
+        const currentBalance = parseFloat(
+          currentInvoiceState.rows[0].balance_due || 0
+        );
+        const currentStatus = currentInvoiceState.rows[0].invoice_status;
 
-      const newBalance = currentBalance + paidAmount;
-      // Round to 2 decimal places
-      const finalNewBalance = parseFloat(newBalance.toFixed(2));
+        const newBalance = currentBalance + paidAmount;
+        // Round to 2 decimal places
+        const finalNewBalance = parseFloat(newBalance.toFixed(2));
 
-      // Determine the new status
-      let newStatus;
-      if (finalNewBalance <= 0) {
-        newStatus = "paid"; // Fully paid
-      } else {
-        // If invoice was overdue before, keep it overdue
-        if (currentStatus === "overdue") {
-          newStatus = "overdue";
+        // Determine the new status
+        let newStatus;
+        if (finalNewBalance <= 0) {
+          newStatus = "paid"; // Fully paid
         } else {
-          // Otherwise use normal unpaid status
-          newStatus = "Unpaid";
+          // If invoice was overdue before, keep it overdue
+          if (currentStatus === "overdue") {
+            newStatus = "overdue";
+          } else {
+            // Otherwise use normal unpaid status
+            newStatus = "Unpaid";
+          }
         }
-      }
 
-      const updateInvoiceQuery = `
-        UPDATE invoices SET balance_due = $1, invoice_status = $2
-        WHERE id = $3
-      `;
-      await client.query(updateInvoiceQuery, [
-        finalNewBalance,
-        newStatus,
-        invoice_id,
-      ]);
+        const updateInvoiceQuery = `
+          UPDATE invoices SET balance_due = $1, invoice_status = $2
+          WHERE id = $3
+        `;
+        await client.query(updateInvoiceQuery, [
+          finalNewBalance,
+          newStatus,
+          invoice_id,
+        ]);
 
-      // 4. Update Customer Credit if it was an INVOICE payment
-      if (paymenttype === "INVOICE") {
-        await updateCustomerCredit(client, customerid, paidAmount); // Add back the amount to credit used
+        // 4. Update Customer Credit if it was an INVOICE payment (only for active payments)
+        if (paymenttype === "INVOICE") {
+          await updateCustomerCredit(client, customerid, paidAmount); // Add back the amount to credit used
+        }
+      } else {
+        // For pending payments, no balance or credit adjustments needed
+        console.log(
+          `Cancelled pending payment ${paymentIdNum} - no balance/credit adjustments made`
+        );
       }
 
       await client.query("COMMIT");
