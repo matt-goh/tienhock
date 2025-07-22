@@ -126,7 +126,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     <div
       className={`flex items-center bg-white border ${
         isDateRangeFocused ? "border-default-500" : "border-default-300"
-      } rounded-full pl-3 pr-1 ${className}`}
+      } rounded-full pl-3 pr-2 ${className}`}
     >
       <div className="flex items-center gap-2 flex-1">
         <input
