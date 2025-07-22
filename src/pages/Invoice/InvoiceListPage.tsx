@@ -1493,7 +1493,7 @@ const InvoiceListPage: React.FC = () => {
   // --- Render ---
   return (
     <div className="flex flex-col w-full h-full px-4 md:px-12">
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* --- Combined Header and Filters --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
           {/* Title */}
@@ -1502,9 +1502,9 @@ const InvoiceListPage: React.FC = () => {
           </h1>
 
           {/* Filters and Actions Container */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-2 w-full md:flex-1 md:justify-end">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-2 w-full md:flex-1 md:justify-end">
             {/* Left Group: Date Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap w-full lg:w-auto lg:flex-nowrap">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap sm:flex-nowrap w-full xl:w-auto">
               {/* Date Range Picker */}
               <div className="w-full sm:w-auto">
                 <DateRangePicker
@@ -1517,7 +1517,7 @@ const InvoiceListPage: React.FC = () => {
               </div>
 
               {/* Month Selector */}
-              <div className="w-full sm:w-40">
+              <div className="w-full xl:w-40">
                 <Listbox value={selectedMonth} onChange={handleMonthChange}>
                   <div className="relative">
                     <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
@@ -1610,7 +1610,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Right Group: Search and Main Filters */}
-            <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
               {/* Search Input */}
               <div
                 className="relative flex-1 w-full sm:w-auto"
@@ -1641,7 +1641,7 @@ const InvoiceListPage: React.FC = () => {
               </div>
 
               {/* Filter Menu Button */}
-              <div className="relative flex-shrink-0">
+              <div className="relative w-full sm:w-auto sm:flex-shrink-0">
                 <InvoiceFilterMenu
                   currentFilters={filters}
                   onFilterChange={handleApplyFilters}
