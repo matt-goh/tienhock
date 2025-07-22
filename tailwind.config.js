@@ -13,6 +13,7 @@ export default {
       sky: colors.sky,
       blue: colors.blue,
       indigo: colors.indigo,
+      purple: colors.purple,
       rose: colors.rose,
       red: colors.red,
       yellow: colors.yellow,

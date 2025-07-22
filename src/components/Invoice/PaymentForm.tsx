@@ -7,6 +7,7 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import InvoiceSelectionTable from "./InvoiceSelectionTable";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 
 interface PaymentFormProps {
   payment: Payment | null;
@@ -36,6 +37,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     InvoicePaymentAllocation[]
   >([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
+  const [overpaymentDetails, setOverpaymentDetails] = useState<
+    | {
+        invoiceId: string;
+        customerName: string;
+        totalAmount: number;
+        regularAmount: number;
+        overpaidAmount: number;
+      }[]
+    | null
+  >(null);
 
   const [formData, setFormData] = useState({
     payment_date: new Date().toISOString().split("T")[0],
@@ -102,6 +114,32 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
+    // Check for ALL overpayments
+    const overpaymentInvoices = selectedInvoices.filter(
+      ({ invoice, amountToPay }) => amountToPay > invoice.balance_due
+    );
+
+    if (overpaymentInvoices.length > 0) {
+      const overpaymentData = overpaymentInvoices.map(
+        ({ invoice, amountToPay }) => ({
+          invoiceId: invoice.id,
+          customerName: invoice.customerName || invoice.customerid,
+          totalAmount: amountToPay,
+          regularAmount: invoice.balance_due,
+          overpaidAmount: amountToPay - invoice.balance_due,
+        })
+      );
+
+      setOverpaymentDetails(overpaymentData);
+      setShowOverpaymentConfirm(true);
+      return;
+    }
+
+    // Proceed with normal payment processing
+    await processPayments();
+  };
+
+  const processPayments = async () => {
     setIsSubmitting(true);
     const toastId = toast.loading("Processing payment...");
 
@@ -118,15 +156,36 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         })
       );
 
-      await Promise.all(paymentPromises);
+      const results = await Promise.all(paymentPromises);
 
-      toast.success(
-        selectedInvoices.length === 1
-          ? "Payment recorded successfully"
-          : `Payment recorded for ${selectedInvoices.length} invoices`,
-        { id: toastId }
-      );
+      // Count overpayments
+      const overpaymentCount = results.filter(
+        (result) => result.isOverpayment
+      ).length;
 
+      let successMessage;
+      if (overpaymentCount > 0) {
+        if (selectedInvoices.length === 1) {
+          successMessage =
+            "Payment recorded successfully with overpaid amount tracked separately";
+        } else {
+          successMessage = `Payments recorded for ${selectedInvoices.length} invoices`;
+          if (overpaymentCount === selectedInvoices.length) {
+            successMessage += " - all with overpayments tracked separately";
+          } else {
+            successMessage += ` - ${overpaymentCount} with overpayments tracked separately`;
+          }
+        }
+      } else {
+        successMessage =
+          selectedInvoices.length === 1
+            ? "Payment recorded successfully"
+            : `Payment recorded for ${selectedInvoices.length} invoices`;
+      }
+
+      toast.success(successMessage, { id: toastId, duration: 6000 });
+      setShowOverpaymentConfirm(false);
+      setOverpaymentDetails(null);
       onSuccess();
     } catch (error: any) {
       console.error("Error creating payment:", error);
@@ -136,6 +195,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleConfirmOverpayment = async () => {
+    setShowOverpaymentConfirm(false);
+    await processPayments();
   };
 
   const handleInvoiceSelect = (invoice: InvoiceData) => {
@@ -273,52 +337,87 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <div className="mb-4">
                 <h4 className="text-md font-medium text-gray-900 mb-2">
                   Selected Invoices ({selectedInvoices.length})
+                  {selectedInvoices.some(
+                    ({ invoice, amountToPay }) =>
+                      amountToPay > invoice.balance_due
+                  ) && (
+                    <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                      {
+                        selectedInvoices.filter(
+                          ({ invoice, amountToPay }) =>
+                            amountToPay > invoice.balance_due
+                        ).length
+                      }{" "}
+                      Overpayment(s)
+                    </span>
+                  )}
                 </h4>
                 <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                   <div className="space-y-2">
-                    {selectedInvoices.map(({ invoice, amountToPay }) => (
-                      <div
-                        key={invoice.id}
-                        className="flex items-center justify-between bg-white p-2 rounded border"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 text-sm">
-                            <span className="font-medium">{invoice.id}</span>
-                            <span className="text-gray-600 truncate">
-                              {invoice.customerName}
-                            </span>
-                            <span className="text-gray-500 text-xs">
-                              Bal: {formatCurrency(invoice.balance_due)}
-                            </span>
+                    {selectedInvoices.map(({ invoice, amountToPay }) => {
+                      const isOverpayment = amountToPay > invoice.balance_due;
+                      const overpaidAmount = isOverpayment
+                        ? amountToPay - invoice.balance_due
+                        : 0;
+
+                      return (
+                        <div
+                          key={invoice.id}
+                          className={`flex items-center justify-between p-2 rounded border transition-colors ${
+                            isOverpayment
+                              ? "bg-purple-50 border-purple-200"
+                              : "bg-white border-gray-200"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className="font-medium">{invoice.id}</span>
+                              <span className="text-gray-600 truncate">
+                                {invoice.customerName}
+                              </span>
+                              <span className="text-gray-500 text-xs">
+                                Bal: {formatCurrency(invoice.balance_due)}
+                              </span>
+                              {isOverpayment && (
+                                <span className="text-purple-600 text-xs font-medium">
+                                  Overpaid: {formatCurrency(overpaidAmount)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-2">
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={amountToPay}
+                                onChange={(e) =>
+                                  handleAmountChange(
+                                    invoice.id,
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                className={`w-24 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-sky-500 ${
+                                  isOverpayment
+                                    ? "border-purple-400 bg-purple-50"
+                                    : "border-gray-300"
+                                }`}
+                                disabled={isSubmitting}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleInvoiceRemove(invoice.id)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                              disabled={isSubmitting}
+                            >
+                              <IconTrash size={16} />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            max={invoice.balance_due}
-                            value={amountToPay}
-                            onChange={(e) =>
-                              handleAmountChange(
-                                invoice.id,
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-sky-500"
-                            disabled={isSubmitting}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleInvoiceRemove(invoice.id)}
-                            className="text-red-500 hover:text-red-700 p-1"
-                            disabled={isSubmitting}
-                          >
-                            <IconTrash size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="mt-3 pt-3 border-t border-gray-300">
                     <div className="flex justify-between items-center">
@@ -327,6 +426,46 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                         {formatCurrency(totalPaymentAmount)}
                       </span>
                     </div>
+                    {selectedInvoices.some(
+                      ({ invoice, amountToPay }) =>
+                        amountToPay > invoice.balance_due
+                    ) && (
+                      <div className="mt-2 pt-2 border-t border-purple-200 bg-purple-50 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-purple-700">
+                            Regular Payments:
+                          </span>
+                          <span className="font-medium text-purple-700">
+                            {formatCurrency(
+                              selectedInvoices.reduce(
+                                (sum, { invoice, amountToPay }) =>
+                                  sum +
+                                  Math.min(amountToPay, invoice.balance_due),
+                                0
+                              )
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-purple-700">
+                            Overpaid Amounts:
+                          </span>
+                          <span className="font-medium text-purple-700">
+                            {formatCurrency(
+                              selectedInvoices.reduce(
+                                (sum, { invoice, amountToPay }) =>
+                                  sum +
+                                  Math.max(
+                                    0,
+                                    amountToPay - invoice.balance_due
+                                  ),
+                                0
+                              )
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -393,6 +532,115 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </div>
         </form>
       </div>
+      {/* Overpayment Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showOverpaymentConfirm}
+        onClose={() => {
+          setShowOverpaymentConfirm(false);
+          setOverpaymentDetails(null);
+        }}
+        onConfirm={handleConfirmOverpayment}
+        title={`Overpayment${
+          overpaymentDetails && overpaymentDetails.length > 1 ? "s" : ""
+        } Detected`}
+        message={
+          overpaymentDetails ? (
+            <div className="space-y-2">
+              <p>
+                {overpaymentDetails.length === 1
+                  ? "The following payment exceeds the balance due:"
+                  : `${overpaymentDetails.length} payments exceed their respective balance due:`}
+              </p>
+
+              <div className="space-y-2 max-h-[264px] overflow-y-auto">
+                {overpaymentDetails.map((detail, index) => (
+                  <div
+                    key={detail.invoiceId}
+                    className="bg-gray-50 p-3 border rounded-lg"
+                  >
+                    <div className="font-medium text-sm text-gray-800 mb-2">
+                      Invoice {detail.invoiceId} - {detail.customerName}
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Payment:</span>
+                        <span className="font-medium">
+                          {formatCurrency(detail.totalAmount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Applied to Balance:</span>
+                        <span className="font-medium">
+                          {formatCurrency(detail.regularAmount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span>Overpaid Amount:</span>
+                        <span className="font-medium text-purple-600">
+                          {formatCurrency(detail.overpaidAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Summary */}
+              <div className="bg-purple-50 p-3 border border-purple-200 rounded-lg">
+                <div className="font-medium text-sm text-purple-800 mb-2">
+                  Summary
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total Regular Payments:</span>
+                    <span className="font-medium">
+                      {formatCurrency(
+                        overpaymentDetails.reduce(
+                          (sum, detail) => sum + detail.regularAmount,
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total Overpaid Amount:</span>
+                    <span className="font-medium text-purple-600">
+                      {formatCurrency(
+                        overpaymentDetails.reduce(
+                          (sum, detail) => sum + detail.overpaidAmount,
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t pt-1 mt-1">
+                    <span>Grand Total:</span>
+                    <span className="font-bold">
+                      {formatCurrency(
+                        overpaymentDetails.reduce(
+                          (sum, detail) => sum + detail.totalAmount,
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                Each overpaid amount will be recorded as a separate "Overpaid"
+                payment record for its respective invoice.
+              </p>
+            </div>
+          ) : (
+            ""
+          )
+        }
+        confirmButtonText={`Confirm Split Payment${
+          overpaymentDetails && overpaymentDetails.length > 1 ? "s" : ""
+        }`}
+        variant="default"
+      />
     </div>
   );
 };
