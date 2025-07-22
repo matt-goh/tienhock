@@ -19,7 +19,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   dateRange,
   onDateChange,
   className = "",
-  inputClassName = "px-2 py-2 rounded-full bg-transparent outline-none",
+  inputClassName = "py-2 rounded-full bg-transparent outline-none",
   startInputWidth = "flex-1",
   endInputWidth = "flex-1",
 }) => {
@@ -126,9 +126,9 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     <div
       className={`flex items-center bg-white border ${
         isDateRangeFocused ? "border-default-500" : "border-default-300"
-      } rounded-full px-4 ${className}`}
+      } rounded-full pl-3 pr-1 ${className}`}
     >
-      <div className="flex items-center gap-3 flex-1">
+      <div className="flex items-center gap-2 flex-1">
         <input
           type="date"
           value={formatDateForInput(dateRange.start)}

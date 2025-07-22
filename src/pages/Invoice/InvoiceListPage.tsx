@@ -42,6 +42,8 @@ import {
   IconFileInvoice,
   IconUser,
   IconFileExport,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -709,6 +711,48 @@ const InvoiceListPage: React.FC = () => {
       dateRange: {
         start: startOfToday,
         end: endOfToday,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Backward one day handler
+  const handleBackwardOneDay = useCallback(() => {
+    const baseDate = filters.dateRange.start || new Date();
+    const newDate = new Date(baseDate);
+    newDate.setDate(newDate.getDate() - 1);
+
+    const startOfDay = new Date(newDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(newDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfDay,
+        end: endOfDay,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Forward one day handler
+  const handleForwardOneDay = useCallback(() => {
+    const baseDate = filters.dateRange.start || new Date();
+    const newDate = new Date(baseDate);
+    newDate.setDate(newDate.getDate() + 1);
+
+    const startOfDay = new Date(newDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(newDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfDay,
+        end: endOfDay,
       },
     };
     handleApplyFilters(updatedFilters);
@@ -1457,84 +1501,119 @@ const InvoiceListPage: React.FC = () => {
             Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
           </h1>
 
-          {/* Filters container */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap md:flex-1 md:justify-end">
-            {/* Date Range Picker */}
-            <div className="w-full sm:w-auto">
-              <DateRangePicker
-                dateRange={{
-                  start: filters.dateRange.start || new Date(),
-                  end: filters.dateRange.end || new Date(),
-                }}
-                onDateChange={handleDateChange}
-              />
-            </div>
+          {/* Filters and Actions Container */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 w-full md:flex-1 md:justify-end">
+            {/* Left Group: Date Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap w-full lg:w-auto lg:flex-nowrap">
+              {/* Date Range Picker */}
+              <div className="w-full sm:w-auto">
+                <DateRangePicker
+                  dateRange={{
+                    start: filters.dateRange.start || new Date(),
+                    end: filters.dateRange.end || new Date(),
+                  }}
+                  onDateChange={handleDateChange}
+                />
+              </div>
 
-            {/* Month Selector */}
-            <div className="w-full sm:w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                    <span className="block truncate pl-1">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <Transition
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                      {monthOptions.map((month) => (
-                        <ListboxOption
-                          key={month.id}
-                          value={month}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                              active
-                                ? "bg-default-100 text-default-900"
-                                : "text-gray-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                {month.name}
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                    stroke={2.5}
-                                  />
+              {/* Month Selector */}
+              <div className="w-full sm:w-40">
+                <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                  <div className="relative">
+                    <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                      <span className="block truncate pl-1">
+                        {selectedMonth.name}
+                      </span>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <IconChevronDown
+                          className="h-5 w-5 text-default-400"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                        {monthOptions.map((month) => (
+                          <ListboxOption
+                            key={month.id}
+                            value={month}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
+                                active
+                                  ? "bg-default-100 text-default-900"
+                                  : "text-gray-900"
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {month.name}
                                 </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                      ))}
-                    </ListboxOptions>
-                  </Transition>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                    <IconCheck
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                      stroke={2.5}
+                                    />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </div>
+
+              {/* Date Navigation and Daily Buttons */}
+              <div className="flex w-full xl:w-auto items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleBackwardOneDay}
+                    title="Previous Day"
+                    aria-label="Previous Day"
+                    className="px-0.5 h-[42px] w-[42px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <IconChevronLeft size={20} className="pr-0.5" />
+                  </button>
+                  <button
+                    onClick={handleForwardOneDay}
+                    title="Next Day"
+                    aria-label="Next Day"
+                    className="px-0.5 h-[42px] w-[42px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <IconChevronRight size={20} className="pl-0.5" />
+                  </button>
                 </div>
-              </Listbox>
+                <Button
+                  onClick={handleTodayClick}
+                  variant="outline"
+                  size="sm"
+                  className="w-full xl:w-auto h-[42px] whitespace-nowrap"
+                >
+                  Today
+                </Button>
+                <InvoiceDailyPrintMenu filters={filters} />
+              </div>
             </div>
 
-            {/* Search Input and Daily Button */}
-            <div className="flex items-center gap-2 w-full sm:flex-1 md:max-w-md">
+            {/* Right Group: Search and Main Filters */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+              {/* Search Input */}
               <div
-                className="relative flex-1"
+                className="relative flex-1 w-full sm:w-auto"
                 title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
               >
                 <IconSearch
@@ -1561,181 +1640,168 @@ const InvoiceListPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Daily Print Button */}
-              <InvoiceDailyPrintMenu filters={filters} />
+              {/* Filter Menu Button */}
+              <div className="relative flex-shrink-0">
+                <InvoiceFilterMenu
+                  currentFilters={filters}
+                  onFilterChange={handleApplyFilters}
+                  salesmanOptions={salesmen.map((s) => ({
+                    id: s.id,
+                    name: s.name || s.id,
+                  }))}
+                  onMouseEnter={() => {
+                    setIsFilterButtonHovered(true);
+                    setHasViewedFilters(true);
+                  }}
+                  onMouseLeave={() => setIsFilterButtonHovered(false)}
+                  activeFilterCount={activeFilterCount}
+                  hasViewedFilters={hasViewedFilters}
+                />
 
-              {/* Today Button */}
-              <Button
-                onClick={handleTodayClick}
-                variant="outline"
-                size="sm"
-                className="h-[42px] px-3 whitespace-nowrap"
-              >
-                Today
-              </Button>
-            </div>
+                {/* Filters info dropdown panel */}
+                {isFilterButtonHovered && (
+                  <div className="absolute z-30 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
+                    <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
+                      {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
+                    </h3>
+                    {activeFilterCount === 0 ? (
+                      <div className="text-default-500 py-2 px-1">
+                        No filters applied.
+                      </div>
+                    ) : (
+                      <ul className="space-y-2">
+                        {filters.salespersonId &&
+                          filters.salespersonId.length > 0 && (
+                            <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                              <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
+                                <IconUser size={14} className="text-sky-600" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="text-default-500 text-xs">
+                                  Salesman
+                                </span>
+                                <div className="font-medium break-words">
+                                  {filters.salespersonId.join(", ")}
+                                </div>
+                              </div>
+                            </li>
+                          )}
 
-            {/* Filter Menu Button */}
-            <div className="relative">
-              <InvoiceFilterMenu
-                currentFilters={filters}
-                onFilterChange={handleApplyFilters}
-                salesmanOptions={salesmen.map((s) => ({
-                  id: s.id,
-                  name: s.name || s.id,
-                }))}
-                onMouseEnter={() => {
-                  setIsFilterButtonHovered(true);
-                  setHasViewedFilters(true);
-                }}
-                onMouseLeave={() => setIsFilterButtonHovered(false)}
-                activeFilterCount={activeFilterCount}
-                hasViewedFilters={hasViewedFilters}
-              />
-
-              {/* Filters info dropdown panel */}
-              {isFilterButtonHovered && (
-                <div className="absolute z-30 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
-                  <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
-                    {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
-                  </h3>
-                  {activeFilterCount === 0 ? (
-                    <div className="text-default-500 py-2 px-1">
-                      No filters applied.
-                    </div>
-                  ) : (
-                    <ul className="space-y-2">
-                      {filters.salespersonId &&
-                        filters.salespersonId.length > 0 && (
+                        {filters.customerId && (
                           <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                             <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
                               <IconUser size={14} className="text-sky-600" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <span className="text-default-500 text-xs">
-                                Salesman
+                                Customer
                               </span>
                               <div className="font-medium break-words">
-                                {filters.salespersonId.join(", ")}
+                                {customerNames[filters.customerId] ||
+                                  filters.customerId}
                               </div>
                             </div>
                           </li>
                         )}
 
-                      {filters.customerId && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                          <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
-                            <IconUser size={14} className="text-sky-600" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <span className="text-default-500 text-xs">
-                              Customer
-                            </span>
-                            <div className="font-medium break-words">
-                              {customerNames[filters.customerId] ||
-                                filters.customerId}
-                            </div>
-                          </div>
-                        </li>
-                      )}
-
-                      {filters.paymentType && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                          <div className="bg-sky-100 p-1 rounded-md mr-2">
-                            <IconCash size={14} className="text-sky-600" />
-                          </div>
-                          <div>
-                            <span className="text-default-500 text-xs">
-                              Payment Type
-                            </span>
-                            <div className="font-medium">
-                              {filters.paymentType}
-                            </div>
-                          </div>
-                        </li>
-                      )}
-
-                      {filters.invoiceStatus &&
-                        filters.invoiceStatus.length > 0 &&
-                        !(
-                          filters.invoiceStatus.length === 3 &&
-                          filters.invoiceStatus.includes("paid") &&
-                          filters.invoiceStatus.includes("Unpaid") &&
-                          filters.invoiceStatus.includes("overdue") &&
-                          filters.invoiceStatus.includes("cancelled")
-                        ) && (
+                        {filters.paymentType && (
                           <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                             <div className="bg-sky-100 p-1 rounded-md mr-2">
-                              <IconCircleCheck
-                                size={14}
-                                className="text-sky-600"
-                              />
+                              <IconCash size={14} className="text-sky-600" />
                             </div>
                             <div>
                               <span className="text-default-500 text-xs">
-                                Invoice Status
+                                Payment Type
                               </span>
                               <div className="font-medium">
-                                {filters.invoiceStatus
-                                  .map(
-                                    (status) =>
-                                      status.charAt(0).toUpperCase() +
-                                      status.slice(1)
-                                  )
-                                  .join(", ")}
+                                {filters.paymentType}
                               </div>
                             </div>
                           </li>
                         )}
 
-                      {filters.eInvoiceStatus &&
-                        filters.eInvoiceStatus.length > 0 && (
-                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                            <div className="bg-sky-100 p-1 rounded-md mr-2">
-                              <IconFileInvoice
-                                size={14}
-                                className="text-sky-600"
-                              />
-                            </div>
-                            <div>
-                              <span className="text-default-500 text-xs">
-                                E-Invoice Status
-                              </span>
-                              <div className="font-medium">
-                                {filters.eInvoiceStatus
-                                  .map((status) =>
-                                    status === "null"
-                                      ? "Not Submitted"
-                                      : status.charAt(0).toUpperCase() +
+                        {filters.invoiceStatus &&
+                          filters.invoiceStatus.length > 0 &&
+                          !(
+                            filters.invoiceStatus.length === 4 &&
+                            filters.invoiceStatus.includes("paid") &&
+                            filters.invoiceStatus.includes("Unpaid") &&
+                            filters.invoiceStatus.includes("overdue") &&
+                            filters.invoiceStatus.includes("cancelled")
+                          ) && (
+                            <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                              <div className="bg-sky-100 p-1 rounded-md mr-2">
+                                <IconCircleCheck
+                                  size={14}
+                                  className="text-sky-600"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-default-500 text-xs">
+                                  Invoice Status
+                                </span>
+                                <div className="font-medium">
+                                  {filters.invoiceStatus
+                                    .map(
+                                      (status) =>
+                                        status.charAt(0).toUpperCase() +
                                         status.slice(1)
-                                  )
-                                  .join(", ")}
+                                    )
+                                    .join(", ")}
+                                </div>
+                              </div>
+                            </li>
+                          )}
+
+                        {filters.eInvoiceStatus &&
+                          filters.eInvoiceStatus.length > 0 && (
+                            <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                              <div className="bg-sky-100 p-1 rounded-md mr-2">
+                                <IconFileInvoice
+                                  size={14}
+                                  className="text-sky-600"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-default-500 text-xs">
+                                  E-Invoice Status
+                                </span>
+                                <div className="font-medium">
+                                  {filters.eInvoiceStatus
+                                    .map((status) =>
+                                      status === "null"
+                                        ? "Not Submitted"
+                                        : status.charAt(0).toUpperCase() +
+                                          status.slice(1)
+                                    )
+                                    .join(", ")}
+                                </div>
+                              </div>
+                            </li>
+                          )}
+
+                        {filters.consolidation !== "all" && (
+                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                            <div className="bg-sky-100 p-1 rounded-md mr-2">
+                              <IconFiles size={14} className="text-sky-600" />
+                            </div>
+                            <div>
+                              <span className="text-default-500 text-xs">
+                                Consolidation
+                              </span>
+                              <div className="font-medium">
+                                {filters.consolidation === "consolidated"
+                                  ? "Consolidated"
+                                  : "Individual"}
                               </div>
                             </div>
                           </li>
                         )}
-
-                      {filters.consolidation !== "all" && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                          <div className="bg-sky-100 p-1 rounded-md mr-2">
-                            <IconFiles size={14} className="text-sky-600" />
-                          </div>
-                          <div>
-                            <span className="text-default-500 text-xs">
-                              Consolidation
-                            </span>
-                            <div className="font-medium">
-                              {filters.consolidation === "consolidated"
-                                ? "Consolidated"
-                                : "Individual"}
-                            </div>
-                          </div>
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              )}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
