@@ -1777,6 +1777,9 @@ export default function (pool, config) {
       // If it's a CASH invoice, create automatic payment record
       if (isCash && totalPayable > 0) {
         // Check if payment details were provided in the request
+        const paymentDate = new Date(
+          parseInt(invoice.createddate, 10)
+        ).toISOString();
         const paymentMethod = invoice.payment_method || "cash";
         const paymentReference = invoice.payment_reference || null;
         const paymentNotes =
@@ -1790,7 +1793,7 @@ export default function (pool, config) {
         `;
         await client.query(paymentQuery, [
           createdInvoice.id,
-          new Date().toISOString(),
+          paymentDate,
           totalPayable,
           paymentMethod, // Use provided payment method
           paymentReference, // Use provided reference
@@ -2567,7 +2570,35 @@ export default function (pool, config) {
         }
       }
 
-      // 5. Update Invoice Status in DB
+      // 5. Zero out all financial data for cancelled invoice
+      // Update all order details to zero
+      const zeroOrderDetailsQuery = `
+        UPDATE order_details 
+        SET quantity = 0, 
+            price = 0,
+            total = '0.00',
+            freeproduct = 0,
+            returnproduct = 0,
+            tax = 0
+        WHERE invoiceid = $1
+      `;
+      await client.query(zeroOrderDetailsQuery, [id]);
+
+      // Update invoice financial totals to zero
+      const zeroInvoiceTotalsQuery = `
+        UPDATE invoices 
+        SET total_excluding_tax = 0,
+            tax_amount = 0,
+            rounding = 0,
+            totalamountpayable = 0,
+            balance_due = 0
+        WHERE id = $1
+      `;
+      await client.query(zeroInvoiceTotalsQuery, [id]);
+
+      console.log(`Zeroed out financial data for cancelled invoice ${id}`);
+
+      // 6. Update Invoice Status in DB
       const newEInvoiceStatus = einvoiceCancelledApi
         ? "cancelled"
         : invoice.einvoice_status;
@@ -3503,6 +3534,28 @@ export default function (pool, config) {
         throw new Error("Failed to update invoice");
       }
 
+      // Update associated payments' dates to match the new invoice date
+      // Convert epoch timestamp to PostgreSQL timestamp format
+      const updatePaymentsQuery = `
+        UPDATE payments 
+        SET payment_date = TO_TIMESTAMP($1::bigint / 1000)::date
+        WHERE invoice_id = $2 
+          AND (status IS NULL OR status != 'cancelled')
+        RETURNING payment_id, payment_date
+      `;
+
+      const paymentsResult = await client.query(updatePaymentsQuery, [
+        createddate,
+        id,
+      ]);
+
+      // Log the updated payments for debugging
+      if (paymentsResult.rows.length > 0) {
+        console.log(
+          `Updated ${paymentsResult.rows.length} payment(s) for invoice ${id} to new date`
+        );
+      }
+
       await client.query("COMMIT");
 
       res.json({
@@ -3510,6 +3563,7 @@ export default function (pool, config) {
         invoiceId: id,
         createddate: createddate,
         einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
+        paymentsUpdated: paymentsResult.rows.length,
       });
     } catch (error) {
       await client.query("ROLLBACK");
