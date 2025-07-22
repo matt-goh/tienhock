@@ -1777,6 +1777,9 @@ export default function (pool, config) {
       // If it's a CASH invoice, create automatic payment record
       if (isCash && totalPayable > 0) {
         // Check if payment details were provided in the request
+        const paymentDate = new Date(
+          parseInt(invoice.createddate, 10)
+        ).toISOString();
         const paymentMethod = invoice.payment_method || "cash";
         const paymentReference = invoice.payment_reference || null;
         const paymentNotes =
@@ -1790,7 +1793,7 @@ export default function (pool, config) {
         `;
         await client.query(paymentQuery, [
           createdInvoice.id,
-          new Date().toISOString(),
+          paymentDate,
           totalPayable,
           paymentMethod, // Use provided payment method
           paymentReference, // Use provided reference
