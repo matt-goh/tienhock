@@ -4,10 +4,8 @@ import {
   IconCash,
   IconPlus,
   IconSearch,
-  IconFilter,
   IconChevronDown,
   IconCheck,
-  IconCalendar,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -308,6 +306,7 @@ const PaymentPage: React.FC = () => {
                 { id: "", name: "All Status" },
                 { id: "active", name: "Active" },
                 { id: "pending", name: "Pending" },
+                { id: "overpaid", name: "Overpaid" },
                 { id: "cancelled", name: "Cancelled" },
               ]}
               className="w-full sm:w-40"

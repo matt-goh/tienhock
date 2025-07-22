@@ -48,7 +48,7 @@ export default function (pool) {
 
       // Only include active payments by default
       if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
       }
 
       query += " ORDER BY p.payment_date DESC, p.created_at DESC";
@@ -115,13 +115,13 @@ export default function (pool) {
       // Status filter
       if (status) {
         if (status === "active") {
-          query += ` AND (p.status = 'active' OR p.status = 'pending')`;
+          query += ` AND (p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
         } else {
           queryParams.push(status);
           query += ` AND p.status = $${paramCounter++}`;
         }
       } else if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
       }
 
       // Search filter
@@ -197,13 +197,12 @@ export default function (pool) {
   // --- POST /api/payments (Create Payment) ---
   router.post("/", async (req, res) => {
     const {
-      invoice_id, // Required: ID of the invoice being paid
-      payment_date, // Required: Date of payment
-      amount_paid, // Required: Amount being paid
-      payment_method, // Required: 'cash', 'cheque', 'bank_transfer', 'online'
-      payment_reference, // Optional: Cheque no, transaction ID, etc.
-      notes, // Optional: Any notes about the payment
-      // internal_reference is NOT expected from frontend for standard payments
+      invoice_id,
+      payment_date,
+      amount_paid,
+      payment_method,
+      payment_reference,
+      notes,
     } = req.body;
 
     // Basic validation
@@ -225,10 +224,10 @@ export default function (pool) {
 
       // 1. Get Invoice details & Lock the row
       const invoiceQuery = `
-        SELECT id, customerid, paymenttype, totalamountpayable, balance_due, invoice_status
-        FROM invoices
-        WHERE id = $1 FOR UPDATE
-      `;
+      SELECT id, customerid, paymenttype, totalamountpayable, balance_due, invoice_status
+      FROM invoices
+      WHERE id = $1 FOR UPDATE
+    `;
       const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
 
       if (invoiceResult.rows.length === 0) {
@@ -236,24 +235,28 @@ export default function (pool) {
       }
       const invoice = invoiceResult.rows[0];
       const currentBalance = parseFloat(invoice.balance_due || 0);
+      const paymentAmount = parseFloat(amount_paid);
 
-      // 2. Check invoice status and payment amount
+      // 2. Check invoice status
       if (invoice.invoice_status === "cancelled") {
         throw new Error(
           `Invoice ${invoice_id} is cancelled and cannot receive payments.`
         );
       }
-      if (parseFloat(amount_paid) > currentBalance) {
-        throw new Error(
-          `Payment amount (${parseFloat(amount_paid).toFixed(
-            2
-          )}) exceeds balance due (${currentBalance.toFixed(2)}).`
-        );
-      }
 
-      // 3. Insert the payment record
-      // (Removed internal_reference generation logic - assume not needed or handled elsewhere)
-      const insertPaymentQuery = `
+      // 3. Determine if this is an overpayment
+      const isOverpayment = paymentAmount > currentBalance;
+      const regularAmount = isOverpayment ? currentBalance : paymentAmount;
+      const overpaidAmount = isOverpayment ? paymentAmount - currentBalance : 0;
+
+      const createdPayments = [];
+
+      // 4. Create the regular payment (up to balance due)
+      if (regularAmount > 0) {
+        const initialStatus =
+          payment_method === "cheque" ? "pending" : "active";
+
+        const insertPaymentQuery = `
         INSERT INTO payments (
           invoice_id, payment_date, amount_paid, payment_method,
           payment_reference, notes, status
@@ -261,74 +264,104 @@ export default function (pool) {
         RETURNING *
       `;
 
-      // Determine initial status based on payment method
-      const initialStatus = payment_method === "cheque" ? "pending" : "active";
-
-      const paymentValues = [
-        invoice_id,
-        payment_date,
-        parseFloat(amount_paid),
-        payment_method,
-        payment_reference || null, // Use null if empty/undefined
-        notes || null,
-        initialStatus, // Set initial status based on payment method
-      ];
-      const paymentResult = await client.query(
-        insertPaymentQuery,
-        paymentValues
-      );
-      const createdPayment = paymentResult.rows[0];
-
-      // Only update invoice balance and customer credit if payment is active (not pending)
-      if (initialStatus === "active") {
-        // 4. Update Invoice balance and status
-        const newBalance = Math.max(
-          0,
-          currentBalance - parseFloat(amount_paid)
+        const paymentValues = [
+          invoice_id,
+          payment_date,
+          regularAmount,
+          payment_method,
+          payment_reference || null,
+          notes || null,
+          initialStatus,
+        ];
+        const paymentResult = await client.query(
+          insertPaymentQuery,
+          paymentValues
         );
-        const finalNewBalance = parseFloat(newBalance.toFixed(2));
+        createdPayments.push(paymentResult.rows[0]);
 
-        let newStatus;
-        if (finalNewBalance <= 0) {
-          newStatus = "paid";
-        } else {
-          if (invoice.invoice_status === "overdue") {
-            newStatus = "overdue";
+        // Update invoice balance and status only for active payments
+        if (initialStatus === "active") {
+          const newBalance = Math.max(0, currentBalance - regularAmount);
+          const finalNewBalance = parseFloat(newBalance.toFixed(2));
+
+          let newStatus;
+          if (finalNewBalance <= 0) {
+            newStatus = "paid";
           } else {
-            newStatus = "Unpaid";
+            if (invoice.invoice_status === "overdue") {
+              newStatus = "overdue";
+            } else {
+              newStatus = "Unpaid";
+            }
+          }
+
+          const updateInvoiceQuery = `
+          UPDATE invoices
+          SET balance_due = $1, invoice_status = $2
+          WHERE id = $3
+        `;
+          await client.query(updateInvoiceQuery, [
+            finalNewBalance,
+            newStatus,
+            invoice_id,
+          ]);
+
+          // Update Customer Credit if it was an INVOICE payment
+          if (invoice.paymenttype === "INVOICE") {
+            await updateCustomerCredit(
+              client,
+              invoice.customerid,
+              -regularAmount
+            );
           }
         }
+      }
 
-        const updateInvoiceQuery = `
-        UPDATE invoices
-        SET balance_due = $1, invoice_status = $2
-        WHERE id = $3
+      // 5. Create overpaid payment record if there's excess
+      if (overpaidAmount > 0) {
+        const overpaidStatus =
+          payment_method === "cheque" ? "pending" : "overpaid";
+
+        const insertOverpaidQuery = `
+        INSERT INTO payments (
+          invoice_id, payment_date, amount_paid, payment_method,
+          payment_reference, notes, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
       `;
-        await client.query(updateInvoiceQuery, [
-          finalNewBalance,
-          newStatus,
-          invoice_id,
-        ]);
 
-        // 5. Update Customer Credit if it was an INVOICE payment
-        if (invoice.paymenttype === "INVOICE") {
-          await updateCustomerCredit(
-            client,
-            invoice.customerid,
-            -parseFloat(amount_paid)
-          );
-        }
+        const overpaidValues = [
+          invoice_id,
+          payment_date,
+          overpaidAmount,
+          payment_method,
+          payment_reference || null,
+          (notes || "") + (notes ? " - " : "") + "Overpaid amount",
+          overpaidStatus,
+        ];
+        const overpaidResult = await client.query(
+          insertOverpaidQuery,
+          overpaidValues
+        );
+        createdPayments.push(overpaidResult.rows[0]);
       }
 
       await client.query("COMMIT");
 
+      // Format response
+      const formattedPayments = createdPayments.map((payment) => ({
+        ...payment,
+        amount_paid: parseFloat(payment.amount_paid || 0),
+      }));
+
       res.status(201).json({
-        message: "Payment created successfully",
-        // Parse amount back to float for consistency in response
-        payment: {
-          ...createdPayment,
-          amount_paid: parseFloat(createdPayment.amount_paid || 0),
-        },
+        message: isOverpayment
+          ? "Payment created successfully. Overpaid amount recorded separately."
+          : "Payment created successfully",
+        payments: formattedPayments,
+        isOverpayment,
+        regularAmount: regularAmount,
+        overpaidAmount: overpaidAmount,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -363,7 +396,7 @@ export default function (pool) {
       if (initialPaymentResult.rows.length === 0) {
         // Check if it was already confirmed to provide a better message
         const alreadyConfirmedCheck = await client.query(
-          "SELECT payment_reference FROM payments WHERE payment_id = $1 AND status = 'active'",
+          "SELECT payment_reference FROM payments WHERE payment_id = $1 AND (status = 'active' OR status = 'overpaid')",
           [paymentIdNum]
         );
         if (alreadyConfirmedCheck.rows.length > 0) {
@@ -417,63 +450,74 @@ export default function (pool) {
       // 3. Process each payment
       for (const payment of paymentsToConfirm) {
         const {
+          payment_id: currentPaymentId,
           invoice_id,
           amount_paid,
           customerid,
           paymenttype,
           invoice_status,
+          notes,
         } = payment;
         const paidAmount = parseFloat(amount_paid || 0);
 
         if (invoice_status === "cancelled") {
           console.warn(
-            `Skipping confirmation for payment ${payment.payment_id} as its invoice ${invoice_id} is cancelled.`
+            `Skipping confirmation for payment ${currentPaymentId} as its invoice ${invoice_id} is cancelled.`
           );
           continue;
         }
 
-        // 4. Update payment status to active
+        // 4. Determine the appropriate status for this payment
+        // Check if this is an overpaid payment by looking at the notes
+        const isOverpaidPayment = notes && notes.includes("Overpaid amount");
+        const newStatus = isOverpaidPayment ? "overpaid" : "active";
+
+        // 5. Update payment status
         const updatePaymentQuery = `
         UPDATE payments
-        SET status = 'active'
-        WHERE payment_id = $1
+        SET status = $1
+        WHERE payment_id = $2
         RETURNING *
       `;
         const updateResult = await client.query(updatePaymentQuery, [
-          payment.payment_id,
+          newStatus,
+          currentPaymentId,
         ]);
         const confirmedPaymentData = updateResult.rows[0];
 
-        // 5. Update Invoice balance and status
-        const currentBalance = parseFloat(payment.balance_due || 0);
-        const newBalance = Math.max(0, currentBalance - paidAmount);
-        const finalNewBalance = parseFloat(newBalance.toFixed(2));
+        // 6. Update Invoice balance and status (only for non-overpaid payments)
+        if (newStatus === "active") {
+          const currentBalance = parseFloat(payment.balance_due || 0);
+          const newBalance = Math.max(0, currentBalance - paidAmount);
+          const finalNewBalance = parseFloat(newBalance.toFixed(2));
 
-        let newStatus;
-        if (finalNewBalance <= 0) {
-          newStatus = "paid";
-        } else {
-          newStatus = invoice_status === "overdue" ? "overdue" : "Unpaid";
-        }
+          let invoiceNewStatus;
+          if (finalNewBalance <= 0) {
+            invoiceNewStatus = "paid";
+          } else {
+            invoiceNewStatus =
+              invoice_status === "overdue" ? "overdue" : "Unpaid";
+          }
 
-        const updateInvoiceQuery = `
-        UPDATE invoices
-        SET balance_due = $1, invoice_status = $2
-        WHERE id = $3
-      `;
-        await client.query(updateInvoiceQuery, [
-          finalNewBalance,
-          newStatus,
-          invoice_id,
-        ]);
+          const updateInvoiceQuery = `
+          UPDATE invoices
+          SET balance_due = $1, invoice_status = $2
+          WHERE id = $3
+        `;
+          await client.query(updateInvoiceQuery, [
+            finalNewBalance,
+            invoiceNewStatus,
+            invoice_id,
+          ]);
 
-        // 6. Update Customer Credit if it was an INVOICE payment
-        if (paymenttype === "INVOICE") {
-          await updateCustomerCredit(
-            client,
-            customerid,
-            -paidAmount // Reduce credit used
-          );
+          // 7. Update Customer Credit if it was an INVOICE payment (only for active payments)
+          if (paymenttype === "INVOICE") {
+            await updateCustomerCredit(
+              client,
+              customerid,
+              -paidAmount // Reduce credit used
+            );
+          }
         }
 
         confirmedPayments.push({
@@ -484,14 +528,29 @@ export default function (pool) {
 
       await client.query("COMMIT");
 
-      const message =
-        confirmedPayments.length > 1
-          ? `${confirmedPayments.length} payments confirmed successfully.`
-          : "Payment confirmed successfully.";
+      const regularPayments = confirmedPayments.filter(
+        (p) => p.status === "active"
+      );
+      const overpaidPayments = confirmedPayments.filter(
+        (p) => p.status === "overpaid"
+      );
+
+      let message;
+      if (overpaidPayments.length > 0 && regularPayments.length > 0) {
+        message = `${regularPayments.length} payment(s) confirmed as active, ${overpaidPayments.length} payment(s) confirmed as overpaid.`;
+      } else if (overpaidPayments.length > 0) {
+        message = `${overpaidPayments.length} overpaid payment(s) confirmed.`;
+      } else {
+        message =
+          confirmedPayments.length > 1
+            ? `${confirmedPayments.length} payments confirmed successfully.`
+            : "Payment confirmed successfully.";
+      }
 
       res.json({
         message,
-        payments: confirmedPayments, // Return an array of payments
+        payments: confirmedPayments,
+        hasOverpaidPayments: overpaidPayments.length > 0,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -524,7 +583,7 @@ export default function (pool) {
         FROM payments p
         JOIN invoices i ON p.invoice_id = i.id
         WHERE p.payment_id = $1 
-          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
+          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')
         FOR UPDATE OF i -- Lock the associated invoice row
       `;
       const paymentResult = await client.query(paymentQuery, [paymentIdNum]);
