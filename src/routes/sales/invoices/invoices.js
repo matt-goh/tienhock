@@ -3506,6 +3506,28 @@ export default function (pool, config) {
         throw new Error("Failed to update invoice");
       }
 
+      // Update associated payments' dates to match the new invoice date
+      // Convert epoch timestamp to PostgreSQL timestamp format
+      const updatePaymentsQuery = `
+        UPDATE payments 
+        SET payment_date = TO_TIMESTAMP($1::bigint / 1000)::date
+        WHERE invoice_id = $2 
+          AND (status IS NULL OR status != 'cancelled')
+        RETURNING payment_id, payment_date
+      `;
+
+      const paymentsResult = await client.query(updatePaymentsQuery, [
+        createddate,
+        id,
+      ]);
+
+      // Log the updated payments for debugging
+      if (paymentsResult.rows.length > 0) {
+        console.log(
+          `Updated ${paymentsResult.rows.length} payment(s) for invoice ${id} to new date`
+        );
+      }
+
       await client.query("COMMIT");
 
       res.json({
@@ -3513,6 +3535,7 @@ export default function (pool, config) {
         invoiceId: id,
         createddate: createddate,
         einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
+        paymentsUpdated: paymentsResult.rows.length,
       });
     } catch (error) {
       await client.query("ROLLBACK");
