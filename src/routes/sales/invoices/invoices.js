@@ -2570,7 +2570,35 @@ export default function (pool, config) {
         }
       }
 
-      // 5. Update Invoice Status in DB
+      // 5. Zero out all financial data for cancelled invoice
+      // Update all order details to zero
+      const zeroOrderDetailsQuery = `
+        UPDATE order_details 
+        SET quantity = 0, 
+            price = 0,
+            total = '0.00',
+            freeproduct = 0,
+            returnproduct = 0,
+            tax = 0
+        WHERE invoiceid = $1
+      `;
+      await client.query(zeroOrderDetailsQuery, [id]);
+
+      // Update invoice financial totals to zero
+      const zeroInvoiceTotalsQuery = `
+        UPDATE invoices 
+        SET total_excluding_tax = 0,
+            tax_amount = 0,
+            rounding = 0,
+            totalamountpayable = 0,
+            balance_due = 0
+        WHERE id = $1
+      `;
+      await client.query(zeroInvoiceTotalsQuery, [id]);
+
+      console.log(`Zeroed out financial data for cancelled invoice ${id}`);
+
+      // 6. Update Invoice Status in DB
       const newEInvoiceStatus = einvoiceCancelledApi
         ? "cancelled"
         : invoice.einvoice_status;
@@ -2589,26 +2617,7 @@ export default function (pool, config) {
       ]);
 
       await client.query("COMMIT");
-
-      // Format and return the final cancelled invoice data
-      const finalCancelledInvoice = updateResult.rows[0];
-      res.status(200).json({
-        message:
-          "Invoice and associated active payments cancelled successfully",
-        deletedInvoice: {
-          // using deletedInvoice to match the old format for mobile app to work
-          ...finalCancelledInvoice,
-          total_excluding_tax: parseFloat(
-            finalCancelledInvoice.total_excluding_tax || 0
-          ),
-          tax_amount: parseFloat(finalCancelledInvoice.tax_amount || 0),
-          rounding: parseFloat(finalCancelledInvoice.rounding || 0),
-          totalamountpayable: parseFloat(
-            finalCancelledInvoice.totalamountpayable || 0
-          ),
-          balance_due: parseFloat(finalCancelledInvoice.balance_due || 0), // Should be 0 now
-        },
-      });
+      res.status(200).json({});
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error cancelling invoice and payments:", error); // Updated log message

@@ -387,18 +387,8 @@ const InvoiceDetailsPage: React.FC = () => {
     const toastId = toast.loading("Cancelling invoice...");
 
     try {
-      const cancelledInvoiceData = await cancelInvoice(invoiceData.id);
-
-      // Preserve the products array when updating the state
-      setInvoiceData((prevData) => {
-        if (!prevData) return cancelledInvoiceData;
-
-        return {
-          ...cancelledInvoiceData,
-          products: prevData.products, // Keep the existing products array
-        };
-      });
-
+      await cancelInvoice(invoiceData.id); // Call the API to cancel invoice
+      await fetchDetails(); // Refresh invoice and payment data
       toast.success("Invoice cancelled successfully.", { id: toastId });
       setShowPaymentForm(false); // Hide payment form
     } catch (error: any) {
@@ -2592,7 +2582,6 @@ const InvoiceDetailsPage: React.FC = () => {
           </div>
         </div>
       )}
-      {/* E-Invoice Cancellation Confirmation Dialog */}
       {/* E-Invoice Cancellation Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showEInvoiceCancelConfirm}
