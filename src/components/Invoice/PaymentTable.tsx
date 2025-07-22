@@ -103,6 +103,12 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
             Pending
           </span>
         );
+      case "overpaid":
+        return (
+          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
+            Overpaid
+          </span>
+        );
       case "cancelled":
         return (
           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">

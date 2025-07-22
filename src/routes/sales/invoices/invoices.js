@@ -1720,7 +1720,7 @@ export default function (pool, config) {
       const totalPayable = parseFloat(invoice.totalamountpayable || 0);
       const isCash = invoice.paymenttype === "CASH";
       const balance_due = isCash ? 0 : totalPayable; // Zero balance for CASH
-      const invoice_status = isCash ? "paid" : "Unpaid"; // "paid" for CASH, "Unpaid" for others
+      const invoice_status = isCash || totalPayable === 0 ? "paid" : "Unpaid"; // "paid" for CASH or zero amount
 
       // Insert invoice
       const insertInvoiceQuery = `
