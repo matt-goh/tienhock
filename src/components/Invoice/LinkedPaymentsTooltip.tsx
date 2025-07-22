@@ -157,7 +157,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                       <div className="flex justify-between items-start">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate">
-                            Inv: {paymentInfo.invoice_id}
+                            Invoice: {paymentInfo.invoice_id}
                           </div>
                           <div className="text-xs text-default-500 truncate">
                             {paymentInfo.customer_name}

@@ -280,6 +280,12 @@ const InvoiceDetailsPage: React.FC = () => {
   const [editedProducts, setEditedProducts] = useState<ProductItem[]>([]);
   const [isUpdatingOrderDetails, setIsUpdatingOrderDetails] =
     useState<boolean>(false);
+  const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
+  const [overpaymentDetails, setOverpaymentDetails] = useState<{
+    totalAmount: number;
+    regularAmount: number;
+    overpaidAmount: number;
+  } | null>(null);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -1062,23 +1068,11 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error("Payment amount must be positive");
       return false;
     }
-    // Use a small tolerance for floating point comparison
-    const balanceTolerance = 0.001;
-    if (
-      invoiceData &&
-      paymentFormData.amount_paid > invoiceData.balance_due + balanceTolerance
-    ) {
-      toast.error(
-        `Payment amount cannot exceed balance due (${formatCurrency(
-          invoiceData.balance_due
-        )})`
-      );
-      return false;
-    }
     if (!paymentFormData.payment_method) {
       toast.error("Payment method is required");
       return false;
     }
+    // Removed overpayment validation
     return true;
   };
 
@@ -1086,18 +1080,34 @@ const InvoiceDetailsPage: React.FC = () => {
     e.preventDefault();
     if (!validatePaymentForm() || !invoiceData || isProcessingPayment) return;
 
+    const paymentAmount = paymentFormData.amount_paid;
+    const currentBalance = invoiceData.balance_due;
+
+    // Check for overpayment
+    if (paymentAmount > currentBalance && currentBalance > 0) {
+      const overpaidAmount = paymentAmount - currentBalance;
+      setOverpaymentDetails({
+        totalAmount: paymentAmount,
+        regularAmount: currentBalance,
+        overpaidAmount: overpaidAmount,
+      });
+      setShowOverpaymentConfirm(true);
+      return;
+    }
+
+    // Proceed with normal payment
+    await processPayment();
+  };
+
+  const processPayment = async () => {
+    if (!invoiceData) return;
+
     setIsProcessingPayment(true);
     const toastId = toast.loading("Recording payment...");
 
-    // Ensure amount paid doesn't exceed balance due due to potential float issues
-    const amountToPay = Math.min(
-      paymentFormData.amount_paid,
-      invoiceData.balance_due
-    );
-
     const paymentPayload: Omit<Payment, "payment_id" | "created_at"> = {
       invoice_id: invoiceData.id,
-      amount_paid: parseFloat(amountToPay.toFixed(2)), // Send rounded value
+      amount_paid: paymentFormData.amount_paid,
       payment_date: paymentFormData.payment_date,
       payment_method: paymentFormData.payment_method,
       payment_reference:
@@ -1108,16 +1118,33 @@ const InvoiceDetailsPage: React.FC = () => {
     };
 
     try {
-      await createPayment(paymentPayload);
-      toast.success("Payment recorded successfully.", { id: toastId });
+      const response = await api.post("/api/payments", paymentPayload);
+
+      if (response.isOverpayment) {
+        toast.success(
+          `Payment recorded successfully. Regular: ${formatCurrency(
+            response.regularAmount
+          )}, Overpaid: ${formatCurrency(response.overpaidAmount)}`,
+          { id: toastId, duration: 5000 }
+        );
+      } else {
+        toast.success("Payment recorded successfully.", { id: toastId });
+      }
+
       setShowPaymentForm(false);
-      await fetchDetails(); // Refresh invoice and payment data
+      setShowOverpaymentConfirm(false);
+      setOverpaymentDetails(null);
+      await fetchDetails();
     } catch (error) {
-      // Error toast handled by utility, update main toast
       toast.error("Failed to record payment.", { id: toastId });
     } finally {
       setIsProcessingPayment(false);
     }
+  };
+
+  const handleConfirmOverpayment = async () => {
+    setShowOverpaymentConfirm(false);
+    await processPayment();
   };
 
   const handleConfirmPaymentClick = (payment: Payment) => {
@@ -1543,7 +1570,6 @@ const InvoiceDetailsPage: React.FC = () => {
                 onChange={handlePaymentFormChange}
                 step="0.01"
                 min={0.01}
-                max={invoiceData.balance_due}
                 disabled={isProcessingPayment}
               />
               <FormListbox
@@ -2006,6 +2032,8 @@ const InvoiceDetailsPage: React.FC = () => {
                               ? "bg-red-100 text-red-700"
                               : p.status === "pending"
                               ? "bg-yellow-100 text-yellow-700"
+                              : p.status === "overpaid"
+                              ? "bg-indigo-100 text-indigo-700"
                               : "bg-green-100 text-green-700"
                           }`}
                         >
@@ -2013,6 +2041,8 @@ const InvoiceDetailsPage: React.FC = () => {
                             ? "Cancelled"
                             : p.status === "pending"
                             ? "Pending"
+                            : p.status === "overpaid"
+                            ? "Overpaid"
                             : "Paid"}
                         </span>
                       </td>
@@ -2601,6 +2631,51 @@ const InvoiceDetailsPage: React.FC = () => {
         } will cancel the e-invoice at MyInvois. You will need to resubmit the e-invoice after making all necessary changes. Do you want to continue?`}
         confirmButtonText="Cancel E-Invoice & Continue"
         variant="danger"
+      />
+      {/* Overpayment Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showOverpaymentConfirm}
+        onClose={() => {
+          setShowOverpaymentConfirm(false);
+          setOverpaymentDetails(null);
+        }}
+        onConfirm={handleConfirmOverpayment}
+        title="Overpayment Detected"
+        message={
+          overpaymentDetails ? (
+            <div className="space-y-2">
+              <p>The payment amount exceeds the balance due:</p>
+              <div className="bg-gray-50 p-3 border rounded-lg text-sm">
+                <div className="flex justify-between">
+                  <span>Total Payment:</span>
+                  <span className="font-medium">
+                    {formatCurrency(overpaymentDetails.totalAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Applied to Balance:</span>
+                  <span className="font-medium">
+                    {formatCurrency(overpaymentDetails.regularAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span>Overpaid Amount:</span>
+                  <span className="font-medium text-indigo-600">
+                    {formatCurrency(overpaymentDetails.overpaidAmount)}
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">
+                The overpaid amount will be recorded as a separate "Overpaid"
+                payment record.
+              </p>
+            </div>
+          ) : (
+            ""
+          )
+        }
+        confirmButtonText="Confirm Split Payment"
+        variant="default"
       />
     </div>
   );

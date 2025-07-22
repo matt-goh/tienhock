@@ -404,7 +404,7 @@ export interface Payment {
   internal_reference?: string;
   notes?: string;
   created_at?: string;
-  status?: "active" | "cancelled" | "pending";
+  status?: "active" | "cancelled" | "pending" | "overpaid";
   cancellation_date?: string;
   cancellation_reason?: string;
 }

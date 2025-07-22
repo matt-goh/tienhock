@@ -1584,17 +1584,17 @@ const InvoiceListPage: React.FC = () => {
                     onClick={handleBackwardOneDay}
                     title="Previous Day"
                     aria-label="Previous Day"
-                    className="px-0.5 h-[42px] w-[42px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <IconChevronLeft size={20} className="pr-0.5" />
+                    <IconChevronLeft size={20} className="mr-[1px]" />
                   </button>
                   <button
                     onClick={handleForwardOneDay}
                     title="Next Day"
                     aria-label="Next Day"
-                    className="px-0.5 h-[42px] w-[42px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <IconChevronRight size={20} className="pl-0.5" />
+                    <IconChevronRight size={20} className="ml-[1px]" />
                   </button>
                 </div>
                 <Button
