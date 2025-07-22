@@ -372,13 +372,6 @@ const InvoiceDetailsPage: React.FC = () => {
     return filtered;
   }, [customers, displayedCustomers, customerQuery]);
 
-  // Customer options for the combobox
-  const customerOptions = customers.map((customer) => ({
-    id: customer.id,
-    name: customer.name,
-    phone_number: customer.phone_number,
-  }));
-
   // --- Actions ---
 
   const handleCancelInvoiceClick = () => {
