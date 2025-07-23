@@ -245,7 +245,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   }, [formData.contextData, jobConfig, employeeSelectionState.jobHours]);
 
-  // Add this effect to handle day type changes for leave selection
+  // Clear Cuti Umum selections when day type changes from holiday to non-holiday
   useEffect(() => {
     if (formData.dayType !== "Umum") {
       setLeaveEmployees((prev) => {
@@ -1457,7 +1457,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   return (
-    <div className="relative w-full mx-4 md:mx-6 -mt-8">
+    <div className="relative w-full mx-4 mb-4 md:mx-6 -mt-8">
       <BackButton onClick={handleBack} />
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
@@ -2236,115 +2236,113 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           )}
         </div>
 
-        {formData.dayType === "Umum" && (
-          <div className="border-t border-default-200 pt-6 mt-8">
-            <h2 className="text-lg font-semibold text-default-700 mb-2">
-              Leave & Absence Recording
-            </h2>
-            <p className="text-sm text-default-500 mb-4">
-              Select employees on paid leave. Cuti Umum is available on public
-              holidays, Cuti Sakit is available any day. Pay is based on regular
-              day rates.
-            </p>
+        <div className="border-t border-default-200 pt-6 mt-8">
+          <h2 className="text-lg font-semibold text-default-700 mb-2">
+            Leave & Absence Recording
+          </h2>
+          <p className="text-sm text-default-500 mb-4">
+            Select employees on paid leave.{" "}
+            {formData.dayType === "Umum"
+              ? "Cuti Umum is available on public holidays, "
+              : ""}
+            Cuti Sakit is available any day. Pay is based on regular day rates.
+          </p>
 
-            <div className="bg-white rounded-lg border shadow-sm">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-50">
-                  <tr>
-                    <th scope="col" className="w-16 px-6 py-3 text-left"></th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Employee
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Leave Type
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-default-200">
-                  {uniqueEmployees.map((employee) => {
-                    const leaveOptions = [
-                      { id: "cuti_sakit", name: "Cuti Sakit" },
-                    ];
-                    if (formData.dayType === "Umum") {
-                      leaveOptions.push({ id: "cuti_umum", name: "Cuti Umum" });
-                    }
-                    return (
-                      <tr key={`leave-${employee.id}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Checkbox
-                            checked={
-                              leaveEmployees[employee.id]?.selected || false
-                            }
-                            onChange={() => handleLeaveSelection(employee.id)}
-                            size={20}
-                            checkedColor="text-amber-600"
-                            ariaLabel={`Select ${employee.name} for leave`}
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-default-900">
-                            {employee.name}
-                          </div>
-                          <div className="text-xs text-default-500">
-                            {employee.id}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {leaveEmployees[employee.id]?.selected && (
-                            <div className="w-48">
-                              <FormListbox
-                                name={`leaveType-${employee.id}`}
-                                value={
-                                  leaveEmployees[employee.id]?.leaveType ||
-                                  "cuti_sakit"
-                                }
-                                onChange={(value) =>
-                                  handleLeaveTypeChange(
-                                    employee.id,
-                                    value as LeaveType
-                                  )
-                                }
-                                options={leaveOptions}
-                                disabled={
-                                  !leaveEmployees[employee.id]?.selected
-                                }
-                              />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          {leaveEmployees[employee.id]?.selected && (
-                            <ActivitiesTooltip
-                              activities={(
-                                leaveEmployeeActivities[employee.id] || []
-                              ).filter((a: ActivityItem) => a.isSelected)}
-                              employeeName={employee.name}
-                              onClick={() =>
-                                handleManageLeaveActivities(employee)
+          <div className="bg-white rounded-lg border shadow-sm">
+            <table className="min-w-full divide-y divide-default-200">
+              <thead className="bg-default-50">
+                <tr>
+                  <th scope="col" className="w-16 px-6 py-3 text-left"></th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                  >
+                    Employee
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                  >
+                    Leave Type
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-default-200">
+                {uniqueEmployees.map((employee) => {
+                  const leaveOptions = [
+                    { id: "cuti_sakit", name: "Cuti Sakit" },
+                  ];
+                  if (formData.dayType === "Umum") {
+                    leaveOptions.push({ id: "cuti_umum", name: "Cuti Umum" });
+                  }
+                  return (
+                    <tr key={`leave-${employee.id}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Checkbox
+                          checked={
+                            leaveEmployees[employee.id]?.selected || false
+                          }
+                          onChange={() => handleLeaveSelection(employee.id)}
+                          size={20}
+                          checkedColor="text-amber-600"
+                          ariaLabel={`Select ${employee.name} for leave`}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-default-900">
+                          {employee.name}
+                        </div>
+                        <div className="text-xs text-default-500">
+                          {employee.id}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {leaveEmployees[employee.id]?.selected && (
+                          <div className="w-48">
+                            <FormListbox
+                              name={`leaveType-${employee.id}`}
+                              value={
+                                leaveEmployees[employee.id]?.leaveType ||
+                                "cuti_sakit"
                               }
+                              onChange={(value) =>
+                                handleLeaveTypeChange(
+                                  employee.id,
+                                  value as LeaveType
+                                )
+                              }
+                              options={leaveOptions}
+                              disabled={!leaveEmployees[employee.id]?.selected}
                             />
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {leaveEmployees[employee.id]?.selected && (
+                          <ActivitiesTooltip
+                            activities={(
+                              leaveEmployeeActivities[employee.id] || []
+                            ).filter((a: ActivityItem) => a.isSelected)}
+                            employeeName={employee.name}
+                            onClick={() =>
+                              handleManageLeaveActivities(employee)
+                            }
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
 
         {/* Action Buttons */}
         <div className="border-t border-default-200 pt-4 mt-4 flex justify-end space-x-3">
