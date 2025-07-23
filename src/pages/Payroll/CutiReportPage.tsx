@@ -154,7 +154,7 @@ const CutiReportPage: React.FC = () => {
   };
 
   const renderStaffHeader = (staff: Employee) => (
-    <div className="bg-white p-6 rounded-xl border border-default-200">
+    <div className="bg-white px-6 py-4 rounded-xl border border-default-200">
       <div className="flex items-center gap-4">
         <IconUserCircle size={48} className="text-default-400" />
         <div>
@@ -381,48 +381,46 @@ const CutiReportPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-default-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="max-w-md mb-6">
-          <FormCombobox
-            name="staff"
-            label="Select Staff"
-            value={selectedStaffId || ""}
-            onChange={(value) => setSelectedStaffId(value as string)}
-            options={staffOptions}
-            query={searchQuery}
-            setQuery={setSearchQuery}
-            placeholder="Search by name or ID..."
-            mode="single"
-            disabled={loadingStaffs}
-          />
-        </div>
-
-        {(loadingStaffs || loadingReport) && <LoadingSpinner />}
-
-        {!loadingReport && reportError && (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-rose-300">
-            <IconAlertCircle className="mx-auto text-rose-500 h-12 w-12" />
-            <p className="mt-4 text-rose-600 font-medium">{reportError}</p>
-          </div>
-        )}
-
-        {!loadingReport && !reportError && selectedStaff && (
-          <div className="space-y-6">
-            {renderStaffHeader(selectedStaff)}
-            {leaveBalances && renderLeaveBalanceSummary(leaveBalances)}
-            {renderMonthlyLeaveTable()}
-          </div>
-        )}
-
-        {!loadingStaffs && !loadingReport && !selectedStaffId && (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed">
-            <p className="text-default-600">
-              Please select a staff member to view their leave report.
-            </p>
-          </div>
-        )}
+    <div className="mt-4">
+      <div className="max-w-md mb-4">
+        <FormCombobox
+          name="staff"
+          label="Select Staff"
+          value={selectedStaffId || ""}
+          onChange={(value) => setSelectedStaffId(value as string)}
+          options={staffOptions}
+          query={searchQuery}
+          setQuery={setSearchQuery}
+          placeholder="Search by name or ID..."
+          mode="single"
+          disabled={loadingStaffs}
+        />
       </div>
+
+      {(loadingStaffs || loadingReport) && <LoadingSpinner />}
+
+      {!loadingReport && reportError && (
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-rose-300">
+          <IconAlertCircle className="mx-auto text-rose-500 h-12 w-12" />
+          <p className="mt-4 text-rose-600 font-medium">{reportError}</p>
+        </div>
+      )}
+
+      {!loadingReport && !reportError && selectedStaff && (
+        <div className="space-y-4">
+          {renderStaffHeader(selectedStaff)}
+          {leaveBalances && renderLeaveBalanceSummary(leaveBalances)}
+          {renderMonthlyLeaveTable()}
+        </div>
+      )}
+
+      {!loadingStaffs && !loadingReport && !selectedStaffId && (
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed">
+          <p className="text-default-600">
+            Please select a staff member to view their leave report.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

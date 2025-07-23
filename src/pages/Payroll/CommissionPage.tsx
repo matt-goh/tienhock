@@ -105,116 +105,108 @@ const CommissionPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-default-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold text-default-800 mb-6">
-          Record Maintenance Commission
-        </h1>
-        <div className="bg-white p-8 rounded-xl border border-default-200 shadow-sm">
-          <div className="max-w-xs mb-6">
-            <FormInput
-              name="commissionDate"
-              label="Commission Date"
-              type="date"
-              value={commissionDate}
-              onChange={(e) => setCommissionDate(e.target.value)}
-              required
-            />
-          </div>
+    <div className="mt-4">
+      <h1 className="text-2xl font-bold text-default-800 mb-4">
+        Record Maintenance Commission
+      </h1>
+      <div className="bg-white p-6 rounded-xl border border-default-200 shadow-sm">
+        <div className="max-w-xs mb-4">
+          <FormInput
+            name="commissionDate"
+            label="Commission Date"
+            type="date"
+            value={commissionDate}
+            onChange={(e) => setCommissionDate(e.target.value)}
+            required
+          />
+        </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr>
-                  <th className="py-2 px-4 text-left font-medium text-default-600 w-2/5">
-                    Staff (Maintenance)
-                  </th>
-                  <th className="py-2 px-4 text-left font-medium text-default-600 w-1/5">
-                    Amount (RM)
-                  </th>
-                  <th className="py-2 px-4 text-left font-medium text-default-600 w-2/5">
-                    Description
-                  </th>
-                  <th className="py-2 px-4 text-left font-medium text-default-600"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry, index) => (
-                  <tr key={entry.id} className="group">
-                    <td className="py-2 px-1 align-top">
-                      <FormCombobox
-                        name={`employee-${index}`}
-                        label=""
-                        value={entry.employeeId ?? undefined}
-                        onChange={(value) =>
-                          handleEntryChange(index, "employeeId", value)
-                        }
-                        options={maintenanceStaffOptions}
-                        query=""
-                        setQuery={() => {}}
-                        placeholder="Select Staff..."
-                        mode="single"
-                      />
-                    </td>
-                    <td className="py-2 px-1 align-top">
-                      <FormInput
-                        name={`amount-${index}`}
-                        label=""
-                        type="number"
-                        value={entry.amount}
-                        onChange={(e) =>
-                          handleEntryChange(index, "amount", e.target.value)
-                        }
-                        placeholder="0.00"
-                        step="0.01"
-                      />
-                    </td>
-                    <td className="py-2 px-1 align-top">
-                      <FormInput
-                        name={`description-${index}`}
-                        label=""
-                        type="text"
-                        value={entry.description}
-                        onChange={(e) =>
-                          handleEntryChange(
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                        placeholder="e.g., Special repair work"
-                      />
-                    </td>
-                    <td className="py-2 px-1 align-top">
-                      {entries.length > 1 && (
-                        <button
-                          onClick={() => removeEntryRow(entry.id)}
-                          className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Remove row"
-                        >
-                          <IconX size={18} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <table className="min-w-full">
+          <thead>
+            <tr>
+              <th className="py-2 text-left font-medium text-default-600 w-2/5">
+                Staff (Maintenance)
+              </th>
+              <th className="py-2 px-3 text-left font-medium text-default-600 w-1/5">
+                Amount (RM)
+              </th>
+              <th className="py-2 px-3 text-left font-medium text-default-600 w-2/5">
+                Description
+              </th>
+              <th className="py-2 text-left font-medium text-default-600"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry, index) => (
+              <tr key={entry.id} className="group">
+                <td className="py-2 align-top">
+                  <FormCombobox
+                    name={`employee-${index}`}
+                    label=""
+                    value={entry.employeeId ?? undefined}
+                    onChange={(value) =>
+                      handleEntryChange(index, "employeeId", value)
+                    }
+                    options={maintenanceStaffOptions}
+                    query=""
+                    setQuery={() => {}}
+                    placeholder="Select Staff..."
+                    mode="single"
+                  />
+                </td>
+                <td className="py-2 px-3 align-top">
+                  <FormInput
+                    name={`amount-${index}`}
+                    label=""
+                    type="number"
+                    value={entry.amount}
+                    onChange={(e) =>
+                      handleEntryChange(index, "amount", e.target.value)
+                    }
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </td>
+                <td className="py-2 px-3 align-top">
+                  <FormInput
+                    name={`description-${index}`}
+                    label=""
+                    type="text"
+                    value={entry.description}
+                    onChange={(e) =>
+                      handleEntryChange(index, "description", e.target.value)
+                    }
+                    placeholder="e.g., Special repair work"
+                  />
+                </td>
+                <td className="py-2 align-top">
+                  {entries.length > 1 && (
+                    <button
+                      onClick={() => removeEntryRow(entry.id)}
+                      className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove row"
+                    >
+                      <IconX size={18} />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-          <div className="flex justify-between items-center mt-6 border-t border-default-200 pt-6">
-            <Button variant="outline" onClick={addEntryRow} icon={IconPlus}>
-              Add Row
-            </Button>
-            <Button
-              color="sky"
-              onClick={handleSave}
-              disabled={isSaving}
-              icon={IconDeviceFloppy}
-            >
-              {isSaving ? "Saving..." : "Save Commissions"}
-            </Button>
-          </div>
+        <div className="flex justify-between items-center mt-6 border-t border-default-200 pt-6">
+          <Button variant="outline" onClick={addEntryRow} icon={IconPlus}>
+            Add Row
+          </Button>
+          <Button
+            color="sky"
+            onClick={handleSave}
+            disabled={isSaving}
+            icon={IconDeviceFloppy}
+          >
+            {isSaving ? "Saving..." : "Save Commissions"}
+          </Button>
         </div>
       </div>
     </div>
