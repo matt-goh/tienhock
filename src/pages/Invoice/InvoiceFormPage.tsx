@@ -296,8 +296,8 @@ const InvoiceFormPage: React.FC = () => {
     let taxTotal = 0;
     invoiceData.products.forEach((item) => {
       if (!item.issubtotal && !item.istotal) {
-        if (item.code === "OTH") {
-          // For 'OTH' products, use price directly as the line total, ignoring quantity.
+        if (item.code === "OTH" || item.code === "LESS") {
+          // For 'OTH' or 'LESS' products, use price directly as the line total, ignoring quantity.
           subtotal += Number(item.price) || 0;
         } else {
           // For all other products, calculate total as quantity * price.
