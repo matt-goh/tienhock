@@ -51,8 +51,8 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
         const quantity = Number(item.quantity) || 0;
         const price = Number(item.price) || 0; // Will be negative for LESS items
         const tax = Number(item.tax) || 0; // Will be 0 for LESS items
-        // Special calculation for OTH products - use price only, not quantity * price
-        if (item.code === "OTH") {
+        // Special calculation for OTH/LESS products - use price only, not quantity * price
+        if (item.code === "OTH" || item.code === "LESS") {
           item.total = (price + tax).toFixed(2);
         } else {
           item.total = (quantity * price + tax).toFixed(2);
