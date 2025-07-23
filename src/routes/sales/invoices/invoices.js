@@ -2763,15 +2763,7 @@ export default function (pool, config) {
       const invoice = invoiceResult.rows[0];
       const oldTotal = parseFloat(invoice.totalamountpayable || 0);
 
-      // 2. Validate that the invoice is not cancelled
-      if (invoice.invoice_status === "cancelled") {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot change order details for cancelled invoices",
-        });
-      }
-
-      // 3. Check if this requires e-Invoice cancellation confirmation
+      // 2. Check if this requires e-Invoice cancellation confirmation
       const requiresConfirmation =
         invoice.einvoice_status !== null &&
         invoice.einvoice_status !== "cancelled";
@@ -2786,7 +2778,7 @@ export default function (pool, config) {
         });
       }
 
-      // 4. If confirmation provided, attempt to cancel e-invoice and clear fields
+      // 3. If confirmation provided, attempt to cancel e-invoice and clear fields
       if (requiresConfirmation && confirmEInvoiceCancellation) {
         // Try to cancel via MyInvois API if UUID exists
         if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
@@ -2818,15 +2810,15 @@ export default function (pool, config) {
         await client.query(clearEInvoiceQuery, [id]);
       }
 
-      // 5. Delete existing order details
+      // 4. Delete existing order details
       const deleteQuery = `DELETE FROM order_details WHERE invoiceid = $1`;
       await client.query(deleteQuery, [id]);
 
-      // 6. Calculate new totals
+      // 5. Calculate new totals
       let subtotal = 0;
       let taxTotal = 0;
 
-      // 7. Insert new order details
+      // 6. Insert new order details
       const insertQuery = `
       INSERT INTO order_details (
         invoiceid, code, price, quantity, freeproduct,
@@ -2860,7 +2852,7 @@ export default function (pool, config) {
         }
       }
 
-      // 8. Calculate new totals
+      // 7. Calculate new totals
       const totalPayable = subtotal + taxTotal;
       const newTotal = parseFloat(totalPayable.toFixed(2));
 
@@ -2888,7 +2880,7 @@ export default function (pool, config) {
       const totalActivePaid = parseFloat(activePaid || 0);
       const totalPendingAmount = parseFloat(pendingAmount || 0);
 
-      // 9. Cancel ALL pending payments when order details change (regardless of payment type)
+      // 8. Cancel ALL pending payments when order details change (regardless of payment type)
       let cancelledPendingCount = 0;
       if (pendingCount > 0) {
         const cancelPendingQuery = `
@@ -2911,7 +2903,7 @@ export default function (pool, config) {
         );
       }
 
-      // 10. Calculate new balance_due based on payment type
+      // 9. Calculate new balance_due based on payment type
       let newBalanceDue;
       if (invoice.paymenttype === "CASH") {
         // CASH invoices should always have zero balance
@@ -2929,7 +2921,7 @@ export default function (pool, config) {
         }
       }
 
-      // 11. Update invoice totals
+      // 10. Update invoice totals
       const updateInvoiceQuery = `
       UPDATE invoices 
       SET total_excluding_tax = $1,
@@ -2948,7 +2940,7 @@ export default function (pool, config) {
         id,
       ]);
 
-      // 12. Handle CASH invoice payment adjustments
+      // 11. Handle CASH invoice payment adjustments
       let cancelledActiveCount = 0;
       let newPaymentCreated = false;
       if (invoice.paymenttype === "CASH") {
@@ -3012,7 +3004,7 @@ export default function (pool, config) {
         }
       }
 
-      // 13. Update customer credit if this is an INVOICE type
+      // 12. Update customer credit if this is an INVOICE type
       if (invoice.paymenttype === "INVOICE") {
         const creditAdjustment = newTotal - oldTotal;
 
@@ -3027,7 +3019,7 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
 
-      // 14. Return response with detailed payment information
+      // 13. Return response with detailed payment information
       res.json({
         message: "Order details updated successfully",
         invoice: {
@@ -3104,15 +3096,7 @@ export default function (pool, config) {
 
       const invoice = invoiceResult.rows[0];
 
-      // 2. Validate that the invoice is not cancelled
-      if (invoice.invoice_status === "cancelled") {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot change customer for cancelled invoices",
-        });
-      }
-
-      // 3. Check if this is critical e-Invoice data change
+      // 2. Check if this is critical e-Invoice data change
       const requiresConfirmation =
         invoice.einvoice_status !== null &&
         invoice.einvoice_status !== "cancelled";
@@ -3127,7 +3111,7 @@ export default function (pool, config) {
         });
       }
 
-      // 4. If confirmation provided, attempt to cancel e-invoice via API and clear fields
+      // 3. If confirmation provided, attempt to cancel e-invoice via API and clear fields
       if (requiresConfirmation && confirmEInvoiceCancellation) {
         let apiCancellationSuccess = false;
 
@@ -3168,7 +3152,7 @@ export default function (pool, config) {
         await client.query(clearEInvoiceQuery, [id]);
       }
 
-      // 5. Check if the new customer exists
+      // 4. Check if the new customer exists
       const customerCheckQuery = `
       SELECT id, name FROM customers WHERE id = $1
     `;
@@ -3183,7 +3167,7 @@ export default function (pool, config) {
         });
       }
 
-      // 6. Update the invoice with the new customer
+      // 5. Update the invoice with the new customer
       const updateQuery = `
       UPDATE invoices 
       SET customerid = $1
@@ -3194,7 +3178,7 @@ export default function (pool, config) {
 
       await client.query("COMMIT");
 
-      // 7. Return success response
+      // 6. Return success response
       res.json({
         message: "Customer updated successfully",
         invoice: {
@@ -3239,11 +3223,6 @@ export default function (pool, config) {
 
       if (invoiceCheck.rows.length === 0) {
         throw new Error("Invoice not found");
-      }
-
-      // Only prevent changes for cancelled invoices
-      if (invoiceCheck.rows[0].invoice_status === "cancelled") {
-        throw new Error("Cannot change salesman for cancelled invoices");
       }
 
       // Verify salesperson exists
@@ -3315,11 +3294,6 @@ export default function (pool, config) {
       }
 
       const currentInvoice = invoiceCheck.rows[0];
-
-      // Only prevent changes for cancelled invoices
-      if (currentInvoice.invoice_status === "cancelled") {
-        throw new Error("Cannot change payment type for cancelled invoices");
-      }
 
       const currentPaymentType = currentInvoice.paymenttype;
 
@@ -3464,14 +3438,6 @@ export default function (pool, config) {
       }
 
       const invoice = invoiceCheck.rows[0];
-
-      // Validate that the invoice is not cancelled
-      if (invoice.invoice_status === "cancelled") {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot change date/time for cancelled invoices",
-        });
-      }
 
       // Check if this requires e-Invoice cancellation confirmation
       const requiresConfirmation =
