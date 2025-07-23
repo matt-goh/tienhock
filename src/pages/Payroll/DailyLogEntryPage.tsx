@@ -1638,26 +1638,45 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           7;
 
                         return (
-                          <tr key={row.rowKey}>
+                          <tr
+                            key={row.rowKey}
+                            onClick={() => {
+                              if (isSaving || leaveEmployees[row.id]?.selected)
+                                return;
+                              handleEmployeeSelection(row.rowKey);
+                            }}
+                            className={`transition-colors duration-150 ${
+                              isSaving || leaveEmployees[row.id]?.selected
+                                ? "bg-default-50 cursor-not-allowed"
+                                : "cursor-pointer hover:bg-default-50"
+                            } ${
+                              isSelected
+                                ? "bg-sky-50 hover:bg-sky-100"
+                                : "bg-white"
+                            }`}
+                          >
                             <td className="px-6 py-4 whitespace-nowrap align-middle">
-                              <Checkbox
-                                checked={isSelected}
-                                onChange={() =>
-                                  handleEmployeeSelection(row.rowKey)
-                                }
-                                size={20}
-                                checkedColor="text-sky-600"
-                                ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
-                                buttonClassName="p-1 rounded-lg"
-                                disabled={
-                                  isSaving || leaveEmployees[row.id]?.selected
-                                }
-                              />
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onChange={() =>
+                                    handleEmployeeSelection(row.rowKey)
+                                  }
+                                  size={20}
+                                  checkedColor="text-sky-600"
+                                  ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                                  buttonClassName="p-1 rounded-lg"
+                                  disabled={
+                                    isSaving || leaveEmployees[row.id]?.selected
+                                  }
+                                />
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
                               <Link
                                 to={`/catalogue/staff/${row.id}`}
                                 className="hover:underline hover:text-sky-600"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 {row.id}
                               </Link>
@@ -1685,13 +1704,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               <Link
                                 to={`/catalogue/job?id=${row.jobType}`}
                                 className="hover:underline hover:text-sky-600"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 {row.jobName}
                               </Link>
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
                               <td className="px-6 py-4 whitespace-nowrap text-left">
-                                <div className="relative w-40 mx-auto">
+                                <div
+                                  className="relative w-40 mx-auto"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <Listbox
                                     value={
                                       locationTypes[row.rowKey || ""] || "Local"
@@ -1848,7 +1871,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </td>
                             ) : (
                               <td className="px-6 py-4 whitespace-nowrap text-right">
-                                <div className="flex justify-end">
+                                <div
+                                  className="flex justify-end"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <input
                                     type="number"
                                     value={isSelected ? hours.toString() : ""}
@@ -1879,19 +1905,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </td>
                             )}
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <ActivitiesTooltip
-                                activities={(
-                                  employeeActivities[row.rowKey || ""] || []
-                                ).filter((activity) => activity.isSelected)}
-                                employeeName={row.name}
-                                className={
-                                  !isSelected
-                                    ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                    : ""
-                                }
-                                disabled={!isSelected}
-                                onClick={() => handleManageActivities(row)}
-                              />
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <ActivitiesTooltip
+                                  activities={(
+                                    employeeActivities[row.rowKey || ""] || []
+                                  ).filter((activity) => activity.isSelected)}
+                                  employeeName={row.name}
+                                  className={
+                                    !isSelected
+                                      ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                      : ""
+                                  }
+                                  disabled={!isSelected}
+                                  onClick={() => handleManageActivities(row)}
+                                />
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2018,27 +2046,49 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               index === salesmanIkutEmployees.length - 1; // Add this line
 
                             return (
-                              <tr key={row.rowKey}>
+                              <tr
+                                key={row.rowKey}
+                                onClick={() => {
+                                  if (
+                                    isSaving ||
+                                    leaveEmployees[row.id]?.selected
+                                  )
+                                    return;
+                                  handleEmployeeSelection(row.rowKey);
+                                }}
+                                className={`transition-colors duration-150 ${
+                                  isSaving || leaveEmployees[row.id]?.selected
+                                    ? "bg-default-50 cursor-not-allowed"
+                                    : "cursor-pointer hover:bg-default-50"
+                                } ${
+                                  isSelected
+                                    ? "bg-sky-50 hover:bg-sky-100"
+                                    : "bg-white"
+                                }`}
+                              >
                                 <td className="px-6 py-4 whitespace-nowrap align-middle">
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onChange={() =>
-                                      handleEmployeeSelection(row.rowKey)
-                                    }
-                                    size={20}
-                                    checkedColor="text-sky-600"
-                                    ariaLabel={`Select employee ${row.name}`}
-                                    buttonClassName="p-1 rounded-lg"
-                                    disabled={
-                                      isSaving ||
-                                      leaveEmployees[row.id]?.selected
-                                    }
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={!!isSelected}
+                                      onChange={() =>
+                                        handleEmployeeSelection(row.rowKey)
+                                      }
+                                      size={20}
+                                      checkedColor="text-sky-600"
+                                      ariaLabel={`Select employee ${row.name}`}
+                                      buttonClassName="p-1 rounded-lg"
+                                      disabled={
+                                        isSaving ||
+                                        leaveEmployees[row.id]?.selected
+                                      }
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
                                   <Link
                                     to={`/catalogue/staff/${row.id}`}
                                     className="hover:underline hover:text-sky-600"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.id}
                                   </Link>
@@ -2050,54 +2100,64 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   <Link
                                     to={`/catalogue/job?id=${row.jobType}`}
                                     className="hover:underline hover:text-sky-600"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.jobName}
                                   </Link>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <input
-                                    type="number"
-                                    value={
-                                      isSelected
-                                        ? (bagCounts.muatMee || 0).toString()
-                                        : ""
-                                    }
-                                    onChange={(e) =>
-                                      handleBagCountChange(
-                                        row.rowKey || "",
-                                        "muatMee",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
-                                    min="0"
-                                    disabled={!isSelected}
-                                    placeholder={isSelected ? "0" : "-"}
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="number"
+                                      value={
+                                        isSelected
+                                          ? (bagCounts.muatMee || 0).toString()
+                                          : ""
+                                      }
+                                      onChange={(e) =>
+                                        handleBagCountChange(
+                                          row.rowKey || "",
+                                          "muatMee",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                      min="0"
+                                      disabled={!isSelected}
+                                      placeholder={isSelected ? "0" : "-"}
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <input
-                                    type="number"
-                                    value={
-                                      isSelected
-                                        ? (bagCounts.muatBihun || 0).toString()
-                                        : ""
-                                    }
-                                    onChange={(e) =>
-                                      handleBagCountChange(
-                                        row.rowKey || "",
-                                        "muatBihun",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
-                                    min="0"
-                                    disabled={!isSelected}
-                                    placeholder={isSelected ? "0" : "-"}
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="number"
+                                      value={
+                                        isSelected
+                                          ? (
+                                              bagCounts.muatBihun || 0
+                                            ).toString()
+                                          : ""
+                                      }
+                                      onChange={(e) =>
+                                        handleBagCountChange(
+                                          row.rowKey || "",
+                                          "muatBihun",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                      min="0"
+                                      disabled={!isSelected}
+                                      placeholder={isSelected ? "0" : "-"}
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <div className="relative w-48 mx-auto">
+                                  <div
+                                    className="relative w-48 mx-auto"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     <Listbox
                                       value={selectedSalesman}
                                       onChange={(value) =>
@@ -2207,22 +2267,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  <ActivitiesTooltip
-                                    activities={(
-                                      employeeActivities[row.rowKey || ""] || []
-                                    ).filter((activity) => activity.isSelected)}
-                                    employeeName={row.name}
-                                    className={
-                                      !isSelected
-                                        ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                        : ""
-                                    }
-                                    disabled={
-                                      !isSelected ||
-                                      leaveEmployees[row.id]?.selected
-                                    }
-                                    onClick={() => handleManageActivities(row)}
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <ActivitiesTooltip
+                                      activities={(
+                                        employeeActivities[row.rowKey || ""] ||
+                                        []
+                                      ).filter(
+                                        (activity) => activity.isSelected
+                                      )}
+                                      employeeName={row.name}
+                                      className={
+                                        !isSelected
+                                          ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                          : ""
+                                      }
+                                      disabled={
+                                        !isSelected ||
+                                        leaveEmployees[row.id]?.selected
+                                      }
+                                      onClick={() =>
+                                        handleManageActivities(row)
+                                      }
+                                    />
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -2279,10 +2346,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     { id: "cuti_sakit", name: "Cuti Sakit" },
                   ];
                   if (formData.dayType === "Umum") {
-                    leaveOptions.push({ id: "cuti_umum", name: "Cuti Umum" });
+                    leaveOptions.unshift({
+                      id: "cuti_umum",
+                      name: "Cuti Umum",
+                    });
                   }
                   return (
-                    <tr key={`leave-${employee.id}`}>
+                    <tr
+                      key={`leave-${employee.id}`}
+                      className="cursor-pointer hover:bg-default-50"
+                      onClick={() => handleLeaveSelection(employee.id)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Checkbox
                           checked={
@@ -2304,12 +2378,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {leaveEmployees[employee.id]?.selected && (
-                          <div className="w-48">
+                          <div
+                            className="w-48"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <FormListbox
                               name={`leaveType-${employee.id}`}
                               value={
                                 leaveEmployees[employee.id]?.leaveType ||
-                                "cuti_sakit"
+                                (formData.dayType === "Umum"
+                                  ? "cuti_umum"
+                                  : "cuti_sakit")
                               }
                               onChange={(value) =>
                                 handleLeaveTypeChange(
@@ -2325,15 +2404,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         {leaveEmployees[employee.id]?.selected && (
-                          <ActivitiesTooltip
-                            activities={(
-                              leaveEmployeeActivities[employee.id] || []
-                            ).filter((a: ActivityItem) => a.isSelected)}
-                            employeeName={employee.name}
-                            onClick={() =>
-                              handleManageLeaveActivities(employee)
-                            }
-                          />
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ActivitiesTooltip
+                              activities={(
+                                leaveEmployeeActivities[employee.id] || []
+                              ).filter((a: ActivityItem) => a.isSelected)}
+                              employeeName={employee.name}
+                              onClick={() =>
+                                handleManageLeaveActivities(employee)
+                              }
+                            />
+                          </div>
                         )}
                       </td>
                     </tr>
