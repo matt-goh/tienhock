@@ -427,12 +427,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       }
 
+      // Set the correct default leave type based on day type
+      const defaultLeaveType =
+        formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+
       return {
         ...prev,
         [employeeId]: {
           ...prev[employeeId],
           selected: newSelectedState,
-          leaveType: prev[employeeId]?.leaveType || "cuti_sakit",
+          leaveType: prev[employeeId]?.leaveType || defaultLeaveType, // Use dynamic default
         },
       };
     });
@@ -2386,9 +2390,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               name={`leaveType-${employee.id}`}
                               value={
                                 leaveEmployees[employee.id]?.leaveType ||
-                                (formData.dayType === "Umum"
-                                  ? "cuti_umum"
-                                  : "cuti_sakit")
+                                "cuti_sakit"
                               }
                               onChange={(value) =>
                                 handleLeaveTypeChange(
