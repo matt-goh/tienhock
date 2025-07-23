@@ -76,9 +76,24 @@ interface DailyLogEntryPageProps {
 }
 
 type LeaveType = "cuti_umum" | "cuti_sakit";
+
 interface LeaveEntry {
   selected: boolean;
   leaveType: LeaveType;
+}
+
+interface ActivityItem {
+  payCodeId: string;
+  description: string;
+  payType: string;
+  rateUnit: string;
+  rate: number;
+  isDefault: boolean;
+  isSelected: boolean;
+  unitsProduced?: number;
+  calculatedAmount: number;
+  isContextLinked?: boolean;
+  source?: "job" | "employee";
 }
 
 const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
@@ -118,6 +133,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [leaveEmployees, setLeaveEmployees] = useState<
     Record<string, LeaveEntry>
   >({});
+  const [leaveEmployeeActivities, setLeaveEmployeeActivities] = useState<
+    Record<string, ActivityItem[]>
+  >({});
+  const [showLeaveActivitiesModal, setShowLeaveActivitiesModal] =
+    useState(false);
+  const [selectedLeaveEmployee, setSelectedLeaveEmployee] =
+    useState<EmployeeWithHours | null>(null);
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
 
@@ -222,6 +244,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     });
   }, [formData.contextData, jobConfig, employeeSelectionState.jobHours]);
+
+  // Add this effect to handle day type changes for leave selection
+  useEffect(() => {
+    if (formData.dayType !== "Umum") {
+      setLeaveEmployees((prev) => {
+        const newLeaveEmployees = { ...prev };
+        Object.keys(newLeaveEmployees).forEach((empId) => {
+          if (newLeaveEmployees[empId].leaveType === "cuti_umum") {
+            newLeaveEmployees[empId].leaveType = "cuti_sakit";
+          }
+        });
+        return newLeaveEmployees;
+      });
+    }
+  }, [formData.dayType]);
 
   // Update the jobs filter based on dynamic configuration
   const jobs = useMemo(() => {
@@ -365,10 +402,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [holidays, formData.logDate]);
 
+  // Modify handleLeaveSelection
   const handleLeaveSelection = (employeeId: string) => {
     setLeaveEmployees((prev) => {
       const isCurrentlySelected = prev[employeeId]?.selected;
       const newSelectedState = !isCurrentlySelected;
+
+      // If just selected, fetch default activities for leave pay calculation
+      if (newSelectedState && !leaveEmployeeActivities[employeeId]) {
+        fetchAndApplyActivitiesForLeave(employeeId);
+      }
 
       // If an employee is selected for leave, ensure they are deselected from the working list.
       if (newSelectedState) {
@@ -389,11 +432,35 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         [employeeId]: {
           ...prev[employeeId],
           selected: newSelectedState,
-          // Default to 'cuti_umum' when first selected
-          leaveType: prev[employeeId]?.leaveType || "cuti_umum",
+          leaveType: prev[employeeId]?.leaveType || "cuti_sakit",
         },
       };
     });
+  };
+
+  // Add this function to open the leave activities modal
+  const handleManageLeaveActivities = (employee: Employee) => {
+    setSelectedLeaveEmployee(employee as EmployeeWithHours);
+    setShowLeaveActivitiesModal(true);
+  };
+
+  // Add this function to handle updates from the leave activities modal
+  const handleLeaveActivitiesUpdated = (activities: ActivityItem[]) => {
+    if (!selectedLeaveEmployee) return;
+
+    const employeeId = selectedLeaveEmployee.id;
+    const hours = jobConfig?.defaultHours || 8; // Use standard hours for recalculation
+
+    const recalculatedActivities = calculateActivitiesAmounts(
+      activities,
+      hours
+    );
+
+    setLeaveEmployeeActivities((prev) => ({
+      ...prev,
+      [employeeId]: recalculatedActivities,
+    }));
+    toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
   };
 
   const handleLeaveTypeChange = (employeeId: string, leaveType: LeaveType) => {
@@ -665,10 +732,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const handleSaveForm = async () => {
     const leaveEntries = Object.entries(leaveEmployees)
       .filter(([_, leaveData]) => leaveData.selected)
-      .map(([employeeId, leaveData]) => ({
-        employeeId: employeeId,
-        leaveType: leaveData.leaveType,
-      }));
+      .map(([employeeId, leaveData]) => {
+        const activities = leaveEmployeeActivities[employeeId] || [];
+        const amount_paid = activities
+          .filter((a) => a.isSelected)
+          .reduce((sum, a) => sum + a.calculatedAmount, 0);
+
+        return {
+          employeeId: employeeId,
+          leaveType: leaveData.leaveType,
+          amount_paid: amount_paid,
+        };
+      });
 
     const allSelectedEmployees = Object.entries(
       employeeSelectionState.selectedJobs
@@ -1281,6 +1356,72 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     setEmployeeActivities(newEmployeeActivities);
   };
+
+  // New function to fetch and apply activities for leave employees
+  const fetchAndApplyActivitiesForLeave = useCallback(
+    (employeeId: string) => {
+      const employee = allStaffs.find((s) => s.id === employeeId);
+      if (!employee) return;
+
+      const employeeJobs = employee.job || [];
+      const relevantJobTypes = employeeJobs.filter((jobId) =>
+        JOB_IDS.includes(jobId)
+      );
+      if (relevantJobTypes.length === 0) return;
+
+      const primaryJobType = relevantJobTypes[0];
+      const jobPayCodes = jobPayCodeDetails[primaryJobType] || [];
+      const employeePayCodes = employeeMappings[employeeId] || [];
+
+      const allPayCodes = new Map();
+      jobPayCodes.forEach((pc) =>
+        allPayCodes.set(pc.id, { ...pc, source: "job" })
+      );
+      employeePayCodes.forEach((pc) =>
+        allPayCodes.set(pc.id, { ...pc, source: "employee" })
+      );
+
+      const activities = Array.from(allPayCodes.values()).map((payCode) => {
+        const rate = payCode.override_rate_biasa || payCode.rate_biasa;
+        const isSelected =
+          payCode.is_default_setting && payCode.pay_type === "Base";
+        const hours = jobConfig?.defaultHours || 8; // Assume standard 8 hours for a day's leave pay
+
+        return {
+          payCodeId: payCode.id,
+          description: payCode.description,
+          payType: payCode.pay_type,
+          rateUnit: payCode.rate_unit,
+          rate,
+          isDefault: payCode.is_default_setting,
+          isSelected,
+          unitsProduced: payCode.requires_units_input ? 0 : undefined,
+          source: payCode.source,
+          calculatedAmount: calculateActivityAmount(
+            {
+              isSelected,
+              payType: payCode.pay_type,
+              rateUnit: payCode.rate_unit,
+              rate,
+            },
+            hours
+          ),
+        };
+      });
+
+      setLeaveEmployeeActivities((prev) => ({
+        ...prev,
+        [employeeId]: activities,
+      }));
+    },
+    [
+      allStaffs,
+      JOB_IDS,
+      jobPayCodeDetails,
+      employeeMappings,
+      jobConfig?.defaultHours,
+    ]
+  );
 
   // Update handleActivitiesUpdated to store all activities, not just selected:
   const handleActivitiesUpdated = (activities: any[]) => {
@@ -2098,20 +2239,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         {formData.dayType === "Umum" && (
           <div className="border-t border-default-200 pt-6 mt-8">
             <h2 className="text-lg font-semibold text-default-700 mb-2">
-              Public Holiday Leave Recording
+              Leave & Absence Recording
             </h2>
             <p className="text-sm text-default-500 mb-4">
-              Select employees on paid leave for this public holiday. Their pay
-              is based on their normal day rate.
+              Select employees on paid leave. Cuti Umum is available on public
+              holidays, Cuti Sakit is available any day. Pay is based on regular
+              day rates.
             </p>
 
             <div className="bg-white rounded-lg border shadow-sm">
               <table className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
-                    <th scope="col" className="w-16 px-6 py-3 text-left">
-                      {/* Optional: Add a select-all checkbox here if needed */}
-                    </th>
+                    <th scope="col" className="w-16 px-6 py-3 text-left"></th>
                     <th
                       scope="col"
                       className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
@@ -2124,56 +2264,82 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     >
                       Leave Type
                     </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-default-200">
-                  {uniqueEmployees.map((employee) => (
-                    <tr key={`leave-${employee.id}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Checkbox
-                          checked={
-                            leaveEmployees[employee.id]?.selected || false
-                          }
-                          onChange={() => handleLeaveSelection(employee.id)}
-                          size={20}
-                          checkedColor="text-amber-600"
-                          ariaLabel={`Select ${employee.name} for leave`}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-default-900">
-                          {employee.name}
-                        </div>
-                        <div className="text-xs text-default-500">
-                          {employee.id}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {leaveEmployees[employee.id]?.selected && (
-                          <div className="w-48">
-                            <FormListbox
-                              name={`leaveType-${employee.id}`}
-                              value={
-                                leaveEmployees[employee.id]?.leaveType ||
-                                "cuti_umum"
-                              }
-                              onChange={(value) =>
-                                handleLeaveTypeChange(
-                                  employee.id,
-                                  value as LeaveType
-                                )
-                              }
-                              options={[
-                                { id: "cuti_umum", name: "Cuti Umum" },
-                                { id: "cuti_sakit", name: "Cuti Sakit" },
-                              ]}
-                              disabled={!leaveEmployees[employee.id]?.selected}
-                            />
+                  {uniqueEmployees.map((employee) => {
+                    const leaveOptions = [
+                      { id: "cuti_sakit", name: "Cuti Sakit" },
+                    ];
+                    if (formData.dayType === "Umum") {
+                      leaveOptions.push({ id: "cuti_umum", name: "Cuti Umum" });
+                    }
+                    return (
+                      <tr key={`leave-${employee.id}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Checkbox
+                            checked={
+                              leaveEmployees[employee.id]?.selected || false
+                            }
+                            onChange={() => handleLeaveSelection(employee.id)}
+                            size={20}
+                            checkedColor="text-amber-600"
+                            ariaLabel={`Select ${employee.name} for leave`}
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-default-900">
+                            {employee.name}
                           </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          <div className="text-xs text-default-500">
+                            {employee.id}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {leaveEmployees[employee.id]?.selected && (
+                            <div className="w-48">
+                              <FormListbox
+                                name={`leaveType-${employee.id}`}
+                                value={
+                                  leaveEmployees[employee.id]?.leaveType ||
+                                  "cuti_sakit"
+                                }
+                                onChange={(value) =>
+                                  handleLeaveTypeChange(
+                                    employee.id,
+                                    value as LeaveType
+                                  )
+                                }
+                                options={leaveOptions}
+                                disabled={
+                                  !leaveEmployees[employee.id]?.selected
+                                }
+                              />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {leaveEmployees[employee.id]?.selected && (
+                            <ActivitiesTooltip
+                              activities={(
+                                leaveEmployeeActivities[employee.id] || []
+                              ).filter((a: ActivityItem) => a.isSelected)}
+                              employeeName={employee.name}
+                              onClick={() =>
+                                handleManageLeaveActivities(employee)
+                              }
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2226,6 +2392,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             ? locationTypes[selectedEmployee.rowKey] || "Local"
             : "Local"
         }
+      />
+      <ManageActivitiesModal
+        isOpen={showLeaveActivitiesModal}
+        onClose={() => setShowLeaveActivitiesModal(false)}
+        employee={selectedLeaveEmployee}
+        jobType={selectedLeaveEmployee?.jobType || ""}
+        jobName={selectedLeaveEmployee?.jobName || ""}
+        employeeHours={jobConfig?.defaultHours || 8}
+        dayType="Biasa" // Always use "Biasa" for leave pay calculation
+        onActivitiesUpdated={handleLeaveActivitiesUpdated}
+        existingActivities={
+          leaveEmployeeActivities[selectedLeaveEmployee?.id || ""]
+        }
+        contextLinkedPayCodes={contextLinkedPayCodes}
+        contextData={formData.contextData}
       />
     </div>
   );

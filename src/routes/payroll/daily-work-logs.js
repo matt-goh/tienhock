@@ -331,12 +331,12 @@ export default function (pool) {
         leaveEntries.length > 0
       ) {
         for (const leave of leaveEntries) {
-          const { employeeId, leaveType } = leave;
+          const { employeeId, leaveType, amount_paid } = leave;
 
           const leaveQuery = `
             INSERT INTO leave_records (
-              employee_id, leave_date, leave_type, work_log_id, days_taken, status
-            ) VALUES ($1, $2, $3, $4, $5, 'approved')
+              employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
+            ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)
           `;
           await pool.query(leaveQuery, [
             employeeId,
@@ -344,6 +344,7 @@ export default function (pool) {
             leaveType,
             id, // Use the existing work log ID from params
             1.0,
+            amount_paid || 0,
           ]);
         }
       }
@@ -519,14 +520,12 @@ export default function (pool) {
         leaveEntries.length > 0
       ) {
         for (const leave of leaveEntries) {
-          const { employeeId, leaveType } = leave;
+          const { employeeId, leaveType, amount_paid } = leave;
 
-          // Note: amount_paid is defaulted to 0 in the schema.
-          // It can be calculated later during payroll processing.
           const leaveQuery = `
             INSERT INTO leave_records (
-              employee_id, leave_date, leave_type, work_log_id, days_taken, status
-            ) VALUES ($1, $2, $3, $4, $5, 'approved')
+              employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
+            ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)
           `;
           await pool.query(leaveQuery, [
             employeeId,
@@ -534,6 +533,7 @@ export default function (pool) {
             leaveType,
             workLogId,
             1.0, // Assuming full day leave for now
+            amount_paid || 0,
           ]);
         }
       }
