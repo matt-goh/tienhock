@@ -92,75 +92,73 @@ const CutiTahunanEntryPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-default-50 min-h-screen">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-default-800 mb-6">
-          Cuti Tahunan Entry
-        </h1>
-        <div className="bg-white p-8 rounded-xl border border-default-200 shadow-sm space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <FormCombobox
-                name="employee"
-                label="Select Employee"
-                value={employeeId ?? undefined}
-                onChange={(value) => setEmployeeId(value as string)}
-                options={staffOptions}
-                query={searchQuery}
-                setQuery={setSearchQuery}
-                placeholder="Search for staff..."
-                mode="single"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Leave Dates
-              </label>
-              <DateRangePicker
-                dateRange={dateRange}
-                onDateChange={setDateRange}
-              />
-            </div>
-          </div>
-
+    <div className="mt-4">
+      <h1 className="text-2xl font-bold text-default-800 mb-4">
+        Cuti Tahunan Entry
+      </h1>
+      <div className="bg-white p-6 rounded-xl border border-default-200 shadow-sm space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label
-              htmlFor="reason"
-              className="block text-sm font-medium text-default-700 mb-2"
-            >
-              Reason for Leave
+            <FormCombobox
+              name="employee"
+              label="Select Employee"
+              value={employeeId ?? undefined}
+              onChange={(value) => setEmployeeId(value as string)}
+              options={staffOptions}
+              query={searchQuery}
+              setQuery={setSearchQuery}
+              placeholder="Search for staff..."
+              mode="single"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-default-700 mb-2">
+              Leave Dates
             </label>
-            <textarea
-              id="reason"
-              name="reason"
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-              placeholder="Enter the reason for the annual leave..."
-            ></textarea>
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateChange={setDateRange}
+            />
           </div>
+        </div>
 
-          <div className="bg-default-50 border border-default-200 rounded-lg p-4 flex justify-between items-center">
-            <span className="font-medium text-default-700">
-              Total Leave Days (excluding Sundays):
-            </span>
-            <span className="text-lg font-bold text-sky-600">
-              {totalDays} day(s)
-            </span>
-          </div>
+        <div>
+          <label
+            htmlFor="reason"
+            className="block text-sm font-medium text-default-700 mb-2"
+          >
+            Reason for Leave
+          </label>
+          <textarea
+            id="reason"
+            name="reason"
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+            placeholder="Enter the reason for the annual leave..."
+          ></textarea>
+        </div>
 
-          <div className="flex justify-end pt-4">
-            <Button
-              color="sky"
-              onClick={handleSave}
-              disabled={isSaving}
-              icon={IconDeviceFloppy}
-            >
-              {isSaving ? "Saving..." : "Save Leave Entry"}
-            </Button>
-          </div>
+        <div className="bg-default-50 border border-default-200 rounded-lg p-4 flex justify-between items-center">
+          <span className="font-medium text-default-700">
+            Total Leave Days (excluding Sundays):
+          </span>
+          <span className="text-lg font-bold text-sky-600">
+            {totalDays} day(s)
+          </span>
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button
+            color="sky"
+            onClick={handleSave}
+            disabled={isSaving}
+            icon={IconDeviceFloppy}
+          >
+            {isSaving ? "Saving..." : "Save Leave Entry"}
+          </Button>
         </div>
       </div>
     </div>
