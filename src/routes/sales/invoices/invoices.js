@@ -3306,7 +3306,7 @@ export default function (pool, config) {
 
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable FROM invoices WHERE id = $1",
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -3337,7 +3337,9 @@ export default function (pool, config) {
       if (currentPaymentType === "INVOICE" && paymenttype === "CASH") {
         // Create automatic payment for the full amount
         const paymentAmount = currentInvoice.totalamountpayable;
-        const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+        const paymentDate = new Date(Number(currentInvoice.createddate))
+          .toISOString()
+          .split("T")[0]; // YYYY-MM-DD format
 
         const insertPaymentQuery = `
         INSERT INTO payments (invoice_id, payment_date, payment_method, amount_paid, notes, status)
@@ -3345,7 +3347,11 @@ export default function (pool, config) {
         RETURNING payment_id
       `;
 
-        await client.query(insertPaymentQuery, [id, today, paymentAmount]);
+        await client.query(insertPaymentQuery, [
+          id,
+          paymentDate,
+          paymentAmount,
+        ]);
 
         // Update invoice to CASH type with zero balance and paid status
         const updateInvoiceQuery = `
