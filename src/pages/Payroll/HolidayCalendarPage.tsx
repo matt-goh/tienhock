@@ -65,8 +65,8 @@ const HolidayCalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full mx-4 md:mx-6">
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-center">
+    <div className="relative w-full mt-2">
+      <div className="mb-2 flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           Holiday Calendar
         </h1>
@@ -114,7 +114,7 @@ const HolidayCalendarPage: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg border border-default-200 shadow-sm overflow-hidden">
           <div className="relative overflow-hidden">
-            <div className="max-h-[650px] overflow-y-auto">
+            <div className="max-h-[640px] overflow-y-auto">
               <table className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-100 sticky top-0 z-10">
                   <tr>

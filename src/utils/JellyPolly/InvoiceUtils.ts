@@ -359,13 +359,14 @@ export const confirmPayment = async (paymentId: number): Promise<Payment> => {
 // CREATE Payment
 export const createPayment = async (
   paymentData: Omit<Payment, "payment_id" | "created_at">
-): Promise<Payment> => {
+): Promise<Payment[]> => {
   try {
     const response = await api.post("/jellypolly/api/payments", paymentData);
-    if (!response || !response.payment) {
+    if (!response || !response.payments || response.payments.length === 0) {
       throw new Error("Invalid response received after creating payment.");
     }
-    return response.payment;
+    // The backend now returns an array of payments created.
+    return response.payments;
   } catch (error: any) {
     console.error("Error creating payment:", error);
     const errorMessage =

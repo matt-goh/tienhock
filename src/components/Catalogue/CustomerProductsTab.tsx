@@ -235,6 +235,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                       options={productOptions}
                       placeholder="Select..."
                       disabled={disabled}
+                      optionsPosition="top"
                     />
                   </td>
                   {/* Custom Price */}

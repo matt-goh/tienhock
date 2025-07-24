@@ -65,14 +65,24 @@ const PaymentPage: React.FC = () => {
     return monthOptions[now.getMonth()];
   });
 
-  const [filters, setFilters] = useState<PaymentFilters>({
-    dateRange: {
-      start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-      end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
-    },
-    paymentMethod: null,
-    status: "pending", // Default to pending payments
-    searchTerm: "",
+  const [filters, setFilters] = useState<PaymentFilters>(() => {
+    const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + 1,
+      0
+    );
+    end.setHours(23, 59, 59, 999); // Set to end of day
+
+    return {
+      dateRange: {
+        start,
+        end,
+      },
+      paymentMethod: null,
+      status: "pending", // Default to pending payments
+      searchTerm: "",
+    };
   });
 
   // Fetch payments
@@ -88,7 +98,9 @@ const PaymentPage: React.FC = () => {
         );
       }
       if (filters.dateRange.end) {
-        params.append("endDate", filters.dateRange.end.getTime().toString());
+        const endDate = new Date(filters.dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        params.append("endDate", endDate.getTime().toString());
       }
       if (filters.paymentMethod) {
         params.append("paymentMethod", filters.paymentMethod);
