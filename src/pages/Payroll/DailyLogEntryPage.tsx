@@ -828,7 +828,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       })
       .flat();
 
-    if (selectedEmployeeData.length === 0) {
+    if (selectedEmployeeData.length === 0 && leaveEntries.length === 0) {
       toast.error("No employees selected");
       return;
     }
