@@ -1,13 +1,8 @@
 // src/pages/Payroll/CutiReportPage.tsx
 
-// Add these imports at the top
 import React, { useState, useMemo, useEffect } from "react";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { FormCombobox } from "../../components/FormComponents";
-import {
-  calculateYearsOfService,
-  LeaveAllocation,
-} from "../../utils/payroll/leaveCalculationService";
 import { Employee } from "../../types/types";
 import {
   IconCalendar,
@@ -15,10 +10,13 @@ import {
   IconUserCircle,
   IconClockHour4,
   IconAlertCircle,
+  IconId,
+  IconWorld,
 } from "@tabler/icons-react";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { getMonthName } from "../../utils/payroll/payrollUtils";
 import { api } from "../../routes/utils/api";
+import { calculateYearsOfService } from "../../utils/payroll/leaveCalculationService";
 
 // --- Types for API Data ---
 interface LeaveBalance {
@@ -42,6 +40,7 @@ interface LeaveRecord {
   leave_date: string;
   leave_type: "cuti_umum" | "cuti_sakit" | "cuti_tahunan";
   days_taken: number;
+  amount_paid: number;
 }
 
 const CutiReportPage: React.FC = () => {
@@ -116,24 +115,46 @@ const CutiReportPage: React.FC = () => {
   );
 
   const monthlySummary = useMemo(() => {
-    const summary: Record<number, LeaveTaken> = {};
+    const summary: Record<
+      number,
+      {
+        cuti_umum: { days: number; amount: number };
+        cuti_sakit: { days: number; amount: number };
+        cuti_tahunan: { days: number; amount: number };
+      }
+    > = {};
+
     for (let i = 1; i <= 12; i++) {
-      summary[i] = { cuti_tahunan: 0, cuti_sakit: 0, cuti_umum: 0 };
+      summary[i] = {
+        cuti_umum: { days: 0, amount: 0 },
+        cuti_sakit: { days: 0, amount: 0 },
+        cuti_tahunan: { days: 0, amount: 0 },
+      };
     }
 
     leaveRecords.forEach((record) => {
       const month = new Date(record.leave_date).getMonth() + 1;
-      if (summary[month]) {
-        summary[month][record.leave_type] =
-          (summary[month][record.leave_type] || 0) + Number(record.days_taken);
+      if (summary[month] && record.leave_type) {
+        const leaveTypeData = summary[month][record.leave_type];
+        if (leaveTypeData) {
+          leaveTypeData.days += Number(record.days_taken);
+          leaveTypeData.amount += Number(record.amount_paid || 0);
+        }
       }
     });
 
     return summary;
   }, [leaveRecords]);
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-MY", {
+      style: "currency",
+      currency: "MYR",
+    }).format(amount);
+  };
+
   const renderStaffHeader = (staff: Employee) => (
-    <div className="bg-white p-6 rounded-xl border border-default-200">
+    <div className="bg-white px-6 py-4 rounded-xl border border-default-200">
       <div className="flex items-center gap-4">
         <IconUserCircle size={48} className="text-default-400" />
         <div>
@@ -141,7 +162,7 @@ const CutiReportPage: React.FC = () => {
           <p className="text-default-500">{staff.id}</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 border-t border-default-200 pt-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-4 border-t border-default-200 pt-4">
         <div className="flex items-center gap-2">
           <IconBriefcase size={20} className="text-default-500" />
           <div>
@@ -165,6 +186,20 @@ const CutiReportPage: React.FC = () => {
           <div>
             <p className="text-xs text-default-500">Years of Service</p>
             <p className="text-sm font-medium">{yearsOfService} years</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <IconId size={20} className="text-default-500" />
+          <div>
+            <p className="text-xs text-default-500">IC No.</p>
+            <p className="text-sm font-medium">{staff.icNo || "N/A"}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <IconWorld size={20} className="text-default-500" />
+          <div>
+            <p className="text-xs text-default-500">Nationality</p>
+            <p className="text-sm font-medium">{staff.nationality || "N/A"}</p>
           </div>
         </div>
       </div>
@@ -223,98 +258,169 @@ const CutiReportPage: React.FC = () => {
     );
   };
 
-  const renderMonthlyLeaveTable = () => (
-    <div className="bg-white p-6 rounded-xl border border-default-200">
-      <h3 className="text-lg font-semibold text-default-800 mb-4">
-        Monthly Leave Details ({currentYear})
-      </h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-default-200">
-          <thead className="bg-default-50">
-            <tr>
-              <th className="py-3 px-4 text-left text-xs font-medium text-default-500 uppercase">
-                Month
-              </th>
-              <th className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase">
-                Cuti Tahunan
-              </th>
-              <th className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase">
-                Cuti Sakit
-              </th>
-              <th className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase">
-                Cuti Umum
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-default-200">
-            {Object.entries(monthlySummary).map(([month, summary]) => (
-              <tr key={month}>
-                <td className="py-3 px-4 whitespace-nowrap text-sm font-medium text-default-800">
-                  {getMonthName(parseInt(month))}
-                </td>
-                <td className="py-3 px-4 whitespace-nowrap text-sm text-center text-default-600">
-                  {summary.cuti_tahunan || 0} days
-                </td>
-                <td className="py-3 px-4 whitespace-nowrap text-sm text-center text-default-600">
-                  {summary.cuti_sakit || 0} days
-                </td>
-                <td className="py-3 px-4 whitespace-nowrap text-sm text-center text-default-600">
-                  {summary.cuti_umum || 0} days
-                </td>
+  const renderMonthlyLeaveTable = () => {
+    if (!leaveBalances) return null;
+
+    const remainingTahunan =
+      leaveBalances.cuti_tahunan_total - (leaveTaken.cuti_tahunan || 0);
+    const remainingSakit =
+      leaveBalances.cuti_sakit_total - (leaveTaken.cuti_sakit || 0);
+    const remainingUmum =
+      leaveBalances.cuti_umum_total - (leaveTaken.cuti_umum || 0);
+
+    return (
+      <div className="bg-white p-6 rounded-xl border border-default-200">
+        <h3 className="text-lg font-semibold text-default-800 mb-4">
+          Monthly Leave Details ({currentYear})
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-default-200 border">
+            <thead className="bg-default-50">
+              <tr>
+                <th
+                  rowSpan={2}
+                  className="py-3 px-4 text-left text-xs font-medium text-default-500 uppercase align-middle border-r"
+                >
+                  Month
+                </th>
+                <th
+                  colSpan={3}
+                  className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase border-b border-r"
+                >
+                  Cuti Tahunan
+                </th>
+                <th
+                  colSpan={3}
+                  className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase border-b border-r"
+                >
+                  Cuti Sakit
+                </th>
+                <th
+                  colSpan={3}
+                  className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase border-b"
+                >
+                  Cuti Umum
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+              <tr>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Hari
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Amount
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Balance
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Hari
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Amount
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Balance
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Hari
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                  Amount
+                </th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase">
+                  Balance
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-default-200">
+              {Object.entries(monthlySummary).map(([month, summary]) => (
+                <tr key={month}>
+                  <td className="py-3 px-4 whitespace-nowrap text-sm font-medium text-default-800 border-r">
+                    {getMonthName(parseInt(month))}
+                  </td>
+
+                  {/* Cuti Tahunan */}
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
+                    {summary.cuti_tahunan.days}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
+                    {formatCurrency(summary.cuti_tahunan.amount)}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center font-semibold text-sky-600 border-r">
+                    {remainingTahunan}
+                  </td>
+
+                  {/* Cuti Sakit */}
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
+                    {summary.cuti_sakit.days}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
+                    {formatCurrency(summary.cuti_sakit.amount)}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center font-semibold text-amber-600 border-r">
+                    {remainingSakit}
+                  </td>
+
+                  {/* Cuti Umum */}
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
+                    {summary.cuti_umum.days}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
+                    {formatCurrency(summary.cuti_umum.amount)}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center font-semibold text-emerald-600">
+                    {remainingUmum}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="p-6 bg-default-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold text-default-800 mb-6">
-          Cuti Report
-        </h1>
-        <div className="max-w-md mb-6">
-          <FormCombobox
-            name="staff"
-            label="Select Staff"
-            value={selectedStaffId || ""}
-            onChange={(value) => setSelectedStaffId(value as string)}
-            options={staffOptions}
-            query={searchQuery}
-            setQuery={setSearchQuery}
-            placeholder="Search by name or ID..."
-            mode="single"
-            disabled={loadingStaffs}
-          />
-        </div>
-
-        {(loadingStaffs || loadingReport) && <LoadingSpinner />}
-
-        {!loadingReport && reportError && (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-rose-300">
-            <IconAlertCircle className="mx-auto text-rose-500 h-12 w-12" />
-            <p className="mt-4 text-rose-600 font-medium">{reportError}</p>
-          </div>
-        )}
-
-        {!loadingReport && !reportError && selectedStaff && (
-          <div className="space-y-6">
-            {renderStaffHeader(selectedStaff)}
-            {leaveBalances && renderLeaveBalanceSummary(leaveBalances)}
-            {renderMonthlyLeaveTable()}
-          </div>
-        )}
-
-        {!loadingStaffs && !loadingReport && !selectedStaffId && (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed">
-            <p className="text-default-600">
-              Please select a staff member to view their leave report.
-            </p>
-          </div>
-        )}
+    <div className="mt-4">
+      <div className="max-w-md mb-4">
+        <FormCombobox
+          name="staff"
+          label="Select Staff"
+          value={selectedStaffId || ""}
+          onChange={(value) => setSelectedStaffId(value as string)}
+          options={staffOptions}
+          query={searchQuery}
+          setQuery={setSearchQuery}
+          placeholder="Search by name or ID..."
+          mode="single"
+          disabled={loadingStaffs}
+        />
       </div>
+
+      {(loadingStaffs || loadingReport) && <LoadingSpinner />}
+
+      {!loadingReport && reportError && (
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-rose-300">
+          <IconAlertCircle className="mx-auto text-rose-500 h-12 w-12" />
+          <p className="mt-4 text-rose-600 font-medium">{reportError}</p>
+        </div>
+      )}
+
+      {!loadingReport && !reportError && selectedStaff && (
+        <div className="space-y-4">
+          {renderStaffHeader(selectedStaff)}
+          {leaveBalances && renderLeaveBalanceSummary(leaveBalances)}
+          {renderMonthlyLeaveTable()}
+        </div>
+      )}
+
+      {!loadingStaffs && !loadingReport && !selectedStaffId && (
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed">
+          <p className="text-default-600">
+            Please select a staff member to view their leave report.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

@@ -101,6 +101,7 @@ export default function (pool, config) {
       const {
         page = 1,
         limit = 15, // Use consistent limit (e.g., 15 to match FE)
+        all,
         startDate,
         endDate,
         salesman,
@@ -111,7 +112,11 @@ export default function (pool, config) {
         search,
       } = req.query;
 
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      // Skip pagination if 'all' parameter is true
+      const skipPagination = all === "true";
+      const offset = skipPagination
+        ? 0
+        : (parseInt(page) - 1) * parseInt(limit);
 
       // Base queries
       let selectClause = `
@@ -240,34 +245,41 @@ export default function (pool, config) {
 
       // Always exclude the consolidated invoices themselves from this listing
       whereClause += ` AND (i.is_consolidated = false OR i.is_consolidated IS NULL)`;
-      // Construct Count Query
-      const countQuery = `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
+      // Construct Count Query (only if pagination is needed)
+      const countQuery = skipPagination
+        ? null
+        : `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
 
       // Construct Data Query
       let dataQuery = `${selectClause} ${fromClause} ${whereClause} ${groupByClause}`;
       dataQuery += ` ORDER BY CAST(i.createddate AS bigint) DESC`;
 
-      // Add Pagination to Data Query parameters
+      // Add Pagination to Data Query parameters only if not skipping pagination
       const paginationParams = [];
-      paginationParams.push(parseInt(limit));
-      paginationParams.push(offset);
-      dataQuery += ` LIMIT $${filterParamCounter++} OFFSET $${filterParamCounter++}`;
+      if (!skipPagination) {
+        paginationParams.push(parseInt(limit));
+        paginationParams.push(offset);
+        dataQuery += ` LIMIT $${filterParamCounter++} OFFSET $${filterParamCounter++}`;
+      }
 
       // Combine filter and pagination params for the main data query
       const dataQueryParams = [...filterParams, ...paginationParams];
 
       // --- Execute Queries ---
-      // Execute count query with ONLY filter parameters
-      // Execute data query with filter AND pagination parameters
-      const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, filterParams), // Use filterParams for count
-        pool.query(dataQuery, dataQueryParams), // Use combined params for data
-      ]);
+      let countResult = null;
+      let dataResult;
+
+      if (skipPagination) {
+        // Execute only data query when pagination is disabled
+        dataResult = await pool.query(dataQuery, filterParams);
+      } else {
+        // Execute both count and data queries for pagination
+        [countResult, dataResult] = await Promise.all([
+          pool.query(countQuery, filterParams),
+          pool.query(dataQuery, dataQueryParams),
+        ]);
+      }
       // --- End Execute Queries ---
-
-      const total = parseInt(countResult.rows[0].count);
-      const totalPages = Math.ceil(total / parseInt(limit));
-
       // Format results (Match ExtendedInvoiceData)
       const invoices = dataResult.rows.map((row) => ({
         id: row.id,
@@ -296,15 +308,25 @@ export default function (pool, config) {
         customerIdType: row.customeridtype,
       }));
 
-      res.json({
-        data: invoices,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          totalPages,
-        },
-      });
+      // Return response based on pagination mode
+      if (skipPagination) {
+        // Return just the data array when pagination is disabled
+        res.json(invoices);
+      } else {
+        // Return paginated response
+        const total = parseInt(countResult.rows[0].count);
+        const totalPages = Math.ceil(total / parseInt(limit));
+
+        res.json({
+          data: invoices,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            totalPages,
+          },
+        });
+      }
     } catch (error) {
       console.error("Error fetching invoices:", error);
       res
@@ -3283,9 +3305,9 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
 
-      // Check if invoice exists and get current status
+      // Check if invoice exists and get current status (including customerid for credit adjustments)
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate FROM invoices WHERE id = $1",
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -3294,7 +3316,6 @@ export default function (pool, config) {
       }
 
       const currentInvoice = invoiceCheck.rows[0];
-
       const currentPaymentType = currentInvoice.paymenttype;
 
       // If no change in payment type, return early
@@ -3326,6 +3347,13 @@ export default function (pool, config) {
           paymentDate,
           paymentAmount,
         ]);
+
+        // Reduce customer credit usage since invoice is no longer on credit
+        await updateCustomerCredit(
+          client,
+          currentInvoice.customerid,
+          -paymentAmount // Negative amount decreases credit_used
+        );
 
         // Update invoice to CASH type with zero balance and paid status
         const updateInvoiceQuery = `
@@ -3363,6 +3391,13 @@ export default function (pool, config) {
 
           await client.query(cancelPaymentQuery, [payment.payment_id]);
         }
+
+        // Increase customer credit usage since invoice is now on credit
+        await updateCustomerCredit(
+          client,
+          currentInvoice.customerid,
+          currentInvoice.totalamountpayable // Positive amount increases credit_used
+        );
 
         // Update invoice to INVOICE type with full balance and unpaid status
         const updateInvoiceQuery = `

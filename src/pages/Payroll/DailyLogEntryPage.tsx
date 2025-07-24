@@ -76,9 +76,24 @@ interface DailyLogEntryPageProps {
 }
 
 type LeaveType = "cuti_umum" | "cuti_sakit";
+
 interface LeaveEntry {
   selected: boolean;
   leaveType: LeaveType;
+}
+
+interface ActivityItem {
+  payCodeId: string;
+  description: string;
+  payType: string;
+  rateUnit: string;
+  rate: number;
+  isDefault: boolean;
+  isSelected: boolean;
+  unitsProduced?: number;
+  calculatedAmount: number;
+  isContextLinked?: boolean;
+  source?: "job" | "employee";
 }
 
 const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
@@ -118,6 +133,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [leaveEmployees, setLeaveEmployees] = useState<
     Record<string, LeaveEntry>
   >({});
+  const [leaveEmployeeActivities, setLeaveEmployeeActivities] = useState<
+    Record<string, ActivityItem[]>
+  >({});
+  const [showLeaveActivitiesModal, setShowLeaveActivitiesModal] =
+    useState(false);
+  const [selectedLeaveEmployee, setSelectedLeaveEmployee] =
+    useState<EmployeeWithHours | null>(null);
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
 
@@ -222,6 +244,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     });
   }, [formData.contextData, jobConfig, employeeSelectionState.jobHours]);
+
+  // Clear Cuti Umum selections when day type changes from holiday to non-holiday
+  useEffect(() => {
+    if (formData.dayType !== "Umum") {
+      setLeaveEmployees((prev) => {
+        const newLeaveEmployees = { ...prev };
+        Object.keys(newLeaveEmployees).forEach((empId) => {
+          if (newLeaveEmployees[empId].leaveType === "cuti_umum") {
+            newLeaveEmployees[empId].leaveType = "cuti_sakit";
+          }
+        });
+        return newLeaveEmployees;
+      });
+    }
+  }, [formData.dayType]);
 
   // Update the jobs filter based on dynamic configuration
   const jobs = useMemo(() => {
@@ -365,10 +402,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [holidays, formData.logDate]);
 
+  // Modify handleLeaveSelection
   const handleLeaveSelection = (employeeId: string) => {
     setLeaveEmployees((prev) => {
       const isCurrentlySelected = prev[employeeId]?.selected;
       const newSelectedState = !isCurrentlySelected;
+
+      // If just selected, fetch default activities for leave pay calculation
+      if (newSelectedState && !leaveEmployeeActivities[employeeId]) {
+        fetchAndApplyActivitiesForLeave(employeeId);
+      }
 
       // If an employee is selected for leave, ensure they are deselected from the working list.
       if (newSelectedState) {
@@ -384,16 +427,44 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       }
 
+      // Set the correct default leave type based on day type
+      const defaultLeaveType =
+        formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+
       return {
         ...prev,
         [employeeId]: {
           ...prev[employeeId],
           selected: newSelectedState,
-          // Default to 'cuti_umum' when first selected
-          leaveType: prev[employeeId]?.leaveType || "cuti_umum",
+          leaveType: prev[employeeId]?.leaveType || defaultLeaveType, // Use dynamic default
         },
       };
     });
+  };
+
+  // Add this function to open the leave activities modal
+  const handleManageLeaveActivities = (employee: Employee) => {
+    setSelectedLeaveEmployee(employee as EmployeeWithHours);
+    setShowLeaveActivitiesModal(true);
+  };
+
+  // Add this function to handle updates from the leave activities modal
+  const handleLeaveActivitiesUpdated = (activities: ActivityItem[]) => {
+    if (!selectedLeaveEmployee) return;
+
+    const employeeId = selectedLeaveEmployee.id;
+    const hours = jobConfig?.defaultHours || 8; // Use standard hours for recalculation
+
+    const recalculatedActivities = calculateActivitiesAmounts(
+      activities,
+      hours
+    );
+
+    setLeaveEmployeeActivities((prev) => ({
+      ...prev,
+      [employeeId]: recalculatedActivities,
+    }));
+    toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
   };
 
   const handleLeaveTypeChange = (employeeId: string, leaveType: LeaveType) => {
@@ -665,10 +736,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const handleSaveForm = async () => {
     const leaveEntries = Object.entries(leaveEmployees)
       .filter(([_, leaveData]) => leaveData.selected)
-      .map(([employeeId, leaveData]) => ({
-        employeeId: employeeId,
-        leaveType: leaveData.leaveType,
-      }));
+      .map(([employeeId, leaveData]) => {
+        const activities = leaveEmployeeActivities[employeeId] || [];
+        const amount_paid = activities
+          .filter((a) => a.isSelected)
+          .reduce((sum, a) => sum + a.calculatedAmount, 0);
+
+        return {
+          employeeId: employeeId,
+          leaveType: leaveData.leaveType,
+          amount_paid: amount_paid,
+        };
+      });
 
     const allSelectedEmployees = Object.entries(
       employeeSelectionState.selectedJobs
@@ -1282,6 +1361,72 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     setEmployeeActivities(newEmployeeActivities);
   };
 
+  // New function to fetch and apply activities for leave employees
+  const fetchAndApplyActivitiesForLeave = useCallback(
+    (employeeId: string) => {
+      const employee = allStaffs.find((s) => s.id === employeeId);
+      if (!employee) return;
+
+      const employeeJobs = employee.job || [];
+      const relevantJobTypes = employeeJobs.filter((jobId) =>
+        JOB_IDS.includes(jobId)
+      );
+      if (relevantJobTypes.length === 0) return;
+
+      const primaryJobType = relevantJobTypes[0];
+      const jobPayCodes = jobPayCodeDetails[primaryJobType] || [];
+      const employeePayCodes = employeeMappings[employeeId] || [];
+
+      const allPayCodes = new Map();
+      jobPayCodes.forEach((pc) =>
+        allPayCodes.set(pc.id, { ...pc, source: "job" })
+      );
+      employeePayCodes.forEach((pc) =>
+        allPayCodes.set(pc.id, { ...pc, source: "employee" })
+      );
+
+      const activities = Array.from(allPayCodes.values()).map((payCode) => {
+        const rate = payCode.override_rate_biasa || payCode.rate_biasa;
+        const isSelected =
+          payCode.is_default_setting && payCode.pay_type === "Base";
+        const hours = jobConfig?.defaultHours || 8; // Assume standard 8 hours for a day's leave pay
+
+        return {
+          payCodeId: payCode.id,
+          description: payCode.description,
+          payType: payCode.pay_type,
+          rateUnit: payCode.rate_unit,
+          rate,
+          isDefault: payCode.is_default_setting,
+          isSelected,
+          unitsProduced: payCode.requires_units_input ? 0 : undefined,
+          source: payCode.source,
+          calculatedAmount: calculateActivityAmount(
+            {
+              isSelected,
+              payType: payCode.pay_type,
+              rateUnit: payCode.rate_unit,
+              rate,
+            },
+            hours
+          ),
+        };
+      });
+
+      setLeaveEmployeeActivities((prev) => ({
+        ...prev,
+        [employeeId]: activities,
+      }));
+    },
+    [
+      allStaffs,
+      JOB_IDS,
+      jobPayCodeDetails,
+      employeeMappings,
+      jobConfig?.defaultHours,
+    ]
+  );
+
   // Update handleActivitiesUpdated to store all activities, not just selected:
   const handleActivitiesUpdated = (activities: any[]) => {
     if (!selectedEmployee?.rowKey) return;
@@ -1316,7 +1461,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   return (
-    <div className="relative w-full mx-4 md:mx-6 -mt-8">
+    <div className="relative w-full mx-4 mb-4 md:mx-6 -mt-8">
       <BackButton onClick={handleBack} />
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
@@ -1497,26 +1642,45 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           7;
 
                         return (
-                          <tr key={row.rowKey}>
+                          <tr
+                            key={row.rowKey}
+                            onClick={() => {
+                              if (isSaving || leaveEmployees[row.id]?.selected)
+                                return;
+                              handleEmployeeSelection(row.rowKey);
+                            }}
+                            className={`transition-colors duration-150 ${
+                              isSaving || leaveEmployees[row.id]?.selected
+                                ? "bg-default-50 cursor-not-allowed"
+                                : "cursor-pointer hover:bg-default-50"
+                            } ${
+                              isSelected
+                                ? "bg-sky-50 hover:bg-sky-100"
+                                : "bg-white"
+                            }`}
+                          >
                             <td className="px-6 py-4 whitespace-nowrap align-middle">
-                              <Checkbox
-                                checked={isSelected}
-                                onChange={() =>
-                                  handleEmployeeSelection(row.rowKey)
-                                }
-                                size={20}
-                                checkedColor="text-sky-600"
-                                ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
-                                buttonClassName="p-1 rounded-lg"
-                                disabled={
-                                  isSaving || leaveEmployees[row.id]?.selected
-                                }
-                              />
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onChange={() =>
+                                    handleEmployeeSelection(row.rowKey)
+                                  }
+                                  size={20}
+                                  checkedColor="text-sky-600"
+                                  ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                                  buttonClassName="p-1 rounded-lg"
+                                  disabled={
+                                    isSaving || leaveEmployees[row.id]?.selected
+                                  }
+                                />
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
                               <Link
                                 to={`/catalogue/staff/${row.id}`}
                                 className="hover:underline hover:text-sky-600"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 {row.id}
                               </Link>
@@ -1544,13 +1708,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               <Link
                                 to={`/catalogue/job?id=${row.jobType}`}
                                 className="hover:underline hover:text-sky-600"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 {row.jobName}
                               </Link>
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
                               <td className="px-6 py-4 whitespace-nowrap text-left">
-                                <div className="relative w-40 mx-auto">
+                                <div
+                                  className="relative w-40 mx-auto"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <Listbox
                                     value={
                                       locationTypes[row.rowKey || ""] || "Local"
@@ -1707,7 +1875,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </td>
                             ) : (
                               <td className="px-6 py-4 whitespace-nowrap text-right">
-                                <div className="flex justify-end">
+                                <div
+                                  className="flex justify-end"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <input
                                     type="number"
                                     value={isSelected ? hours.toString() : ""}
@@ -1738,19 +1909,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </td>
                             )}
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <ActivitiesTooltip
-                                activities={(
-                                  employeeActivities[row.rowKey || ""] || []
-                                ).filter((activity) => activity.isSelected)}
-                                employeeName={row.name}
-                                className={
-                                  !isSelected
-                                    ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                    : ""
-                                }
-                                disabled={!isSelected}
-                                onClick={() => handleManageActivities(row)}
-                              />
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <ActivitiesTooltip
+                                  activities={(
+                                    employeeActivities[row.rowKey || ""] || []
+                                  ).filter((activity) => activity.isSelected)}
+                                  employeeName={row.name}
+                                  className={
+                                    !isSelected
+                                      ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                      : ""
+                                  }
+                                  disabled={!isSelected}
+                                  onClick={() => handleManageActivities(row)}
+                                />
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1877,27 +2050,49 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               index === salesmanIkutEmployees.length - 1; // Add this line
 
                             return (
-                              <tr key={row.rowKey}>
+                              <tr
+                                key={row.rowKey}
+                                onClick={() => {
+                                  if (
+                                    isSaving ||
+                                    leaveEmployees[row.id]?.selected
+                                  )
+                                    return;
+                                  handleEmployeeSelection(row.rowKey);
+                                }}
+                                className={`transition-colors duration-150 ${
+                                  isSaving || leaveEmployees[row.id]?.selected
+                                    ? "bg-default-50 cursor-not-allowed"
+                                    : "cursor-pointer hover:bg-default-50"
+                                } ${
+                                  isSelected
+                                    ? "bg-sky-50 hover:bg-sky-100"
+                                    : "bg-white"
+                                }`}
+                              >
                                 <td className="px-6 py-4 whitespace-nowrap align-middle">
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onChange={() =>
-                                      handleEmployeeSelection(row.rowKey)
-                                    }
-                                    size={20}
-                                    checkedColor="text-sky-600"
-                                    ariaLabel={`Select employee ${row.name}`}
-                                    buttonClassName="p-1 rounded-lg"
-                                    disabled={
-                                      isSaving ||
-                                      leaveEmployees[row.id]?.selected
-                                    }
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={!!isSelected}
+                                      onChange={() =>
+                                        handleEmployeeSelection(row.rowKey)
+                                      }
+                                      size={20}
+                                      checkedColor="text-sky-600"
+                                      ariaLabel={`Select employee ${row.name}`}
+                                      buttonClassName="p-1 rounded-lg"
+                                      disabled={
+                                        isSaving ||
+                                        leaveEmployees[row.id]?.selected
+                                      }
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
                                   <Link
                                     to={`/catalogue/staff/${row.id}`}
                                     className="hover:underline hover:text-sky-600"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.id}
                                   </Link>
@@ -1909,54 +2104,64 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   <Link
                                     to={`/catalogue/job?id=${row.jobType}`}
                                     className="hover:underline hover:text-sky-600"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.jobName}
                                   </Link>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <input
-                                    type="number"
-                                    value={
-                                      isSelected
-                                        ? (bagCounts.muatMee || 0).toString()
-                                        : ""
-                                    }
-                                    onChange={(e) =>
-                                      handleBagCountChange(
-                                        row.rowKey || "",
-                                        "muatMee",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
-                                    min="0"
-                                    disabled={!isSelected}
-                                    placeholder={isSelected ? "0" : "-"}
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="number"
+                                      value={
+                                        isSelected
+                                          ? (bagCounts.muatMee || 0).toString()
+                                          : ""
+                                      }
+                                      onChange={(e) =>
+                                        handleBagCountChange(
+                                          row.rowKey || "",
+                                          "muatMee",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                      min="0"
+                                      disabled={!isSelected}
+                                      placeholder={isSelected ? "0" : "-"}
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <input
-                                    type="number"
-                                    value={
-                                      isSelected
-                                        ? (bagCounts.muatBihun || 0).toString()
-                                        : ""
-                                    }
-                                    onChange={(e) =>
-                                      handleBagCountChange(
-                                        row.rowKey || "",
-                                        "muatBihun",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
-                                    min="0"
-                                    disabled={!isSelected}
-                                    placeholder={isSelected ? "0" : "-"}
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="number"
+                                      value={
+                                        isSelected
+                                          ? (
+                                              bagCounts.muatBihun || 0
+                                            ).toString()
+                                          : ""
+                                      }
+                                      onChange={(e) =>
+                                        handleBagCountChange(
+                                          row.rowKey || "",
+                                          "muatBihun",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                      min="0"
+                                      disabled={!isSelected}
+                                      placeholder={isSelected ? "0" : "-"}
+                                    />
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <div className="relative w-48 mx-auto">
+                                  <div
+                                    className="relative w-48 mx-auto"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     <Listbox
                                       value={selectedSalesman}
                                       onChange={(value) =>
@@ -2066,22 +2271,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  <ActivitiesTooltip
-                                    activities={(
-                                      employeeActivities[row.rowKey || ""] || []
-                                    ).filter((activity) => activity.isSelected)}
-                                    employeeName={row.name}
-                                    className={
-                                      !isSelected
-                                        ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                        : ""
-                                    }
-                                    disabled={
-                                      !isSelected ||
-                                      leaveEmployees[row.id]?.selected
-                                    }
-                                    onClick={() => handleManageActivities(row)}
-                                  />
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <ActivitiesTooltip
+                                      activities={(
+                                        employeeActivities[row.rowKey || ""] ||
+                                        []
+                                      ).filter(
+                                        (activity) => activity.isSelected
+                                      )}
+                                      employeeName={row.name}
+                                      className={
+                                        !isSelected
+                                          ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                          : ""
+                                      }
+                                      disabled={
+                                        !isSelected ||
+                                        leaveEmployees[row.id]?.selected
+                                      }
+                                      onClick={() =>
+                                        handleManageActivities(row)
+                                      }
+                                    />
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -2095,40 +2307,60 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           )}
         </div>
 
-        {formData.dayType === "Umum" && (
-          <div className="border-t border-default-200 pt-6 mt-8">
-            <h2 className="text-lg font-semibold text-default-700 mb-2">
-              Public Holiday Leave Recording
-            </h2>
-            <p className="text-sm text-default-500 mb-4">
-              Select employees on paid leave for this public holiday. Their pay
-              is based on their normal day rate.
-            </p>
+        <div className="border-t border-default-200 pt-6 mt-8">
+          <h2 className="text-lg font-semibold text-default-700 mb-2">
+            Leave & Absence Recording
+          </h2>
+          <p className="text-sm text-default-500 mb-4">
+            Select employees on paid leave.{" "}
+            {formData.dayType === "Umum"
+              ? "Cuti Umum is available on public holidays, "
+              : ""}
+            Cuti Sakit is available any day. Pay is based on regular day rates.
+          </p>
 
-            <div className="bg-white rounded-lg border shadow-sm">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-50">
-                  <tr>
-                    <th scope="col" className="w-16 px-6 py-3 text-left">
-                      {/* Optional: Add a select-all checkbox here if needed */}
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+          <div className="bg-white rounded-lg border shadow-sm">
+            <table className="min-w-full divide-y divide-default-200">
+              <thead className="bg-default-50">
+                <tr>
+                  <th scope="col" className="w-16 px-6 py-3 text-left"></th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                  >
+                    Employee
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                  >
+                    Leave Type
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-default-200">
+                {uniqueEmployees.map((employee) => {
+                  const leaveOptions = [
+                    { id: "cuti_sakit", name: "Cuti Sakit" },
+                  ];
+                  if (formData.dayType === "Umum") {
+                    leaveOptions.unshift({
+                      id: "cuti_umum",
+                      name: "Cuti Umum",
+                    });
+                  }
+                  return (
+                    <tr
+                      key={`leave-${employee.id}`}
+                      className="cursor-pointer hover:bg-default-50"
+                      onClick={() => handleLeaveSelection(employee.id)}
                     >
-                      Employee
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                    >
-                      Leave Type
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-default-200">
-                  {uniqueEmployees.map((employee) => (
-                    <tr key={`leave-${employee.id}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Checkbox
                           checked={
@@ -2150,12 +2382,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {leaveEmployees[employee.id]?.selected && (
-                          <div className="w-48">
+                          <div
+                            className="w-48"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <FormListbox
                               name={`leaveType-${employee.id}`}
                               value={
                                 leaveEmployees[employee.id]?.leaveType ||
-                                "cuti_umum"
+                                "cuti_sakit"
                               }
                               onChange={(value) =>
                                 handleLeaveTypeChange(
@@ -2163,22 +2398,34 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   value as LeaveType
                                 )
                               }
-                              options={[
-                                { id: "cuti_umum", name: "Cuti Umum" },
-                                { id: "cuti_sakit", name: "Cuti Sakit" },
-                              ]}
+                              options={leaveOptions}
                               disabled={!leaveEmployees[employee.id]?.selected}
                             />
                           </div>
                         )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {leaveEmployees[employee.id]?.selected && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ActivitiesTooltip
+                              activities={(
+                                leaveEmployeeActivities[employee.id] || []
+                              ).filter((a: ActivityItem) => a.isSelected)}
+                              employeeName={employee.name}
+                              onClick={() =>
+                                handleManageLeaveActivities(employee)
+                              }
+                            />
+                          </div>
+                        )}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
 
         {/* Action Buttons */}
         <div className="border-t border-default-200 pt-4 mt-4 flex justify-end space-x-3">
@@ -2226,6 +2473,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             ? locationTypes[selectedEmployee.rowKey] || "Local"
             : "Local"
         }
+      />
+      <ManageActivitiesModal
+        isOpen={showLeaveActivitiesModal}
+        onClose={() => setShowLeaveActivitiesModal(false)}
+        employee={selectedLeaveEmployee}
+        jobType={selectedLeaveEmployee?.jobType || ""}
+        jobName={selectedLeaveEmployee?.jobName || ""}
+        employeeHours={jobConfig?.defaultHours || 8}
+        dayType="Biasa" // Always use "Biasa" for leave pay calculation
+        onActivitiesUpdated={handleLeaveActivitiesUpdated}
+        existingActivities={
+          leaveEmployeeActivities[selectedLeaveEmployee?.id || ""]
+        }
+        contextLinkedPayCodes={contextLinkedPayCodes}
+        contextData={formData.contextData}
       />
     </div>
   );

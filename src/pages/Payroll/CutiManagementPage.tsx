@@ -15,22 +15,26 @@ const CutiManagementPage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full">
-      <div className="p-6 bg-white border-b border-default-200">
-        <h1 className="text-2xl font-bold text-default-900">
-          Leave & Commission Management
-        </h1>
-        <p className="mt-1 text-sm text-default-600">
-          Manage employee leave, holidays, and maintenance commissions.
-        </p>
+    <div className="relative w-full space-y-4 mx-4 md:mx-6 -mt-8">
+      <div className="flex flex-col md:flex-row justify-between items-center">
+        <div>
+          <h1 className="text-xl font-semibold text-default-800">
+            Leave & Commission Management
+          </h1>
+          <p className="mt-1 text-sm text-default-600">
+            Manage employee leave, holidays, and maintenance commissions.
+          </p>
+        </div>
       </div>
 
-      <Tab labels={tabLabels} tabWidth="w-36">
-        <CutiReportPage />
-        <CutiTahunanEntryPage />
-        <CommissionPage />
-        <HolidayCalendarPage />
-      </Tab>
+      <div className="rounded-lg border border-default-200 shadow-sm p-6">
+        <Tab labels={tabLabels} tabWidth="w-40">
+          <CutiReportPage />
+          <CutiTahunanEntryPage />
+          <CommissionPage />
+          <HolidayCalendarPage />
+        </Tab>
+      </div>
     </div>
   );
 };
