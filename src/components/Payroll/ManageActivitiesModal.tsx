@@ -19,8 +19,8 @@ import {
   IconUser,
   IconPackage,
 } from "@tabler/icons-react";
-import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
+import SafeLink from "../SafeLink";
 
 export interface ActivityItem {
   payCodeId: string;
@@ -50,6 +50,8 @@ interface ManageActivitiesModalProps {
   contextData?: Record<string, any>;
   salesmanProducts?: any[]; // Products sold by this salesman
   locationType?: "Local" | "Outstation"; // Location type for salesman
+  hasUnsavedChanges?: boolean;
+  onNavigateAttempt?: (to: string) => void;
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -66,6 +68,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   contextData = {},
   salesmanProducts = [],
   locationType = "Local",
+  hasUnsavedChanges = false,
+  onNavigateAttempt = () => {},
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -293,12 +297,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                   <div className="grid grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-500">Job</p>
-                      <Link
+                      <SafeLink
                         to={`/catalogue/job?id=${jobType}`}
                         className="font-medium hover:underline hover:text-sky-600"
+                        hasUnsavedChanges={hasUnsavedChanges}
+                        onNavigateAttempt={onNavigateAttempt}
                       >
                         {jobName}
-                      </Link>
+                      </SafeLink>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">
@@ -461,8 +467,15 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   className="text-sm font-medium text-gray-900 w-fit"
                                                   title={`${activity.description} (${activity.payCodeId})`}
                                                 >
-                                                  <Link
+                                                  <SafeLink
                                                     to={`/catalogue/pay-codes?desc=${activity.payCodeId}`}
+                                                    hasUnsavedChanges={
+                                                      hasUnsavedChanges
+                                                    }
+                                                    onNavigateAttempt={
+                                                      onNavigateAttempt ||
+                                                      (() => {})
+                                                    }
                                                     className="hover:text-sky-600 hover:underline"
                                                     onClick={(e) =>
                                                       e.stopPropagation()
@@ -475,7 +488,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                           80
                                                         )}...`
                                                       : activity.description}
-                                                  </Link>
+                                                  </SafeLink>
                                                   <span className="ml-1.5 text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
                                                     {activity.payCodeId}
                                                   </span>

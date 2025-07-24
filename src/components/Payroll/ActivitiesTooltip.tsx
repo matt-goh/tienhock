@@ -2,7 +2,7 @@ import { IconLink } from "@tabler/icons-react";
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ActivityItem } from "./ManageActivitiesModal";
-import { Link } from "react-router-dom";
+import SafeLink from "../SafeLink";
 
 interface ActivitiesTooltipProps {
   activities: ActivityItem[];
@@ -10,6 +10,8 @@ interface ActivitiesTooltipProps {
   className?: string;
   disabled?: boolean;
   onClick?: () => void;
+  hasUnsavedChanges?: boolean;
+  onNavigateAttempt?: (to: string) => void;
 }
 
 const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
@@ -18,6 +20,8 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   className = "",
   disabled,
   onClick,
+  hasUnsavedChanges = false,
+  onNavigateAttempt = () => {},
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -131,8 +135,10 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       className="font-medium text-default-800 truncate"
                       title={`${activity.description} (${activity.payCodeId})`}
                     >
-                      <Link
+                      <SafeLink
                         to={`/catalogue/pay-codes?desc=${activity.payCodeId}`}
+                        hasUnsavedChanges={hasUnsavedChanges}
+                        onNavigateAttempt={onNavigateAttempt}
                         className="hover:text-sky-600 hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -142,7 +148,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         }}
                       >
                         {activity.description}
-                      </Link>
+                      </SafeLink>
                       {activity.payType === "Overtime" && (
                         <span className="ml-2 text-xs text-amber-600">
                           (OT)
