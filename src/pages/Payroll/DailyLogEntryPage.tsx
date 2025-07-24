@@ -7,7 +7,7 @@ import React, {
   useRef,
   Fragment,
 } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
 import { Employee } from "../../types/types";
@@ -46,6 +46,9 @@ import {
   IconMapPin,
   IconMapPinOff,
 } from "@tabler/icons-react";
+import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
+import SafeLink from "../../components/SafeLink";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -141,11 +144,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [selectedLeaveEmployee, setSelectedLeaveEmployee] =
     useState<EmployeeWithHours | null>(null);
   const [leaveSelectAll, setLeaveSelectAll] = useState(false);
-
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
-
   const JOB_IDS = getJobIds(jobType);
-
   // Get job configuration
   const jobConfig = getJobConfig(jobType);
   const contextLinkedPayCodes = jobConfig
@@ -197,6 +197,63 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   } = useJobPayCodeMappings();
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
+  const [initialState, setInitialState] = useState<{
+    formData: DailyLogFormData;
+    employeeSelectionState: any;
+    employeeActivities: Record<string, any[]>;
+    locationTypes: Record<string, "Local" | "Outstation">;
+    salesmanIkutRelations: Record<string, string>;
+    ikutBagCounts: Record<string, { muatMee: number; muatBihun: number }>;
+    leaveEmployees: Record<string, LeaveEntry>;
+    leaveEmployeeActivities: Record<string, ActivityItem[]>;
+  } | null>(null);
+
+  // Function to check if there are unsaved changes
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialState || mode === "edit") return false; // Don't check for edit mode initially
+
+    // Deep compare current state with initial state
+    return (
+      JSON.stringify(formData) !== JSON.stringify(initialState.formData) ||
+      JSON.stringify(employeeSelectionState) !==
+        JSON.stringify(initialState.employeeSelectionState) ||
+      JSON.stringify(employeeActivities) !==
+        JSON.stringify(initialState.employeeActivities) ||
+      JSON.stringify(locationTypes) !==
+        JSON.stringify(initialState.locationTypes) ||
+      JSON.stringify(salesmanIkutRelations) !==
+        JSON.stringify(initialState.salesmanIkutRelations) ||
+      JSON.stringify(ikutBagCounts) !==
+        JSON.stringify(initialState.ikutBagCounts) ||
+      JSON.stringify(leaveEmployees) !==
+        JSON.stringify(initialState.leaveEmployees) ||
+      JSON.stringify(leaveEmployeeActivities) !==
+        JSON.stringify(initialState.leaveEmployeeActivities)
+    );
+  }, [
+    formData,
+    employeeSelectionState,
+    employeeActivities,
+    locationTypes,
+    salesmanIkutRelations,
+    ikutBagCounts,
+    leaveEmployees,
+    leaveEmployeeActivities,
+    initialState,
+    mode,
+  ]);
+
+  const {
+    safeNavigate,
+    showConfirmDialog,
+    handleConfirmNavigation,
+    handleCancelNavigation,
+    confirmationMessage,
+  } = useUnsavedChanges({
+    hasUnsavedChanges,
+    message:
+      "You have unsaved changes. Are you sure you want to leave this page?",
+  });
 
   // Update activities when context values change for linked pay codes
   useEffect(() => {
@@ -396,6 +453,48 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
+  // Add this useEffect to capture initial state
+  useEffect(() => {
+    if (
+      !initialState &&
+      !loadingStaffs &&
+      !loadingJobs &&
+      !loadingPayCodeMappings &&
+      expandedEmployees.length > 0
+    ) {
+      setInitialState({
+        formData: JSON.parse(JSON.stringify(formData)),
+        employeeSelectionState: JSON.parse(
+          JSON.stringify(employeeSelectionState)
+        ),
+        employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+        locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+        salesmanIkutRelations: JSON.parse(
+          JSON.stringify(salesmanIkutRelations)
+        ),
+        ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+        leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
+        leaveEmployeeActivities: JSON.parse(
+          JSON.stringify(leaveEmployeeActivities)
+        ),
+      });
+    }
+  }, [
+    loadingStaffs,
+    loadingJobs,
+    loadingPayCodeMappings,
+    expandedEmployees.length,
+    initialState,
+    formData,
+    employeeSelectionState,
+    employeeActivities,
+    locationTypes,
+    salesmanIkutRelations,
+    ikutBagCounts,
+    leaveEmployees,
+    leaveEmployeeActivities,
+  ]);
+
   useEffect(() => {
     if (formData.logDate) {
       const currentDate = new Date(formData.logDate);
@@ -520,7 +619,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleBack = () => {
-    navigate(`/payroll/${jobType.toLowerCase()}-production`);
+    safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
   };
 
   // Toggle employee selection by employee+job combination
@@ -857,6 +956,24 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         await api.post("/api/daily-work-logs", payload);
         toast.success("Work log submitted successfully");
       }
+
+      // Reset initial state to current state after successful save
+      setInitialState({
+        formData: JSON.parse(JSON.stringify(formData)),
+        employeeSelectionState: JSON.parse(
+          JSON.stringify(employeeSelectionState)
+        ),
+        employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+        locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+        salesmanIkutRelations: JSON.parse(
+          JSON.stringify(salesmanIkutRelations)
+        ),
+        ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+        leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
+        leaveEmployeeActivities: JSON.parse(
+          JSON.stringify(leaveEmployeeActivities)
+        ),
+      });
       navigate(`/payroll/${jobType.toLowerCase()}-production`);
     } catch (error: any) {
       console.error("Error saving work log:", error);
@@ -1788,13 +1905,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
-                              <Link
+                              <SafeLink
                                 to={`/catalogue/staff/${row.id}`}
+                                hasUnsavedChanges={hasUnsavedChanges}
+                                onNavigateAttempt={safeNavigate}
                                 className="hover:underline hover:text-sky-600"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {row.id}
-                              </Link>
+                              </SafeLink>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
                               <span className="font-medium">{row.name}</span>
@@ -1816,13 +1935,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                              <Link
+                              <SafeLink
                                 to={`/catalogue/job?id=${row.jobType}`}
+                                hasUnsavedChanges={hasUnsavedChanges}
+                                onNavigateAttempt={safeNavigate}
                                 className="hover:underline hover:text-sky-600"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {row.jobName}
-                              </Link>
+                              </SafeLink>
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
                               <td className="px-6 py-4 whitespace-nowrap text-left">
@@ -2026,6 +2147,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     employeeActivities[row.rowKey || ""] || []
                                   ).filter((activity) => activity.isSelected)}
                                   employeeName={row.name}
+                                  hasUnsavedChanges={hasUnsavedChanges}
+                                  onNavigateAttempt={safeNavigate}
                                   className={
                                     !isSelected
                                       ? "disabled:text-default-300 disabled:cursor-not-allowed"
@@ -2207,25 +2330,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
-                                  <Link
+                                  <SafeLink
                                     to={`/catalogue/staff/${row.id}`}
+                                    hasUnsavedChanges={hasUnsavedChanges}
+                                    onNavigateAttempt={safeNavigate}
                                     className="hover:underline hover:text-sky-600"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.id}
-                                  </Link>
+                                  </SafeLink>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                                   {row.name}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
-                                  <Link
+                                  <SafeLink
                                     to={`/catalogue/job?id=${row.jobType}`}
+                                    hasUnsavedChanges={hasUnsavedChanges}
+                                    onNavigateAttempt={safeNavigate}
                                     className="hover:underline hover:text-sky-600"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.jobName}
-                                  </Link>
+                                  </SafeLink>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                   <div onClick={(e) => e.stopPropagation()}>
@@ -2398,6 +2525,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         (activity) => activity.isSelected
                                       )}
                                       employeeName={row.name}
+                                      hasUnsavedChanges={hasUnsavedChanges}
+                                      onNavigateAttempt={safeNavigate}
                                       className={
                                         !isSelected
                                           ? "disabled:text-default-300 disabled:cursor-not-allowed"
@@ -2643,6 +2772,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   : [] // Show no activities when disabled
                               }
                               employeeName={employee.name}
+                              hasUnsavedChanges={hasUnsavedChanges}
+                              onNavigateAttempt={safeNavigate}
                               className={
                                 !isSelected || isSaving
                                   ? "disabled:text-default-300 disabled:cursor-not-allowed"
@@ -2710,6 +2841,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             ? locationTypes[selectedEmployee.rowKey] || "Local"
             : "Local"
         }
+        hasUnsavedChanges={hasUnsavedChanges}
+        onNavigateAttempt={safeNavigate}
       />
       <ManageActivitiesModal
         isOpen={showLeaveActivitiesModal}
@@ -2725,6 +2858,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }
         contextLinkedPayCodes={contextLinkedPayCodes}
         contextData={formData.contextData}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onNavigateAttempt={safeNavigate}
+      />
+      {/* Confirmation Dialog for Unsaved Changes */}
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onClose={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        title="Unsaved Changes"
+        message={confirmationMessage}
+        confirmButtonText="Leave Page"
+        variant="danger"
       />
     </div>
   );
