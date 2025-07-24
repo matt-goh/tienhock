@@ -2447,13 +2447,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 </p>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-default-200">
+              <table className="min-w-full divide-y divide-default-200 table-fixed">
                 <thead className="bg-default-50">
                   <tr>
-                    <th
-                      scope="col"
-                      className="w-16 px-6 py-3 whitespace-nowrap align-middle"
-                    >
+                    <th scope="col" className="w-16 px-6 py-3 text-left">
                       <Checkbox
                         checked={leaveSelectAll}
                         onChange={handleLeaveSelectAll}
@@ -2472,13 +2469,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-56 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Leave Type
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-48 px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Actions
                     </th>
@@ -2487,10 +2484,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 <tbody className="bg-white divide-y divide-default-200">
                   {availableForLeave.map((employee) => {
                     const leaveOptions = [
-                      ...(formData.dayType === "Umum" 
-                        ? [{ id: "cuti_umum", name: "Cuti Umum" }] 
-                        : []
-                      ),
+                      ...(formData.dayType === "Umum"
+                        ? [{ id: "cuti_umum", name: "Cuti Umum" }]
+                        : []),
                       { id: "cuti_sakit", name: "Cuti Sakit" },
                     ];
                     const isSelected =
@@ -2526,7 +2522,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-default-900">
+                          <div className="text-sm font-medium text-default-900 truncate">
                             {employee.name}
                           </div>
                           <div className="text-xs text-default-500">
@@ -2563,8 +2559,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     {leaveOptions.find(
                                       (option) =>
                                         option.id ===
-                                        (leaveEmployees[employee.id]?.leaveType ||
-                                          "cuti_sakit")
+                                        (leaveEmployees[employee.id]
+                                          ?.leaveType || "cuti_sakit")
                                     )?.name || "Cuti Sakit"}
                                   </span>
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
@@ -2631,10 +2627,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div onClick={(e) => e.stopPropagation()}>
                             <ActivitiesTooltip
-                              activities={(
-                                leaveEmployeeActivities[employee.id] || []
-                              ).filter((a: ActivityItem) => a.isSelected)}
+                              activities={
+                                isSelected
+                                  ? (
+                                      leaveEmployeeActivities[employee.id] || []
+                                    ).filter((a: ActivityItem) => a.isSelected)
+                                  : []
+                              }
                               employeeName={employee.name}
+                              className={
+                                !isSelected
+                                  ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                  : ""
+                              }
                               onClick={() =>
                                 handleManageLeaveActivities(employee)
                               }
