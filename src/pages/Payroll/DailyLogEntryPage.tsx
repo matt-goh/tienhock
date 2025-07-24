@@ -140,6 +140,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     useState(false);
   const [selectedLeaveEmployee, setSelectedLeaveEmployee] =
     useState<EmployeeWithHours | null>(null);
+  const [leaveSelectAll, setLeaveSelectAll] = useState(false);
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
 
@@ -340,6 +341,27 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       (emp: { jobType: string }) => emp.jobType === "SALESMAN_IKUT"
     );
   }, [expandedEmployees, jobConfig?.id]);
+
+  // Helper function to get employees available for work (not on leave)
+  const availableForWork = useMemo(() => {
+    return expandedEmployees.filter((emp) => !leaveEmployees[emp.id]?.selected);
+  }, [expandedEmployees, leaveEmployees]);
+
+  // Helper function to get employees available for leave (not working)
+  const availableForLeave = useMemo(() => {
+    return uniqueEmployees.filter((emp) => {
+      const selectedJobs = employeeSelectionState.selectedJobs[emp.id] || [];
+      return selectedJobs.length === 0;
+    });
+  }, [uniqueEmployees, employeeSelectionState.selectedJobs]);
+
+  // Helper for SALESMAN_IKUT employees available for work
+  const salesmanIkutAvailableForWork = useMemo(() => {
+    if (jobConfig?.id !== "SALESMAN") return [];
+    return salesmanIkutEmployees.filter(
+      (emp) => !leaveEmployees[emp.id]?.selected
+    );
+  }, [salesmanIkutEmployees, leaveEmployees, jobConfig?.id]);
 
   // Get employees followed by each salesman
   const followedBySalesman = useMemo(() => {
@@ -887,36 +909,52 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
+    const availableEmployees =
+      jobConfig?.id === "SALESMAN" ? salesmanEmployees : availableForWork;
+
+    // Check if all available employees are selected
+    const allAvailableSelected = availableEmployees.every((emp) =>
+      employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
+    );
+
     setEmployeeSelectionState((prev) => {
-      if (selectAll) {
-        // Deselect all - clear only the selections, not the hours
+      if (allAvailableSelected) {
+        // Deselect all available employees
+        const newSelectedJobs = { ...prev.selectedJobs };
+        availableEmployees.forEach((emp) => {
+          if (newSelectedJobs[emp.id]) {
+            newSelectedJobs[emp.id] = newSelectedJobs[emp.id].filter(
+              (job) => job !== emp.jobType
+            );
+            if (newSelectedJobs[emp.id].length === 0) {
+              delete newSelectedJobs[emp.id];
+            }
+          }
+        });
+
         return {
-          selectedJobs: {}, // Clear selections
-          jobHours: { ...prev.jobHours }, // Preserve hours
+          selectedJobs: newSelectedJobs,
+          jobHours: prev.jobHours,
         };
       } else {
-        // Select all employees with default hours
-        const newSelectedJobs: Record<string, string[]> = {};
-        const newJobHours: Record<string, Record<string, number>> = {
-          ...prev.jobHours,
-        };
+        // Select all available employees
+        const newSelectedJobs = { ...prev.selectedJobs };
+        const newJobHours = { ...prev.jobHours };
 
-        expandedEmployees.forEach((employee: { id: any; jobType: any }) => {
-          const employeeId = employee.id;
-          const jobType = employee.jobType;
-
-          if (!newSelectedJobs[employeeId]) {
-            newSelectedJobs[employeeId] = [];
+        availableEmployees.forEach((emp) => {
+          if (!newSelectedJobs[emp.id]) {
+            newSelectedJobs[emp.id] = [];
           }
-          if (!newJobHours[employeeId]) {
-            newJobHours[employeeId] = {};
+          if (!newJobHours[emp.id]) {
+            newJobHours[emp.id] = {};
           }
 
-          newSelectedJobs[employeeId].push(jobType);
+          if (!newSelectedJobs[emp.id].includes(emp.jobType)) {
+            newSelectedJobs[emp.id].push(emp.jobType);
+          }
 
-          // Only set hours if they're not already set
-          if (!newJobHours[employeeId][jobType]) {
-            newJobHours[employeeId][jobType] = 7; // Default hours
+          if (!newJobHours[emp.id][emp.jobType]) {
+            newJobHours[emp.id][emp.jobType] = 7;
           }
         });
 
@@ -926,8 +964,57 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         };
       }
     });
+  };
 
-    setSelectAll(!selectAll);
+  // Add leave select all handler
+  const handleLeaveSelectAll = () => {
+    const allLeaveSelected = availableForLeave.every(
+      (emp) => leaveEmployees[emp.id]?.selected
+    );
+
+    if (allLeaveSelected) {
+      // Deselect all from leave
+      setLeaveEmployees((prev) => {
+        const newLeaveEmployees = { ...prev };
+        availableForLeave.forEach((emp) => {
+          if (newLeaveEmployees[emp.id]) {
+            newLeaveEmployees[emp.id].selected = false;
+          }
+        });
+        return newLeaveEmployees;
+      });
+    } else {
+      // Select all available for leave
+      setLeaveEmployees((prev) => {
+        const newLeaveEmployees = { ...prev };
+        availableForLeave.forEach((emp) => {
+          const defaultLeaveType =
+            formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+          newLeaveEmployees[emp.id] = {
+            selected: true,
+            leaveType: prev[emp.id]?.leaveType || defaultLeaveType,
+          };
+
+          // Fetch activities if not already available
+          if (!leaveEmployeeActivities[emp.id]) {
+            fetchAndApplyActivitiesForLeave(emp.id);
+          }
+        });
+        return newLeaveEmployees;
+      });
+
+      // Remove selected employees from work selection
+      setEmployeeSelectionState((prev) => {
+        const newSelectedJobs = { ...prev.selectedJobs };
+        availableForLeave.forEach((emp) => {
+          delete newSelectedJobs[emp.id];
+        });
+        return {
+          ...prev,
+          selectedJobs: newSelectedJobs,
+        };
+      });
+    }
   };
 
   const handleIkutChange = (ikutRowKey: string, salesmanId: string) => {
@@ -1010,15 +1097,34 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }));
   };
 
-  // Update select all state based on individual selections
+  // Update select all state based on individual selections and availability
   useEffect(() => {
-    const totalRows = expandedEmployees.length;
-    const selectedRows = Object.entries(
-      employeeSelectionState.selectedJobs
-    ).flatMap(([_, jobTypes]) => jobTypes).length;
+    const availableEmployees =
+      jobConfig?.id === "SALESMAN" ? salesmanEmployees : availableForWork;
+    const totalAvailable = availableEmployees.length;
+    const selectedAvailable = availableEmployees.filter((emp) =>
+      employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
+    ).length;
 
-    setSelectAll(totalRows > 0 && totalRows === selectedRows);
-  }, [employeeSelectionState.selectedJobs, expandedEmployees]);
+    setSelectAll(totalAvailable > 0 && totalAvailable === selectedAvailable);
+
+    // Update leave select all state
+    const totalAvailableForLeave = availableForLeave.length;
+    const selectedForLeave = availableForLeave.filter(
+      (emp) => leaveEmployees[emp.id]?.selected
+    ).length;
+
+    setLeaveSelectAll(
+      totalAvailableForLeave > 0 && totalAvailableForLeave === selectedForLeave
+    );
+  }, [
+    employeeSelectionState.selectedJobs,
+    availableForWork,
+    salesmanEmployees,
+    jobConfig?.id,
+    leaveEmployees,
+    availableForLeave,
+  ]);
 
   // Use a one-time initialization effect
   const initializedRef = useRef(false);
@@ -1582,6 +1688,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             checkedColor="text-sky-600"
                             ariaLabel="Select all employees"
                             buttonClassName="p-1 rounded-lg"
+                            disabled={
+                              availableForWork.length === 0 &&
+                              jobConfig?.id !== "SALESMAN"
+                            }
                           />
                         </th>
                         <th
@@ -1943,14 +2053,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           <tr>
                             <th scope="col" className="px-6 py-3 text-left">
                               <Checkbox
-                                checked={salesmanIkutEmployees.every((emp) =>
-                                  employeeSelectionState.selectedJobs[
-                                    emp.id
-                                  ]?.includes(emp.jobType)
+                                checked={salesmanIkutAvailableForWork.every(
+                                  (emp) =>
+                                    employeeSelectionState.selectedJobs[
+                                      emp.id
+                                    ]?.includes(emp.jobType)
                                 )}
                                 onChange={() => {
                                   const allSelected =
-                                    salesmanIkutEmployees.every((emp) =>
+                                    salesmanIkutAvailableForWork.every((emp) =>
                                       employeeSelectionState.selectedJobs[
                                         emp.id
                                       ]?.includes(emp.jobType)
@@ -1958,30 +2069,33 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
                                   setEmployeeSelectionState((prev) => {
                                     const newState = { ...prev };
-                                    salesmanIkutEmployees.forEach((emp) => {
-                                      if (allSelected) {
-                                        // Deselect all and clear salesman relations
-                                        newState.selectedJobs[emp.id] = (
-                                          newState.selectedJobs[emp.id] || []
-                                        ).filter((job) => job !== emp.jobType);
+                                    salesmanIkutAvailableForWork.forEach(
+                                      (emp) => {
+                                        if (allSelected) {
+                                          // Deselect all and clear salesman relations
+                                          newState.selectedJobs[emp.id] = (
+                                            newState.selectedJobs[emp.id] || []
+                                          ).filter(
+                                            (job) => job !== emp.jobType
+                                          );
 
-                                        // Clear salesman relation when deselecting
-                                        setSalesmanIkutRelations(
-                                          (prevRelations) => {
-                                            const newRelations = {
-                                              ...prevRelations,
-                                            };
-                                            delete newRelations[
-                                              emp.rowKey || ""
-                                            ];
-                                            return newRelations;
-                                          }
-                                        );
-                                      } else {
-                                        // Don't auto-select - user must choose salesman first
-                                        // This prevents selecting without a salesman assignment
+                                          // Clear salesman relation when deselecting
+                                          setSalesmanIkutRelations(
+                                            (prevRelations) => {
+                                              const newRelations = {
+                                                ...prevRelations,
+                                              };
+                                              delete newRelations[
+                                                emp.rowKey || ""
+                                              ];
+                                              return newRelations;
+                                            }
+                                          );
+                                        } else {
+                                          // Don't auto-select - user must choose salesman first
+                                        }
                                       }
-                                    });
+                                    );
                                     return newState;
                                   });
                                 }}
@@ -1989,6 +2103,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 checkedColor="text-sky-600"
                                 ariaLabel="Select all ikut lori employees"
                                 buttonClassName="p-1 rounded-lg"
+                                disabled={
+                                  salesmanIkutAvailableForWork.length === 0
+                                }
                               />
                             </th>
                             <th
@@ -2320,74 +2437,108 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           </p>
 
           <div className="bg-white rounded-lg border shadow-sm">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
-                <tr>
-                  <th scope="col" className="w-16 px-6 py-3 text-left"></th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                  >
-                    Employee
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                  >
-                    Leave Type
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-default-200">
-                {uniqueEmployees.map((employee) => {
-                  const leaveOptions = [
-                    { id: "cuti_sakit", name: "Cuti Sakit" },
-                  ];
-                  if (formData.dayType === "Umum") {
-                    leaveOptions.unshift({
-                      id: "cuti_umum",
-                      name: "Cuti Umum",
-                    });
-                  }
-                  return (
-                    <tr
-                      key={`leave-${employee.id}`}
-                      className="cursor-pointer hover:bg-default-50"
-                      onClick={() => handleLeaveSelection(employee.id)}
+            {availableForLeave.length === 0 ? (
+              <div className="text-center py-10 px-6">
+                <p className="text-sm text-default-500">
+                  No employees available for leave.
+                </p>
+                <p className="text-xs text-default-400 mt-1">
+                  Employees selected for work cannot be marked as on leave.
+                </p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-default-200">
+                <thead className="bg-default-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="w-16 px-6 py-3 whitespace-nowrap align-middle"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Checkbox
-                          checked={
-                            leaveEmployees[employee.id]?.selected || false
-                          }
-                          onChange={() => handleLeaveSelection(employee.id)}
-                          size={20}
-                          checkedColor="text-amber-600"
-                          ariaLabel={`Select ${employee.name} for leave`}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-default-900">
-                          {employee.name}
-                        </div>
-                        <div className="text-xs text-default-500">
-                          {employee.id}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {leaveEmployees[employee.id]?.selected && (
+                      <Checkbox
+                        checked={leaveSelectAll}
+                        onChange={handleLeaveSelectAll}
+                        size={20}
+                        checkedColor="text-amber-600"
+                        ariaLabel="Select all employees for leave"
+                        buttonClassName="p-1 rounded-lg"
+                        disabled={availableForLeave.length === 0}
+                      />
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
+                      Employee
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
+                      Leave Type
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-default-200">
+                  {availableForLeave.map((employee) => {
+                    const leaveOptions = [
+                      ...(formData.dayType === "Umum" 
+                        ? [{ id: "cuti_umum", name: "Cuti Umum" }] 
+                        : []
+                      ),
+                      { id: "cuti_sakit", name: "Cuti Sakit" },
+                    ];
+                    const isSelected =
+                      leaveEmployees[employee.id]?.selected || false;
+                    return (
+                      <tr
+                        key={`leave-${employee.id}`}
+                        className={`transition-colors duration-150 ${
+                          isSaving
+                            ? "bg-default-50 cursor-not-allowed"
+                            : "cursor-pointer"
+                        } ${
+                          isSelected
+                            ? "bg-amber-50 hover:bg-amber-100/75"
+                            : "bg-white hover:bg-default-100"
+                        }`}
+                        onClick={() => {
+                          if (isSaving) return;
+                          handleLeaveSelection(employee.id);
+                        }}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap align-middle">
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => handleLeaveSelection(employee.id)}
+                              size={20}
+                              checkedColor="text-amber-600"
+                              ariaLabel={`Select ${employee.name} for leave`}
+                              buttonClassName="p-1 rounded-lg"
+                              disabled={isSaving}
+                            />
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-default-900">
+                            {employee.name}
+                          </div>
+                          <div className="text-xs text-default-500">
+                            {employee.id}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap relative">
                           <div
-                            className="w-48"
+                            className="w-48 relative"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <FormListbox
-                              name={`leaveType-${employee.id}`}
+                            <Listbox
                               value={
                                 leaveEmployees[employee.id]?.leaveType ||
                                 "cuti_sakit"
@@ -2398,14 +2549,86 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   value as LeaveType
                                 )
                               }
-                              options={leaveOptions}
-                              disabled={!leaveEmployees[employee.id]?.selected}
-                            />
+                              disabled={!isSelected || isSaving}
+                            >
+                              <div className="relative">
+                                <ListboxButton
+                                  className={`relative w-full pl-3 pr-8 py-2 text-left rounded-md border ${
+                                    !isSelected || isSaving
+                                      ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
+                                      : "bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  }`}
+                                >
+                                  <span className="block truncate text-sm">
+                                    {leaveOptions.find(
+                                      (option) =>
+                                        option.id ===
+                                        (leaveEmployees[employee.id]?.leaveType ||
+                                          "cuti_sakit")
+                                    )?.name || "Cuti Sakit"}
+                                  </span>
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                    <IconChevronDown
+                                      className="w-4 h-4 text-default-400"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                </ListboxButton>
+                                <Transition
+                                  as={Fragment}
+                                  leave="transition ease-in duration-100"
+                                  leaveFrom="opacity-100"
+                                  leaveTo="opacity-0"
+                                >
+                                  <ListboxOptions className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                    {leaveOptions.map((option) => (
+                                      <ListboxOption
+                                        key={option.id}
+                                        value={option.id}
+                                        className={({ active }) =>
+                                          `${
+                                            active
+                                              ? "bg-amber-100 text-amber-900"
+                                              : "text-default-700"
+                                          } cursor-pointer select-none relative py-2 pl-3 pr-8`
+                                        }
+                                      >
+                                        {({ selected, active }) => (
+                                          <>
+                                            <span
+                                              className={`${
+                                                selected
+                                                  ? "font-medium"
+                                                  : "font-normal"
+                                              } block truncate`}
+                                            >
+                                              {option.name}
+                                            </span>
+                                            {selected ? (
+                                              <span
+                                                className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                  active
+                                                    ? "text-amber-600"
+                                                    : "text-amber-500"
+                                                }`}
+                                              >
+                                                <IconCheck
+                                                  className="w-4 h-4"
+                                                  aria-hidden="true"
+                                                />
+                                              </span>
+                                            ) : null}
+                                          </>
+                                        )}
+                                      </ListboxOption>
+                                    ))}
+                                  </ListboxOptions>
+                                </Transition>
+                              </div>
+                            </Listbox>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {leaveEmployees[employee.id]?.selected && (
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div onClick={(e) => e.stopPropagation()}>
                             <ActivitiesTooltip
                               activities={(
@@ -2415,15 +2638,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               onClick={() =>
                                 handleManageLeaveActivities(employee)
                               }
+                              disabled={!isSelected || isSaving}
                             />
                           </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
