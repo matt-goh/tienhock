@@ -73,6 +73,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       const params = new URLSearchParams({
         invoiceStatus: "Unpaid,overdue",
+        all: "true", // Add this to get all invoices without pagination
       });
 
       // Add date range filter from props
@@ -84,8 +85,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       }
 
       const response = await api.get(`/api/invoices?${params.toString()}`);
-      // The API returns a paginated response, we need the `data` property.
-      setAvailableInvoices(response.data || []);
+      // With all=true, the response is directly an array of invoices
+      setAvailableInvoices(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error("Error fetching unpaid invoices:", error);
       toast.error("Failed to fetch unpaid invoices");

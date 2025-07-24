@@ -101,6 +101,7 @@ export default function (pool, config) {
       const {
         page = 1,
         limit = 15, // Use consistent limit (e.g., 15 to match FE)
+        all,
         startDate,
         endDate,
         salesman,
@@ -111,7 +112,11 @@ export default function (pool, config) {
         search,
       } = req.query;
 
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      // Skip pagination if 'all' parameter is true
+      const skipPagination = all === "true";
+      const offset = skipPagination
+        ? 0
+        : (parseInt(page) - 1) * parseInt(limit);
 
       // Base queries
       let selectClause = `
@@ -240,34 +245,41 @@ export default function (pool, config) {
 
       // Always exclude the consolidated invoices themselves from this listing
       whereClause += ` AND (i.is_consolidated = false OR i.is_consolidated IS NULL)`;
-      // Construct Count Query
-      const countQuery = `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
+      // Construct Count Query (only if pagination is needed)
+      const countQuery = skipPagination
+        ? null
+        : `SELECT COUNT(DISTINCT i.id) ${fromClause} ${whereClause}`;
 
       // Construct Data Query
       let dataQuery = `${selectClause} ${fromClause} ${whereClause} ${groupByClause}`;
       dataQuery += ` ORDER BY CAST(i.createddate AS bigint) DESC`;
 
-      // Add Pagination to Data Query parameters
+      // Add Pagination to Data Query parameters only if not skipping pagination
       const paginationParams = [];
-      paginationParams.push(parseInt(limit));
-      paginationParams.push(offset);
-      dataQuery += ` LIMIT $${filterParamCounter++} OFFSET $${filterParamCounter++}`;
+      if (!skipPagination) {
+        paginationParams.push(parseInt(limit));
+        paginationParams.push(offset);
+        dataQuery += ` LIMIT $${filterParamCounter++} OFFSET $${filterParamCounter++}`;
+      }
 
       // Combine filter and pagination params for the main data query
       const dataQueryParams = [...filterParams, ...paginationParams];
 
       // --- Execute Queries ---
-      // Execute count query with ONLY filter parameters
-      // Execute data query with filter AND pagination parameters
-      const [countResult, dataResult] = await Promise.all([
-        pool.query(countQuery, filterParams), // Use filterParams for count
-        pool.query(dataQuery, dataQueryParams), // Use combined params for data
-      ]);
+      let countResult = null;
+      let dataResult;
+
+      if (skipPagination) {
+        // Execute only data query when pagination is disabled
+        dataResult = await pool.query(dataQuery, filterParams);
+      } else {
+        // Execute both count and data queries for pagination
+        [countResult, dataResult] = await Promise.all([
+          pool.query(countQuery, filterParams),
+          pool.query(dataQuery, dataQueryParams),
+        ]);
+      }
       // --- End Execute Queries ---
-
-      const total = parseInt(countResult.rows[0].count);
-      const totalPages = Math.ceil(total / parseInt(limit));
-
       // Format results (Match ExtendedInvoiceData)
       const invoices = dataResult.rows.map((row) => ({
         id: row.id,
@@ -296,15 +308,25 @@ export default function (pool, config) {
         customerIdType: row.customeridtype,
       }));
 
-      res.json({
-        data: invoices,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total,
-          totalPages,
-        },
-      });
+      // Return response based on pagination mode
+      if (skipPagination) {
+        // Return just the data array when pagination is disabled
+        res.json(invoices);
+      } else {
+        // Return paginated response
+        const total = parseInt(countResult.rows[0].count);
+        const totalPages = Math.ceil(total / parseInt(limit));
+
+        res.json({
+          data: invoices,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            totalPages,
+          },
+        });
+      }
     } catch (error) {
       console.error("Error fetching invoices:", error);
       res
