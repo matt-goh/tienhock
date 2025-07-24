@@ -2464,13 +2464,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-1/3 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Employee
                     </th>
                     <th
                       scope="col"
-                      className="w-56 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Leave Type
                     </th>
@@ -2532,15 +2532,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             />
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-default-900">
+                        <td className="w-1/3 px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-default-900 truncate">
                             {employee.name}
                           </div>
                           <div className="text-xs text-default-500">
                             {employee.id}
                           </div>
                         </td>
-                        <td className="w-48 px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div
                             className="w-full max-w-[180px]"
                             onClick={(e) => e.stopPropagation()}
@@ -2632,7 +2632,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </Listbox>
                           </div>
                         </td>
-                        <td className="w-40 px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="w-48 px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div onClick={(e) => e.stopPropagation()}>
                             <ActivitiesTooltip
                               activities={
