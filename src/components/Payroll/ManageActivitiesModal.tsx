@@ -1,5 +1,5 @@
 // src/components/Payroll/ManageActivitiesModal.tsx
-import React, { useState, useEffect, Fragment, useMemo } from "react";
+import React, { useState, useEffect, Fragment, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -77,65 +77,98 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const isSalesman = jobType === "SALESMAN";
   const jobConfig = getJobConfig(jobType);
+  const prevEmployeeIdRef = useRef<string | null>(null);
+  const prevActivitiesRef = useRef<ActivityItem[]>([]);
+
+  const areActivitiesEqual = (
+    activities1: ActivityItem[],
+    activities2: ActivityItem[]
+  ): boolean => {
+    if (activities1.length !== activities2.length) return false;
+
+    return activities1.every((act1, index) => {
+      const act2 = activities2[index];
+      return (
+        act1.payCodeId === act2.payCodeId &&
+        act1.isSelected === act2.isSelected &&
+        act1.calculatedAmount === act2.calculatedAmount &&
+        act1.unitsProduced === act2.unitsProduced
+      );
+    });
+  };
 
   useEffect(() => {
     if (isOpen && employee) {
-      if (existingActivities && existingActivities.length > 0) {
-        // First, make a deep copy of existing activities to avoid mutation issues
-        const activitiesWithContext = JSON.parse(
-          JSON.stringify(existingActivities)
-        );
+      const isNewEmployee = prevEmployeeIdRef.current !== employee.id;
+      const activitiesChanged = !areActivitiesEqual(
+        existingActivities || [],
+        prevActivitiesRef.current
+      );
 
-        // Process each activity
-        for (let i = 0; i < activitiesWithContext.length; i++) {
-          const activity = activitiesWithContext[i];
+      // Only process if it's a new employee OR if activities actually changed
+      if (isNewEmployee || activitiesChanged) {
+        prevEmployeeIdRef.current = employee.id;
+        prevActivitiesRef.current = existingActivities || [];
 
-          // For salesman, deselect Hour-based pay codes
-          if (isSalesman && activity.rateUnit === "Hour") {
-            activity.isSelected = false;
-            activity.calculatedAmount = 0;
-            continue; // Skip to next activity
-          }
+        if (existingActivities && existingActivities.length > 0) {
+          // First, make a deep copy of existing activities to avoid mutation issues
+          const activitiesWithContext = JSON.parse(
+            JSON.stringify(existingActivities)
+          );
 
-          // Process product-linked activities for salesmen
-          if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
-            // Find a matching product by ID
-            const matchingProduct = salesmanProducts.find(
-              (p) => String(p.product_id) === String(activity.payCodeId)
-            );
+          // Process each activity
+          for (let i = 0; i < activitiesWithContext.length; i++) {
+            const activity = activitiesWithContext[i];
 
-            if (matchingProduct) {
-              const quantity = parseFloat(matchingProduct.quantity) || 0;
-              if (quantity > 0) {
-                activity.unitsProduced = quantity;
-                activity.isSelected = true;
+            // For salesman, deselect Hour-based pay codes
+            if (isSalesman && activity.rateUnit === "Hour") {
+              activity.isSelected = false;
+              activity.calculatedAmount = 0;
+              continue; // Skip to next activity
+            }
+
+            // Process product-linked activities for salesmen
+            if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
+              // Find a matching product by ID
+              const matchingProduct = salesmanProducts.find(
+                (p) => String(p.product_id) === String(activity.payCodeId)
+              );
+
+              if (matchingProduct) {
+                const quantity = parseFloat(matchingProduct.quantity) || 0;
+                if (quantity > 0) {
+                  activity.unitsProduced = quantity;
+                  activity.isSelected = true;
+                }
               }
+            }
+
+            // Handle context-linked fields
+            const contextField = contextLinkedPayCodes[activity.payCodeId];
+            if (contextField && contextData[contextField.id] !== undefined) {
+              activity.unitsProduced = contextData[contextField.id];
+              activity.isContextLinked = true;
             }
           }
 
-          // Handle context-linked fields
-          const contextField = contextLinkedPayCodes[activity.payCodeId];
-          if (contextField && contextData[contextField.id] !== undefined) {
-            activity.unitsProduced = contextData[contextField.id];
-            activity.isContextLinked = true;
-          }
+          // Recalculate all amounts
+          const calculatedActivities = calculateActivitiesAmounts(
+            activitiesWithContext,
+            isSalesman ? 0 : employeeHours,
+            contextData,
+            locationType
+          );
+
+          setActivities(calculatedActivities);
+          setOriginalActivities(
+            JSON.parse(JSON.stringify(calculatedActivities))
+          );
+        } else {
+          setActivities([]);
+          setOriginalActivities([]);
         }
-
-        // Recalculate all amounts
-        const calculatedActivities = calculateActivitiesAmounts(
-          activitiesWithContext,
-          isSalesman ? 0 : employeeHours,
-          contextData,
-          locationType
-        );
-
-        setActivities(calculatedActivities);
-        setOriginalActivities(JSON.parse(JSON.stringify(calculatedActivities)));
-      } else {
-        setActivities([]);
-        setOriginalActivities([]);
+        setError(null);
       }
-      setError(null);
     }
   }, [
     isOpen,
