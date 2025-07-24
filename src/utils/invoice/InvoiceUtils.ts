@@ -338,14 +338,15 @@ export const syncCancellationStatus = async (invoiceId: string) => {
 // CREATE Payment
 export const createPayment = async (
   paymentData: Omit<Payment, "payment_id" | "created_at">
-): Promise<Payment> => {
+): Promise<Payment[]> => {
   try {
     const response = await api.post("/api/payments", paymentData);
-    if (!response || !response.payment) {
-      throw new Error("Invalid response received after creating payment.");
+    // Backend now returns { message: string, payments: Payment[], ... }
+    if (!response || !response.payments || !Array.isArray(response.payments)) {
+      throw new Error("Invalid response received after creating payment(s).");
     }
     await refreshCreditsCache(); // Refresh customer cache
-    return response.payment;
+    return response.payments; // Return the array of created payments
   } catch (error: any) {
     console.error("Error creating payment:", error);
     const errorMessage =

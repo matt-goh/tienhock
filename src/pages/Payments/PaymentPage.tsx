@@ -88,7 +88,9 @@ const PaymentPage: React.FC = () => {
         );
       }
       if (filters.dateRange.end) {
-        params.append("endDate", filters.dateRange.end.getTime().toString());
+        const endDate = new Date(filters.dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        params.append("endDate", endDate.getTime().toString());
       }
       if (filters.paymentMethod) {
         params.append("paymentMethod", filters.paymentMethod);
