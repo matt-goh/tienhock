@@ -456,9 +456,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       return {
         ...prev,
         [employeeId]: {
-          ...prev[employeeId],
           selected: newSelectedState,
-          leaveType: prev[employeeId]?.leaveType || defaultLeaveType, // Use dynamic default
+          leaveType: newSelectedState
+            ? defaultLeaveType // Always use fresh default when selecting
+            : prev[employeeId]?.leaveType || defaultLeaveType, // Keep existing when deselecting
         },
       };
     });
@@ -2484,13 +2485,23 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 <tbody className="bg-white divide-y divide-default-200">
                   {availableForLeave.map((employee) => {
                     const leaveOptions = [
-                      ...(formData.dayType === "Umum"
-                        ? [{ id: "cuti_umum", name: "Cuti Umum" }]
-                        : []),
                       { id: "cuti_sakit", name: "Cuti Sakit" },
                     ];
+                    if (formData.dayType === "Umum") {
+                      leaveOptions.unshift({
+                        id: "cuti_umum",
+                        name: "Cuti Umum",
+                      });
+                    }
+
                     const isSelected =
                       leaveEmployees[employee.id]?.selected || false;
+                    const defaultLeaveType =
+                      formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+                    const currentLeaveType =
+                      leaveEmployees[employee.id]?.leaveType ||
+                      defaultLeaveType;
+
                     return (
                       <tr
                         key={`leave-${employee.id}`}
@@ -2508,7 +2519,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           handleLeaveSelection(employee.id);
                         }}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap align-middle">
+                        <td className="w-16 px-6 py-4 whitespace-nowrap align-middle">
                           <div onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={isSelected}
@@ -2522,23 +2533,20 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-default-900 truncate">
+                          <div className="text-sm font-medium text-default-900">
                             {employee.name}
                           </div>
                           <div className="text-xs text-default-500">
                             {employee.id}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap relative">
+                        <td className="w-48 px-6 py-4 whitespace-nowrap">
                           <div
-                            className="w-48 relative"
+                            className="w-full max-w-[180px]"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Listbox
-                              value={
-                                leaveEmployees[employee.id]?.leaveType ||
-                                "cuti_sakit"
-                              }
+                              value={currentLeaveType}
                               onChange={(value) =>
                                 handleLeaveTypeChange(
                                   employee.id,
@@ -2557,11 +2565,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 >
                                   <span className="block truncate text-sm">
                                     {leaveOptions.find(
-                                      (option) =>
-                                        option.id ===
-                                        (leaveEmployees[employee.id]
-                                          ?.leaveType || "cuti_sakit")
-                                    )?.name || "Cuti Sakit"}
+                                      (option) => option.id === currentLeaveType
+                                    )?.name ||
+                                      (formData.dayType === "Umum"
+                                        ? "Cuti Umum"
+                                        : "Cuti Sakit")}
                                   </span>
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                     <IconChevronDown
@@ -2624,26 +2632,26 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </Listbox>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="w-40 px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div onClick={(e) => e.stopPropagation()}>
                             <ActivitiesTooltip
                               activities={
-                                isSelected
+                                isSelected && !isSaving
                                   ? (
                                       leaveEmployeeActivities[employee.id] || []
                                     ).filter((a: ActivityItem) => a.isSelected)
-                                  : []
+                                  : [] // Show no activities when disabled
                               }
                               employeeName={employee.name}
                               className={
-                                !isSelected
+                                !isSelected || isSaving
                                   ? "disabled:text-default-300 disabled:cursor-not-allowed"
                                   : ""
                               }
+                              disabled={!isSelected || isSaving}
                               onClick={() =>
                                 handleManageLeaveActivities(employee)
                               }
-                              disabled={!isSelected || isSaving}
                             />
                           </div>
                         </td>
