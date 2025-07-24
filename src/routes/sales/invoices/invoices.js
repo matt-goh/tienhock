@@ -3305,9 +3305,9 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
 
-      // Check if invoice exists and get current status
+      // Check if invoice exists and get current status (including customerid for credit adjustments)
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate FROM invoices WHERE id = $1",
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid FROM invoices WHERE id = $1",
         [id]
       );
 
@@ -3316,7 +3316,6 @@ export default function (pool, config) {
       }
 
       const currentInvoice = invoiceCheck.rows[0];
-
       const currentPaymentType = currentInvoice.paymenttype;
 
       // If no change in payment type, return early
@@ -3348,6 +3347,13 @@ export default function (pool, config) {
           paymentDate,
           paymentAmount,
         ]);
+
+        // Reduce customer credit usage since invoice is no longer on credit
+        await updateCustomerCredit(
+          client,
+          currentInvoice.customerid,
+          -paymentAmount // Negative amount decreases credit_used
+        );
 
         // Update invoice to CASH type with zero balance and paid status
         const updateInvoiceQuery = `
@@ -3385,6 +3391,13 @@ export default function (pool, config) {
 
           await client.query(cancelPaymentQuery, [payment.payment_id]);
         }
+
+        // Increase customer credit usage since invoice is now on credit
+        await updateCustomerCredit(
+          client,
+          currentInvoice.customerid,
+          currentInvoice.totalamountpayable // Positive amount increases credit_used
+        );
 
         // Update invoice to INVOICE type with full balance and unpaid status
         const updateInvoiceQuery = `
