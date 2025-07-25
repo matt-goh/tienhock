@@ -1569,7 +1569,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             ? mergedPayCodes
             : hours > 8
             ? mergedPayCodes
-            : mergedPayCodes.filter((pc) => pc.rate_unit !== "OT");
+            : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
 
           // Convert to activity format
           const activities = filteredPayCodes.map((payCode) => {
