@@ -142,9 +142,6 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         className="hover:text-sky-600 hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (typeof onClick === "function") {
-                            onClick();
-                          }
                         }}
                       >
                         {activity.description}
