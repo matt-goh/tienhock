@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { format } from "date-fns";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -26,6 +27,7 @@ import {
   getMidMonthPayrollByEmployee,
   MidMonthPayroll,
 } from "../../utils/payroll/midMonthPayrollUtils";
+import { api } from "../../routes/utils/api";
 
 interface PayrollItem {
   id: number;
@@ -37,6 +39,17 @@ interface PayrollItem {
   amount: number;
   is_manual: boolean;
   pay_type?: string;
+}
+
+interface MonthlyLeaveRecord {
+  id: number;
+  employee_id: string;
+  date: string;
+  leave_type: string;
+  days_taken: number;
+  amount_paid: number;
+  status: string;
+  work_log_id?: number;
 }
 
 const EmployeePayrollDetailsPage: React.FC = () => {
@@ -51,10 +64,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [midMonthPayroll, setMidMonthPayroll] =
     useState<MidMonthPayroll | null>(null);
+  const [monthlyLeaveRecords, setMonthlyLeaveRecords] = useState<
+    MonthlyLeaveRecord[]
+  >([]);
 
   useEffect(() => {
     fetchEmployeePayroll();
   }, [id]);
+
+  useEffect(() => {
+    if (payroll) {
+      fetchMonthlyLeaveRecords();
+    }
+  }, [payroll]);
 
   const fetchEmployeePayroll = async () => {
     if (!id) return;
@@ -78,6 +100,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       toast.error("Failed to load employee payroll details");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchMonthlyLeaveRecords = async () => {
+    if (!payroll || !payroll.employee_id) return;
+
+    try {
+      const response = await api.get(
+        `/api/leave-management/summary/${payroll.employee_id}/${payroll.year}/${payroll.month}`
+      );
+      setMonthlyLeaveRecords(response);
+    } catch (error) {
+      console.error("Error fetching monthly leave records:", error);
+      // Don't show error toast for leave records since they're optional
     }
   };
 
@@ -156,7 +192,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   );
 
   return (
-    <div className="relative w-full mx-4 md:mx-6 -mt-6">
+    <div className="relative w-full mx-4 md:mx-6 -mt-6 mb-4">
       <BackButton onClick={handleBack} />
 
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
@@ -360,6 +396,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <Tab labels={["Payroll Items", "Pay Slip Preview"]}>
             {/* Payroll Items Tab - This will contain all the existing payroll items tables */}
             <div className="mt-4">
+              {/* Payroll Items Section */}
               <h2 className="text-lg font-medium text-default-800 mb-4">
                 Payroll Items
               </h2>
@@ -752,6 +789,107 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
                             {formatCurrency(overtimeTotal)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Monthly Leave Summary */}
+              {monthlyLeaveRecords.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-medium text-default-800 mb-4">
+                    Leave Records This Month
+                  </h2>
+                  <div className="border rounded-lg overflow-x-auto">
+                    <table className="min-w-full divide-y divide-default-200">
+                      <thead className="bg-default-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                            Leave Type
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                            Days
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                            Amount Paid
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-default-200">
+                        {monthlyLeaveRecords.map((record, index) => {
+                          const getLeaveTypeDisplay = (leaveType: string) => {
+                            switch (leaveType) {
+                              case "cuti_umum":
+                                return "Cuti Umum";
+                              case "cuti_sakit":
+                                return "Cuti Sakit";
+                              case "cuti_tahunan":
+                                return "Cuti Tahunan";
+                              default:
+                                return leaveType;
+                            }
+                          };
+
+                          const getLeaveTypeColor = (leaveType: string) => {
+                            switch (leaveType) {
+                              case "cuti_umum":
+                                return "bg-red-100 text-red-700";
+                              case "cuti_sakit":
+                                return "bg-amber-100 text-amber-700";
+                              case "cuti_tahunan":
+                                return "bg-green-100 text-green-700";
+                              default:
+                                return "bg-default-100 text-default-700";
+                            }
+                          };
+                          return (
+                            <tr key={index} className="hover:bg-default-50">
+                              <td className="px-4 py-3 text-sm text-default-900">
+                                {format(
+                                  new Date(record.date.replace(/-/g, "/")),
+                                  "dd MMM yyyy"
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(
+                                    record.leave_type
+                                  )}`}
+                                >
+                                  {getLeaveTypeDisplay(record.leave_type)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center text-sm text-default-900">
+                                {Math.round(record.days_taken)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-medium text-default-900">
+                                {formatCurrency(record.amount_paid)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-default-50 border-t-2 border-default-200">
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="px-4 py-3 text-right text-sm font-medium text-default-600"
+                          >
+                            Total Leave Pay This Month
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-semibold text-default-900">
+                            {formatCurrency(
+                              monthlyLeaveRecords.reduce(
+                                (sum, record) => sum + record.amount_paid,
+                                0
+                              )
+                            )}
                           </td>
                         </tr>
                       </tfoot>
