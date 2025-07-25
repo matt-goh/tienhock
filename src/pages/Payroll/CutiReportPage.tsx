@@ -261,12 +261,48 @@ const CutiReportPage: React.FC = () => {
   const renderMonthlyLeaveTable = () => {
     if (!leaveBalances) return null;
 
-    const remainingTahunan =
-      leaveBalances.cuti_tahunan_total - (leaveTaken.cuti_tahunan || 0);
-    const remainingSakit =
-      leaveBalances.cuti_sakit_total - (leaveTaken.cuti_sakit || 0);
-    const remainingUmum =
-      leaveBalances.cuti_umum_total - (leaveTaken.cuti_umum || 0);
+    // Calculate running balances for each month
+    const calculateRunningBalances = () => {
+      const results: Record<
+        number,
+        {
+          tahunanBalance: number;
+          sakitBalance: number;
+          umumBalance: number;
+          tahunanCumulative: number;
+          sakitCumulative: number;
+          umumCumulative: number;
+        }
+      > = {};
+
+      let cumulativeTahunan = 0;
+      let cumulativeSakit = 0;
+      let cumulativeUmum = 0;
+
+      // Process months in order (1-12)
+      for (let month = 1; month <= 12; month++) {
+        const monthData = monthlySummary[month];
+
+        // Add current month's usage to cumulative
+        cumulativeTahunan += monthData.cuti_tahunan.days;
+        cumulativeSakit += monthData.cuti_sakit.days;
+        cumulativeUmum += monthData.cuti_umum.days;
+
+        // Calculate remaining balance
+        results[month] = {
+          tahunanBalance: leaveBalances.cuti_tahunan_total - cumulativeTahunan,
+          sakitBalance: leaveBalances.cuti_sakit_total - cumulativeSakit,
+          umumBalance: leaveBalances.cuti_umum_total - cumulativeUmum,
+          tahunanCumulative: cumulativeTahunan,
+          sakitCumulative: cumulativeSakit,
+          umumCumulative: cumulativeUmum,
+        };
+      }
+
+      return results;
+    };
+
+    const runningBalances = calculateRunningBalances();
 
     return (
       <div className="bg-white p-6 rounded-xl border border-default-200">
@@ -274,107 +310,209 @@ const CutiReportPage: React.FC = () => {
           Monthly Leave Details ({currentYear})
         </h3>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-default-200 border">
-            <thead className="bg-default-50">
-              <tr>
+          <table className="min-w-full border border-default-800 rounded-lg">
+            <thead>
+              {/* Main header row with leave type categories */}
+              <tr className="bg-default-100">
                 <th
                   rowSpan={2}
-                  className="py-3 px-4 text-left text-xs font-medium text-default-500 uppercase align-middle border-r"
+                  className="py-4 px-4 text-left text-sm font-semibold text-default-700 uppercase align-middle border-r-2 border-default-300 bg-default-50"
                 >
                   Month
                 </th>
                 <th
                   colSpan={3}
-                  className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase border-b border-r"
+                  className="py-3 px-4 text-center text-sm font-semibold text-sky-800 uppercase border-b border-r-2 border-default-300 bg-sky-100"
                 >
-                  Cuti Tahunan
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-sky-500"></div>
+                    Cuti Tahunan
+                  </div>
                 </th>
                 <th
                   colSpan={3}
-                  className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase border-b border-r"
+                  className="py-3 px-4 text-center text-sm font-semibold text-amber-800 uppercase border-b border-r-2 border-default-300 bg-amber-100"
                 >
-                  Cuti Sakit
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                    Cuti Sakit
+                  </div>
                 </th>
                 <th
                   colSpan={3}
-                  className="py-3 px-4 text-center text-xs font-medium text-default-500 uppercase border-b"
+                  className="py-3 px-4 text-center text-sm font-semibold text-emerald-800 uppercase border-b bg-emerald-100"
                 >
-                  Cuti Umum
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                    Cuti Umum
+                  </div>
                 </th>
               </tr>
-              <tr>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
-                  Hari
+              {/* Sub-header row with column details */}
+              <tr className="bg-default-50">
+                {/* Cuti Tahunan sub-headers */}
+                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
+                  Days
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
                   Amount
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r-2 border-default-300 bg-sky-50">
                   Balance
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
-                  Hari
+                {/* Cuti Sakit sub-headers */}
+                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
+                  Days
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
                   Amount
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r-2 border-default-300 bg-amber-50">
                   Balance
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
-                  Hari
+                {/* Cuti Umum sub-headers */}
+                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
+                  Days
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase border-r">
+                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
                   Amount
                 </th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-default-500 uppercase">
+                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase bg-emerald-50">
                   Balance
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-default-200">
-              {Object.entries(monthlySummary).map(([month, summary]) => (
-                <tr key={month}>
-                  <td className="py-3 px-4 whitespace-nowrap text-sm font-medium text-default-800 border-r">
-                    {getMonthName(parseInt(month))}
-                  </td>
+            <tbody className="bg-white">
+              {Object.entries(monthlySummary).map(([month, summary], index) => {
+                const monthNum = parseInt(month);
+                const balances = runningBalances[monthNum];
 
-                  {/* Cuti Tahunan */}
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
-                    {summary.cuti_tahunan.days}
-                  </td>
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
-                    {formatCurrency(summary.cuti_tahunan.amount)}
-                  </td>
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center font-semibold text-sky-600 border-r">
-                    {remainingTahunan}
-                  </td>
+                return (
+                  <tr
+                    key={month}
+                    className={`border-b border-default-200 hover:bg-default-25 transition-colors ${
+                      index % 2 === 0 ? "bg-white" : "bg-default-25"
+                    }`}
+                  >
+                    {/* Month column */}
+                    <td className="py-4 px-4 whitespace-nowrap text-sm font-semibold text-default-800 border-r-2 border-default-300 bg-default-50">
+                      {getMonthName(monthNum)}
+                    </td>
 
-                  {/* Cuti Sakit */}
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
-                    {summary.cuti_sakit.days}
-                  </td>
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
-                    {formatCurrency(summary.cuti_sakit.amount)}
-                  </td>
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center font-semibold text-amber-600 border-r">
-                    {remainingSakit}
-                  </td>
+                    {/* Cuti Tahunan columns */}
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 border-r border-sky-100 bg-sky-25">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          summary.cuti_tahunan.days > 0
+                            ? "bg-sky-100 text-sky-800"
+                            : "bg-default-100 text-default-500"
+                        }`}
+                      >
+                        {summary.cuti_tahunan.days || "0"}
+                      </span>
+                    </td>
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 border-r border-sky-100 bg-sky-25">
+                      <span className="font-medium">
+                        {formatCurrency(summary.cuti_tahunan.amount)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-700 border-r-2 border-default-300 bg-sky-50">
+                      <span
+                        className={`px-3 py-1 rounded-full text-sky-800 ${
+                          balances.tahunanBalance < 0
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-sky-100"
+                        }`}
+                      >
+                        {balances.tahunanBalance}
+                      </span>
+                    </td>
 
-                  {/* Cuti Umum */}
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
-                    {summary.cuti_umum.days}
-                  </td>
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center text-default-600 border-r">
-                    {formatCurrency(summary.cuti_umum.amount)}
-                  </td>
-                  <td className="py-3 px-2 whitespace-nowrap text-sm text-center font-semibold text-emerald-600">
-                    {remainingUmum}
-                  </td>
-                </tr>
-              ))}
+                    {/* Cuti Sakit columns */}
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 border-r border-amber-100 bg-amber-25">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          summary.cuti_sakit.days > 0
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-default-100 text-default-500"
+                        }`}
+                      >
+                        {summary.cuti_sakit.days || "0"}
+                      </span>
+                    </td>
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 border-r border-amber-100 bg-amber-25">
+                      <span className="font-medium">
+                        {formatCurrency(summary.cuti_sakit.amount)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-700 border-r-2 border-default-300 bg-amber-50">
+                      <span
+                        className={`px-3 py-1 rounded-full text-amber-800 ${
+                          balances.sakitBalance < 0
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100"
+                        }`}
+                      >
+                        {balances.sakitBalance}
+                      </span>
+                    </td>
+
+                    {/* Cuti Umum columns */}
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 border-r border-emerald-100 bg-emerald-25">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          summary.cuti_umum.days > 0
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-default-100 text-default-500"
+                        }`}
+                      >
+                        {summary.cuti_umum.days || "0"}
+                      </span>
+                    </td>
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 border-r border-emerald-100 bg-emerald-25">
+                      <span className="font-medium">
+                        {formatCurrency(summary.cuti_umum.amount)}
+                      </span>
+                    </td>
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-700 bg-emerald-50">
+                      <span
+                        className={`px-3 py-1 rounded-full text-emerald-800 ${
+                          balances.umumBalance < 0
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-emerald-100"
+                        }`}
+                      >
+                        {balances.umumBalance}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap gap-4 text-xs text-default-600 bg-default-50 p-3 rounded-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-sky-500"></div>
+            <span>
+              <strong>Cuti Tahunan:</strong> Annual leave based on years of
+              service
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+            <span>
+              <strong>Cuti Sakit:</strong> Sick leave (available any day)
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+            <span>
+              <strong>Cuti Umum:</strong> Public holiday leave
+            </span>
+          </div>
         </div>
       </div>
     );

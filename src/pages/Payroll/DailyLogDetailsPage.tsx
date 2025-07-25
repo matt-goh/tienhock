@@ -19,12 +19,33 @@ interface DailyLogDetailsPageProps {
   jobType: string;
 }
 
+interface LeaveRecord {
+  id: number;
+  employee_id: string;
+  employee_name: string;
+  leave_type: string;
+  days_taken: number;
+  amount_paid: number;
+  status: string;
+  notes?: string;
+}
+
 const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   jobType,
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [workLog, setWorkLog] = useState<any>(null);
+  const [workLog, setWorkLog] = useState<{
+    id: number;
+    log_date: string;
+    shift: number;
+    day_type: string;
+    section: string;
+    status: string;
+    context_data: any;
+    employeeEntries: any[];
+    leaveRecords?: LeaveRecord[];
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const jobConfig = getJobConfig(jobType);
   const [expandedEntries, setExpandedEntries] = useState<
@@ -490,6 +511,133 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </table>
           </div>
         </div>
+
+        {/* Leave Records Section */}
+        {workLog.leaveRecords && workLog.leaveRecords.length > 0 && (
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-default-800">
+                Leave Records
+              </h2>
+              <div className="text-sm text-default-500">
+                {workLog.leaveRecords.length} employee(s) on leave
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-default-200 rounded-lg">
+              <table className="min-w-full divide-y divide-default-200">
+                <thead className="bg-default-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Employee
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                      Leave Type
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                      Days
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      Amount Paid
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default-200">
+                  {workLog.leaveRecords.map((record) => {
+                    const formatCurrency = (amount: number) => {
+                      return new Intl.NumberFormat("en-MY", {
+                        style: "currency",
+                        currency: "MYR",
+                      }).format(amount);
+                    };
+
+                    const getLeaveTypeDisplay = (leaveType: string) => {
+                      switch (leaveType) {
+                        case "cuti_umum":
+                          return "Cuti Umum";
+                        case "cuti_sakit":
+                          return "Cuti Sakit";
+                        case "cuti_tahunan":
+                          return "Cuti Tahunan";
+                        default:
+                          return leaveType;
+                      }
+                    };
+
+                    const getLeaveTypeColor = (leaveType: string) => {
+                      switch (leaveType) {
+                        case "cuti_umum":
+                          return "bg-red-100 text-red-700";
+                        case "cuti_sakit":
+                          return "bg-amber-100 text-amber-700";
+                        case "cuti_tahunan":
+                          return "bg-green-100 text-green-700";
+                        default:
+                          return "bg-default-100 text-default-700";
+                      }
+                    };
+
+                    return (
+                      <tr key={record.id} className="hover:bg-default-50">
+                        <td className="px-4 py-3">
+                          <Link
+                            to={`/catalogue/staff/${record.employee_id}`}
+                            className="text-sky-600 hover:text-sky-800 font-medium"
+                          >
+                            {record.employee_name}
+                          </Link>
+                          <p className="text-sm text-default-500">
+                            {record.employee_id}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(
+                              record.leave_type
+                            )}`}
+                          >
+                            {getLeaveTypeDisplay(record.leave_type)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm font-medium text-default-900">
+                            {Math.round(record.days_taken)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm font-medium text-default-900">
+                            {formatCurrency(record.amount_paid)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-default-50 border-t-2 border-default-200">
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-4 py-3 text-right text-sm font-medium text-default-600"
+                    >
+                      Total Leave Pay
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-default-900">
+                      {new Intl.NumberFormat("en-MY", {
+                        style: "currency",
+                        currency: "MYR",
+                      }).format(
+                        workLog.leaveRecords.reduce(
+                          (sum, record) => sum + record.amount_paid,
+                          0
+                        )
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
