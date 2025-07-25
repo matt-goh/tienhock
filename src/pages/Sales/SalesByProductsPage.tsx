@@ -892,10 +892,15 @@ const SalesByProductsPage: React.FC = () => {
                   <tfoot className="bg-default-100 sticky bottom-0">
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         className="px-6 py-3 text-right text-base font-medium"
                       >
                         Total:
+                      </td>
+                      <td className="px-6 py-3 text-right text-base font-bold">
+                        {filteredAndSortedData
+                          .reduce((sum, product) => sum + product.quantity, 0)
+                          .toLocaleString()}
                       </td>
                       <td className="px-6 py-3 text-right text-base font-bold">
                         {formatCurrency(

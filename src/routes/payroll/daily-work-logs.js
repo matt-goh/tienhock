@@ -120,6 +120,19 @@ export default function (pool) {
         return res.status(404).json({ message: "Work log not found" });
       }
 
+      // Get leave records for this work log
+      const leaveRecordsQuery = `
+      SELECT 
+        lr.*,
+        CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
+        s.name as employee_name
+      FROM leave_records lr
+      LEFT JOIN staffs s ON lr.employee_id = s.id
+      WHERE lr.work_log_id = $1
+      ORDER BY s.name
+    `;
+      const leaveRecordsResult = await pool.query(leaveRecordsQuery, [id]);
+
       // Get employee entries with job information
       const entriesQuery = `
       SELECT 
@@ -178,6 +191,10 @@ export default function (pool) {
       res.json({
         ...workLogResult.rows[0],
         employeeEntries: entriesWithActivities,
+        leaveRecords: leaveRecordsResult.rows.map((record) => ({
+          ...record,
+          amount_paid: parseFloat(record.amount_paid),
+        })),
       });
     } catch (error) {
       console.error("Error fetching work log details:", error);

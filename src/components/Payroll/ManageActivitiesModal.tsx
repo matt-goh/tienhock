@@ -1,5 +1,5 @@
 // src/components/Payroll/ManageActivitiesModal.tsx
-import React, { useState, useEffect, Fragment, useMemo } from "react";
+import React, { useState, useEffect, Fragment, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -19,8 +19,8 @@ import {
   IconUser,
   IconPackage,
 } from "@tabler/icons-react";
-import { Link } from "react-router-dom";
 import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
+import SafeLink from "../SafeLink";
 
 export interface ActivityItem {
   payCodeId: string;
@@ -50,6 +50,8 @@ interface ManageActivitiesModalProps {
   contextData?: Record<string, any>;
   salesmanProducts?: any[]; // Products sold by this salesman
   locationType?: "Local" | "Outstation"; // Location type for salesman
+  hasUnsavedChanges?: boolean;
+  onNavigateAttempt?: (to: string) => void;
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -66,6 +68,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   contextData = {},
   salesmanProducts = [],
   locationType = "Local",
+  hasUnsavedChanges = false,
+  onNavigateAttempt = () => {},
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -77,65 +81,98 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const isSalesman = jobType === "SALESMAN";
   const jobConfig = getJobConfig(jobType);
+  const prevEmployeeIdRef = useRef<string | null>(null);
+  const prevActivitiesRef = useRef<ActivityItem[]>([]);
+
+  const areActivitiesEqual = (
+    activities1: ActivityItem[],
+    activities2: ActivityItem[]
+  ): boolean => {
+    if (activities1.length !== activities2.length) return false;
+
+    return activities1.every((act1, index) => {
+      const act2 = activities2[index];
+      return (
+        act1.payCodeId === act2.payCodeId &&
+        act1.isSelected === act2.isSelected &&
+        act1.calculatedAmount === act2.calculatedAmount &&
+        act1.unitsProduced === act2.unitsProduced
+      );
+    });
+  };
 
   useEffect(() => {
     if (isOpen && employee) {
-      if (existingActivities && existingActivities.length > 0) {
-        // First, make a deep copy of existing activities to avoid mutation issues
-        const activitiesWithContext = JSON.parse(
-          JSON.stringify(existingActivities)
-        );
+      const isNewEmployee = prevEmployeeIdRef.current !== employee.id;
+      const activitiesChanged = !areActivitiesEqual(
+        existingActivities || [],
+        prevActivitiesRef.current
+      );
 
-        // Process each activity
-        for (let i = 0; i < activitiesWithContext.length; i++) {
-          const activity = activitiesWithContext[i];
+      // Only process if it's a new employee OR if activities actually changed
+      if (isNewEmployee || activitiesChanged) {
+        prevEmployeeIdRef.current = employee.id;
+        prevActivitiesRef.current = existingActivities || [];
 
-          // For salesman, deselect Hour-based pay codes
-          if (isSalesman && activity.rateUnit === "Hour") {
-            activity.isSelected = false;
-            activity.calculatedAmount = 0;
-            continue; // Skip to next activity
-          }
+        if (existingActivities && existingActivities.length > 0) {
+          // First, make a deep copy of existing activities to avoid mutation issues
+          const activitiesWithContext = JSON.parse(
+            JSON.stringify(existingActivities)
+          );
 
-          // Process product-linked activities for salesmen
-          if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
-            // Find a matching product by ID
-            const matchingProduct = salesmanProducts.find(
-              (p) => String(p.product_id) === String(activity.payCodeId)
-            );
+          // Process each activity
+          for (let i = 0; i < activitiesWithContext.length; i++) {
+            const activity = activitiesWithContext[i];
 
-            if (matchingProduct) {
-              const quantity = parseFloat(matchingProduct.quantity) || 0;
-              if (quantity > 0) {
-                activity.unitsProduced = quantity;
-                activity.isSelected = true;
+            // For salesman, deselect Hour-based pay codes
+            if (isSalesman && activity.rateUnit === "Hour") {
+              activity.isSelected = false;
+              activity.calculatedAmount = 0;
+              continue; // Skip to next activity
+            }
+
+            // Process product-linked activities for salesmen
+            if (isSalesman && activity.rateUnit === jobConfig?.replaceUnits) {
+              // Find a matching product by ID
+              const matchingProduct = salesmanProducts.find(
+                (p) => String(p.product_id) === String(activity.payCodeId)
+              );
+
+              if (matchingProduct) {
+                const quantity = parseFloat(matchingProduct.quantity) || 0;
+                if (quantity > 0) {
+                  activity.unitsProduced = quantity;
+                  activity.isSelected = true;
+                }
               }
+            }
+
+            // Handle context-linked fields
+            const contextField = contextLinkedPayCodes[activity.payCodeId];
+            if (contextField && contextData[contextField.id] !== undefined) {
+              activity.unitsProduced = contextData[contextField.id];
+              activity.isContextLinked = true;
             }
           }
 
-          // Handle context-linked fields
-          const contextField = contextLinkedPayCodes[activity.payCodeId];
-          if (contextField && contextData[contextField.id] !== undefined) {
-            activity.unitsProduced = contextData[contextField.id];
-            activity.isContextLinked = true;
-          }
+          // Recalculate all amounts
+          const calculatedActivities = calculateActivitiesAmounts(
+            activitiesWithContext,
+            isSalesman ? 0 : employeeHours,
+            contextData,
+            locationType
+          );
+
+          setActivities(calculatedActivities);
+          setOriginalActivities(
+            JSON.parse(JSON.stringify(calculatedActivities))
+          );
+        } else {
+          setActivities([]);
+          setOriginalActivities([]);
         }
-
-        // Recalculate all amounts
-        const calculatedActivities = calculateActivitiesAmounts(
-          activitiesWithContext,
-          isSalesman ? 0 : employeeHours,
-          contextData,
-          locationType
-        );
-
-        setActivities(calculatedActivities);
-        setOriginalActivities(JSON.parse(JSON.stringify(calculatedActivities)));
-      } else {
-        setActivities([]);
-        setOriginalActivities([]);
+        setError(null);
       }
-      setError(null);
     }
   }, [
     isOpen,
@@ -260,12 +297,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                   <div className="grid grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-500">Job</p>
-                      <Link
+                      <SafeLink
                         to={`/catalogue/job?id=${jobType}`}
                         className="font-medium hover:underline hover:text-sky-600"
+                        hasUnsavedChanges={hasUnsavedChanges}
+                        onNavigateAttempt={onNavigateAttempt}
                       >
                         {jobName}
-                      </Link>
+                      </SafeLink>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">
@@ -428,8 +467,15 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   className="text-sm font-medium text-gray-900 w-fit"
                                                   title={`${activity.description} (${activity.payCodeId})`}
                                                 >
-                                                  <Link
+                                                  <SafeLink
                                                     to={`/catalogue/pay-codes?desc=${activity.payCodeId}`}
+                                                    hasUnsavedChanges={
+                                                      hasUnsavedChanges
+                                                    }
+                                                    onNavigateAttempt={
+                                                      onNavigateAttempt ||
+                                                      (() => {})
+                                                    }
                                                     className="hover:text-sky-600 hover:underline"
                                                     onClick={(e) =>
                                                       e.stopPropagation()
@@ -442,7 +488,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                           80
                                                         )}...`
                                                       : activity.description}
-                                                  </Link>
+                                                  </SafeLink>
                                                   <span className="ml-1.5 text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
                                                     {activity.payCodeId}
                                                   </span>
