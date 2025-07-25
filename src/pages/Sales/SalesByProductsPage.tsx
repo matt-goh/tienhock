@@ -858,7 +858,10 @@ const SalesByProductsPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900">
                           {product.id}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-default-700">
+                        <td
+                          className="px-6 py-4 whitespace-nowrap text-base text-default-700 truncate max-w-xs"
+                          title={product.description}
+                        >
                           {product.description}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-base text-default-700">
