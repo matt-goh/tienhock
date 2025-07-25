@@ -143,6 +143,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     useState(false);
   const [selectedLeaveEmployee, setSelectedLeaveEmployee] =
     useState<EmployeeWithHours | null>(null);
+  const [isInitializationComplete, setIsInitializationComplete] =
+    useState(false);
   const [leaveSelectAll, setLeaveSelectAll] = useState(false);
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
@@ -210,7 +212,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Function to check if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
-    if (!initialState || mode === "edit") return false; // Don't check for edit mode initially
+    // Don't show unsaved changes if initialization isn't complete yet
+    if (!initialState || !isInitializationComplete) return false;
+
+    // For edit mode, always check for changes
+    // For create mode, only check after initialization is complete
 
     // Deep compare current state with initial state
     return (
@@ -240,7 +246,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployees,
     leaveEmployeeActivities,
     initialState,
-    mode,
+    isInitializationComplete,
   ]);
 
   const {
@@ -457,6 +463,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   useEffect(() => {
     if (
       !initialState &&
+      isInitializationComplete &&
       !loadingStaffs &&
       !loadingJobs &&
       !loadingPayCodeMappings &&
@@ -485,6 +492,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     loadingPayCodeMappings,
     expandedEmployees.length,
     initialState,
+    isInitializationComplete,
     formData,
     employeeSelectionState,
     employeeActivities,
@@ -493,6 +501,95 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     ikutBagCounts,
     leaveEmployees,
     leaveEmployeeActivities,
+  ]);
+
+  // Add this useEffect to track initialization completion
+  useEffect(() => {
+    const checkInitializationComplete = () => {
+      // Don't mark as complete if still loading basic data
+      if (loadingStaffs || loadingJobs || loadingPayCodeMappings) {
+        return false;
+      }
+
+      // Don't mark as complete if employees haven't been expanded yet
+      if (expandedEmployees.length === 0) {
+        return false;
+      }
+
+      // For create mode, check if default selections have been applied
+      if (mode === "create") {
+        // Check if employee selection state has been initialized (has some selected jobs)
+        const hasSelectedEmployees =
+          Object.keys(employeeSelectionState.selectedJobs).length > 0;
+        if (!hasSelectedEmployees) {
+          return false;
+        }
+
+        // For SALESMAN job type, wait for products to be fetched if there are selected salesmen
+        if (jobConfig?.id === "SALESMAN") {
+          const hasSelectedSalesmen = Object.entries(
+            employeeSelectionState.selectedJobs
+          ).some(([_, jobTypes]) =>
+            jobTypes.some((jt) => JOB_IDS.includes(jt))
+          );
+          if (
+            hasSelectedSalesmen &&
+            Object.keys(salesmanProducts).length === 0
+          ) {
+            return false; // Still waiting for products
+          }
+        }
+
+        // Check if activities have been fetched for selected employees
+        const selectedRowKeys = Object.entries(
+          employeeSelectionState.selectedJobs
+        ).flatMap(([employeeId, jobTypes]) =>
+          jobTypes.map((jobType) => `${employeeId}-${jobType}`)
+        );
+
+        const hasActivitiesForAllSelected = selectedRowKeys.every(
+          (rowKey) =>
+            employeeActivities[rowKey] && employeeActivities[rowKey].length > 0
+        );
+
+        if (selectedRowKeys.length > 0 && !hasActivitiesForAllSelected) {
+          return false; // Still waiting for activities
+        }
+      }
+
+      // For edit mode, check if existing data has been restored
+      if (mode === "edit" && existingWorkLog) {
+        const hasRestoredSelections =
+          Object.keys(employeeSelectionState.selectedJobs).length > 0;
+        if (!hasRestoredSelections) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    if (!isInitializationComplete && checkInitializationComplete()) {
+      // Add a small delay to ensure all state updates have been processed
+      const timeoutId = setTimeout(() => {
+        setIsInitializationComplete(true);
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [
+    loadingStaffs,
+    loadingJobs,
+    loadingPayCodeMappings,
+    expandedEmployees.length,
+    employeeSelectionState.selectedJobs,
+    employeeActivities,
+    salesmanProducts,
+    mode,
+    existingWorkLog,
+    jobConfig?.id,
+    JOB_IDS,
+    isInitializationComplete,
   ]);
 
   useEffect(() => {
