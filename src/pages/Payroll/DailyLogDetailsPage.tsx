@@ -540,9 +540,6 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
                       Amount Paid
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                      Status
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-default-200">
@@ -612,19 +609,6 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                             {formatCurrency(record.amount_paid)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              record.status === "approved"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {record.status === "approved"
-                              ? "Approved"
-                              : record.status}
-                          </span>
-                        </td>
                       </tr>
                     );
                   })}
@@ -648,7 +632,6 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                         )
                       )}
                     </td>
-                    <td className="px-4 py-3"></td>
                   </tr>
                 </tfoot>
               </table>

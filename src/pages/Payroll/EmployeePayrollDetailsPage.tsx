@@ -886,8 +886,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           <td className="px-4 py-3 text-right text-sm font-semibold text-default-900">
                             {formatCurrency(
                               monthlyLeaveRecords.reduce(
-                                (sum, record) => sum + record.amount_paid,
-                                0
+                              (sum, record) =>
+                                sum + (Number(record.amount_paid) || 0),
+                              0
                               )
                             )}
                           </td>
