@@ -881,14 +881,28 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             colSpan={3}
                             className="px-4 py-3 text-right text-sm font-medium text-default-600"
                           >
-                            Total Leave Pay This Month
+                            Total leave this month (
+                            {monthlyLeaveRecords.reduce(
+                              (sum, record) =>
+                                sum + (Number(record.days_taken) || 0),
+                              0
+                            )}{" "}
+                            day
+                            {monthlyLeaveRecords.reduce(
+                              (sum, record) =>
+                                sum + (Number(record.days_taken) || 0),
+                              0
+                            ) !== 1
+                              ? "s"
+                              : ""}
+                            )
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-semibold text-default-900">
                             {formatCurrency(
                               monthlyLeaveRecords.reduce(
-                              (sum, record) =>
-                                sum + (Number(record.amount_paid) || 0),
-                              0
+                                (sum, record) =>
+                                  sum + (Number(record.amount_paid) || 0),
+                                0
                               )
                             )}
                           </td>
