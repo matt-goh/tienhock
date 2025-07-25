@@ -310,7 +310,7 @@ const CutiReportPage: React.FC = () => {
           Monthly Leave Details ({currentYear})
         </h3>
         <div className="overflow-x-auto">
-          <table className="min-w-full border border-default-300 rounded-lg overflow-hidden">
+          <table className="min-w-full border border-default-800 rounded-lg">
             <thead>
               {/* Main header row with leave type categories */}
               <tr className="bg-default-100">
