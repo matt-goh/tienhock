@@ -1,7 +1,11 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
 import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
+import {
+  EmployeePayroll,
+  MidMonthPayroll,
+  LeaveRecord,
+} from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
 // Create styles
@@ -206,6 +210,36 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     0
   );
 
+  // Group leave records by leave type and sum amounts
+  const groupedLeaveRecords = (payroll.leave_records || []).reduce(
+    (acc, record) => {
+      const leaveType = record.leave_type;
+      if (!acc[leaveType]) {
+        acc[leaveType] = {
+          leave_type: leaveType,
+          total_days: 0,
+          total_amount: 0,
+        };
+      }
+      acc[leaveType].total_days += record.days_taken;
+      acc[leaveType].total_amount += record.amount_paid;
+      return acc;
+    },
+    {} as Record<
+      string,
+      { leave_type: string; total_days: number; total_amount: number }
+    >
+  );
+
+  const leaveRecordsArray = Object.values(groupedLeaveRecords);
+
+  const leaveTotalAmount = leaveRecordsArray.reduce(
+    (sum, record) => sum + record.total_amount,
+    0
+  );
+
+  const combinedTambahanTotal = tambahanTotalAmount + leaveTotalAmount;
+
   // Group additional items by hours
   const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
   const overtimeTotalAmount = groupedItems.Overtime.reduce(
@@ -238,6 +272,14 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  // Helper function to prettify leave type text
+  const prettifyLeaveType = (leaveType: string) => {
+    return leaveType
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   // Helper function to format description based on rate unit
@@ -401,7 +443,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Tambahan Pay Items */}
-        {groupedItems["Tambahan"].length > 0 && (
+        {(groupedItems["Tambahan"].length > 0 ||
+          leaveRecordsArray.length > 0) && (
           <>
             {/* Tambahan Items */}
             {groupedItems["Tambahan"].map((item, index) => (
@@ -433,6 +476,34 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               </View>
             ))}
 
+            {/* Leave Records */}
+            {leaveRecordsArray.map((leaveRecord, index) => (
+              <View key={`leave-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{prettifyLeaveType(leaveRecord.leave_type)}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>
+                    {leaveRecord.total_days} Hari
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(leaveRecord.total_amount)}</Text>
+                </View>
+              </View>
+            ))}
+
             {/* Tambahan Subtotal Row */}
             <View style={[styles.tableRow, styles.subtotalRow]}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
@@ -452,7 +523,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 ]}
               >
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  {formatCurrency(tambahanTotalAmount)}
+                  {formatCurrency(combinedTambahanTotal)}
                 </Text>
               </View>
             </View>

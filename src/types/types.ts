@@ -635,6 +635,14 @@ export interface EmployeePayroll {
   month?: number;
   items: PayrollItem[];
   deductions?: PayrollDeduction[];
+  leave_records?: LeaveRecord[];
+}
+
+export interface LeaveRecord {
+  date: string;
+  leave_type: string;
+  days_taken: number;
+  amount_paid: number;
 }
 
 export interface PayrollItem {
