@@ -521,8 +521,28 @@ export default function (pool) {
     `;
       const deductionsResult = await pool.query(deductionsQuery, [id]);
 
+      // Get leave records for this employee for the specific month/year
+      const leaveRecordsQuery = `
+      SELECT 
+        to_char(leave_date, 'YYYY-MM-DD') as date,
+        leave_type,
+        days_taken,
+        amount_paid
+      FROM leave_records
+      WHERE employee_id = $1 
+        AND EXTRACT(YEAR FROM leave_date) = $2
+        AND EXTRACT(MONTH FROM leave_date) = $3
+        AND status = 'approved'
+      ORDER BY leave_date ASC
+    `;
       // Format response
       const payrollData = payrollResult.rows[0];
+      
+      const leaveRecordsResult = await pool.query(leaveRecordsQuery, [
+        payrollData.employee_id,
+        payrollData.year,
+        payrollData.month,
+      ]);
       const response = {
         ...payrollData,
         gross_pay: parseFloat(payrollData.gross_pay),
@@ -540,6 +560,11 @@ export default function (pool) {
           employer_amount: parseFloat(deduction.employer_amount),
           wage_amount: parseFloat(deduction.wage_amount),
           rate_info: deduction.rate_info || {},
+        })),
+        leave_records: leaveRecordsResult.rows.map((record) => ({
+          ...record,
+          days_taken: parseFloat(record.days_taken),
+          amount_paid: parseFloat(record.amount_paid || 0),
         })),
       };
 
