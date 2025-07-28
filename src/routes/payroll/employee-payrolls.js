@@ -82,6 +82,47 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       amount: parseFloat(item.amount),
     }));
 
+    // Get employee payroll details to fetch year and month for leave records
+    const payrollInfoRes = await pool.query(
+      `
+      SELECT ep.employee_id, mp.year, mp.month
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      WHERE ep.id = $1
+    `,
+      [employeePayrollId]
+    );
+    
+    if (payrollInfoRes.rows.length === 0) {
+      throw new Error("Employee payroll not found");
+    }
+    
+    const { year, month } = payrollInfoRes.rows[0];
+
+    // Get leave records for this employee for the specific month/year
+    const leaveRecordsRes = await pool.query(
+      `
+      SELECT 
+        to_char(leave_date, 'YYYY-MM-DD') as date,
+        leave_type,
+        days_taken,
+        amount_paid
+      FROM leave_records
+      WHERE employee_id = $1 
+        AND EXTRACT(YEAR FROM leave_date) = $2
+        AND EXTRACT(MONTH FROM leave_date) = $3
+        AND status = 'approved'
+      ORDER BY leave_date ASC
+    `,
+      [employee_id, year, month]
+    );
+    
+    const leaveRecords = leaveRecordsRes.rows.map((record) => ({
+      ...record,
+      days_taken: parseFloat(record.days_taken),
+      amount_paid: parseFloat(record.amount_paid || 0),
+    }));
+
     // Get all active contribution rates
     const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
       await Promise.all([
@@ -138,7 +179,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     };
 
     // --- Main Calculation Logic ---
-    const grossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
+    const workGrossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
+    const leaveGrossPay = leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0);
+    const grossPay = workGrossPay + leaveGrossPay;
 
     const groupedItems = payrollItems.reduce(
       (acc, item) => {
@@ -152,7 +195,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
 
     const epfGrossPay =
       (groupedItems.Base?.reduce((s, i) => s + i.amount, 0) || 0) +
-      (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0);
+      (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0) +
+      leaveGrossPay;
 
     const age = Math.floor(
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
@@ -248,8 +292,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Calculate Income Tax
     const incomeTaxRate = incomeTaxRates.find(
       (rate) =>
-        totalGrossPay >= parseFloat(rate.wage_from) &&
-        totalGrossPay <= parseFloat(rate.wage_to)
+        grossPay >= parseFloat(rate.wage_from) &&
+        grossPay <= parseFloat(rate.wage_to)
     );
 
     if (incomeTaxRate) {
@@ -296,7 +340,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           deduction_type: "income_tax",
           employee_amount: applicableRate,
           employer_amount: 0,
-          wage_amount: totalGrossPay,
+          wage_amount: grossPay,
           rate_info: {
             rate_id: incomeTaxRate.id,
             employee_rate: `RM${applicableRate}`,
@@ -631,6 +675,10 @@ export default function (pool) {
       }
 
       await pool.query("COMMIT");
+
+      // Recalculate the payroll to ensure leave records are included in totals
+      // This is done after commit to avoid nested transactions
+      await recalculateAndUpdatePayroll(pool, employeePayrollId);
 
       res.status(201).json({
         message: "Employee payroll created/updated successfully",

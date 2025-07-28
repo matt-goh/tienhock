@@ -267,15 +267,57 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </h2>
           <div
             className={`grid grid-cols-1 ${
-              midMonthPayroll ? "md:grid-cols-5" : "md:grid-cols-3"
+              midMonthPayroll 
+                ? monthlyLeaveRecords.length > 0 
+                  ? "md:grid-cols-7" 
+                  : "md:grid-cols-6"
+                : monthlyLeaveRecords.length > 0 
+                  ? "md:grid-cols-5" 
+                  : "md:grid-cols-4"
             } gap-4`}
           >
+            {/* Base Pay - First card */}
+            <div className="border rounded-lg p-4">
+              <p className="text-sm text-default-500 mb-1">Base Pay</p>
+              <p className="text-xl font-semibold text-blue-600">
+                {formatCurrency(
+                  payroll.gross_pay - 
+                  (monthlyLeaveRecords.length > 0 
+                    ? monthlyLeaveRecords.reduce(
+                        (sum, record) => sum + (Number(record.amount_paid) || 0),
+                        0
+                      )
+                    : 0)
+                )}
+              </p>
+            </div>
+            
+            {/* Leave Pay - Second card (only if there are leave records) */}
+            {monthlyLeaveRecords.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <p className="text-sm text-default-500 mb-1">
+                  Leave Pay ({monthlyLeaveRecords.reduce((sum, record) => sum + Math.round(record.days_taken), 0)} day{monthlyLeaveRecords.reduce((sum, record) => sum + Math.round(record.days_taken), 0) !== 1 ? 's' : ''})
+                </p>
+                <p className="text-xl font-semibold text-green-600">
+                  {formatCurrency(
+                    monthlyLeaveRecords.reduce(
+                      (sum, record) => sum + (Number(record.amount_paid) || 0),
+                      0
+                    )
+                  )}
+                </p>
+              </div>
+            )}
+            
+            {/* Gross Pay - Third card */}
             <div className="border rounded-lg p-4">
               <p className="text-sm text-default-500 mb-1">Gross Pay</p>
               <p className="text-xl font-semibold text-default-800">
                 {formatCurrency(payroll.gross_pay)}
               </p>
             </div>
+            
+            {/* Employee Deductions */}
             {payroll.deductions && payroll.deductions.length > 0 && (
               <div className="border rounded-lg p-4">
                 <p className="text-sm text-default-500 mb-1">
@@ -291,12 +333,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </p>
               </div>
             )}
+            
+            {/* Net Pay */}
             <div className="border rounded-lg p-4">
               <p className="text-sm text-default-500 mb-1">Net Pay</p>
               <p className="text-xl font-semibold text-default-800">
                 {formatCurrency(payroll.net_pay)}
               </p>
             </div>
+            
             {/* Mid-Month Payment Display */}
             {midMonthPayroll && (
               <>

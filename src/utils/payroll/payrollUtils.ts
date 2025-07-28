@@ -104,6 +104,7 @@ export const updateMonthlyPayrollStatus = async (
  * @param section Section
  * @param month Month (1-12)
  * @param year Year
+ * @param leaveRecords Array of leave records for the month (optional)
  * @returns Calculated employee payroll
  */
 export const calculateEmployeePayroll = (
@@ -112,7 +113,8 @@ export const calculateEmployeePayroll = (
   jobType: string,
   section: string,
   month: number,
-  year: number
+  year: number,
+  leaveRecords?: { date: string; leave_type: string; days_taken: number; amount_paid: number }[]
 ): EmployeePayroll => {
   return PayrollCalculationService.processEmployeePayroll(
     workLogs,
@@ -120,7 +122,8 @@ export const calculateEmployeePayroll = (
     jobType,
     section,
     month,
-    year
+    year,
+    leaveRecords
   );
 };
 
