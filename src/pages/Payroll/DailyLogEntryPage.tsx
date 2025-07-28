@@ -78,7 +78,7 @@ interface DailyLogEntryPageProps {
   jobType?: string;
 }
 
-type LeaveType = "cuti_umum" | "cuti_sakit";
+type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan";
 
 interface LeaveEntry {
   selected: boolean;
@@ -146,6 +146,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [isInitializationComplete, setIsInitializationComplete] =
     useState(false);
   const [leaveSelectAll, setLeaveSelectAll] = useState(false);
+  const [leaveBalances, setLeaveBalances] = useState<Record<string, {
+    cuti_tahunan_total: number;
+    cuti_sakit_total: number;
+    cuti_umum_total: number;
+    cuti_tahunan_taken: number;
+    cuti_sakit_taken: number;
+    cuti_umum_taken: number;
+  }>>({});
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
   // Get job configuration
@@ -208,6 +216,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     ikutBagCounts: Record<string, { muatMee: number; muatBihun: number }>;
     leaveEmployees: Record<string, LeaveEntry>;
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
+    leaveBalances: Record<string, any>;
   } | null>(null);
 
   // Function to check if there are unsaved changes
@@ -234,7 +243,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       JSON.stringify(leaveEmployees) !==
         JSON.stringify(initialState.leaveEmployees) ||
       JSON.stringify(leaveEmployeeActivities) !==
-        JSON.stringify(initialState.leaveEmployeeActivities)
+        JSON.stringify(initialState.leaveEmployeeActivities) ||
+      JSON.stringify(leaveBalances) !==
+        JSON.stringify(initialState.leaveBalances)
     );
   }, [
     formData,
@@ -245,6 +256,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     ikutBagCounts,
     leaveEmployees,
     leaveEmployeeActivities,
+    leaveBalances,
     initialState,
     isInitializationComplete,
   ]);
@@ -459,6 +471,91 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
+  // Function to fetch leave balances for multiple employees in batch
+  const fetchLeaveBalancesBatch = async (employeeIds: string[]) => {
+    if (employeeIds.length === 0) return {};
+    
+    try {
+      const currentYear = new Date(formData.logDate).getFullYear();
+      const response = await api.get(
+        `/api/leave-management/balances/batch?employeeIds=${employeeIds.join(',')}&year=${currentYear}`
+      );
+      
+      // Process the batch response and update state
+      const newBalances: Record<string, any> = {};
+      
+      Object.entries(response).forEach(([employeeId, data]: [string, any]) => {
+        const balance = data.balance;
+        const taken = data.taken || {};
+        
+        newBalances[employeeId] = {
+          cuti_tahunan_total: balance.cuti_tahunan_total || 0,
+          cuti_sakit_total: balance.cuti_sakit_total || 0,
+          cuti_umum_total: balance.cuti_umum_total || 0,
+          cuti_tahunan_taken: taken.cuti_tahunan || 0,
+          cuti_sakit_taken: taken.cuti_sakit || 0,
+          cuti_umum_taken: taken.cuti_umum || 0,
+        };
+      });
+      
+      setLeaveBalances(prev => ({
+        ...prev,
+        ...newBalances
+      }));
+      
+      return newBalances;
+    } catch (error) {
+      console.error('Error fetching batch leave balances:', error);
+      toast.error('Failed to fetch leave balances');
+      return {};
+    }
+  };
+
+  // Function to fetch leave balance for a single employee (fallback)
+  const fetchLeaveBalance = async (employeeId: string) => {
+    const result = await fetchLeaveBalancesBatch([employeeId]);
+    return result[employeeId] ? { balance: result[employeeId], taken: {} } : null;
+  };
+
+  // Function to check if leave is available for an employee
+  const checkLeaveAvailability = (employeeId: string, leaveType: LeaveType) => {
+    const balance = leaveBalances[employeeId];
+    if (!balance) return { available: false, remaining: 0, message: "Leave balance not loaded" };
+    
+    let remaining = 0;
+    let totalAllowed = 0;
+    let taken = 0;
+    
+    switch (leaveType) {
+      case "cuti_tahunan":
+        totalAllowed = balance.cuti_tahunan_total;
+        taken = balance.cuti_tahunan_taken;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_sakit":
+        totalAllowed = balance.cuti_sakit_total;
+        taken = balance.cuti_sakit_taken;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_umum":
+        totalAllowed = balance.cuti_umum_total;
+        taken = balance.cuti_umum_taken;
+        remaining = totalAllowed - taken;
+        break;
+    }
+    
+    const available = remaining > 0;
+    let message = "";
+    
+    if (!available) {
+      const leaveTypeName = leaveType === "cuti_tahunan" ? "Annual Leave" : 
+                           leaveType === "cuti_sakit" ? "Sick Leave" : "Public Holiday Leave";
+      message = `${leaveTypeName} balance exhausted (${taken}/${totalAllowed} days used)`;
+    }
+    
+    return { available, remaining, message, taken, totalAllowed };
+  };
+
   // Add this useEffect to capture initial state
   useEffect(() => {
     if (
@@ -484,6 +581,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         leaveEmployeeActivities: JSON.parse(
           JSON.stringify(leaveEmployeeActivities)
         ),
+        leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
       });
     }
   }, [
@@ -501,6 +599,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     ikutBagCounts,
     leaveEmployees,
     leaveEmployeeActivities,
+    leaveBalances,
   ]);
 
   // Add this useEffect to track initialization completion
@@ -620,12 +719,67 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [holidays, formData.logDate]);
 
-  // Modify handleLeaveSelection
-  const handleLeaveSelection = (employeeId: string) => {
-    setLeaveEmployees((prev) => {
-      const isCurrentlySelected = prev[employeeId]?.selected;
-      const newSelectedState = !isCurrentlySelected;
+  // Pre-load leave balances for all available employees using batch API
+  useEffect(() => {
+    const preloadLeaveBalances = async () => {
+      if (!formData.logDate || uniqueEmployees.length === 0) return;
+      
+      // Get employees who don't have balance data loaded yet
+      const employeesToLoad = uniqueEmployees
+        .filter(emp => !leaveBalances[emp.id])
+        .map(emp => emp.id);
+      
+      if (employeesToLoad.length === 0) return;
+      
+      // Load all balances in a single batch API call
+      await fetchLeaveBalancesBatch(employeesToLoad);
+    };
 
+    // Only preload when we have employees and a date
+    if (uniqueEmployees.length > 0 && formData.logDate) {
+      preloadLeaveBalances();
+    }
+  }, [uniqueEmployees, formData.logDate, leaveBalances]);
+
+  // Modify handleLeaveSelection
+  const handleLeaveSelection = async (employeeId: string) => {
+    const isCurrentlySelected = leaveEmployees[employeeId]?.selected;
+    const newSelectedState = !isCurrentlySelected;
+
+    // If selecting for leave, check balance availability
+    if (newSelectedState) {
+      // If balance is not loaded yet, load it now (fallback)
+      if (!leaveBalances[employeeId]) {
+        const balanceData = await fetchLeaveBalance(employeeId);
+        if (!balanceData) {
+          toast.error("Failed to load leave balance. Please try again.");
+          return; // Don't proceed if balance fetch failed
+        }
+      }
+
+      // Determine the leave type that would be selected
+      const defaultLeaveType = formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+      
+      // Check if leave is available for this type
+      const availability = checkLeaveAvailability(employeeId, defaultLeaveType);
+      
+      if (!availability.available) {
+        toast.error(availability.message);
+        // For public holidays, if cuti_umum is exhausted, suggest cuti_sakit
+        if (defaultLeaveType === "cuti_umum") {
+          const sakitAvailability = checkLeaveAvailability(employeeId, "cuti_sakit");
+          if (sakitAvailability.available) {
+            toast(`Consider using Sick Leave instead (${sakitAvailability.remaining} days remaining)`);
+          }
+        }
+        return; // Don't allow selection
+      }
+      
+      // Show available balance when selecting
+      toast.success(`Leave selected - ${availability.remaining} days remaining`);
+    }
+
+    setLeaveEmployees((prev) => {
       // If just selected, fetch default activities for leave pay calculation
       if (newSelectedState && !leaveEmployeeActivities[employeeId]) {
         fetchAndApplyActivitiesForLeave(employeeId);
@@ -686,7 +840,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
   };
 
-  const handleLeaveTypeChange = (employeeId: string, leaveType: LeaveType) => {
+  const handleLeaveTypeChange = async (employeeId: string, leaveType: LeaveType) => {
+    // Check if leave balance is available for the new leave type
+    if (!leaveBalances[employeeId]) {
+      const balanceData = await fetchLeaveBalance(employeeId);
+      if (!balanceData) {
+        return; // Don't proceed if balance fetch failed
+      }
+    }
+
+    const availability = checkLeaveAvailability(employeeId, leaveType);
+    
+    if (!availability.available) {
+      toast.error(availability.message);
+      return; // Don't allow the change
+    }
+    
     setLeaveEmployees((prev) => ({
       ...prev,
       [employeeId]: {
@@ -694,6 +863,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         leaveType,
       },
     }));
+    
+    // Show remaining balance for the new leave type
+    toast.success(`Leave type changed - ${availability.remaining} days remaining`);
   };
 
   // Handle hours blur event
@@ -1070,6 +1242,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         leaveEmployeeActivities: JSON.parse(
           JSON.stringify(leaveEmployeeActivities)
         ),
+        leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
       });
       navigate(`/payroll/${jobType.toLowerCase()}-production`);
     } catch (error: any) {
@@ -1182,7 +1355,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   // Add leave select all handler
-  const handleLeaveSelectAll = () => {
+  const handleLeaveSelectAll = async () => {
     const allLeaveSelected = availableForLeave.every(
       (emp) => leaveEmployees[emp.id]?.selected
     );
@@ -1199,12 +1372,36 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         return newLeaveEmployees;
       });
     } else {
+      // Check leave balance for all employees before selecting
+      const defaultLeaveType = formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+      const employeesWithInsufficientBalance: string[] = [];
+      
+      // First, fetch balances for employees who don't have them loaded using batch API
+      const employeesToLoad = availableForLeave
+        .filter(emp => !leaveBalances[emp.id])
+        .map(emp => emp.id);
+      
+      if (employeesToLoad.length > 0) {
+        await fetchLeaveBalancesBatch(employeesToLoad);
+      }
+      
+      // Check availability for each employee
+      for (const emp of availableForLeave) {
+        const availability = checkLeaveAvailability(emp.id, defaultLeaveType);
+        if (!availability.available) {
+          employeesWithInsufficientBalance.push(emp.name);
+        }
+      }
+      
+      if (employeesWithInsufficientBalance.length > 0) {
+        toast.error(`Cannot select all: ${employeesWithInsufficientBalance.join(', ')} have insufficient ${defaultLeaveType.replace('_', ' ')} balance`);
+        return;
+      }
+
       // Select all available for leave
       setLeaveEmployees((prev) => {
         const newLeaveEmployees = { ...prev };
         availableForLeave.forEach((emp) => {
-          const defaultLeaveType =
-            formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
           newLeaveEmployees[emp.id] = {
             selected: true,
             leaveType: prev[emp.id]?.leaveType || defaultLeaveType,
@@ -1229,6 +1426,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           selectedJobs: newSelectedJobs,
         };
       });
+      
+      toast.success(`Selected all employees for leave`);
     }
   };
 
@@ -2759,11 +2958,37 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           </div>
                         </td>
                         <td className="w-1/3 px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-default-900 truncate">
-                            {employee.name}
-                          </div>
-                          <div className="text-xs text-default-500">
-                            {employee.id}
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="text-sm font-medium text-default-900 truncate">
+                                {employee.name}
+                              </div>
+                              <div className="text-xs text-default-500">
+                                {employee.id}
+                              </div>
+                            </div>
+                            {/* Show leave balance if available */}
+                            {leaveBalances[employee.id] && (
+                              <div className="flex-shrink-0">
+                                {(() => {
+                                  const currentLeaveType = leaveEmployees[employee.id]?.leaveType || 
+                                    (formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit");
+                                  const availability = checkLeaveAvailability(employee.id, currentLeaveType);
+                                  const leaveTypeName = currentLeaveType === "cuti_tahunan" ? "Annual" : 
+                                                      currentLeaveType === "cuti_sakit" ? "Sick" : 
+                                                      "Public Holiday";
+                                  return (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      availability.remaining > 0 
+                                        ? "bg-green-100 text-green-800" 
+                                        : "bg-red-100 text-red-800"
+                                    }`}>
+                                      {leaveTypeName}: {availability.remaining}/{availability.totalAllowed}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
