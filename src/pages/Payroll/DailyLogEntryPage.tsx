@@ -1930,7 +1930,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }
 
         // Otherwise, create a new unselected activity
-        const isSelected = payCode.is_default_setting && payCode.pay_type === "Base";
+        const isSelected =
+          payCode.is_default_setting && payCode.pay_type === "Base";
         return {
           payCodeId: payCode.id,
           description: payCode.description,
@@ -2105,7 +2106,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
             // Generate full activities list and mark saved ones as selected
             setTimeout(() => {
-              generateLeaveActivitiesWithSavedSelection(employeeId, savedActivitiesMap);
+              generateLeaveActivitiesWithSavedSelection(
+                employeeId,
+                savedActivitiesMap
+              );
             }, 0);
           } else {
             // No saved activities, generate default activities
@@ -3084,7 +3088,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             {formData.dayType === "Umum"
               ? "Cuti Umum is available on public holidays, "
               : ""}
-            Cuti Sakit is available any day. Pay is based on regular day rates.
+            Cuti Sakit and Cuti Tahunan is available any day. Pay is based on
+            regular day rates.
           </p>
 
           <div className="bg-white rounded-lg border shadow-sm">
@@ -3136,6 +3141,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   {availableForLeave.map((employee) => {
                     const leaveOptions = [
                       { id: "cuti_sakit", name: "Cuti Sakit" },
+                      { id: "cuti_tahunan", name: "Cuti Tahunan" },
                     ];
                     if (formData.dayType === "Umum") {
                       leaveOptions.unshift({
