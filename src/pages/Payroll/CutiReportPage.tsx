@@ -543,6 +543,76 @@ const CutiReportPage: React.FC = () => {
                 );
               })}
             </tbody>
+            <tfoot className="bg-default-100 border-t-2 border-default-300">
+              <tr>
+                <td className="py-4 px-4 whitespace-nowrap text-sm font-bold text-default-800 border-r-2 border-default-300 bg-default-100">
+                  TOTAL
+                </td>
+                
+                {/* Cuti Tahunan totals */}
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r border-sky-200 bg-sky-50">
+                  <span className="px-2 py-1 rounded-full bg-sky-200 text-sky-900">
+                    {Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_tahunan.days, 0)}
+                  </span>
+                </td>
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r border-sky-200 bg-sky-50">
+                  <span className="font-bold">
+                    {formatCurrency(Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_tahunan.amount, 0))}
+                  </span>
+                </td>
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r-2 border-default-300 bg-sky-100">
+                  <span className={`px-3 py-1 rounded-full font-bold ${
+                    (leaveBalances.cuti_tahunan_total - (leaveTaken.cuti_tahunan || 0)) < 0
+                      ? "bg-rose-200 text-rose-900"
+                      : "bg-sky-200 text-sky-900"
+                  }`}>
+                    {leaveBalances.cuti_tahunan_total - (leaveTaken.cuti_tahunan || 0)}
+                  </span>
+                </td>
+
+                {/* Cuti Sakit totals */}
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r border-amber-200 bg-amber-50">
+                  <span className="px-2 py-1 rounded-full bg-amber-200 text-amber-900">
+                    {Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_sakit.days, 0)}
+                  </span>
+                </td>
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r border-amber-200 bg-amber-50">
+                  <span className="font-bold">
+                    {formatCurrency(Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_sakit.amount, 0))}
+                  </span>
+                </td>
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r-2 border-default-300 bg-amber-100">
+                  <span className={`px-3 py-1 rounded-full font-bold ${
+                    (leaveBalances.cuti_sakit_total - (leaveTaken.cuti_sakit || 0)) < 0
+                      ? "bg-rose-200 text-rose-900"
+                      : "bg-amber-200 text-amber-900"
+                  }`}>
+                    {leaveBalances.cuti_sakit_total - (leaveTaken.cuti_sakit || 0)}
+                  </span>
+                </td>
+
+                {/* Cuti Umum totals */}
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 border-r border-emerald-200 bg-emerald-50">
+                  <span className="px-2 py-1 rounded-full bg-emerald-200 text-emerald-900">
+                    {Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_umum.days, 0)}
+                  </span>
+                </td>
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 border-r border-emerald-200 bg-emerald-50">
+                  <span className="font-bold">
+                    {formatCurrency(Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_umum.amount, 0))}
+                  </span>
+                </td>
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 bg-emerald-100">
+                  <span className={`px-3 py-1 rounded-full font-bold ${
+                    (leaveBalances.cuti_umum_total - (leaveTaken.cuti_umum || 0)) < 0
+                      ? "bg-rose-200 text-rose-900"
+                      : "bg-emerald-200 text-emerald-900"
+                  }`}>
+                    {leaveBalances.cuti_umum_total - (leaveTaken.cuti_umum || 0)}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
