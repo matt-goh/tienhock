@@ -55,6 +55,16 @@ interface MonthlyLeaveRecord {
   work_log_id?: number;
 }
 
+interface CommissionRecord {
+  id: number;
+  employee_id: string;
+  commission_date: string;
+  amount: number;
+  description: string;
+  created_by: string;
+  created_at: string;
+}
+
 const EmployeePayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -70,6 +80,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [monthlyLeaveRecords, setMonthlyLeaveRecords] = useState<
     MonthlyLeaveRecord[]
   >([]);
+  const [commissionRecords, setCommissionRecords] = useState<
+    CommissionRecord[]
+  >([]);
   const [isDeductionsExpanded, setIsDeductionsExpanded] = useState(false);
 
   useEffect(() => {
@@ -79,6 +92,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   useEffect(() => {
     if (payroll) {
       fetchMonthlyLeaveRecords();
+      fetchCommissionRecords();
     }
   }, [payroll]);
 
@@ -118,6 +132,34 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     } catch (error) {
       console.error("Error fetching monthly leave records:", error);
       // Don't show error toast for leave records since they're optional
+    }
+  };
+
+  const fetchCommissionRecords = async () => {
+    if (!payroll || !payroll.employee_id || !payroll.year || !payroll.month)
+      return;
+
+    try {
+      // Build date range for the payroll month
+      const startDate = `${payroll.year}-${payroll.month
+        .toString()
+        .padStart(2, "0")}-01`;
+      const lastDay = new Date(payroll.year, payroll.month, 0).getDate();
+      const endDate = `${payroll.year}-${payroll.month
+        .toString()
+        .padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
+
+      const url = `/api/commissions?start_date=${encodeURIComponent(
+        startDate
+      )}&end_date=${encodeURIComponent(
+        endDate
+      )}&employee_id=${encodeURIComponent(payroll.employee_id)}`;
+
+      const response = await api.get(url);
+      setCommissionRecords(response || []);
+    } catch (error) {
+      console.error("Error fetching commission records:", error);
+      // Don't show error toast for commission records since they're optional
     }
   };
 
@@ -300,6 +342,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     {formatCurrency(
                       monthlyLeaveRecords.reduce(
                         (sum, record) => sum + Number(record.amount_paid),
+                        0
+                      )
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600">Commission</span>
+                  <span className="font-medium">
+                    {formatCurrency(
+                      commissionRecords.reduce(
+                        (sum, record) => sum + Number(record.amount),
                         0
                       )
                     )}
@@ -869,6 +922,84 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
                           {formatCurrency(overtimeTotal)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Commission Records */}
+            {commissionRecords.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-md font-medium text-default-700 mb-2">
+                  Commission
+                </h3>
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="min-w-full divide-y divide-default-200">
+                    <thead className="bg-default-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Date
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Description
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                        >
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-default-200">
+                      {commissionRecords.map((record) => (
+                        <tr key={record.id} className="hover:bg-default-50">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-default-900">
+                            {format(
+                              new Date(record.commission_date),
+                              "dd MMM yyyy"
+                            )}
+                          </td>
+                          <td className="px-6 py-3 max-w-xs">
+                            <div
+                              className="text-sm font-medium text-default-900 truncate"
+                              title={record.description}
+                            >
+                              {record.description}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-right">
+                            <div className="text-sm font-medium text-default-900">
+                              {formatCurrency(record.amount)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-default-50 border-t-2 border-default-200">
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
+                        >
+                          Total Commission
+                        </td>
+                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
+                          {formatCurrency(
+                            commissionRecords.reduce(
+                              (sum, record) => sum + Number(record.amount),
+                              0
+                            )
+                          )}
                         </td>
                       </tr>
                     </tfoot>
