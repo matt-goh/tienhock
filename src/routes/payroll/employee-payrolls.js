@@ -460,11 +460,48 @@ export default function (pool) {
         {}
       );
 
-      // Merge payrolls with their items and deductions
+      // Get all leave records for these payrolls in a single query
+      const leaveRecordsQuery = `
+      SELECT 
+        ep.id as employee_payroll_id,
+        to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+        lr.leave_type,
+        lr.days_taken,
+        lr.amount_paid
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN leave_records lr ON ep.employee_id = lr.employee_id
+      WHERE ep.id = ANY($1)
+        AND EXTRACT(YEAR FROM lr.leave_date) = mp.year
+        AND EXTRACT(MONTH FROM lr.leave_date) = mp.month
+        AND lr.status = 'approved'
+      ORDER BY ep.id, lr.leave_date ASC
+    `;
+      const leaveRecordsResult = await pool.query(leaveRecordsQuery, [payrollIds]);
+
+      // Group leave records by employee_payroll_id
+      const leaveRecordsByPayrollId = leaveRecordsResult.rows.reduce(
+        (acc, record) => {
+          if (!acc[record.employee_payroll_id]) {
+            acc[record.employee_payroll_id] = [];
+          }
+          acc[record.employee_payroll_id].push({
+            date: record.date,
+            leave_type: record.leave_type,
+            days_taken: parseFloat(record.days_taken),
+            amount_paid: parseFloat(record.amount_paid || 0),
+          });
+          return acc;
+        },
+        {}
+      );
+
+      // Merge payrolls with their items, deductions, and leave records
       const response = payrollsResult.rows.map((payroll) => ({
         ...payroll,
         items: itemsByPayrollId[payroll.id] || [],
         deductions: deductionsByPayrollId[payroll.id] || [],
+        leave_records: leaveRecordsByPayrollId[payroll.id] || [],
         gross_pay: parseFloat(payroll.gross_pay),
         net_pay: parseFloat(payroll.net_pay),
       }));

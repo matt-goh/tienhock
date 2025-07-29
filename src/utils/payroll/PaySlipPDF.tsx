@@ -4,7 +4,6 @@ import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import {
   EmployeePayroll,
   MidMonthPayroll,
-  LeaveRecord,
 } from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
