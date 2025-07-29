@@ -739,7 +739,7 @@ const CutiReportPage: React.FC = () => {
       {selectedStaffId && (
         <>
           {/* --- Employee Selection Combobox and Info (Only shows after selection) --- */}
-          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 mt-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
             <div className="flex-shrink-0">
               <button
                 onClick={() => {
