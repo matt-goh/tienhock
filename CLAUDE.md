@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. Always add appropriate types to all function parameters, variables, and return types.
 6. Fix all TypeScript errors immediately - don't leave them for the user to fix.
 7. Identify potential edge cases or limitations in your implementation.
-8. Don't run or ask to run type checks or lint commands unless explicitly requested by the user.
+8. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
 
 ## Architecture Overview
 

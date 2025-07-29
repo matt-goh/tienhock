@@ -2,14 +2,12 @@
 import React from "react";
 import Tab from "../../components/Tab";
 import CutiReportPage from "./CutiReportPage";
-import CutiTahunanEntryPage from "./CutiTahunanEntryPage";
 import HolidayCalendarPage from "./HolidayCalendarPage";
 import CommissionPage from "./CommissionPage";
 
 const CutiManagementPage: React.FC = () => {
   const tabLabels = [
     "Cuti Report",
-    "Cuti Tahunan Entry",
     "Commission",
     "Holiday Calendar",
   ];
@@ -30,7 +28,6 @@ const CutiManagementPage: React.FC = () => {
       <div className="rounded-lg border border-default-200 shadow-sm p-6">
         <Tab labels={tabLabels} tabWidth="w-40">
           <CutiReportPage />
-          <CutiTahunanEntryPage />
           <CommissionPage />
           <HolidayCalendarPage />
         </Tab>
