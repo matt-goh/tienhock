@@ -277,9 +277,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   // Helper function to prettify leave type text
   const prettifyLeaveType = (leaveType: string) => {
     return leaveType
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   // Helper function to format description based on rate unit
@@ -488,9 +488,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   <Text></Text>
                 </View>
                 <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                  <Text>
-                    {leaveRecord.total_days} Hari
-                  </Text>
+                  <Text>{leaveRecord.total_days} Hari</Text>
                 </View>
                 <View
                   style={[
@@ -763,10 +761,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           <>
             <View style={styles.tableRow}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text>
-                  Bayaran Pertama (1) Gaji Pertengahan Bulan (
-                  {midMonthPayroll.payment_method})
-                </Text>
+                <Text>BAYARAN PENDAHULUAN (ADVANCES PAYMENT)</Text>
               </View>
               <View style={[styles.tableCol, styles.rateCol]}>
                 <Text></Text>
