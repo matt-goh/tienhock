@@ -406,7 +406,7 @@ const CutiReportPage: React.FC = () => {
               <tr className="bg-default-50">
                 {/* Cuti Tahunan sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
-                  Days Used 
+                  Days Used
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
                   Amount
@@ -416,7 +416,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 {/* Cuti Sakit sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
-                  Days Used 
+                  Days Used
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
                   Amount
@@ -426,7 +426,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 {/* Cuti Umum sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
-                  Days Used 
+                  Days Used
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
                   Amount
@@ -548,67 +548,106 @@ const CutiReportPage: React.FC = () => {
                 <td className="py-4 px-4 whitespace-nowrap text-sm font-bold text-default-800 border-r-2 border-default-300 bg-default-100">
                   TOTAL
                 </td>
-                
+
                 {/* Cuti Tahunan totals */}
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r border-sky-200 bg-sky-50">
                   <span className="px-2 py-1 rounded-full bg-sky-200 text-sky-900">
-                    {Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_tahunan.days, 0)}
+                    {Object.values(monthlySummary).reduce(
+                      (sum, month) => sum + month.cuti_tahunan.days,
+                      0
+                    )}
                   </span>
                 </td>
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r border-sky-200 bg-sky-50">
                   <span className="font-bold">
-                    {formatCurrency(Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_tahunan.amount, 0))}
+                    {formatCurrency(
+                      Object.values(monthlySummary).reduce(
+                        (sum, month) => sum + month.cuti_tahunan.amount,
+                        0
+                      )
+                    )}
                   </span>
                 </td>
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r-2 border-default-300 bg-sky-100">
-                  <span className={`px-3 py-1 rounded-full font-bold ${
-                    (leaveBalances.cuti_tahunan_total - (leaveTaken.cuti_tahunan || 0)) < 0
-                      ? "bg-rose-200 text-rose-900"
-                      : "bg-sky-200 text-sky-900"
-                  }`}>
-                    {leaveBalances.cuti_tahunan_total - (leaveTaken.cuti_tahunan || 0)}
+                  <span
+                    className={`px-3 py-1 rounded-full font-bold ${
+                      leaveBalances.cuti_tahunan_total -
+                        (leaveTaken.cuti_tahunan || 0) <
+                      0
+                        ? "bg-rose-200 text-rose-900"
+                        : "bg-sky-200 text-sky-900"
+                    }`}
+                  >
+                    {leaveBalances.cuti_tahunan_total -
+                      (leaveTaken.cuti_tahunan || 0)}
                   </span>
                 </td>
 
                 {/* Cuti Sakit totals */}
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r border-amber-200 bg-amber-50">
                   <span className="px-2 py-1 rounded-full bg-amber-200 text-amber-900">
-                    {Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_sakit.days, 0)}
+                    {Object.values(monthlySummary).reduce(
+                      (sum, month) => sum + month.cuti_sakit.days,
+                      0
+                    )}
                   </span>
                 </td>
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r border-amber-200 bg-amber-50">
                   <span className="font-bold">
-                    {formatCurrency(Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_sakit.amount, 0))}
+                    {formatCurrency(
+                      Object.values(monthlySummary).reduce(
+                        (sum, month) => sum + month.cuti_sakit.amount,
+                        0
+                      )
+                    )}
                   </span>
                 </td>
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r-2 border-default-300 bg-amber-100">
-                  <span className={`px-3 py-1 rounded-full font-bold ${
-                    (leaveBalances.cuti_sakit_total - (leaveTaken.cuti_sakit || 0)) < 0
-                      ? "bg-rose-200 text-rose-900"
-                      : "bg-amber-200 text-amber-900"
-                  }`}>
-                    {leaveBalances.cuti_sakit_total - (leaveTaken.cuti_sakit || 0)}
+                  <span
+                    className={`px-3 py-1 rounded-full font-bold ${
+                      leaveBalances.cuti_sakit_total -
+                        (leaveTaken.cuti_sakit || 0) <
+                      0
+                        ? "bg-rose-200 text-rose-900"
+                        : "bg-amber-200 text-amber-900"
+                    }`}
+                  >
+                    {leaveBalances.cuti_sakit_total -
+                      (leaveTaken.cuti_sakit || 0)}
                   </span>
                 </td>
 
                 {/* Cuti Umum totals */}
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 border-r border-emerald-200 bg-emerald-50">
                   <span className="px-2 py-1 rounded-full bg-emerald-200 text-emerald-900">
-                    {Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_umum.days, 0)}
+                    {Object.values(monthlySummary).reduce(
+                      (sum, month) => sum + month.cuti_umum.days,
+                      0
+                    )}
                   </span>
                 </td>
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 border-r border-emerald-200 bg-emerald-50">
                   <span className="font-bold">
-                    {formatCurrency(Object.values(monthlySummary).reduce((sum, month) => sum + month.cuti_umum.amount, 0))}
+                    {formatCurrency(
+                      Object.values(monthlySummary).reduce(
+                        (sum, month) => sum + month.cuti_umum.amount,
+                        0
+                      )
+                    )}
                   </span>
                 </td>
                 <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 bg-emerald-100">
-                  <span className={`px-3 py-1 rounded-full font-bold ${
-                    (leaveBalances.cuti_umum_total - (leaveTaken.cuti_umum || 0)) < 0
-                      ? "bg-rose-200 text-rose-900"
-                      : "bg-emerald-200 text-emerald-900"
-                  }`}>
-                    {leaveBalances.cuti_umum_total - (leaveTaken.cuti_umum || 0)}
+                  <span
+                    className={`px-3 py-1 rounded-full font-bold ${
+                      leaveBalances.cuti_umum_total -
+                        (leaveTaken.cuti_umum || 0) <
+                      0
+                        ? "bg-rose-200 text-rose-900"
+                        : "bg-emerald-200 text-emerald-900"
+                    }`}
+                  >
+                    {leaveBalances.cuti_umum_total -
+                      (leaveTaken.cuti_umum || 0)}
                   </span>
                 </td>
               </tr>
@@ -643,7 +682,7 @@ const CutiReportPage: React.FC = () => {
   };
 
   return (
-    <div className={`relative w-full mb-2 mt-4`}>
+    <div className={`relative w-full mb-2`}>
       {/* --- Conditional Rendering: Show Cards or Detail View --- */}
       {!selectedStaffId && !loadingStaffs && (
         <>
@@ -666,8 +705,8 @@ const CutiReportPage: React.FC = () => {
           </div>
 
           {/* --- Employee Card Grid --- */}
-          <div className="max-h-[calc(100vh-300px)] overflow-y-auto pb-4 pr-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-2">
+          <div className="max-h-[calc(100vh-260px)] overflow-y-auto border border-default-200 rounded-lg bg-white shadow-sm p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredEmployees.map((employee) => (
                 <EmployeeCard
                   key={employee.id}
@@ -678,7 +717,7 @@ const CutiReportPage: React.FC = () => {
             </div>
 
             {filteredEmployees.length === 0 && searchQuery && (
-              <div className="text-center py-16 bg-white rounded-xl border border-dashed">
+              <div className="text-center py-16 border border-dashed border-default-300 rounded-lg">
                 <p className="text-default-600">
                   No employees found matching "{searchQuery}"
                 </p>
