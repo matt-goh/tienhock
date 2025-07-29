@@ -146,14 +146,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [isInitializationComplete, setIsInitializationComplete] =
     useState(false);
   const [leaveSelectAll, setLeaveSelectAll] = useState(false);
-  const [leaveBalances, setLeaveBalances] = useState<Record<string, {
-    cuti_tahunan_total: number;
-    cuti_sakit_total: number;
-    cuti_umum_total: number;
-    cuti_tahunan_taken: number;
-    cuti_sakit_taken: number;
-    cuti_umum_taken: number;
-  }>>({});
+  const [leaveBalances, setLeaveBalances] = useState<
+    Record<
+      string,
+      {
+        cuti_tahunan_total: number;
+        cuti_sakit_total: number;
+        cuti_umum_total: number;
+        cuti_tahunan_taken: number;
+        cuti_sakit_taken: number;
+        cuti_umum_taken: number;
+      }
+    >
+  >({});
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
   // Get job configuration
@@ -474,20 +479,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // Function to fetch leave balances for multiple employees in batch
   const fetchLeaveBalancesBatch = async (employeeIds: string[]) => {
     if (employeeIds.length === 0) return {};
-    
+
     try {
       const currentYear = new Date(formData.logDate).getFullYear();
       const response = await api.get(
-        `/api/leave-management/balances/batch?employeeIds=${employeeIds.join(',')}&year=${currentYear}`
+        `/api/leave-management/balances/batch?employeeIds=${employeeIds.join(
+          ","
+        )}&year=${currentYear}`
       );
-      
+
       // Process the batch response and update state
       const newBalances: Record<string, any> = {};
-      
+
       Object.entries(response).forEach(([employeeId, data]: [string, any]) => {
         const balance = data.balance;
         const taken = data.taken || {};
-        
+
         newBalances[employeeId] = {
           cuti_tahunan_total: balance.cuti_tahunan_total || 0,
           cuti_sakit_total: balance.cuti_sakit_total || 0,
@@ -497,16 +504,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           cuti_umum_taken: taken.cuti_umum || 0,
         };
       });
-      
-      setLeaveBalances(prev => ({
+
+      setLeaveBalances((prev) => ({
         ...prev,
-        ...newBalances
+        ...newBalances,
       }));
-      
+
       return newBalances;
     } catch (error) {
-      console.error('Error fetching batch leave balances:', error);
-      toast.error('Failed to fetch leave balances');
+      console.error("Error fetching batch leave balances:", error);
+      toast.error("Failed to fetch leave balances");
       return {};
     }
   };
@@ -514,18 +521,25 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // Function to fetch leave balance for a single employee (fallback)
   const fetchLeaveBalance = async (employeeId: string) => {
     const result = await fetchLeaveBalancesBatch([employeeId]);
-    return result[employeeId] ? { balance: result[employeeId], taken: {} } : null;
+    return result[employeeId]
+      ? { balance: result[employeeId], taken: {} }
+      : null;
   };
 
   // Function to check if leave is available for an employee
   const checkLeaveAvailability = (employeeId: string, leaveType: LeaveType) => {
     const balance = leaveBalances[employeeId];
-    if (!balance) return { available: false, remaining: 0, message: "Leave balance not loaded" };
-    
+    if (!balance)
+      return {
+        available: false,
+        remaining: 0,
+        message: "Leave balance not loaded",
+      };
+
     let remaining = 0;
     let totalAllowed = 0;
     let taken = 0;
-    
+
     switch (leaveType) {
       case "cuti_tahunan":
         totalAllowed = balance.cuti_tahunan_total;
@@ -543,16 +557,20 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         remaining = totalAllowed - taken;
         break;
     }
-    
+
     const available = remaining > 0;
     let message = "";
-    
+
     if (!available) {
-      const leaveTypeName = leaveType === "cuti_tahunan" ? "Annual Leave" : 
-                           leaveType === "cuti_sakit" ? "Sick Leave" : "Public Holiday Leave";
+      const leaveTypeName =
+        leaveType === "cuti_tahunan"
+          ? "Annual Leave"
+          : leaveType === "cuti_sakit"
+          ? "Sick Leave"
+          : "Public Holiday Leave";
       message = `${leaveTypeName} balance exhausted (${taken}/${totalAllowed} days used)`;
     }
-    
+
     return { available, remaining, message, taken, totalAllowed };
   };
 
@@ -723,14 +741,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   useEffect(() => {
     const preloadLeaveBalances = async () => {
       if (!formData.logDate || uniqueEmployees.length === 0) return;
-      
+
       // Get employees who don't have balance data loaded yet
       const employeesToLoad = uniqueEmployees
-        .filter(emp => !leaveBalances[emp.id])
-        .map(emp => emp.id);
-      
+        .filter((emp) => !leaveBalances[emp.id])
+        .map((emp) => emp.id);
+
       if (employeesToLoad.length === 0) return;
-      
+
       // Load all balances in a single batch API call
       await fetchLeaveBalancesBatch(employeesToLoad);
     };
@@ -758,25 +776,33 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
 
       // Determine the leave type that would be selected
-      const defaultLeaveType = formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
-      
+      const defaultLeaveType =
+        formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+
       // Check if leave is available for this type
       const availability = checkLeaveAvailability(employeeId, defaultLeaveType);
-      
+
       if (!availability.available) {
         toast.error(availability.message);
         // For public holidays, if cuti_umum is exhausted, suggest cuti_sakit
         if (defaultLeaveType === "cuti_umum") {
-          const sakitAvailability = checkLeaveAvailability(employeeId, "cuti_sakit");
+          const sakitAvailability = checkLeaveAvailability(
+            employeeId,
+            "cuti_sakit"
+          );
           if (sakitAvailability.available) {
-            toast(`Consider using Sick Leave instead (${sakitAvailability.remaining} days remaining)`);
+            toast(
+              `Consider using Sick Leave instead (${sakitAvailability.remaining} days remaining)`
+            );
           }
         }
         return; // Don't allow selection
       }
-      
+
       // Show available balance when selecting
-      toast.success(`Leave selected - ${availability.remaining} days remaining`);
+      toast.success(
+        `Leave selected - ${availability.remaining} days remaining`
+      );
     }
 
     setLeaveEmployees((prev) => {
@@ -840,7 +866,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
   };
 
-  const handleLeaveTypeChange = async (employeeId: string, leaveType: LeaveType) => {
+  const handleLeaveTypeChange = async (
+    employeeId: string,
+    leaveType: LeaveType
+  ) => {
     // Check if leave balance is available for the new leave type
     if (!leaveBalances[employeeId]) {
       const balanceData = await fetchLeaveBalance(employeeId);
@@ -850,12 +879,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
 
     const availability = checkLeaveAvailability(employeeId, leaveType);
-    
+
     if (!availability.available) {
       toast.error(availability.message);
       return; // Don't allow the change
     }
-    
+
     setLeaveEmployees((prev) => ({
       ...prev,
       [employeeId]: {
@@ -863,9 +892,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         leaveType,
       },
     }));
-    
+
     // Show remaining balance for the new leave type
-    toast.success(`Leave type changed - ${availability.remaining} days remaining`);
+    toast.success(
+      `Leave type changed - ${availability.remaining} days remaining`
+    );
   };
 
   // Handle hours blur event
@@ -1137,6 +1168,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           employeeId: employeeId,
           leaveType: leaveData.leaveType,
           amount_paid: amount_paid,
+          activities: activities.filter((a) => a.isSelected),
         };
       });
 
@@ -1373,18 +1405,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
     } else {
       // Check leave balance for all employees before selecting
-      const defaultLeaveType = formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+      const defaultLeaveType =
+        formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
       const employeesWithInsufficientBalance: string[] = [];
-      
+
       // First, fetch balances for employees who don't have them loaded using batch API
       const employeesToLoad = availableForLeave
-        .filter(emp => !leaveBalances[emp.id])
-        .map(emp => emp.id);
-      
+        .filter((emp) => !leaveBalances[emp.id])
+        .map((emp) => emp.id);
+
       if (employeesToLoad.length > 0) {
         await fetchLeaveBalancesBatch(employeesToLoad);
       }
-      
+
       // Check availability for each employee
       for (const emp of availableForLeave) {
         const availability = checkLeaveAvailability(emp.id, defaultLeaveType);
@@ -1392,9 +1425,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           employeesWithInsufficientBalance.push(emp.name);
         }
       }
-      
+
       if (employeesWithInsufficientBalance.length > 0) {
-        toast.error(`Cannot select all: ${employeesWithInsufficientBalance.join(', ')} have insufficient ${defaultLeaveType.replace('_', ' ')} balance`);
+        toast.error(
+          `Cannot select all: ${employeesWithInsufficientBalance.join(
+            ", "
+          )} have insufficient ${defaultLeaveType.replace("_", " ")} balance`
+        );
         return;
       }
 
@@ -1426,7 +1463,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           selectedJobs: newSelectedJobs,
         };
       });
-      
+
       toast.success(`Selected all employees for leave`);
     }
   };
@@ -1559,101 +1596,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     loadingJobs,
     initializeDefaultSelections,
     mode,
-  ]);
-
-  useEffect(() => {
-    if (
-      mode === "edit" &&
-      existingWorkLog &&
-      !loadingStaffs &&
-      !loadingJobs &&
-      !loadingPayCodeMappings
-    ) {
-      // Restore selection state for employees
-      const newSelectedJobs: Record<string, string[]> = {};
-      const newJobHours: Record<string, Record<string, number>> = {};
-      const newEmployeeActivities: Record<string, any[]> = {};
-      const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
-
-      // Restore SALESMAN_IKUT relations and bag counts
-      const newSalesmanIkutRelations: Record<string, string> = {};
-      const newIkutBagCounts: Record<
-        string,
-        { muatMee: number; muatBihun: number }
-      > = {};
-
-      existingWorkLog.employeeEntries.forEach((entry: any) => {
-        const rowKey = `${entry.employee_id}-${entry.job_id}`;
-
-        // Restore employee selection and hours
-        if (!newSelectedJobs[entry.employee_id]) {
-          newSelectedJobs[entry.employee_id] = [];
-        }
-        newSelectedJobs[entry.employee_id].push(entry.job_id);
-
-        if (!newJobHours[entry.employee_id]) {
-          newJobHours[entry.employee_id] = {};
-        }
-        newJobHours[entry.employee_id][entry.job_id] = parseFloat(
-          entry.total_hours
-        );
-
-        // Restore activities
-        if (entry.activities && entry.activities.length > 0) {
-          newEmployeeActivities[rowKey] = entry.activities.map(
-            (activity: any) => ({
-              payCodeId: activity.pay_code_id,
-              description: activity.description,
-              payType: activity.pay_type,
-              rateUnit: activity.rate_unit,
-              rate: parseFloat(activity.rate_used),
-              unitsProduced: activity.units_produced
-                ? parseFloat(activity.units_produced)
-                : 0,
-              hoursApplied: activity.hours_applied
-                ? parseFloat(activity.hours_applied)
-                : null,
-              calculatedAmount: parseFloat(activity.calculated_amount),
-              isSelected: true,
-              isContextLinked: false,
-            })
-          );
-        }
-
-        // Restore SALESMAN_IKUT specific data
-        if (entry.job_id === "SALESMAN_IKUT") {
-          if (entry.following_salesman_id) {
-            newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
-          }
-
-          newIkutBagCounts[rowKey] = {
-            muatMee: entry.muat_mee_bags || 0,
-            muatBihun: entry.muat_bihun_bags || 0,
-          };
-        }
-
-        // Restore SALESMAN location types
-        if (entry.job_id === "SALESMAN") {
-          newLocationTypes[rowKey] = entry.location_type || "Local";
-        }
-      });
-
-      // Apply all the restored state
-      setEmployeeSelectionState({
-        selectedJobs: newSelectedJobs,
-        jobHours: newJobHours,
-      });
-      setEmployeeActivities(newEmployeeActivities);
-      setLocationTypes(newLocationTypes);
-      setSalesmanIkutRelations(newSalesmanIkutRelations);
-      setIkutBagCounts(newIkutBagCounts);
-    }
-  }, [
-    mode,
-    existingWorkLog,
-    loadingStaffs,
-    loadingJobs,
-    loadingPayCodeMappings,
   ]);
 
   useEffect(() => {
@@ -1946,6 +1888,289 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobConfig?.defaultHours,
     ]
   );
+
+  // Generate full activities list for leave employees with saved selections
+  const generateLeaveActivitiesWithSavedSelection = useCallback(
+    (employeeId: string, savedActivitiesMap: Map<string, any>) => {
+      const employee = allStaffs.find((s) => s.id === employeeId);
+      if (!employee) return;
+
+      const employeeJobs = employee.job || [];
+      const relevantJobTypes = employeeJobs.filter((jobId) =>
+        JOB_IDS.includes(jobId)
+      );
+      if (relevantJobTypes.length === 0) return;
+
+      const primaryJobType = relevantJobTypes[0];
+      const jobPayCodes = jobPayCodeDetails[primaryJobType] || [];
+      const employeePayCodes = employeeMappings[employeeId] || [];
+
+      // Combine job and employee-specific pay codes
+      const allPayCodes = new Map();
+      jobPayCodes.forEach((pc) =>
+        allPayCodes.set(pc.id, { ...pc, source: "job" })
+      );
+      employeePayCodes.forEach((pc) =>
+        allPayCodes.set(pc.id, { ...pc, source: "employee" })
+      );
+
+      // Create activities with proper selection state
+      const activities = Array.from(allPayCodes.values()).map((payCode) => {
+        const savedActivity = savedActivitiesMap.get(payCode.id);
+        const rate = payCode.override_rate_biasa || payCode.rate_biasa;
+        const hours = jobConfig?.defaultHours || 8;
+
+        // If this activity was saved, use the saved data
+        if (savedActivity) {
+          return {
+            ...savedActivity,
+            isDefault: payCode.is_default_setting,
+            source: payCode.source,
+          };
+        }
+
+        // Otherwise, create a new unselected activity
+        const isSelected = payCode.is_default_setting && payCode.pay_type === "Base";
+        return {
+          payCodeId: payCode.id,
+          description: payCode.description,
+          payType: payCode.pay_type,
+          rateUnit: payCode.rate_unit,
+          rate,
+          isDefault: payCode.is_default_setting,
+          isSelected: false, // Default to unselected for unsaved activities
+          unitsProduced: payCode.requires_units_input ? 0 : undefined,
+          hoursApplied: payCode.rate_unit === "Hour" ? hours : null,
+          calculatedAmount: calculateActivityAmount(
+            {
+              payCodeId: payCode.id,
+              description: payCode.description,
+              payType: payCode.pay_type,
+              rateUnit: payCode.rate_unit,
+              rate,
+              isSelected: false,
+              unitsProduced: payCode.requires_units_input ? 0 : undefined,
+              hoursApplied: payCode.rate_unit === "Hour" ? hours : null,
+            },
+            hours,
+            formData.contextData
+          ),
+          isContextLinked: false,
+          source: payCode.source,
+        };
+      });
+
+      setLeaveEmployeeActivities((prev) => ({
+        ...prev,
+        [employeeId]: activities,
+      }));
+    },
+    [
+      allStaffs,
+      JOB_IDS,
+      jobPayCodeDetails,
+      employeeMappings,
+      jobConfig?.defaultHours,
+      formData.dayType,
+    ]
+  );
+
+  useEffect(() => {
+    if (
+      mode === "edit" &&
+      existingWorkLog &&
+      !loadingStaffs &&
+      !loadingJobs &&
+      !loadingPayCodeMappings
+    ) {
+      // Restore selection state for employees
+      const newSelectedJobs: Record<string, string[]> = {};
+      const newJobHours: Record<string, Record<string, number>> = {};
+      const newEmployeeActivities: Record<string, any[]> = {};
+      const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
+
+      // Restore SALESMAN_IKUT relations and bag counts
+      const newSalesmanIkutRelations: Record<string, string> = {};
+      const newIkutBagCounts: Record<
+        string,
+        { muatMee: number; muatBihun: number }
+      > = {};
+
+      existingWorkLog.employeeEntries.forEach((entry: any) => {
+        const rowKey = `${entry.employee_id}-${entry.job_id}`;
+
+        // Restore employee selection and hours
+        if (!newSelectedJobs[entry.employee_id]) {
+          newSelectedJobs[entry.employee_id] = [];
+        }
+        newSelectedJobs[entry.employee_id].push(entry.job_id);
+
+        if (!newJobHours[entry.employee_id]) {
+          newJobHours[entry.employee_id] = {};
+        }
+        newJobHours[entry.employee_id][entry.job_id] = parseFloat(
+          entry.total_hours
+        );
+
+        // Restore activities
+        if (entry.activities && entry.activities.length > 0) {
+          newEmployeeActivities[rowKey] = entry.activities.map(
+            (activity: any) => ({
+              payCodeId: activity.pay_code_id,
+              description: activity.description,
+              payType: activity.pay_type,
+              rateUnit: activity.rate_unit,
+              rate: parseFloat(activity.rate_used),
+              unitsProduced: activity.units_produced
+                ? parseFloat(activity.units_produced)
+                : 0,
+              hoursApplied: activity.hours_applied
+                ? parseFloat(activity.hours_applied)
+                : null,
+              calculatedAmount: parseFloat(activity.calculated_amount),
+              isSelected: true,
+              isContextLinked: false,
+            })
+          );
+        }
+
+        // Restore SALESMAN_IKUT specific data
+        if (entry.job_id === "SALESMAN_IKUT") {
+          if (entry.following_salesman_id) {
+            newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
+          }
+
+          newIkutBagCounts[rowKey] = {
+            muatMee: entry.muat_mee_bags || 0,
+            muatBihun: entry.muat_bihun_bags || 0,
+          };
+        }
+
+        // Restore SALESMAN location types
+        if (entry.job_id === "SALESMAN") {
+          newLocationTypes[rowKey] = entry.location_type || "Local";
+        }
+      });
+
+      // Apply all the restored state
+      setEmployeeSelectionState({
+        selectedJobs: newSelectedJobs,
+        jobHours: newJobHours,
+      });
+      setEmployeeActivities(newEmployeeActivities);
+      setLocationTypes(newLocationTypes);
+      setSalesmanIkutRelations(newSalesmanIkutRelations);
+      setIkutBagCounts(newIkutBagCounts);
+
+      // Restore leave records if they exist
+      if (
+        existingWorkLog.leaveRecords &&
+        existingWorkLog.leaveRecords.length > 0
+      ) {
+        const newLeaveEmployees: Record<string, LeaveEntry> = {};
+        const newLeaveEmployeeActivities: Record<string, ActivityItem[]> = {};
+        const newLeaveBalances: Record<string, any> = {};
+
+        existingWorkLog.leaveRecords.forEach((leaveRecord: any) => {
+          const employeeId = leaveRecord.employee_id;
+
+          // Restore leave employee selection and type
+          newLeaveEmployees[employeeId] = {
+            selected: true,
+            leaveType: leaveRecord.leave_type as LeaveType,
+          };
+
+          // Store saved activities for later processing
+          if (leaveRecord.activities && leaveRecord.activities.length > 0) {
+            // Create a map of saved activities by payCodeId for easy lookup
+            const savedActivitiesMap = new Map();
+            leaveRecord.activities.forEach((activity: any) => {
+              savedActivitiesMap.set(activity.pay_code_id, {
+                payCodeId: activity.pay_code_id,
+                description: activity.description,
+                payType: activity.pay_type,
+                rateUnit: activity.rate_unit,
+                rate: parseFloat(activity.rate_used),
+                unitsProduced: activity.units_produced
+                  ? parseFloat(activity.units_produced)
+                  : 0,
+                hoursApplied: activity.hours_applied
+                  ? parseFloat(activity.hours_applied)
+                  : null,
+                calculatedAmount: parseFloat(activity.calculated_amount),
+                isSelected: true,
+                isContextLinked: false,
+              });
+            });
+
+            // Generate full activities list and mark saved ones as selected
+            setTimeout(() => {
+              generateLeaveActivitiesWithSavedSelection(employeeId, savedActivitiesMap);
+            }, 0);
+          } else {
+            // No saved activities, generate default activities
+            setTimeout(() => {
+              fetchAndApplyActivitiesForLeave(employeeId);
+            }, 0);
+          }
+        });
+
+        // Apply leave-related state
+        setLeaveEmployees(newLeaveEmployees);
+        setLeaveEmployeeActivities(newLeaveEmployeeActivities);
+      }
+
+      // Restore activity records if they exist
+      if (
+        existingWorkLog.activityRecords &&
+        existingWorkLog.activityRecords.length > 0
+      ) {
+        const newSavedActivities: Record<string, ActivityItem[]> = {};
+
+        existingWorkLog.activityRecords.forEach((activityRecord: any) => {
+          const employeeId = activityRecord.employee_id;
+          const jobId = activityRecord.job_id;
+          const rowKey = jobId ? `${employeeId}-${jobId}` : employeeId;
+
+          // Restore saved activities
+          if (
+            activityRecord.activities &&
+            activityRecord.activities.length > 0
+          ) {
+            newSavedActivities[rowKey] = activityRecord.activities.map(
+              (activity: any) => ({
+                payCodeId: activity.pay_code_id,
+                description: activity.description,
+                payType: activity.pay_type,
+                rateUnit: activity.rate_unit,
+                rate: parseFloat(activity.rate_used),
+                unitsProduced: activity.units_produced
+                  ? parseFloat(activity.units_produced)
+                  : 0,
+                hoursApplied: activity.hours_applied
+                  ? parseFloat(activity.hours_applied)
+                  : null,
+                calculatedAmount: parseFloat(activity.calculated_amount),
+                isSelected: true,
+                isContextLinked: false,
+              })
+            );
+          }
+        });
+
+        // Apply saved activities to the appropriate state
+        setEmployeeActivities((prev) => ({ ...prev, ...newSavedActivities }));
+      }
+    }
+  }, [
+    mode,
+    existingWorkLog,
+    loadingStaffs,
+    loadingJobs,
+    loadingPayCodeMappings,
+    fetchAndApplyActivitiesForLeave,
+    generateLeaveActivitiesWithSavedSelection,
+  ]);
 
   // Update handleActivitiesUpdated to store all activities, not just selected:
   const handleActivitiesUpdated = (activities: any[]) => {
@@ -2971,19 +3196,31 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             {leaveBalances[employee.id] && (
                               <div className="flex-shrink-0">
                                 {(() => {
-                                  const currentLeaveType = leaveEmployees[employee.id]?.leaveType || 
-                                    (formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit");
-                                  const availability = checkLeaveAvailability(employee.id, currentLeaveType);
-                                  const leaveTypeName = currentLeaveType === "cuti_tahunan" ? "Annual" : 
-                                                      currentLeaveType === "cuti_sakit" ? "Sick" : 
-                                                      "Public Holiday";
+                                  const currentLeaveType =
+                                    leaveEmployees[employee.id]?.leaveType ||
+                                    (formData.dayType === "Umum"
+                                      ? "cuti_umum"
+                                      : "cuti_sakit");
+                                  const availability = checkLeaveAvailability(
+                                    employee.id,
+                                    currentLeaveType
+                                  );
+                                  const leaveTypeName =
+                                    currentLeaveType === "cuti_tahunan"
+                                      ? "Annual"
+                                      : currentLeaveType === "cuti_sakit"
+                                      ? "Sick"
+                                      : "Public Holiday";
                                   return (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      availability.remaining > 0 
-                                        ? "bg-green-100 text-green-800" 
-                                        : "bg-red-100 text-red-800"
-                                    }`}>
-                                      {leaveTypeName}: {availability.remaining}/{availability.totalAllowed}
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        availability.remaining > 0
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
+                                      {leaveTypeName}: {availability.remaining}/
+                                      {availability.totalAllowed}
                                     </span>
                                   );
                                 })()}
