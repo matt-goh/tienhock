@@ -26,7 +26,7 @@ const CutiManagementPage: React.FC = () => {
       </div>
 
       <div className="rounded-lg border border-default-200 shadow-sm p-6">
-        <Tab labels={tabLabels} tabWidth="w-40">
+        <Tab labels={tabLabels} tabWidth="w-36">
           <CutiReportPage />
           <CommissionPage />
           <HolidayCalendarPage />
