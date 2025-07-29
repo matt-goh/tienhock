@@ -1,7 +1,12 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconTrash,
+  IconChevronDown,
+  IconChevronUp,
+} from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
@@ -65,6 +70,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [monthlyLeaveRecords, setMonthlyLeaveRecords] = useState<
     MonthlyLeaveRecord[]
   >([]);
+  const [isDeductionsExpanded, setIsDeductionsExpanded] = useState(false);
 
   useEffect(() => {
     fetchEmployeePayroll();
@@ -312,9 +318,30 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Final Payment Column */}
             <div className="border rounded-lg p-4 flex flex-col bg-sky-50 border-sky-200">
-              <h3 className="text-md font-semibold text-sky-800 mb-3">
-                Final Payment
-              </h3>
+              <button
+                onClick={() => setIsDeductionsExpanded(!isDeductionsExpanded)}
+                className="flex gap-1.5 items-center w-fit mb-3 cursor-pointer text-left"
+                title="Toggle Deductions Breakdown"
+                aria-expanded={isDeductionsExpanded}
+                aria-controls="deductions-breakdown"
+              >
+                <h3 className="text-md font-semibold text-sky-800">
+                  Final Payment
+                </h3>
+                {isDeductionsExpanded ? (
+                  <IconChevronUp
+                    size={16}
+                    stroke={2.5}
+                    className="text-sky-800"
+                  />
+                ) : (
+                  <IconChevronDown
+                    size={16}
+                    stroke={2.5}
+                    className="text-sky-800"
+                  />
+                )}
+              </button>
               <div className="space-y-2 flex-grow">
                 <div className="flex justify-between text-sm">
                   <span className="text-sky-700">Gross Pay</span>
@@ -362,77 +389,88 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Deductions Summary */}
-        {payroll.deductions && payroll.deductions.length > 0 && (
-          <div className="mb-4">
-            <h2 className="text-lg font-medium text-default-800 mb-4">
-              Deductions Summary
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {payroll.deductions
-                .sort((a, b) => {
-                  const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
-                  const aIndex = order.indexOf(a.deduction_type.toUpperCase());
-                  const bIndex = order.indexOf(b.deduction_type.toUpperCase());
-                  return (
-                    (aIndex === -1 ? 999 : aIndex) -
-                    (bIndex === -1 ? 999 : bIndex)
-                  );
-                })
-                .map((deduction, index) => {
-                  const deductionType = deduction.deduction_type.toUpperCase();
-                  const deductionName =
-                    deductionType === "INCOME_TAX"
-                      ? "Income Tax"
-                      : deductionType;
-                  return (
-                    <div key={index} className="border rounded-lg p-4">
-                      <h3 className="text-sm font-medium text-default-700 mb-2">
-                        {deductionName}
-                      </h3>
-                      <div className="space-y-2">
-                        <div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-default-600">Employee:</span>
-                            <span className="font-medium text-default-900">
-                              {formatCurrency(deduction.employee_amount)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-default-600">Employer:</span>
-                            <span className="font-medium text-default-900">
-                              {formatCurrency(deduction.employer_amount)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="border-t border-default-200 pt-2 mt-2">
-                          <div className="flex justify-between text-xs text-default-500">
-                            <span>Employee Rate:</span>
-                            <span>{deduction.rate_info.employee_rate}</span>
-                          </div>
-                          <div className="flex justify-between text-xs text-default-500">
-                            <span>Employer Rate:</span>
-                            <span>{deduction.rate_info.employer_rate}</span>
-                          </div>
-                          {deduction.rate_info.age_group && (
-                            <div className="flex justify-between text-xs text-default-500">
-                              <span>Age Group:</span>
-                              <span className="capitalize">
-                                {deduction.rate_info.age_group.replace(
-                                  /_/g,
-                                  " "
-                                )}
+        {/* Deductions Breakdown */}
+        {isDeductionsExpanded &&
+          payroll.deductions &&
+          payroll.deductions.length > 0 && (
+            <div className="mb-4" id="deductions-breakdown">
+              <h2 className="text-lg font-medium text-default-800 mb-4">
+                Deductions Breakdown
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {payroll.deductions
+                  .sort((a, b) => {
+                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
+                    const aIndex = order.indexOf(
+                      a.deduction_type.toUpperCase()
+                    );
+                    const bIndex = order.indexOf(
+                      b.deduction_type.toUpperCase()
+                    );
+                    return (
+                      (aIndex === -1 ? 999 : aIndex) -
+                      (bIndex === -1 ? 999 : bIndex)
+                    );
+                  })
+                  .map((deduction, index) => {
+                    const deductionType =
+                      deduction.deduction_type.toUpperCase();
+                    const deductionName =
+                      deductionType === "INCOME_TAX"
+                        ? "Income Tax"
+                        : deductionType;
+                    return (
+                      <div key={index} className="border rounded-lg p-4">
+                        <h3 className="text-sm font-medium text-default-700 mb-2">
+                          {deductionName}
+                        </h3>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-default-600">
+                                Employee:
+                              </span>
+                              <span className="font-medium text-default-900">
+                                {formatCurrency(deduction.employee_amount)}
                               </span>
                             </div>
-                          )}
+                            <div className="flex justify-between text-sm">
+                              <span className="text-default-600">
+                                Employer:
+                              </span>
+                              <span className="font-medium text-default-900">
+                                {formatCurrency(deduction.employer_amount)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="border-t border-default-200 pt-2 mt-2">
+                            <div className="flex justify-between text-xs text-default-500">
+                              <span>Employee Rate:</span>
+                              <span>{deduction.rate_info.employee_rate}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-default-500">
+                              <span>Employer Rate:</span>
+                              <span>{deduction.rate_info.employer_rate}</span>
+                            </div>
+                            {deduction.rate_info.age_group && (
+                              <div className="flex justify-between text-xs text-default-500">
+                                <span>Age Group:</span>
+                                <span className="capitalize">
+                                  {deduction.rate_info.age_group.replace(
+                                    /_/g,
+                                    " "
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Tabs for Items and Pay Slip View */}
         <div className="mb-6">
@@ -482,7 +520,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <tbody className="bg-white divide-y divide-default-200">
                       {groupedItems["Base"].map((item) => (
                         <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-6 py-4 max-w-xs">
+                          <td className="px-6 py-3 max-w-xs">
                             <div
                               className="text-sm font-medium text-default-900 truncate"
                               title={item.description}
@@ -493,7 +531,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               {item.pay_code_id}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <div className="text-sm text-default-900">
                               {item.rate_unit === "Percent" ? (
                                 <>{item.rate}%</>
@@ -507,7 +545,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <div className="text-sm text-default-900">
                               {item.quantity}
                               <span className="text-xs text-default-500 ml-1">
@@ -523,7 +561,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-6 py-3 whitespace-nowrap text-right">
                             <div className="text-sm font-medium text-default-900">
                               {formatCurrency(item.amount)}
                             </div>
@@ -584,7 +622,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             return null;
                           })()}
                         </td>
-                        <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
+                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
                           {formatCurrency(baseTotal)}
                         </td>
                       </tr>
@@ -641,7 +679,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <tbody className="bg-white divide-y divide-default-200">
                       {groupedItems["Tambahan"].map((item) => (
                         <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-6 py-4 max-w-xs">
+                          <td className="px-6 py-3 max-w-xs">
                             <div
                               className="text-sm font-medium text-default-900 truncate flex items-center"
                               title={item.description}
@@ -659,7 +697,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               {item.pay_code_id}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <div className="text-sm text-default-900">
                               {item.rate_unit === "Percent" ? (
                                 <>{item.rate}%</>
@@ -673,7 +711,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <div className="text-sm text-default-900">
                               {item.quantity}
                               <span className="text-xs text-default-500 ml-1">
@@ -689,13 +727,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-6 py-3 whitespace-nowrap text-right">
                             <div className="text-sm font-medium text-default-900">
                               {formatCurrency(item.amount)}
                             </div>
                           </td>
                           {isEditable && (
-                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <td className="px-6 py-3 whitespace-nowrap text-center">
                               <button
                                 onClick={() => {
                                   setItemToDelete({
@@ -722,10 +760,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         >
                           Total Tambahan Pay
                         </td>
-                        <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
+                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
                           {formatCurrency(tambahanTotal)}
                         </td>
-                        {isEditable && <td className="px-6 py-4"></td>}
+                        {isEditable && <td className="px-6 py-3"></td>}
                       </tr>
                     </tfoot>
                   </table>
@@ -772,7 +810,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <tbody className="bg-white divide-y divide-default-200">
                       {groupedItems["Overtime"].map((item) => (
                         <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-6 py-4 max-w-xs">
+                          <td className="px-6 py-3 max-w-xs">
                             <div
                               className="text-sm font-medium text-default-900 truncate"
                               title={item.description}
@@ -783,7 +821,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               {item.pay_code_id}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <div className="text-sm text-default-900">
                               {item.rate_unit === "Percent" ? (
                                 <>{item.rate}%</>
@@ -797,7 +835,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center">
                             <div className="text-sm text-default-900">
                               {item.quantity}
                               <span className="text-xs text-default-500 ml-1">
@@ -813,7 +851,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-6 py-3 whitespace-nowrap text-right">
                             <div className="text-sm font-medium text-default-900">
                               {formatCurrency(item.amount)}
                             </div>
@@ -829,7 +867,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         >
                           Total Overtime Pay
                         </td>
-                        <td className="px-6 py-4 text-right text-sm font-semibold text-default-900">
+                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
                           {formatCurrency(overtimeTotal)}
                         </td>
                       </tr>
@@ -842,7 +880,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             {/* Monthly Leave Summary */}
             {monthlyLeaveRecords.length > 0 && (
               <div>
-                <h2 className="text-lg font-medium text-default-800 mb-4">
+                <h2 className="text-lg font-medium text-default-800 mb-2">
                   Leave Records This Month
                 </h2>
                 <div className="border rounded-lg overflow-x-auto">
