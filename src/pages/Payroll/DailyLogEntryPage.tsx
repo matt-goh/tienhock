@@ -775,34 +775,61 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }
       }
 
-      // Determine the leave type that would be selected
+      // Define all possible leave types based on day type
+      const possibleLeaveTypes: LeaveType[] = [
+        "cuti_sakit",
+        "cuti_tahunan",
+        ...(formData.dayType === "Umum" ? ["cuti_umum" as LeaveType] : []),
+      ];
+
+      // Check if any leave type is available
+      const availableLeaveTypes = possibleLeaveTypes.filter((leaveType) => {
+        const availability = checkLeaveAvailability(employeeId, leaveType);
+        return availability.available;
+      });
+
+      if (availableLeaveTypes.length === 0) {
+        toast.error(
+          "No leave types available for this employee (all balances exhausted)"
+        );
+        return; // Don't allow selection if no leave types are available
+      }
+
+      // Determine the leave type that would be selected (prefer default if available, otherwise use first available)
       const defaultLeaveType =
         formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
 
-      // Check if leave is available for this type
-      const availability = checkLeaveAvailability(employeeId, defaultLeaveType);
+      const selectedLeaveType = availableLeaveTypes.includes(defaultLeaveType)
+        ? defaultLeaveType
+        : availableLeaveTypes[0];
 
-      if (!availability.available) {
-        toast.error(availability.message);
-        // For public holidays, if cuti_umum is exhausted, suggest cuti_sakit
-        if (defaultLeaveType === "cuti_umum") {
-          const sakitAvailability = checkLeaveAvailability(
-            employeeId,
-            "cuti_sakit"
-          );
-          if (sakitAvailability.available) {
-            toast(
-              `Consider using Sick Leave instead (${sakitAvailability.remaining} days remaining)`
-            );
-          }
-        }
-        return; // Don't allow selection
-      }
+      const availability = checkLeaveAvailability(
+        employeeId,
+        selectedLeaveType
+      );
 
       // Show available balance when selecting
+      const leaveTypeName =
+        selectedLeaveType === "cuti_tahunan"
+          ? "Annual Leave"
+          : selectedLeaveType === "cuti_sakit"
+          ? "Sick Leave"
+          : "Public Holiday Leave";
+
       toast.success(
-        `Leave selected - ${availability.remaining} days remaining`
+        `${leaveTypeName} selected - ${availability.remaining} days remaining`
       );
+
+      // If we're not using the default leave type, inform the user
+      if (selectedLeaveType !== defaultLeaveType) {
+        const defaultTypeName =
+          defaultLeaveType === "cuti_umum"
+            ? "Public Holiday Leave"
+            : "Sick Leave";
+        toast(
+          `${defaultTypeName} is exhausted, using ${leaveTypeName} instead`
+        );
+      }
     }
 
     setLeaveEmployees((prev) => {
@@ -825,17 +852,41 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       }
 
-      // Set the correct default leave type based on day type
-      const defaultLeaveType =
-        formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+      // Set the correct leave type based on availability or day type
+      let leaveTypeToUse: LeaveType;
+      
+      if (newSelectedState) {
+        // When selecting, use the calculated selectedLeaveType from above
+        // We need to recalculate it here since it's in a different scope
+        const possibleLeaveTypes: LeaveType[] = [
+          "cuti_sakit",
+          "cuti_tahunan",
+          ...(formData.dayType === "Umum" ? ["cuti_umum" as LeaveType] : []),
+        ];
+
+        const availableLeaveTypes = possibleLeaveTypes.filter((leaveType) => {
+          const availability = checkLeaveAvailability(employeeId, leaveType);
+          return availability.available;
+        });
+
+        const defaultLeaveType =
+          formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+        
+        leaveTypeToUse = availableLeaveTypes.includes(defaultLeaveType)
+          ? defaultLeaveType
+          : availableLeaveTypes[0] || defaultLeaveType;
+      } else {
+        // When deselecting, keep existing or use default
+        const defaultLeaveType =
+          formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+        leaveTypeToUse = prev[employeeId]?.leaveType || defaultLeaveType;
+      }
 
       return {
         ...prev,
         [employeeId]: {
           selected: newSelectedState,
-          leaveType: newSelectedState
-            ? defaultLeaveType // Always use fresh default when selecting
-            : prev[employeeId]?.leaveType || defaultLeaveType, // Keep existing when deselecting
+          leaveType: leaveTypeToUse,
         },
       };
     });
