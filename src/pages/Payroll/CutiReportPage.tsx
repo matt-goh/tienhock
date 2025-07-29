@@ -676,9 +676,6 @@ const CutiReportPage: React.FC = () => {
           {loadingReport && (
             <div className="flex justify-center items-center h-40">
               <LoadingSpinner />
-              <span className="ml-3 text-default-600">
-                Loading leave report...
-              </span>
             </div>
           )}
 
