@@ -224,34 +224,52 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveBalances: Record<string, any>;
   } | null>(null);
 
+  // Function to normalize objects for comparison (handles key ordering)
+  const normalizeForComparison = useCallback((obj: any): string => {
+    if (obj === null || obj === undefined) return String(obj);
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+      return JSON.stringify(obj.map(normalizeForComparison));
+    }
+    // Sort keys to ensure consistent ordering
+    const sortedObj: any = {};
+    Object.keys(obj).sort().forEach(key => {
+      sortedObj[key] = obj[key];
+    });
+    return JSON.stringify(sortedObj);
+  }, []);
+
   // Function to check if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
     // Don't show unsaved changes if initialization isn't complete yet
     if (!initialState || !isInitializationComplete) return false;
 
-    // For edit mode, always check for changes
-    // For create mode, only check after initialization is complete
+    // For create mode, also check if we have any meaningful data to compare
+    if (mode === "create") {
+      const hasAnySelections = Object.keys(employeeSelectionState.selectedJobs).length > 0 ||
+                              Object.keys(leaveEmployees).some(id => leaveEmployees[id].selected);
+      
+      // If no selections made yet, don't show unsaved changes
+      if (!hasAnySelections) return false;
+    }
 
-    // Deep compare current state with initial state
-    return (
-      JSON.stringify(formData) !== JSON.stringify(initialState.formData) ||
-      JSON.stringify(employeeSelectionState) !==
-        JSON.stringify(initialState.employeeSelectionState) ||
-      JSON.stringify(employeeActivities) !==
-        JSON.stringify(initialState.employeeActivities) ||
-      JSON.stringify(locationTypes) !==
-        JSON.stringify(initialState.locationTypes) ||
-      JSON.stringify(salesmanIkutRelations) !==
-        JSON.stringify(initialState.salesmanIkutRelations) ||
-      JSON.stringify(ikutBagCounts) !==
-        JSON.stringify(initialState.ikutBagCounts) ||
-      JSON.stringify(leaveEmployees) !==
-        JSON.stringify(initialState.leaveEmployees) ||
-      JSON.stringify(leaveEmployeeActivities) !==
-        JSON.stringify(initialState.leaveEmployeeActivities) ||
-      JSON.stringify(leaveBalances) !==
-        JSON.stringify(initialState.leaveBalances)
-    );
+    // Compare normalized JSON strings for more reliable comparison
+    try {
+      return (
+        normalizeForComparison(formData) !== normalizeForComparison(initialState.formData) ||
+        normalizeForComparison(employeeSelectionState) !== normalizeForComparison(initialState.employeeSelectionState) ||
+        normalizeForComparison(employeeActivities) !== normalizeForComparison(initialState.employeeActivities) ||
+        normalizeForComparison(locationTypes) !== normalizeForComparison(initialState.locationTypes) ||
+        normalizeForComparison(salesmanIkutRelations) !== normalizeForComparison(initialState.salesmanIkutRelations) ||
+        normalizeForComparison(ikutBagCounts) !== normalizeForComparison(initialState.ikutBagCounts) ||
+        normalizeForComparison(leaveEmployees) !== normalizeForComparison(initialState.leaveEmployees) ||
+        normalizeForComparison(leaveEmployeeActivities) !== normalizeForComparison(initialState.leaveEmployeeActivities) ||
+        normalizeForComparison(leaveBalances) !== normalizeForComparison(initialState.leaveBalances)
+      );
+    } catch (error) {
+      console.warn('Error comparing states, defaulting to no changes:', error);
+      return false;
+    }
   }, [
     formData,
     employeeSelectionState,
@@ -264,6 +282,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveBalances,
     initialState,
     isInitializationComplete,
+    mode,
+    normalizeForComparison,
   ]);
 
   const {
@@ -574,50 +594,48 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     return { available, remaining, message, taken, totalAllowed };
   };
 
-  // Add this useEffect to capture initial state
+  // Add this useEffect to capture initial state - only once after initialization is complete
+  const initialStateSetRef = useRef(false);
   useEffect(() => {
     if (
-      !initialState &&
+      !initialStateSetRef.current &&
       isInitializationComplete &&
       !loadingStaffs &&
       !loadingJobs &&
       !loadingPayCodeMappings &&
       expandedEmployees.length > 0
     ) {
-      setInitialState({
-        formData: JSON.parse(JSON.stringify(formData)),
-        employeeSelectionState: JSON.parse(
-          JSON.stringify(employeeSelectionState)
-        ),
-        employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
-        locationTypes: JSON.parse(JSON.stringify(locationTypes)),
-        salesmanIkutRelations: JSON.parse(
-          JSON.stringify(salesmanIkutRelations)
-        ),
-        ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
-        leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
-        leaveEmployeeActivities: JSON.parse(
-          JSON.stringify(leaveEmployeeActivities)
-        ),
-        leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
-      });
+      // Use a longer delay to ensure all initialization state updates are complete
+      const timeoutId = setTimeout(() => {
+        initialStateSetRef.current = true;
+        setInitialState({
+          formData: JSON.parse(JSON.stringify(formData)),
+          employeeSelectionState: JSON.parse(
+            JSON.stringify(employeeSelectionState)
+          ),
+          employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+          locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+          salesmanIkutRelations: JSON.parse(
+            JSON.stringify(salesmanIkutRelations)
+          ),
+          ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+          leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
+          leaveEmployeeActivities: JSON.parse(
+            JSON.stringify(leaveEmployeeActivities)
+          ),
+          leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
+        });
+      }, 300); // Longer delay to ensure stability
+
+      return () => clearTimeout(timeoutId);
     }
   }, [
+    // Only depend on initialization-related variables
     loadingStaffs,
     loadingJobs,
     loadingPayCodeMappings,
     expandedEmployees.length,
-    initialState,
     isInitializationComplete,
-    formData,
-    employeeSelectionState,
-    employeeActivities,
-    locationTypes,
-    salesmanIkutRelations,
-    ikutBagCounts,
-    leaveEmployees,
-    leaveEmployeeActivities,
-    leaveBalances,
   ]);
 
   // Add this useEffect to track initialization completion
