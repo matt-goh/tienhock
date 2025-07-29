@@ -406,7 +406,7 @@ const CutiReportPage: React.FC = () => {
               <tr className="bg-default-50">
                 {/* Cuti Tahunan sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
-                  Days
+                  Days Used 
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
                   Amount
@@ -416,7 +416,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 {/* Cuti Sakit sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
-                  Days
+                  Days Used 
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
                   Amount
@@ -426,7 +426,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 {/* Cuti Umum sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
-                  Days
+                  Days Used 
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
                   Amount
