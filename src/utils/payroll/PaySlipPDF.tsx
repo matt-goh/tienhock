@@ -241,7 +241,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     0
   );
 
-  const combinedTambahanTotal = tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
+  const combinedTambahanTotal =
+    tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
 
   // Group additional items by hours
   const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
@@ -266,7 +267,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
   const isMainten = payroll.job_type === "MAINTEN";
   const cutiTahunanRecords = leaveRecordsArray.filter(
-    record => record.leave_type === "cuti_tahunan"
+    (record) => record.leave_type === "cuti_tahunan"
   );
   const cutiTahunanAmount = cutiTahunanRecords.reduce(
     (sum, record) => sum + record.total_amount,
@@ -275,10 +276,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
 
   // Final payment - subtract mid-month payment and additional MAINTEN deduction
-  const finalPayment = payroll.net_pay - midMonthPayment - additionalMaintenDeduction;
-  // Round final payment to whole number if and only if it ends with .95 or above
-  const roundedFinalPayment =
-    finalPayment % 1 >= 0.95 ? Math.ceil(finalPayment) : finalPayment;
+  const finalPayment =
+    payroll.net_pay - midMonthPayment - additionalMaintenDeduction;
 
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
@@ -493,7 +492,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
             {/* Commission Records in Tambahan Section */}
             {commissionRecords.map((commission, index) => (
-              <View key={`tambahan-commission-${index}`} style={styles.tableRow}>
+              <View
+                key={`tambahan-commission-${index}`}
+                style={styles.tableRow}
+              >
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
                     <Text>{commission.description || "Commission"}</Text>
@@ -806,20 +808,28 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               // For MAINTEN job type, include Cuti Tahunan amounts and description
               const isMainten = payroll.job_type === "MAINTEN";
               const cutiTahunanRecords = leaveRecordsArray.filter(
-                record => record.leave_type === "cuti_tahunan"
+                (record) => record.leave_type === "cuti_tahunan"
               );
               const cutiTahunanAmount = cutiTahunanRecords.reduce(
                 (sum, record) => sum + record.total_amount,
                 0
               );
-              
-              const totalAmount = isMainten ? commission.amount + cutiTahunanAmount : commission.amount;
-              const description = isMainten && cutiTahunanRecords.length > 0
-                ? `${commission.description || "Commission"} + Cuti Tahunan (Advance)`
-                : `${commission.description || "Commission"} (Advance)`;
+
+              const totalAmount = isMainten
+                ? commission.amount + cutiTahunanAmount
+                : commission.amount;
+              const description =
+                isMainten && cutiTahunanRecords.length > 0
+                  ? `${
+                      commission.description || "Commission"
+                    } + Cuti Tahunan (Advance)`
+                  : `${commission.description || "Commission"} (Advance)`;
 
               return (
-                <View key={`commission-advance-${index}`} style={styles.tableRow}>
+                <View
+                  key={`commission-advance-${index}`}
+                  style={styles.tableRow}
+                >
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <Text>{description}</Text>
                   </View>
@@ -845,7 +855,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Mid Month Payment Deduction - Show if mid-month payment exists or commission records exist */}
-        {(midMonthPayroll || commissionRecords.length > 0) && (
+        {midMonthPayroll && (
           <>
             <View style={styles.tableRow}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
@@ -906,9 +916,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           <View
             style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
           >
-            <Text style={styles.totalText}>
-              {formatCurrency(roundedFinalPayment)}
-            </Text>
+            <Text style={styles.totalText}>{formatCurrency(finalPayment)}</Text>
           </View>
         </View>
       </View>
