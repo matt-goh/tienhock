@@ -376,13 +376,38 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </span>
                   </div>
                 )}
+                {payroll.job_type === "MAINTEN" && monthlyLeaveRecords.filter(record => record.leave_type === "cuti_tahunan").length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-sky-700">Cuti Tahunan Advance</span>
+                    <span className="font-medium text-sky-900">
+                      - {formatCurrency(
+                        monthlyLeaveRecords
+                          .filter(record => record.leave_type === "cuti_tahunan")
+                          .reduce((sum, record) => sum + record.amount_paid, 0)
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="border-t border-sky-200 mt-3 pt-3">
                 <div className="flex justify-between font-bold">
                   <span className="text-sky-800">Take Home Pay</span>
                   <span className="text-sky-900 text-xl">
                     {formatCurrency(
-                      payroll.net_pay - (midMonthPayroll?.amount || 0)
+                      (() => {
+                        // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
+                        const isMainten = payroll.job_type === "MAINTEN";
+                        const cutiTahunanRecords = monthlyLeaveRecords.filter(
+                          record => record.leave_type === "cuti_tahunan"
+                        );
+                        const cutiTahunanAmount = cutiTahunanRecords.reduce(
+                          (sum, record) => sum + record.amount_paid,
+                          0
+                        );
+                        const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
+                        
+                        return payroll.net_pay - (midMonthPayroll?.amount || 0) - additionalMaintenDeduction;
+                      })()
                     )}
                   </span>
                 </div>
