@@ -123,6 +123,28 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       amount_paid: parseFloat(record.amount_paid || 0),
     }));
 
+    // Get commission records for this employee for the specific month/year
+    const commissionRecordsRes = await pool.query(
+      `
+      SELECT amount, description
+      FROM commission_records
+      WHERE employee_id = $1
+        AND DATE(commission_date) >= $2
+        AND DATE(commission_date) <= $3
+      ORDER BY commission_date DESC
+    `,
+      [
+        employee_id,
+        `${year}-${month.toString().padStart(2, "0")}-01`,
+        `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`
+      ]
+    );
+    
+    const commissionRecords = commissionRecordsRes.rows.map((record) => ({
+      ...record,
+      amount: parseFloat(record.amount || 0),
+    }));
+
     // Get all active contribution rates
     const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
       await Promise.all([
@@ -181,7 +203,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // --- Main Calculation Logic ---
     const workGrossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
     const leaveGrossPay = leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0);
-    const grossPay = workGrossPay + leaveGrossPay;
+    const commissionGrossPay = commissionRecords.reduce((sum, record) => sum + record.amount, 0);
+    const grossPay = workGrossPay + leaveGrossPay + commissionGrossPay;
 
     const groupedItems = payrollItems.reduce(
       (acc, item) => {
@@ -196,7 +219,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     const epfGrossPay =
       (groupedItems.Base?.reduce((s, i) => s + i.amount, 0) || 0) +
       (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0) +
-      leaveGrossPay;
+      leaveGrossPay +
+      commissionGrossPay;
 
     const age = Math.floor(
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
@@ -356,7 +380,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (sum, d) => sum + d.employee_amount,
       0
     );
-    const netPay = grossPay - totalEmployeeDeductions;
+    // Commission amounts are deducted as advance payments
+    const totalCommissionDeductions = commissionGrossPay;
+    const netPay = grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 
     // Update gross pay and net pay
     await pool.query(
@@ -496,12 +522,76 @@ export default function (pool) {
         {}
       );
 
-      // Merge payrolls with their items, deductions, and leave records
+      // Get all mid-month payrolls for these payrolls in a single query
+      const midMonthQuery = `
+      SELECT 
+        ep.id as employee_payroll_id,
+        mmp.*,
+        s.name as employee_name
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN mid_month_payrolls mmp ON ep.employee_id = mmp.employee_id AND mp.year = mmp.year AND mp.month = mmp.month
+      LEFT JOIN staffs s ON mmp.employee_id = s.id
+      WHERE ep.id = ANY($1)
+      ORDER BY ep.id
+    `;
+      const midMonthResult = await pool.query(midMonthQuery, [payrollIds]);
+
+      // Group mid-month payrolls by employee_payroll_id
+      const midMonthByPayrollId = midMonthResult.rows.reduce(
+        (acc, record) => {
+          acc[record.employee_payroll_id] = {
+            ...record,
+            amount: parseFloat(record.amount)
+          };
+          delete acc[record.employee_payroll_id].employee_payroll_id;
+          return acc;
+        },
+        {}
+      );
+
+      // Get all commission records for these payrolls in a single query
+      const commissionsQuery = `
+      SELECT 
+        ep.id as employee_payroll_id,
+        cr.*,
+        s.name as employee_name
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN commission_records cr ON ep.employee_id = cr.employee_id
+      JOIN staffs s ON cr.employee_id = s.id
+      WHERE ep.id = ANY($1)
+        AND EXTRACT(YEAR FROM cr.commission_date) = mp.year
+        AND EXTRACT(MONTH FROM cr.commission_date) = mp.month
+      ORDER BY ep.id, cr.commission_date DESC
+    `;
+      const commissionsResult = await pool.query(commissionsQuery, [payrollIds]);
+
+      // Group commission records by employee_payroll_id
+      const commissionsByPayrollId = commissionsResult.rows.reduce(
+        (acc, record) => {
+          if (!acc[record.employee_payroll_id]) {
+            acc[record.employee_payroll_id] = [];
+          }
+          const commissionRecord = { ...record };
+          delete commissionRecord.employee_payroll_id;
+          acc[record.employee_payroll_id].push({
+            ...commissionRecord,
+            amount: parseFloat(commissionRecord.amount)
+          });
+          return acc;
+        },
+        {}
+      );
+
+      // Merge payrolls with their items, deductions, leave records, mid-month payrolls, and commission records
       const response = payrollsResult.rows.map((payroll) => ({
         ...payroll,
         items: itemsByPayrollId[payroll.id] || [],
         deductions: deductionsByPayrollId[payroll.id] || [],
         leave_records: leaveRecordsByPayrollId[payroll.id] || [],
+        mid_month_payroll: midMonthByPayrollId[payroll.id] || null,
+        commission_records: commissionsByPayrollId[payroll.id] || [],
         gross_pay: parseFloat(payroll.gross_pay),
         net_pay: parseFloat(payroll.net_pay),
       }));
@@ -645,7 +735,7 @@ export default function (pool) {
     }
   });
 
-  // Get employee payroll details with items
+  // Get employee payroll details with items (now includes comprehensive data)
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
 
@@ -664,51 +754,73 @@ export default function (pool) {
         return res.status(404).json({ message: "Employee payroll not found" });
       }
 
-      // Get payroll items
-      const itemsQuery = `
-        SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
-              pi.quantity, pi.amount, pi.is_manual, pc.pay_type
-        FROM payroll_items pi
-        LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
-        WHERE pi.employee_payroll_id = $1
-        ORDER BY pi.id
-      `;
-      const itemsResult = await pool.query(itemsQuery, [id]);
-
-      // Get payroll deductions
-      const deductionsQuery = `
-      SELECT pd.*, 
-             CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
-             CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
-             CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
-      FROM payroll_deductions pd
-      WHERE pd.employee_payroll_id = $1
-      ORDER BY pd.deduction_type
-    `;
-      const deductionsResult = await pool.query(deductionsQuery, [id]);
-
-      // Get leave records for this employee for the specific month/year
-      const leaveRecordsQuery = `
-      SELECT 
-        to_char(leave_date, 'YYYY-MM-DD') as date,
-        leave_type,
-        days_taken,
-        amount_paid
-      FROM leave_records
-      WHERE employee_id = $1 
-        AND EXTRACT(YEAR FROM leave_date) = $2
-        AND EXTRACT(MONTH FROM leave_date) = $3
-        AND status = 'approved'
-      ORDER BY leave_date ASC
-    `;
-      // Format response
       const payrollData = payrollResult.rows[0];
-      
-      const leaveRecordsResult = await pool.query(leaveRecordsQuery, [
-        payrollData.employee_id,
-        payrollData.year,
-        payrollData.month,
+
+      // Get all data in parallel for efficiency
+      const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
+        // Get payroll items
+        pool.query(`
+          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
+                pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+          FROM payroll_items pi
+          LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pi.employee_payroll_id = $1
+          ORDER BY pi.id
+        `, [id]),
+
+        // Get payroll deductions
+        pool.query(`
+          SELECT pd.*, 
+                 CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
+                 CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
+                 CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
+          FROM payroll_deductions pd
+          WHERE pd.employee_payroll_id = $1
+          ORDER BY pd.deduction_type
+        `, [id]),
+
+        // Get leave records for this employee for the specific month/year
+        pool.query(`
+          SELECT 
+            to_char(leave_date, 'YYYY-MM-DD') as date,
+            leave_type,
+            days_taken,
+            amount_paid
+          FROM leave_records
+          WHERE employee_id = $1 
+            AND EXTRACT(YEAR FROM leave_date) = $2
+            AND EXTRACT(MONTH FROM leave_date) = $3
+            AND status = 'approved'
+          ORDER BY leave_date ASC
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get mid-month payroll data
+        pool.query(`
+          SELECT 
+            mmp.*,
+            s.name as employee_name
+          FROM mid_month_payrolls mmp
+          LEFT JOIN staffs s ON mmp.employee_id = s.id
+          WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get commission records for the specific month/year
+        pool.query(`
+          SELECT cr.*, s.name as employee_name
+          FROM commission_records cr
+          JOIN staffs s ON cr.employee_id = s.id
+          WHERE cr.employee_id = $1
+            AND DATE(cr.commission_date) >= $2
+            AND DATE(cr.commission_date) <= $3
+          ORDER BY cr.commission_date DESC
+        `, [
+          payrollData.employee_id,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+        ])
       ]);
+
+      // Format comprehensive response
       const response = {
         ...payrollData,
         gross_pay: parseFloat(payrollData.gross_pay),
@@ -732,6 +844,14 @@ export default function (pool) {
           days_taken: parseFloat(record.days_taken),
           amount_paid: parseFloat(record.amount_paid || 0),
         })),
+        mid_month_payroll: midMonthResult.rows.length > 0 ? {
+          ...midMonthResult.rows[0],
+          amount: parseFloat(midMonthResult.rows[0].amount)
+        } : null,
+        commission_records: commissionsResult.rows.map((record) => ({
+          ...record,
+          amount: parseFloat(record.amount)
+        }))
       };
 
       res.json(response);

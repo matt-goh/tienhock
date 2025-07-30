@@ -245,14 +245,6 @@ export const printPayslip = async (
   let pdfUrl: string | null = null;
   let hasPrinted = false;
 
-  const cleanup = () => {
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    if (printFrame && printFrame.parentNode) {
-      document.body.removeChild(printFrame);
-    }
-    if (onAfterPrint) onAfterPrint();
-  };
-
   try {
     if (onBeforePrint) onBeforePrint();
 
@@ -286,19 +278,9 @@ export const printPayslip = async (
         setTimeout(() => {
           printFrame?.contentWindow?.print();
         }, 500);
-
-        // Handle print completion
-        const onFocus = () => {
-          window.removeEventListener("focus", onFocus);
-          clearTimeout(fallbackTimeout);
-          cleanup();
-        };
-        window.addEventListener("focus", onFocus);
-
-        const fallbackTimeout = setTimeout(() => {
-          window.removeEventListener("focus", onFocus);
-          cleanup();
-        }, timeout);
+        
+        // Note: Auto cleanup removed - print dialog will stay open until user closes it
+        if (onAfterPrint) onAfterPrint();
       }
     };
 
@@ -309,7 +291,11 @@ export const printPayslip = async (
       error instanceof Error ? error : new Error("Unknown error during print");
     toast.error(`Failed to print: ${errorObj.message}`);
     if (onError) onError(errorObj);
-    cleanup();
+    // Manual cleanup on error
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    if (printFrame && printFrame.parentNode) {
+      document.body.removeChild(printFrame);
+    }
   }
 };
 
@@ -339,14 +325,6 @@ export const printBatchPayslips = async (
   let printFrame: HTMLIFrameElement | null = null;
   let pdfUrl: string | null = null;
   let hasPrinted = false;
-
-  const cleanup = () => {
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    if (printFrame && printFrame.parentNode) {
-      document.body.removeChild(printFrame);
-    }
-    if (onAfterPrint) onAfterPrint();
-  };
 
   try {
     if (onBeforePrint) onBeforePrint();
@@ -402,18 +380,8 @@ export const printBatchPayslips = async (
           printFrame?.contentWindow?.print();
         }, 500);
 
-        // Handle print completion
-        const onFocus = () => {
-          window.removeEventListener("focus", onFocus);
-          clearTimeout(fallbackTimeout);
-          cleanup();
-        };
-        window.addEventListener("focus", onFocus);
-
-        const fallbackTimeout = setTimeout(() => {
-          window.removeEventListener("focus", onFocus);
-          cleanup();
-        }, timeout);
+        // Note: Auto cleanup removed - print dialog will stay open until user closes it
+        if (onAfterPrint) onAfterPrint();
       }
     };
 
@@ -426,7 +394,11 @@ export const printBatchPayslips = async (
         : new Error("Unknown error during batch print");
     toast.error(`Failed to print: ${errorObj.message}`);
     if (onError) onError(errorObj);
-    cleanup();
+    // Manual cleanup on error
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    if (printFrame && printFrame.parentNode) {
+      document.body.removeChild(printFrame);
+    }
   }
 };
 
