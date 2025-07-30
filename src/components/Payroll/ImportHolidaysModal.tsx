@@ -67,7 +67,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
             day = parts[1];
             description = parts.slice(2).join(" ");
           }
-        } 
+        }
         // Then try to parse as multiple spaces format (website with spaces)
         else if (line.match(/\s{2,}/)) {
           const parts = line.split(/\s{2,}/);
@@ -88,7 +88,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
             if (dateMatch) {
               dateStr = dateMatch[1];
               const remainingText = line.substring(dateMatch[0].length).trim();
-              
+
               // Extract day (usually 3 letters like Mon, Tue, Wed, etc.)
               const dayMatch = remainingText.match(/^(\w{3})\s+(.+)$/);
               if (dayMatch) {
@@ -235,11 +235,30 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                 {!showPreview ? (
                   <div className="mt-4">
                     <p className="text-sm text-gray-500 mb-2">
-                      Paste holiday data. Supports multiple formats:
-                      <br />• Tab-separated: "1 Jan	Wed	New Year's Day"
-                      <br />• Space-separated: "1 Jan Wed New Year's Day"
-                      <br />• Website copy-paste with HTML entities
+                      Paste the list of holidays below. The format is tailored
+                      for copying directly from sites like{" "}
+                      <a
+                        href="https://publicholidays.com.my/sabah/2026-dates/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sky-600 hover:underline"
+                      >
+                        publicholidays.com.my
+                      </a>
+                      .<br />
+                      You can also manually type entries.
+                      <br />
+                      Each holiday should be on a new line. For example:
                     </p>
+                    <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 mb-4">
+                      <code>
+                        1 Jan Wed New Year's Day
+                        <br />
+                        29 Jan Thu Chinese New Year
+                        <br />
+                        14 Feb Fri Valentine's Day
+                      </code>
+                    </pre>
                     <textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
