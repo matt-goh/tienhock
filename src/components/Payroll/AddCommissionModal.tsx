@@ -46,6 +46,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
     { id: Date.now(), employeeId: null, amount: "", description: "Commission" },
   ]);
   const [isSaving, setIsSaving] = useState(false);
+  const [staffQueries, setStaffQueries] = useState<Record<number, string>>({});
 
   const allStaffOptions = useMemo(
     () =>
@@ -67,6 +68,17 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
     setEntries(newEntries);
   };
 
+  const getStaffQuery = (entryId: number): string => {
+    return staffQueries[entryId] || "";
+  };
+
+  const setStaffQuery = (entryId: number, query: React.SetStateAction<string>) => {
+    setStaffQueries(prev => ({
+      ...prev,
+      [entryId]: typeof query === 'function' ? query(prev[entryId] || '') : query
+    }));
+  };
+
   const addEntryRow = () => {
     setEntries([
       ...entries,
@@ -82,6 +94,12 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
   const removeEntryRow = (id: number) => {
     if (entries.length > 1) {
       setEntries(entries.filter((entry) => entry.id !== id));
+      // Clean up the staff query for this entry
+      setStaffQueries(prev => {
+        const newQueries = { ...prev };
+        delete newQueries[id];
+        return newQueries;
+      });
     }
   };
 
@@ -122,6 +140,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
           description: "Commission",
         },
       ]);
+      setStaffQueries({});
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -145,6 +164,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
           description: "Commission",
         },
       ]);
+      setStaffQueries({});
       setCommissionDate(
         `${currentYear}-${currentMonth.toString().padStart(2, "0")}-01`
       );
@@ -227,8 +247,8 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
                                 handleEntryChange(index, "employeeId", value)
                               }
                               options={allStaffOptions}
-                              query=""
-                              setQuery={() => {}}
+                              query={getStaffQuery(entry.id)}
+                              setQuery={(query: React.SetStateAction<string>) => setStaffQuery(entry.id, query)}
                               placeholder="Select Staff..."
                               mode="single"
                             />
