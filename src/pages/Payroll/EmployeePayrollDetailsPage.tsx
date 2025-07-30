@@ -13,7 +13,7 @@ import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
-  getEmployeePayrollDetails,
+  getEmployeePayrollComprehensive,
   deletePayrollItem,
   groupItemsByType,
   getMonthName,
@@ -21,16 +21,11 @@ import {
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
-import { EmployeePayroll } from "../../types/types";
+import { EmployeePayroll, CommissionRecord, MidMonthPayroll } from "../../types/types";
 import {
   DownloadPayslipButton,
   PrintPayslipButton,
 } from "../../utils/payroll/PayslipButtons";
-import {
-  getMidMonthPayrollByEmployee,
-  MidMonthPayroll,
-} from "../../utils/payroll/midMonthPayrollUtils";
-import { api } from "../../routes/utils/api";
 
 interface PayrollItem {
   id: number;
@@ -55,16 +50,6 @@ interface MonthlyLeaveRecord {
   work_log_id?: number;
 }
 
-interface CommissionRecord {
-  id: number;
-  employee_id: string;
-  commission_date: string;
-  amount: number;
-  description: string;
-  created_by: string;
-  created_at: string;
-}
-
 const EmployeePayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -86,80 +71,26 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [isDeductionsExpanded, setIsDeductionsExpanded] = useState(false);
 
   useEffect(() => {
-    fetchEmployeePayroll();
+    fetchEmployeePayrollComprehensive();
   }, [id]);
 
-  useEffect(() => {
-    if (payroll) {
-      fetchMonthlyLeaveRecords();
-      fetchCommissionRecords();
-    }
-  }, [payroll]);
-
-  const fetchEmployeePayroll = async () => {
+  const fetchEmployeePayrollComprehensive = async () => {
     if (!id) return;
 
     setIsLoading(true);
     try {
-      const response = await getEmployeePayrollDetails(Number(id));
+      const response = await getEmployeePayrollComprehensive(Number(id));
+      
+      // Set all data from the comprehensive response
       setPayroll(response);
-
-      // Fetch mid-month payroll if payroll data exists
-      if (response && response.employee_id && response.year && response.month) {
-        const midMonthResponse = await getMidMonthPayrollByEmployee(
-          response.employee_id,
-          response.year,
-          response.month
-        );
-        setMidMonthPayroll(midMonthResponse);
-      }
+      setMidMonthPayroll(response.mid_month_payroll);
+      setMonthlyLeaveRecords(response.leave_records || []);
+      setCommissionRecords(response.commission_records || []);
     } catch (error) {
-      console.error("Error fetching employee payroll:", error);
+      console.error("Error fetching comprehensive employee payroll:", error);
       toast.error("Failed to load employee payroll details");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchMonthlyLeaveRecords = async () => {
-    if (!payroll || !payroll.employee_id) return;
-
-    try {
-      const response = await api.get(
-        `/api/leave-management/summary/${payroll.employee_id}/${payroll.year}/${payroll.month}`
-      );
-      setMonthlyLeaveRecords(response);
-    } catch (error) {
-      console.error("Error fetching monthly leave records:", error);
-      // Don't show error toast for leave records since they're optional
-    }
-  };
-
-  const fetchCommissionRecords = async () => {
-    if (!payroll || !payroll.employee_id || !payroll.year || !payroll.month)
-      return;
-
-    try {
-      // Build date range for the payroll month
-      const startDate = `${payroll.year}-${payroll.month
-        .toString()
-        .padStart(2, "0")}-01`;
-      const lastDay = new Date(payroll.year, payroll.month, 0).getDate();
-      const endDate = `${payroll.year}-${payroll.month
-        .toString()
-        .padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
-
-      const url = `/api/commissions?start_date=${encodeURIComponent(
-        startDate
-      )}&end_date=${encodeURIComponent(
-        endDate
-      )}&employee_id=${encodeURIComponent(payroll.employee_id)}`;
-
-      const response = await api.get(url);
-      setCommissionRecords(response || []);
-    } catch (error) {
-      console.error("Error fetching commission records:", error);
-      // Don't show error toast for commission records since they're optional
     }
   };
 
@@ -170,7 +101,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     try {
       await deletePayrollItem(itemToDelete.id);
       toast.success("Item deleted successfully");
-      await fetchEmployeePayroll();
+      await fetchEmployeePayrollComprehensive();
     } catch (error) {
       console.error("Error deleting payroll item:", error);
       toast.error("Failed to delete payroll item");
@@ -1148,7 +1079,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         isOpen={showAddItemModal}
         onClose={() => setShowAddItemModal(false)}
         employeePayrollId={Number(id)}
-        onItemAdded={fetchEmployeePayroll}
+        onItemAdded={fetchEmployeePayrollComprehensive}
       />
 
       {/* Delete Item Confirmation Dialog */}
