@@ -55,12 +55,69 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
         const line = lines[i].trim();
         if (!line) continue;
 
-        // Try to parse the line (handle both tab and multiple spaces)
-        const parts = line.split(/\t+|\s{2,}/);
-        if (parts.length < 3) continue;
+        let dateStr = "";
+        let day = "";
+        let description = "";
 
-        const [dateStr, day, ...descriptionParts] = parts;
-        const description = descriptionParts.join(" ");
+        // First, try to parse as tab-separated format (website copy-paste)
+        if (line.includes("\t")) {
+          const parts = line.split(/\t+/);
+          if (parts.length >= 3) {
+            dateStr = parts[0];
+            day = parts[1];
+            description = parts.slice(2).join(" ");
+          }
+        } 
+        // Then try to parse as multiple spaces format (website with spaces)
+        else if (line.match(/\s{2,}/)) {
+          const parts = line.split(/\s{2,}/);
+          if (parts.length >= 3) {
+            dateStr = parts[0];
+            day = parts[1];
+            description = parts.slice(2).join(" ");
+          }
+        }
+        // Finally, try to parse as single space format (manually typed)
+        else {
+          // For manually typed format like "1 Jan Wed New Year's Day"
+          // We need to be smarter about extracting date, day, and description
+          const words = line.split(/\s+/);
+          if (words.length >= 4) {
+            // Try to identify the date part (number + month)
+            const dateMatch = line.match(/^(\d{1,2}\s+\w{3})/);
+            if (dateMatch) {
+              dateStr = dateMatch[1];
+              const remainingText = line.substring(dateMatch[0].length).trim();
+              
+              // Extract day (usually 3 letters like Mon, Tue, Wed, etc.)
+              const dayMatch = remainingText.match(/^(\w{3})\s+(.+)$/);
+              if (dayMatch) {
+                day = dayMatch[1];
+                description = dayMatch[2];
+              } else {
+                // If day format doesn't match, treat first word as day
+                const parts = remainingText.split(/\s+/);
+                day = parts[0] || "";
+                description = parts.slice(1).join(" ");
+              }
+            } else {
+              // Fallback: assume first two words are date, third is day, rest is description
+              dateStr = `${words[0]} ${words[1]}`;
+              day = words[2];
+              description = words.slice(3).join(" ");
+            }
+          }
+        }
+
+        // Skip if we couldn't extract the minimum required parts
+        if (!dateStr || !description) continue;
+
+        // Clean up the description (remove HTML entities, extra spaces)
+        description = description
+          .replace(/&#10;/g, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
 
         // Parse date like "1 Jan" with the selected year
         try {
@@ -79,7 +136,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
 
           holidays.push({
             date: parsedDate,
-            day,
+            day: day.trim(),
             description,
             isDuplicate: !!existingHoliday,
             existingDescription: existingHoliday?.description,
@@ -178,14 +235,16 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                 {!showPreview ? (
                   <div className="mt-4">
                     <p className="text-sm text-gray-500 mb-2">
-                      Paste holiday data in the format: Date, Day, Holiday
-                      Description
+                      Paste holiday data. Supports multiple formats:
+                      <br />• Tab-separated: "1 Jan	Wed	New Year's Day"
+                      <br />• Space-separated: "1 Jan Wed New Year's Day"
+                      <br />• Website copy-paste with HTML entities
                     </p>
                     <textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                      placeholder="1 Jan	Wed	New Year's Day&#10;29 Jan	Wed	Chinese New Year&#10;..."
+                      placeholder="1 Jan Wed New Year's Day&#10;29 Jan Thu Chinese New Year&#10;14 Feb Fri Valentine's Day&#10;..."
                     />
                     <div className="mt-4 flex justify-end space-x-3">
                       <Button variant="outline" onClick={handleClose}>
