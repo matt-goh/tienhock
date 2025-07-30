@@ -54,7 +54,18 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
         ? emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           emp.id.toLowerCase().includes(searchQuery.toLowerCase())
         : true
-    );
+    )
+    .sort((a, b) => {
+      // Sort associated employees (current) at the top
+      const aAssociated = currentEmployeeIds.includes(a.id);
+      const bAssociated = currentEmployeeIds.includes(b.id);
+      
+      if (aAssociated && !bAssociated) return -1;
+      if (!aAssociated && bAssociated) return 1;
+      
+      // Within each group, sort alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
 
   const handleToggleEmployee = (employeeId: string) => {
     setSelectedEmployeeIds((prev) => {
