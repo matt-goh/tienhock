@@ -263,8 +263,19 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
 
-  // Final payment - subtract mid-month payment only (commission already deducted in net_pay)
-  const finalPayment = payroll.net_pay - midMonthPayment;
+  // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
+  const isMainten = payroll.job_type === "MAINTEN";
+  const cutiTahunanRecords = leaveRecordsArray.filter(
+    record => record.leave_type === "cuti_tahunan"
+  );
+  const cutiTahunanAmount = cutiTahunanRecords.reduce(
+    (sum, record) => sum + record.total_amount,
+    0
+  );
+  const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
+
+  // Final payment - subtract mid-month payment and additional MAINTEN deduction
+  const finalPayment = payroll.net_pay - midMonthPayment - additionalMaintenDeduction;
   // Round final payment to whole number if and only if it ends with .95 or above
   const roundedFinalPayment =
     finalPayment % 1 >= 0.95 ? Math.ceil(finalPayment) : finalPayment;
@@ -791,30 +802,45 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         {/* Commission Advance Deductions - Show below Jumlah Gaji Bersih */}
         {commissionRecords.length > 0 && (
           <>
-            {commissionRecords.map((commission, index) => (
-              <View key={`commission-advance-${index}`} style={styles.tableRow}>
-                <View style={[styles.tableCol, styles.descriptionCol]}>
-                  <Text>
-                    {commission.description || "Commission"} (Advance)
-                  </Text>
+            {commissionRecords.map((commission, index) => {
+              // For MAINTEN job type, include Cuti Tahunan amounts and description
+              const isMainten = payroll.job_type === "MAINTEN";
+              const cutiTahunanRecords = leaveRecordsArray.filter(
+                record => record.leave_type === "cuti_tahunan"
+              );
+              const cutiTahunanAmount = cutiTahunanRecords.reduce(
+                (sum, record) => sum + record.total_amount,
+                0
+              );
+              
+              const totalAmount = isMainten ? commission.amount + cutiTahunanAmount : commission.amount;
+              const description = isMainten && cutiTahunanRecords.length > 0
+                ? `${commission.description || "Commission"} + Cuti Tahunan (Advance)`
+                : `${commission.description || "Commission"} (Advance)`;
+
+              return (
+                <View key={`commission-advance-${index}`} style={styles.tableRow}>
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>{description}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text></Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({formatCurrency(totalAmount)})</Text>
+                  </View>
                 </View>
-                <View style={[styles.tableCol, styles.rateCol]}>
-                  <Text></Text>
-                </View>
-                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                  <Text></Text>
-                </View>
-                <View
-                  style={[
-                    styles.tableCol,
-                    styles.amountCol,
-                    { borderRightWidth: 0 },
-                  ]}
-                >
-                  <Text>({formatCurrency(commission.amount)})</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </>
         )}
 
