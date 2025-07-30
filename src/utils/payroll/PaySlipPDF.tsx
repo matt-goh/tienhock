@@ -1,10 +1,7 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
 import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import {
-  EmployeePayroll,
-  MidMonthPayroll,
-} from "../../types/types";
+import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
 // Create styles
@@ -237,7 +234,14 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     0
   );
 
-  const combinedTambahanTotal = tambahanTotalAmount + leaveTotalAmount;
+  // Commission records data
+  const commissionRecords = payroll.commission_records || [];
+  const commissionTotalAmount = commissionRecords.reduce(
+    (sum, record) => sum + record.amount,
+    0
+  );
+
+  const combinedTambahanTotal = tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
 
   // Group additional items by hours
   const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
@@ -259,7 +263,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
 
-  // Final payment
+  // Final payment - subtract mid-month payment only (commission already deducted in net_pay)
   const finalPayment = payroll.net_pay - midMonthPayment;
   // Round final payment to whole number if and only if it ends with .95 or above
   const roundedFinalPayment =
@@ -443,7 +447,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
         {/* Tambahan Pay Items */}
         {(groupedItems["Tambahan"].length > 0 ||
-          leaveRecordsArray.length > 0) && (
+          leaveRecordsArray.length > 0 ||
+          commissionRecords.length > 0) && (
           <>
             {/* Tambahan Items */}
             {groupedItems["Tambahan"].map((item, index) => (
@@ -471,6 +476,32 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                   ]}
                 >
                   <Text>{formatCurrency(item.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Commission Records in Tambahan Section */}
+            {commissionRecords.map((commission, index) => (
+              <View key={`tambahan-commission-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{commission.description || "Commission"}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>Advance</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(commission.amount)}</Text>
                 </View>
               </View>
             ))}
@@ -734,7 +765,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           style={[
             styles.tableRow,
             styles.jumlahGajiBersihRow,
-            !midMonthPayroll ? { borderBottomWidth: 0 } : {},
+            !(midMonthPayroll || commissionRecords.length > 0)
+              ? { borderBottomWidth: 0 }
+              : {},
           ]}
         >
           <View style={[styles.tableCol, styles.descriptionCol]}>
@@ -750,13 +783,43 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
           >
             <Text style={styles.totalText}>
-              {formatCurrency(payroll.net_pay)}
+              {formatCurrency(payroll.net_pay + commissionTotalAmount)}
             </Text>
           </View>
         </View>
 
-        {/* Mid Month Payment Deduction - Only show if mid-month payment exists */}
-        {midMonthPayroll && (
+        {/* Commission Advance Deductions - Show below Jumlah Gaji Bersih */}
+        {commissionRecords.length > 0 && (
+          <>
+            {commissionRecords.map((commission, index) => (
+              <View key={`commission-advance-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <Text>
+                    {commission.description || "Commission"} (Advance)
+                  </Text>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text></Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>({formatCurrency(commission.amount)})</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
+        {/* Mid Month Payment Deduction - Show if mid-month payment exists or commission records exist */}
+        {(midMonthPayroll || commissionRecords.length > 0) && (
           <>
             <View style={styles.tableRow}>
               <View style={[styles.tableCol, styles.descriptionCol]}>

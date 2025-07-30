@@ -21,7 +21,11 @@ import {
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
-import { EmployeePayroll, CommissionRecord, MidMonthPayroll } from "../../types/types";
+import {
+  EmployeePayroll,
+  CommissionRecord,
+  MidMonthPayroll,
+} from "../../types/types";
 import {
   DownloadPayslipButton,
   PrintPayslipButton,
@@ -80,7 +84,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await getEmployeePayrollComprehensive(Number(id));
-      
+
       // Set all data from the comprehensive response
       setPayroll(response);
       setMidMonthPayroll(response.mid_month_payroll);
@@ -350,6 +354,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       </span>
                     </div>
                   ))}
+                {commissionRecords.length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-sky-700">Commission Advance</span>
+                    <span className="font-medium text-sky-900">
+                      -{" "}
+                      {formatCurrency(
+                        commissionRecords.reduce(
+                          (sum, record) => sum + Number(record.amount),
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                )}
                 {midMonthPayroll && (
                   <div className="flex justify-between text-sm">
                     <span className="text-sky-700">Mid-month Advance</span>
