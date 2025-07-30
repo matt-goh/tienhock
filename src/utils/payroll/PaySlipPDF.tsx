@@ -778,7 +778,11 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           style={[
             styles.tableRow,
             styles.jumlahGajiBersihRow,
-            !(midMonthPayroll || commissionRecords.length > 0)
+            !(
+              midMonthPayroll ||
+              commissionRecords.length > 0 ||
+              (isMainten && cutiTahunanAmount > 0)
+            )
               ? { borderBottomWidth: 0 }
               : {},
           ]}
@@ -854,7 +858,33 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           </>
         )}
 
-        {/* Mid Month Payment Deduction - Show if mid-month payment exists or commission records exist */}
+        {/* Cuti Tahunan Deduction for MAINTEN job type when no commission records */}
+        {commissionRecords.length === 0 &&
+          isMainten &&
+          cutiTahunanAmount > 0 && (
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text>Cuti Tahunan (Advance)</Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text></Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>({formatCurrency(cutiTahunanAmount)})</Text>
+              </View>
+            </View>
+          )}
+
+        {/* Mid Month Payment Deduction - Show if mid-month payment exists */}
         {midMonthPayroll && (
           <>
             <View style={styles.tableRow}>
@@ -877,29 +907,35 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 <Text>({formatCurrency(midMonthPayment)})</Text>
               </View>
             </View>
-            <View style={[styles.tableRow, styles.jumlahRow]}>
-              <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.rateCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text style={styles.totalText}>Jumlah</Text>
-              </View>
-              <View
-                style={[
-                  styles.tableCol,
-                  styles.amountCol,
-                  { borderRightWidth: 0 },
-                ]}
-              >
-                <Text style={styles.totalText}>
-                  {formatCurrency(finalPayment)}
-                </Text>
-              </View>
-            </View>
           </>
+        )}
+
+        {/* Jumlah Row - Show if there are deductions (mid-month, commission, or MAINTEN Cuti Tahunan) */}
+        {(midMonthPayroll ||
+          commissionRecords.length > 0 ||
+          (isMainten && cutiTahunanAmount > 0)) && (
+          <View style={[styles.tableRow, styles.jumlahRow]}>
+            <View style={[styles.tableCol, styles.descriptionCol]}>
+              <Text></Text>
+            </View>
+            <View style={[styles.tableCol, styles.rateCol]}>
+              <Text></Text>
+            </View>
+            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+              <Text style={styles.totalText}>Jumlah</Text>
+            </View>
+            <View
+              style={[
+                styles.tableCol,
+                styles.amountCol,
+                { borderRightWidth: 0 },
+              ]}
+            >
+              <Text style={styles.totalText}>
+                {formatCurrency(finalPayment)}
+              </Text>
+            </View>
+          </View>
         )}
 
         {/* Final Rounded Amount Row */}
