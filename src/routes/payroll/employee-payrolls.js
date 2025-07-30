@@ -744,6 +744,202 @@ export default function (pool) {
     }
   });
 
+  // Batch create or update multiple employee payrolls
+  router.post("/batch", async (req, res) => {
+    const {
+      monthly_payroll_id,
+      employee_payrolls = []
+    } = req.body;
+
+    // Validate required fields
+    if (!monthly_payroll_id || !Array.isArray(employee_payrolls) || employee_payrolls.length === 0) {
+      return res.status(400).json({
+        message: "monthly_payroll_id and employee_payrolls array are required",
+      });
+    }
+
+    // Validate each employee payroll
+    for (const payroll of employee_payrolls) {
+      if (!payroll.employee_id || !payroll.job_type || !payroll.section) {
+        return res.status(400).json({
+          message: "Each employee payroll must have employee_id, job_type, and section",
+        });
+      }
+    }
+
+    const client = await pool.connect();
+    const results = [];
+    const errors = [];
+
+    try {
+      await client.query("BEGIN");
+
+      // Process each employee payroll
+      for (let i = 0; i < employee_payrolls.length; i++) {
+        const payroll = employee_payrolls[i];
+        const {
+          employee_id,
+          job_type,
+          section,
+          gross_pay,
+          net_pay,
+          status = "Processing",
+          items = [],
+          deductions = [],
+        } = payroll;
+
+        try {
+          // Check if employee payroll exists
+          const checkQuery = `
+            SELECT id FROM employee_payrolls 
+            WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
+          `;
+          const checkResult = await client.query(checkQuery, [
+            monthly_payroll_id,
+            employee_id,
+            job_type,
+          ]);
+
+          let employeePayrollId;
+
+          if (checkResult.rows.length > 0) {
+            // Update existing employee payroll
+            employeePayrollId = checkResult.rows[0].id;
+
+            const updateQuery = `
+              UPDATE employee_payrolls
+              SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5
+              WHERE id = $6
+              RETURNING *
+            `;
+
+            await client.query(updateQuery, [
+              job_type,
+              section,
+              gross_pay || 0,
+              net_pay || 0,
+              status,
+              employeePayrollId,
+            ]);
+
+            // Delete existing items to replace with new ones
+            await client.query(
+              "DELETE FROM payroll_items WHERE employee_payroll_id = $1",
+              [employeePayrollId]
+            );
+          } else {
+            // Create a new employee payroll
+            const insertQuery = `
+              INSERT INTO employee_payrolls (
+                monthly_payroll_id, employee_id, job_type, section,
+                gross_pay, net_pay, status
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              RETURNING id
+            `;
+
+            const insertResult = await client.query(insertQuery, [
+              monthly_payroll_id,
+              employee_id,
+              job_type,
+              section,
+              gross_pay || 0,
+              net_pay || 0,
+              status,
+            ]);
+
+            employeePayrollId = insertResult.rows[0].id;
+          }
+
+          // Insert new payroll items
+          if (items.length > 0) {
+            const itemValues = items
+              .map((item) => {
+                return `(
+                ${employeePayrollId},
+                '${item.pay_code_id}',
+                '${item.description.replace(/'/g, "''")}',
+                ${item.rate},
+                '${item.rate_unit}',
+                ${item.quantity},
+                ${item.amount},
+                ${item.is_manual || false}
+              )`;
+              })
+              .join(", ");
+
+            const itemsQuery = `
+              INSERT INTO payroll_items (
+                employee_payroll_id, pay_code_id, description, 
+                rate, rate_unit, quantity, amount, is_manual
+              )
+              VALUES ${itemValues}
+              RETURNING id
+            `;
+
+            await client.query(itemsQuery);
+          }
+
+          // Save deductions if provided
+          if (deductions && deductions.length > 0) {
+            await saveDeductions(client, employeePayrollId, deductions);
+          }
+
+          results.push({
+            employee_id,
+            job_type,
+            employee_payroll_id: employeePayrollId,
+            status: "success"
+          });
+
+        } catch (error) {
+          console.error(`Error processing employee ${employee_id}:`, error);
+          errors.push({
+            employee_id,
+            job_type,
+            error: error.message,
+            status: "error"
+          });
+        }
+      }
+
+      await client.query("COMMIT");
+
+      // Run recalculation for all successful payrolls in parallel
+      const recalculationPromises = results.map(async (result) => {
+        try {
+          await recalculateAndUpdatePayroll(pool, result.employee_payroll_id);
+        } catch (error) {
+          console.error(`Error recalculating payroll for employee ${result.employee_id}:`, error);
+          // Don't fail the entire batch for recalculation errors
+        }
+      });
+
+      await Promise.all(recalculationPromises);
+
+      res.status(201).json({
+        message: `Batch processing completed: ${results.length} successful, ${errors.length} errors`,
+        results,
+        errors,
+        summary: {
+          total: employee_payrolls.length,
+          successful: results.length,
+          errors: errors.length
+        }
+      });
+
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error in batch processing employee payrolls:", error);
+      res.status(500).json({
+        message: "Error in batch processing employee payrolls",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // Create or update an employee payroll
   router.post("/", async (req, res) => {
     const {

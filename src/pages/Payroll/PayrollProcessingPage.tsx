@@ -13,7 +13,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   getMonthlyPayrollDetails,
   processMonthlyPayroll,
-  saveEmployeePayroll,
+  saveEmployeePayrollsBatch,
   getEligibleEmployees,
   getMonthName,
 } from "../../utils/payroll/payrollUtils";
@@ -195,61 +195,82 @@ const PayrollProcessingPage: React.FC = () => {
     > = {};
 
     selectedCombinations.forEach(({ employeeId, jobType }) => {
-      initialStatus[`${employeeId}-${jobType}`] = "pending";
+      initialStatus[`${employeeId}-${jobType}`] = "processing";
     });
 
     setProcessingStatus(initialStatus);
 
-    const processingResults: EmployeePayroll[] = [];
+    try {
+      // Calculate payrolls for all selected employees
+      const employeePayrolls: EmployeePayroll[] = [];
 
-    // Process in batches to avoid locking the UI
-    const batchSize = 5;
-    for (let i = 0; i < selectedCombinations.length; i += batchSize) {
-      const batch = selectedCombinations.slice(i, i + batchSize);
+      selectedCombinations.forEach(({ employeeId, jobType }) => {
+        try {
+          // Get section from job data
+          const job = jobs.find((j) => j.id === jobType);
+          const section = job?.section?.[0] || "Unknown";
 
-      await Promise.all(
-        batch.map(async ({ employeeId, jobType }) => {
+          // Calculate employee payroll
+          const employeePayroll =
+            PayrollCalculationService.processEmployeePayrollWithDeductions(
+              logs,
+              employeeId,
+              jobType,
+              section,
+              payroll.month,
+              payroll.year,
+              staffs, // Pass staffs for age/nationality lookup
+              epfRates,
+              socsoRates,
+              sipRates,
+              incomeTaxRates
+            );
+
+          employeePayrolls.push(employeePayroll);
+        } catch (error) {
+          console.error(`Error calculating payroll for employee ${employeeId}:`, error);
           const key = `${employeeId}-${jobType}`;
-          try {
-            setProcessingStatus((prev) => ({ ...prev, [key]: "processing" }));
+          setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
+        }
+      });
 
-            // Get section from job data
-            const job = jobs.find((j) => j.id === jobType);
-            const section = job?.section?.[0] || "Unknown";
+      // Save all payrolls in a single batch request
+      const batchResponse = await saveEmployeePayrollsBatch(payroll.id, employeePayrolls);
 
-            // Calculate employee payroll
-            const employeePayroll =
-              PayrollCalculationService.processEmployeePayrollWithDeductions(
-                logs,
-                employeeId,
-                jobType,
-                section,
-                payroll.month,
-                payroll.year,
-                staffs, // Pass staffs for age/nationality lookup
-                epfRates,
-                socsoRates,
-                sipRates,
-                incomeTaxRates
-              );
+      // Update processing status based on batch response
+      if (batchResponse.results) {
+        batchResponse.results.forEach((result: any) => {
+          const key = `${result.employee_id}-${result.job_type}`;
+          setProcessingStatus((prev) => ({ ...prev, [key]: "success" }));
+        });
+      }
 
-            // Save to the server (including deductions)
-            await saveEmployeePayroll(payroll.id, employeePayroll);
+      if (batchResponse.errors) {
+        batchResponse.errors.forEach((error: any) => {
+          const key = `${error.employee_id}-${error.job_type}`;
+          setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
+        });
+      }
 
-            processingResults.push(employeePayroll);
-            setProcessingStatus((prev) => ({ ...prev, [key]: "success" }));
-          } catch (error) {
-            console.error(`Error processing employee ${employeeId}:`, error);
-            setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
-          }
-        })
-      );
+      setProcessedPayrolls(employeePayrolls);
 
-      // Small delay to allow UI updates
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Show batch processing summary
+      const { successful = 0, errors: errorCount = 0, total = 0 } = batchResponse.summary || {};
+      if (errorCount > 0) {
+        toast.error(`Processing completed with ${errorCount} errors out of ${total} employees`);
+      } else {
+        toast.success(`Successfully processed ${successful} employees`);
+      }
+
+    } catch (error) {
+      console.error("Error in batch processing:", error);
+      // Mark all as error if batch processing fails
+      selectedCombinations.forEach(({ employeeId, jobType }) => {
+        const key = `${employeeId}-${jobType}`;
+        setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
+      });
+      toast.error("Failed to process employee payrolls");
     }
-
-    setProcessedPayrolls(processingResults);
 
     // Refresh payroll details to show new data
     await fetchPayrollDetails();
@@ -309,11 +330,6 @@ const PayrollProcessingPage: React.FC = () => {
       </div>
     );
   }
-
-  // Calculate total employees eligible for processing
-  const totalEligibleEmployees = Object.values(
-    eligibleData.jobEmployeeMap
-  ).reduce((sum, employees) => sum + employees.length, 0);
 
   // Calculate total selected employees
   const totalSelectedEmployees = Object.entries(selectedEmployees).reduce(
