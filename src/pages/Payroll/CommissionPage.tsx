@@ -127,7 +127,7 @@ const CommissionPage: React.FC = () => {
 
   // Calculate total amount
   const totalAmount = commissions.reduce(
-    (sum, commission) => sum + commission.amount,
+    (sum, commission) => sum + (Number(commission.amount) || 0),
     0
   );
 
