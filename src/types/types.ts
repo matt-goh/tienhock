@@ -636,6 +636,19 @@ export interface EmployeePayroll {
   items: PayrollItem[];
   deductions?: PayrollDeduction[];
   leave_records?: LeaveRecord[];
+  mid_month_payroll?: MidMonthPayroll | null;
+  commission_records?: CommissionRecord[];
+}
+
+export interface CommissionRecord {
+  id: number;
+  employee_id: string;
+  commission_date: string;
+  amount: number;
+  description: string;
+  created_by: string;
+  created_at: string;
+  employee_name?: string;
 }
 
 export interface LeaveRecord {

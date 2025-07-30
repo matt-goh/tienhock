@@ -208,6 +208,21 @@ export const getEmployeePayrollDetailsBatch = async (
 };
 
 /**
+ * Fetches comprehensive employee payroll with all related data (items, deductions, leave records, mid-month payroll, commissions)
+ * @param id Employee payroll ID
+ * @returns Comprehensive employee payroll data
+ */
+export const getEmployeePayrollComprehensive = async (id: number) => {
+  try {
+    const response = await api.get(`/api/employee-payrolls/${id}/comprehensive`);
+    return response;
+  } catch (error) {
+    console.error("Error fetching comprehensive employee payroll details:", error);
+    throw error;
+  }
+};
+
+/**
  * Fetches detailed employee payroll with items
  * @param id Employee payroll ID
  * @returns Employee payroll with items

@@ -516,6 +516,135 @@ export default function (pool) {
     }
   });
 
+  // Get comprehensive employee payroll details with all related data
+  router.get("/:id/comprehensive", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // Get employee payroll details
+      const payrollQuery = `
+        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        LEFT JOIN staffs s ON ep.employee_id = s.id
+        WHERE ep.id = $1
+      `;
+      const payrollResult = await pool.query(payrollQuery, [id]);
+
+      if (payrollResult.rows.length === 0) {
+        return res.status(404).json({ message: "Employee payroll not found" });
+      }
+
+      const payrollData = payrollResult.rows[0];
+
+      // Get all data in parallel for efficiency
+      const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
+        // Get payroll items
+        pool.query(`
+          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
+                pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+          FROM payroll_items pi
+          LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pi.employee_payroll_id = $1
+          ORDER BY pi.id
+        `, [id]),
+
+        // Get payroll deductions
+        pool.query(`
+          SELECT pd.*, 
+                 CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
+                 CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
+                 CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
+          FROM payroll_deductions pd
+          WHERE pd.employee_payroll_id = $1
+          ORDER BY pd.deduction_type
+        `, [id]),
+
+        // Get leave records for this employee for the specific month/year
+        pool.query(`
+          SELECT 
+            to_char(leave_date, 'YYYY-MM-DD') as date,
+            leave_type,
+            days_taken,
+            amount_paid
+          FROM leave_records
+          WHERE employee_id = $1 
+            AND EXTRACT(YEAR FROM leave_date) = $2
+            AND EXTRACT(MONTH FROM leave_date) = $3
+            AND status = 'approved'
+          ORDER BY leave_date ASC
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get mid-month payroll data
+        pool.query(`
+          SELECT 
+            mmp.*,
+            s.name as employee_name
+          FROM mid_month_payrolls mmp
+          LEFT JOIN staffs s ON mmp.employee_id = s.id
+          WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get commission records for the specific month/year
+        pool.query(`
+          SELECT cr.*, s.name as employee_name
+          FROM commission_records cr
+          JOIN staffs s ON cr.employee_id = s.id
+          WHERE cr.employee_id = $1
+            AND DATE(cr.commission_date) >= $2
+            AND DATE(cr.commission_date) <= $3
+          ORDER BY cr.commission_date DESC
+        `, [
+          payrollData.employee_id,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+        ])
+      ]);
+
+      // Format comprehensive response
+      const response = {
+        ...payrollData,
+        gross_pay: parseFloat(payrollData.gross_pay),
+        net_pay: parseFloat(payrollData.net_pay),
+        items: itemsResult.rows.map((item) => ({
+          ...item,
+          rate: parseFloat(item.rate),
+          quantity: parseFloat(item.quantity),
+          amount: parseFloat(item.amount),
+          is_manual: !!item.is_manual,
+        })),
+        deductions: deductionsResult.rows.map((deduction) => ({
+          ...deduction,
+          employee_amount: parseFloat(deduction.employee_amount),
+          employer_amount: parseFloat(deduction.employer_amount),
+          wage_amount: parseFloat(deduction.wage_amount),
+          rate_info: deduction.rate_info || {},
+        })),
+        leave_records: leaveRecordsResult.rows.map((record) => ({
+          ...record,
+          days_taken: parseFloat(record.days_taken),
+          amount_paid: parseFloat(record.amount_paid || 0),
+        })),
+        mid_month_payroll: midMonthResult.rows.length > 0 ? {
+          ...midMonthResult.rows[0],
+          amount: parseFloat(midMonthResult.rows[0].amount)
+        } : null,
+        commission_records: commissionsResult.rows.map((record) => ({
+          ...record,
+          amount: parseFloat(record.amount)
+        }))
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error fetching comprehensive employee payroll details:", error);
+      res.status(500).json({
+        message: "Error fetching comprehensive employee payroll details",
+        error: error.message,
+      });
+    }
+  });
+
   // Get employee payroll details with items
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
