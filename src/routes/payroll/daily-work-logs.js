@@ -455,6 +455,8 @@ export default function (pool) {
     const { id } = req.params;
 
     try {
+      await pool.query("BEGIN");
+
       // Check if the work log is processed
       const checkQuery = `
       SELECT status FROM daily_work_logs WHERE id = $1
@@ -462,16 +464,32 @@ export default function (pool) {
       const checkResult = await pool.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
+        await pool.query("ROLLBACK");
         return res.status(404).json({ message: "Work log not found" });
       }
 
       if (checkResult.rows[0].status === "Processed") {
+        await pool.query("ROLLBACK");
         return res.status(400).json({
           message: "Cannot delete processed work log",
         });
       }
 
-      // Delete the work log (cascade will delete related entries)
+      // Delete leave records first (foreign key constraint)
+      await pool.query("DELETE FROM leave_records WHERE work_log_id = $1", [id]);
+
+      // Delete daily work log activities
+      await pool.query(`
+        DELETE FROM daily_work_log_activities 
+        WHERE log_entry_id IN (
+          SELECT id FROM daily_work_log_entries WHERE work_log_id = $1
+        )
+      `, [id]);
+
+      // Delete daily work log entries
+      await pool.query("DELETE FROM daily_work_log_entries WHERE work_log_id = $1", [id]);
+
+      // Finally delete the work log
       const deleteQuery = `
       DELETE FROM daily_work_logs
       WHERE id = $1
@@ -479,8 +497,11 @@ export default function (pool) {
     `;
 
       await pool.query(deleteQuery, [id]);
+      await pool.query("COMMIT");
+
       res.json({ message: "Work log deleted successfully" });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error deleting work log:", error);
       res.status(500).json({
         message: "Error deleting work log",
