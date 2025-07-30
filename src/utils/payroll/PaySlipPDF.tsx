@@ -206,6 +206,44 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     0
   );
 
+  // Group leave records by leave type and sum amounts
+  const groupedLeaveRecords = (payroll.leave_records || []).reduce(
+    (acc, record) => {
+      const leaveType = record.leave_type;
+      if (!acc[leaveType]) {
+        acc[leaveType] = {
+          leave_type: leaveType,
+          total_days: 0,
+          total_amount: 0,
+        };
+      }
+      acc[leaveType].total_days += record.days_taken;
+      acc[leaveType].total_amount += record.amount_paid;
+      return acc;
+    },
+    {} as Record<
+      string,
+      { leave_type: string; total_days: number; total_amount: number }
+    >
+  );
+
+  const leaveRecordsArray = Object.values(groupedLeaveRecords);
+
+  const leaveTotalAmount = leaveRecordsArray.reduce(
+    (sum, record) => sum + record.total_amount,
+    0
+  );
+
+  // Commission records data
+  const commissionRecords = payroll.commission_records || [];
+  const commissionTotalAmount = commissionRecords.reduce(
+    (sum, record) => sum + record.amount,
+    0
+  );
+
+  const combinedTambahanTotal =
+    tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
+
   // Group additional items by hours
   const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
   const overtimeTotalAmount = groupedItems.Overtime.reduce(
@@ -226,11 +264,20 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
 
-  // Final payment
-  const finalPayment = payroll.net_pay - midMonthPayment;
-  // Round final payment to whole number if and only if it ends with .95 or above
-  const roundedFinalPayment =
-    finalPayment % 1 >= 0.95 ? Math.ceil(finalPayment) : finalPayment;
+  // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
+  const isMainten = payroll.job_type === "MAINTEN";
+  const cutiTahunanRecords = leaveRecordsArray.filter(
+    (record) => record.leave_type === "cuti_tahunan"
+  );
+  const cutiTahunanAmount = cutiTahunanRecords.reduce(
+    (sum, record) => sum + record.total_amount,
+    0
+  );
+  const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
+
+  // Final payment - subtract mid-month payment and additional MAINTEN deduction
+  const finalPayment =
+    payroll.net_pay - midMonthPayment - additionalMaintenDeduction;
 
   // Helper function to format currency
   const formatCurrency = (amount: number) => {
@@ -238,6 +285,14 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  // Helper function to prettify leave type text
+  const prettifyLeaveType = (leaveType: string) => {
+    return leaveType
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   // Helper function to format description based on rate unit
@@ -401,7 +456,9 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Tambahan Pay Items */}
-        {groupedItems["Tambahan"].length > 0 && (
+        {(groupedItems["Tambahan"].length > 0 ||
+          leaveRecordsArray.length > 0 ||
+          commissionRecords.length > 0) && (
           <>
             {/* Tambahan Items */}
             {groupedItems["Tambahan"].map((item, index) => (
@@ -433,6 +490,61 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               </View>
             ))}
 
+            {/* Commission Records in Tambahan Section */}
+            {commissionRecords.map((commission, index) => (
+              <View
+                key={`tambahan-commission-${index}`}
+                style={styles.tableRow}
+              >
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{commission.description || "Commission"}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>Advance</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(commission.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Leave Records */}
+            {leaveRecordsArray.map((leaveRecord, index) => (
+              <View key={`leave-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{prettifyLeaveType(leaveRecord.leave_type)}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>{leaveRecord.total_days} Hari</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(leaveRecord.total_amount)}</Text>
+                </View>
+              </View>
+            ))}
+
             {/* Tambahan Subtotal Row */}
             <View style={[styles.tableRow, styles.subtotalRow]}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
@@ -452,7 +564,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 ]}
               >
                 <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                  {formatCurrency(tambahanTotalAmount)}
+                  {formatCurrency(combinedTambahanTotal)}
                 </Text>
               </View>
             </View>
@@ -666,7 +778,13 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           style={[
             styles.tableRow,
             styles.jumlahGajiBersihRow,
-            !midMonthPayroll ? { borderBottomWidth: 0 } : {},
+            !(
+              midMonthPayroll ||
+              commissionRecords.length > 0 ||
+              (isMainten && cutiTahunanAmount > 0)
+            )
+              ? { borderBottomWidth: 0 }
+              : {},
           ]}
         >
           <View style={[styles.tableCol, styles.descriptionCol]}>
@@ -682,20 +800,96 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
           >
             <Text style={styles.totalText}>
-              {formatCurrency(payroll.net_pay)}
+              {formatCurrency(payroll.net_pay + commissionTotalAmount)}
             </Text>
           </View>
         </View>
 
-        {/* Mid Month Payment Deduction - Only show if mid-month payment exists */}
+        {/* Commission Advance Deductions - Show below Jumlah Gaji Bersih */}
+        {commissionRecords.length > 0 && (
+          <>
+            {commissionRecords.map((commission, index) => {
+              // For MAINTEN job type, include Cuti Tahunan amounts and description
+              const isMainten = payroll.job_type === "MAINTEN";
+              const cutiTahunanRecords = leaveRecordsArray.filter(
+                (record) => record.leave_type === "cuti_tahunan"
+              );
+              const cutiTahunanAmount = cutiTahunanRecords.reduce(
+                (sum, record) => sum + record.total_amount,
+                0
+              );
+
+              const totalAmount = isMainten
+                ? commission.amount + cutiTahunanAmount
+                : commission.amount;
+              const description =
+                isMainten && cutiTahunanRecords.length > 0
+                  ? `${
+                      commission.description || "Commission"
+                    } + Cuti Tahunan (Advance)`
+                  : `${commission.description || "Commission"} (Advance)`;
+
+              return (
+                <View
+                  key={`commission-advance-${index}`}
+                  style={styles.tableRow}
+                >
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <Text>{description}</Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text></Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>({formatCurrency(totalAmount)})</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
+
+        {/* Cuti Tahunan Deduction for MAINTEN job type when no commission records */}
+        {commissionRecords.length === 0 &&
+          isMainten &&
+          cutiTahunanAmount > 0 && (
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text>Cuti Tahunan (Advance)</Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text></Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>({formatCurrency(cutiTahunanAmount)})</Text>
+              </View>
+            </View>
+          )}
+
+        {/* Mid Month Payment Deduction - Show if mid-month payment exists */}
         {midMonthPayroll && (
           <>
             <View style={styles.tableRow}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text>
-                  Bayaran Pertama (1) Gaji Pertengahan Bulan (
-                  {midMonthPayroll.payment_method})
-                </Text>
+                <Text>BAYARAN PENDAHULUAN (ADVANCES PAYMENT)</Text>
               </View>
               <View style={[styles.tableCol, styles.rateCol]}>
                 <Text></Text>
@@ -713,29 +907,35 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 <Text>({formatCurrency(midMonthPayment)})</Text>
               </View>
             </View>
-            <View style={[styles.tableRow, styles.jumlahRow]}>
-              <View style={[styles.tableCol, styles.descriptionCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.rateCol]}>
-                <Text></Text>
-              </View>
-              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
-                <Text style={styles.totalText}>Jumlah</Text>
-              </View>
-              <View
-                style={[
-                  styles.tableCol,
-                  styles.amountCol,
-                  { borderRightWidth: 0 },
-                ]}
-              >
-                <Text style={styles.totalText}>
-                  {formatCurrency(finalPayment)}
-                </Text>
-              </View>
-            </View>
           </>
+        )}
+
+        {/* Jumlah Row - Show if there are deductions (mid-month, commission, or MAINTEN Cuti Tahunan) */}
+        {(midMonthPayroll ||
+          commissionRecords.length > 0 ||
+          (isMainten && cutiTahunanAmount > 0)) && (
+          <View style={[styles.tableRow, styles.jumlahRow]}>
+            <View style={[styles.tableCol, styles.descriptionCol]}>
+              <Text></Text>
+            </View>
+            <View style={[styles.tableCol, styles.rateCol]}>
+              <Text></Text>
+            </View>
+            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+              <Text style={styles.totalText}>Jumlah</Text>
+            </View>
+            <View
+              style={[
+                styles.tableCol,
+                styles.amountCol,
+                { borderRightWidth: 0 },
+              ]}
+            >
+              <Text style={styles.totalText}>
+                {formatCurrency(finalPayment)}
+              </Text>
+            </View>
+          </View>
         )}
 
         {/* Final Rounded Amount Row */}
@@ -752,9 +952,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           <View
             style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
           >
-            <Text style={styles.totalText}>
-              {formatCurrency(roundedFinalPayment)}
-            </Text>
+            <Text style={styles.totalText}>{formatCurrency(finalPayment)}</Text>
           </View>
         </View>
       </View>

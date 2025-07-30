@@ -65,10 +65,10 @@ const HolidayCalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full mt-2">
+    <div className="relative w-full -mt-2">
       <div className="mb-2 flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
-          Holiday Calendar
+          Holiday Calendar ({holidays.length})
         </h1>
         <div className="mt-4 md:mt-0 flex items-center gap-4">
           {/* Year Navigation */}

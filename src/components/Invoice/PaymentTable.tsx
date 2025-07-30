@@ -134,6 +134,23 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     return acc;
   }, {} as Record<string, Payment[]>);
 
+  // Sort groups so that groups with any pending payments appear at the top
+  const sortedGroupEntries = Object.entries(groupedPayments).sort(([, groupA], [, groupB]) => {
+    // Check if any payment in group A has pending status
+    const groupAHasPending = groupA.some(p => p.status === 'pending');
+    // Check if any payment in group B has pending status
+    const groupBHasPending = groupB.some(p => p.status === 'pending');
+    
+    // First priority: groups with pending payments go to top
+    if (groupAHasPending && !groupBHasPending) return -1;
+    if (!groupAHasPending && groupBHasPending) return 1;
+    
+    // Second priority: sort by payment date (newest first)
+    const dateA = new Date(groupA[0].payment_date).getTime();
+    const dateB = new Date(groupB[0].payment_date).getTime();
+    return dateB - dateA;
+  });
+
   if (payments.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
@@ -177,7 +194,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {Object.entries(groupedPayments).map(
+            {sortedGroupEntries.map(
               ([reference, paymentGroup]) => {
                 const isGrouped = paymentGroup.length > 1;
                 const firstPayment = paymentGroup[0];

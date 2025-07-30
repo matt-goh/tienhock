@@ -43,6 +43,13 @@ export interface WorkLogEntry {
   activities: WorkLogActivity[];
 }
 
+export interface LeaveRecord {
+  date: string;
+  leave_type: string;
+  days_taken: number;
+  amount_paid: number;
+}
+
 export interface WorkLog {
   id: number;
   log_date: string;
@@ -187,6 +194,7 @@ export class PayrollCalculationService {
    * @param section Section
    * @param month Month (1-12)
    * @param year Year
+   * @param leaveRecords Array of leave records for the month (optional)
    * @returns Processed employee payroll
    */
   static processEmployeePayroll(
@@ -195,7 +203,8 @@ export class PayrollCalculationService {
     job_type: string,
     section: string,
     month: number,
-    year: number
+    year: number,
+    leaveRecords?: LeaveRecord[]
   ): EmployeePayroll {
     // Aggregate work logs to get payroll items
     const payrollItem = this.aggregateWorkLogs(
@@ -206,8 +215,8 @@ export class PayrollCalculationService {
       year
     );
 
-    // Calculate totals
-    const { gross_pay, net_pay } = this.calculatePayrollTotals(payrollItem);
+    // Calculate totals including leave records
+    const { gross_pay, net_pay } = this.calculatePayrollTotals(payrollItem, leaveRecords);
 
     return {
       employee_id,
@@ -220,16 +229,25 @@ export class PayrollCalculationService {
   }
 
   /**
-   * Calculates total gross and net pay from payroll items
+   * Calculates total gross and net pay from payroll items and leave records
    * @param items Array of payroll items
+   * @param leaveRecords Array of leave records (optional)
    * @returns Object with grossPay and netPay
    */
-  static calculatePayrollTotals(items: PayrollItem[]): {
+  static calculatePayrollTotals(items: PayrollItem[], leaveRecords?: LeaveRecord[]): {
     gross_pay: number;
     net_pay: number;
   } {
-    // Sum all amounts to get gross pay
-    const grossPay = items.reduce((sum, item) => sum + item.amount, 0);
+    // Sum all amounts to get gross pay from work items
+    const workGrossPay = items.reduce((sum, item) => sum + item.amount, 0);
+    
+    // Sum all leave amounts
+    const leaveGrossPay = leaveRecords 
+      ? leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0) 
+      : 0;
+    
+    // Total gross pay includes both work and leave
+    const grossPay = workGrossPay + leaveGrossPay;
 
     // For now, net pay equals gross pay
     // This can be extended to handle deductions
@@ -281,6 +299,7 @@ export class PayrollCalculationService {
    * @param socsoRates Array of SOCSO rates
    * @param sipRates Array of SIP rates
    * @param incomeTaxRates Array of Income Tax rates (optional, default is empty)
+   * @param leaveRecords Array of leave records for additional gross pay calculation (optional)
    * @returns Array of calculated deductions
    */
   static calculateContributions(
@@ -290,7 +309,8 @@ export class PayrollCalculationService {
     epfRates: EPFRate[],
     socsoRates: SOCSORRate[],
     sipRates: SIPRate[],
-    incomeTaxRates: IncomeTaxRate[] = []
+    incomeTaxRates: IncomeTaxRate[] = [],
+    leaveRecords?: LeaveRecord[]
   ): PayrollDeduction[] {
     const deductions: PayrollDeduction[] = [];
 
@@ -313,16 +333,22 @@ export class PayrollCalculationService {
     // Group payroll items by type
     const groupedItems = groupItemsByType(payrollItems);
 
-    // Calculate EPF gross pay (excludes Overtime)
+    // Calculate leave amounts
+    const leaveGrossPay = leaveRecords 
+      ? leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0) 
+      : 0;
+
+    // Calculate EPF gross pay (excludes Overtime but includes leave)
     const epfGrossPay =
       groupedItems.Base.reduce((sum, item) => sum + item.amount, 0) +
-      groupedItems.Tambahan.reduce((sum, item) => sum + item.amount, 0);
+      groupedItems.Tambahan.reduce((sum, item) => sum + item.amount, 0) +
+      leaveGrossPay;
 
-    // Calculate total gross pay (includes all pay types for SOCSO and SIP)
+    // Calculate total gross pay (includes all pay types and leave for SOCSO and SIP)
     const totalGrossPay = payrollItems.reduce(
       (sum, item) => sum + item.amount,
       0
-    );
+    ) + leaveGrossPay;
 
     // Determine employee type for EPF
     const employeeType = getEmployeeType(nationality, age);
@@ -446,6 +472,7 @@ export class PayrollCalculationService {
    * @param socsoRates Array of SOCSO rates
    * @param sipRates Array of SIP rates
    * @param incomeTaxRates Array of Income Tax rates (optional, default is empty)
+   * @param leaveRecords Array of leave records for the month (optional)
    * @returns Processed employee payroll with deductions
    */
   static processEmployeePayrollWithDeductions(
@@ -459,19 +486,21 @@ export class PayrollCalculationService {
     epfRates: EPFRate[],
     socsoRates: SOCSORRate[],
     sipRates: SIPRate[],
-    incomeTaxRates: IncomeTaxRate[] = []
+    incomeTaxRates: IncomeTaxRate[] = [],
+    leaveRecords?: LeaveRecord[]
   ): EmployeePayroll & { deductions: PayrollDeduction[] } {
-    // First calculate the basic payroll (without deductions)
+    // First calculate the basic payroll (including leave records)
     const basePayroll = this.processEmployeePayroll(
       workLogs,
       employee_id,
       job_type,
       section,
       month,
-      year
+      year,
+      leaveRecords
     );
 
-    // Calculate deductions based on gross pay
+    // Calculate deductions based on gross pay (which now includes leave amounts)
     const deductions = this.calculateContributions(
       basePayroll.items,
       employee_id,
@@ -479,7 +508,8 @@ export class PayrollCalculationService {
       epfRates,
       socsoRates,
       sipRates,
-      incomeTaxRates
+      incomeTaxRates,
+      leaveRecords
     );
 
     // Calculate total employee deductions

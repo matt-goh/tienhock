@@ -33,6 +33,7 @@ import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
+import CommissionPage from "./Payroll/CommissionPage";
 
 // Catalogue related imports
 // Staff
@@ -127,6 +128,12 @@ const generatePayrollSubItems = (): SidebarItem[] => {
         },
       ],
     });
+  });
+
+  payrollSubItems.push({
+    name: "Commission",
+    path: "/payroll/commission",
+    component: CommissionPage,
   });
 
   payrollSubItems.push({

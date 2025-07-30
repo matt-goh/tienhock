@@ -1,214 +1,323 @@
 // src/pages/Payroll/CommissionPage.tsx
-import React, { useState, useMemo } from "react";
-import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import React, { useState, useEffect, useMemo } from "react";
+import { format } from "date-fns";
+import {
+  IconPlus,
+  IconEdit,
+  IconTrash,
+  IconCash,
+  IconRefresh,
+} from "@tabler/icons-react";
 import Button from "../../components/Button";
-import { IconDeviceFloppy, IconPlus, IconX } from "@tabler/icons-react";
-import { FormCombobox, FormInput } from "../../components/FormComponents";
-import toast from "react-hot-toast";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { FormListbox } from "../../components/FormComponents";
+import { getMonthName } from "../../utils/payroll/payrollUtils";
+import AddCommissionModal from "../../components/Payroll/AddCommissionModal";
+import EditCommissionModal from "../../components/Payroll/EditCommissionModal";
 import { api } from "../../routes/utils/api";
-import { useAuth } from "../../contexts/AuthContext";
+import toast from "react-hot-toast";
 
-interface CommissionEntry {
-  id: number; // For unique key in list
-  employeeId: string | null;
-  amount: string;
+interface Commission {
+  id: number;
+  employee_id: string;
+  employee_name: string;
+  commission_date: string;
+  amount: number;
   description: string;
+  created_by: string;
+  created_at: string;
 }
 
 const CommissionPage: React.FC = () => {
-  const { staffs } = useStaffsCache();
-  const { user } = useAuth();
-  const [commissionDate, setCommissionDate] = useState(
-    new Date().toISOString().split("T")[0]
+  // State
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCommission, setEditingCommission] = useState<Commission | null>(
+    null
   );
-  const [entries, setEntries] = useState<CommissionEntry[]>([
-    { id: Date.now(), employeeId: null, amount: "", description: "" },
-  ]);
-  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const maintenanceStaffOptions = useMemo(
+  // Filters
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+
+  // Generate year and month options
+  const yearOptions = useMemo(() => {
+    const years = [];
+    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
+      years.push({ id: year, name: year.toString() });
+    }
+    return years;
+  }, [currentYear]);
+
+  const monthOptions = useMemo(
     () =>
-      staffs
-        .filter((staff) => staff.job.includes("MAINTEN"))
-        .map((staff) => ({
-          id: staff.id,
-          name: `${staff.name} (${staff.id})`,
-        })),
-    [staffs]
+      Array.from({ length: 12 }, (_, i) => ({
+        id: i + 1,
+        name: getMonthName(i + 1),
+      })),
+    []
   );
 
-  const handleEntryChange = (
-    index: number,
-    field: keyof CommissionEntry,
-    value: any
-  ) => {
-    const newEntries = [...entries];
-    // @ts-ignore
-    newEntries[index][field] = value;
-    setEntries(newEntries);
-  };
+  // Load commissions on mount and filter changes
+  useEffect(() => {
+    fetchCommissions();
+  }, [currentYear, currentMonth]);
 
-  const addEntryRow = () => {
-    setEntries([
-      ...entries,
-      { id: Date.now(), employeeId: null, amount: "", description: "" },
-    ]);
-  };
+  const fetchCommissions = async () => {
+    setIsLoading(true);
+    try {
+      const startDate = `${currentYear}-${currentMonth
+        .toString()
+        .padStart(2, "0")}-01`;
+      
+      // Get the last day of the current month
+      const lastDay = new Date(currentYear, currentMonth, 0).getDate();
+      const endDate = `${currentYear}-${currentMonth
+        .toString()
+        .padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
 
-  const removeEntryRow = (id: number) => {
-    if (entries.length > 1) {
-      setEntries(entries.filter((entry) => entry.id !== id));
+      console.log("Fetching commissions with dates:", { startDate, endDate });
+
+      // Build URL with query parameters
+      const url = `/api/commissions?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+      
+      const response = await api.get(url);
+      
+      console.log("Commission API response:", response);
+      setCommissions(response || []);
+    } catch (error) {
+      console.error("Error fetching commissions:", error);
+      toast.error("Failed to load commissions");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    const validEntries = entries.filter(
-      (e) => e.employeeId && parseFloat(e.amount) > 0 && e.description
-    );
-    if (validEntries.length === 0) {
-      toast.error(
-        "Please add at least one valid commission entry with staff, amount, and description."
-      );
-      return;
-    }
+  const handleEdit = (commission: Commission) => {
+    setEditingCommission(commission);
+    setShowEditModal(true);
+  };
 
-    setIsSaving(true);
-
-    const promises = validEntries.map((entry) => {
-      const payload = {
-        employee_id: entry.employeeId,
-        commission_date: commissionDate,
-        amount: parseFloat(entry.amount),
-        description: entry.description,
-        created_by: user?.id,
-      };
-      return api.post("/api/commissions", payload);
-    });
+  const handleDeleteCommission = async () => {
+    if (!deletingId) return;
 
     try {
-      await Promise.all(promises);
-      toast.success(
-        `${validEntries.length} commission record(s) saved successfully!`
-      );
-      setEntries([
-        { id: Date.now(), employeeId: null, amount: "", description: "" },
-      ]);
-    } catch (error: any) {
-      console.error("Failed to save commissions:", error);
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to save one or more commissions."
-      );
-    } finally {
-      setIsSaving(false);
+      await api.delete(`/api/commissions/${deletingId}`);
+      toast.success("Commission deleted successfully");
+      setShowDeleteDialog(false);
+      setDeletingId(null);
+      await fetchCommissions();
+    } catch (error) {
+      console.error("Error deleting commission:", error);
+      toast.error("Failed to delete commission");
     }
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-MY", {
+      style: "currency",
+      currency: "MYR",
+    }).format(amount);
+  };
+
+  // Calculate total amount
+  const totalAmount = commissions.reduce(
+    (sum, commission) => sum + (Number(commission.amount) || 0),
+    0
+  );
+
   return (
-    <div className="mt-4">
-      <h1 className="text-2xl font-bold text-default-800 mb-4">
-        Record Maintenance Commission
-      </h1>
-      <div className="bg-white p-6 rounded-xl border border-default-200 shadow-sm">
-        <div className="max-w-xs mb-4">
-          <FormInput
-            name="commissionDate"
-            label="Commission Date"
-            type="date"
-            value={commissionDate}
-            onChange={(e) => setCommissionDate(e.target.value)}
-            required
-          />
-        </div>
-
-        <table className="min-w-full">
-          <thead>
-            <tr>
-              <th className="py-2 text-left font-medium text-default-600 w-2/5">
-                Staff (Maintenance)
-              </th>
-              <th className="py-2 px-3 text-left font-medium text-default-600 w-1/5">
-                Amount (RM)
-              </th>
-              <th className="py-2 px-3 text-left font-medium text-default-600 w-2/5">
-                Description
-              </th>
-              <th className="py-2 text-left font-medium text-default-600"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry, index) => (
-              <tr key={entry.id} className="group">
-                <td className="py-2 align-top">
-                  <FormCombobox
-                    name={`employee-${index}`}
-                    label=""
-                    value={entry.employeeId ?? undefined}
-                    onChange={(value) =>
-                      handleEntryChange(index, "employeeId", value)
-                    }
-                    options={maintenanceStaffOptions}
-                    query=""
-                    setQuery={() => {}}
-                    placeholder="Select Staff..."
-                    mode="single"
-                  />
-                </td>
-                <td className="py-2 px-3 align-top">
-                  <FormInput
-                    name={`amount-${index}`}
-                    label=""
-                    type="number"
-                    value={entry.amount}
-                    onChange={(e) =>
-                      handleEntryChange(index, "amount", e.target.value)
-                    }
-                    placeholder="0.00"
-                    step="0.01"
-                  />
-                </td>
-                <td className="py-2 px-3 align-top">
-                  <FormInput
-                    name={`description-${index}`}
-                    label=""
-                    type="text"
-                    value={entry.description}
-                    onChange={(e) =>
-                      handleEntryChange(index, "description", e.target.value)
-                    }
-                    placeholder="e.g., Special repair work"
-                  />
-                </td>
-                <td className="py-2 align-top">
-                  {entries.length > 1 && (
-                    <button
-                      onClick={() => removeEntryRow(entry.id)}
-                      className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Remove row"
-                    >
-                      <IconX size={18} />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="flex justify-between items-center mt-6 border-t border-default-200 pt-6">
-          <Button variant="outline" onClick={addEntryRow} icon={IconPlus}>
-            Add Row
+    <div className="relative w-full space-y-4 mx-4 md:mx-6">
+      <div className="flex flex-col md:flex-row justify-between items-center">
+        <h1 className="text-xl font-semibold text-default-800">
+          Commission Records
+        </h1>
+        <div className="flex space-x-3 mt-4 md:mt-0">
+          <Button
+            onClick={fetchCommissions}
+            icon={IconRefresh}
+            variant="outline"
+            disabled={isLoading}
+          >
+            Refresh
           </Button>
           <Button
+            onClick={() => setShowAddModal(true)}
+            icon={IconPlus}
             color="sky"
-            onClick={handleSave}
-            disabled={isSaving}
-            icon={IconDeviceFloppy}
+            variant="filled"
           >
-            {isSaving ? "Saving..." : "Save Commissions"}
+            Add Commission
           </Button>
         </div>
       </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <FormListbox
+            name="year"
+            label="Year"
+            value={currentYear.toString()}
+            onChange={(value) => setCurrentYear(Number(value))}
+            options={yearOptions}
+          />
+          <FormListbox
+            name="month"
+            label="Month"
+            value={currentMonth.toString()}
+            onChange={(value) => setCurrentMonth(Number(value))}
+            options={monthOptions}
+          />
+          <div className="flex items-end">
+            <div className="text-sm text-default-600">
+              <div className="font-medium">
+                Total: {commissions.length} records
+              </div>
+              <div className="font-medium">
+                Amount: {formatCurrency(totalAmount)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Commissions Table */}
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm">
+        <div className="px-6 py-4 border-b border-default-200">
+          <h2 className="text-lg font-medium text-default-800">
+            {getMonthName(currentMonth)} {currentYear}
+          </h2>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <LoadingSpinner />
+          </div>
+        ) : commissions.length === 0 ? (
+          <div className="text-center py-12 text-default-500">
+            <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
+            <p className="text-lg font-medium">No commissions found</p>
+            <p>Click "Add Commission" to create commission records</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-default-200">
+              <thead className="bg-default-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Employee ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-default-200">
+                {commissions.map((commission) => (
+                  <tr key={commission.id} className="hover:bg-default-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                      {commission.employee_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                      {commission.employee_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900">
+                      {formatCurrency(commission.amount)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                      {commission.description}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
+                      {format(
+                        new Date(commission.commission_date),
+                        "dd MMM yyyy"
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
+                      {format(new Date(commission.created_at), "dd MMM yyyy")}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end space-x-3">
+                        <button
+                          onClick={() => handleEdit(commission)}
+                          className="text-sky-600 hover:text-sky-800"
+                          title="Edit"
+                        >
+                          <IconEdit size={18} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeletingId(commission.id);
+                            setShowDeleteDialog(true);
+                          }}
+                          className="text-rose-600 hover:text-rose-800"
+                          title="Delete"
+                        >
+                          <IconTrash size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <AddCommissionModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchCommissions}
+        currentYear={currentYear}
+        currentMonth={currentMonth}
+      />
+
+      <EditCommissionModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingCommission(null);
+        }}
+        onSuccess={fetchCommissions}
+        commission={editingCommission}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeletingId(null);
+        }}
+        onConfirm={handleDeleteCommission}
+        title="Delete Commission"
+        message="Are you sure you want to delete this commission record? This action cannot be undone."
+        confirmButtonText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

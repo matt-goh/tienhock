@@ -49,7 +49,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
   return (
     <button
       onClick={() => onClick(job)}
-      className="block w-full p-4 border border-default-200 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 transition-all duration-150 text-left bg-white h-full min-h-[120px]" // Added min-h
+      className="block w-full p-4 border border-default-200 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white h-full min-h-[120px]" // Added min-h
     >
       <h3
         className="text-base font-semibold text-default-800 truncate mb-1"

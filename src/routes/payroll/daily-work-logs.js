@@ -188,13 +188,27 @@ export default function (pool) {
         })
       );
 
-      res.json({
-        ...workLogResult.rows[0],
-        employeeEntries: entriesWithActivities,
-        leaveRecords: leaveRecordsResult.rows.map((record) => ({
+      // Create a set of employee IDs who have leave records
+      const leaveEmployeeIds = new Set(leaveRecordsResult.rows.map(record => record.employee_id));
+
+      // Separate regular entries from leave entries by checking if employee has a leave record
+      const regularEntries = entriesWithActivities.filter(entry => !leaveEmployeeIds.has(entry.employee_id));
+      const leaveEntries = entriesWithActivities.filter(entry => leaveEmployeeIds.has(entry.employee_id));
+
+      // Merge leave activities back into leave records
+      const leaveRecordsWithActivities = leaveRecordsResult.rows.map((record) => {
+        const leaveEntry = leaveEntries.find(entry => entry.employee_id === record.employee_id);
+        return {
           ...record,
           amount_paid: parseFloat(record.amount_paid),
-        })),
+          activities: leaveEntry ? leaveEntry.activities : [],
+        };
+      });
+
+      res.json({
+        ...workLogResult.rows[0],
+        employeeEntries: regularEntries,
+        leaveRecords: leaveRecordsWithActivities,
       });
     } catch (error) {
       console.error("Error fetching work log details:", error);
@@ -348,8 +362,21 @@ export default function (pool) {
         leaveEntries.length > 0
       ) {
         for (const leave of leaveEntries) {
-          const { employeeId, leaveType, amount_paid } = leave;
+          const { employeeId, leaveType, amount_paid, activities } = leave;
 
+          // Get employee's primary job for the leave entry
+          const employeeJobQuery = `
+            SELECT job FROM staffs WHERE id = $1
+          `;
+          const employeeJobResult = await pool.query(employeeJobQuery, [employeeId]);
+          const employeeJobs = employeeJobResult.rows[0]?.job || [];
+          const primaryJob = employeeJobs.length > 0 ? employeeJobs[0] : null;
+
+          if (!primaryJob) {
+            throw new Error(`Employee ${employeeId} has no job assigned`);
+          }
+
+          // Insert leave record
           const leaveQuery = `
             INSERT INTO leave_records (
               employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
@@ -363,6 +390,47 @@ export default function (pool) {
             1.0,
             amount_paid || 0,
           ]);
+
+          // Create a leave entry in daily_work_log_entries for activities
+          const leaveEntryQuery = `
+            INSERT INTO daily_work_log_entries (
+              work_log_id, employee_id, job_id, total_hours
+            ) VALUES ($1, $2, $3, $4)
+            RETURNING id
+          `;
+          const leaveEntryResult = await pool.query(leaveEntryQuery, [
+            id,
+            employeeId,
+            primaryJob, // Use employee's primary job
+            8, // Standard 8 hours for leave
+          ]);
+
+          const leaveEntryId = leaveEntryResult.rows[0].id;
+
+          // Insert leave activities
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                const activityQuery = `
+                  INSERT INTO daily_work_log_activities (
+                    log_entry_id, pay_code_id, hours_applied, 
+                    units_produced, rate_used, calculated_amount,
+                    is_manually_added
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `;
+
+                await pool.query(activityQuery, [
+                  leaveEntryId,
+                  activity.payCodeId,
+                  activity.hoursApplied,
+                  activity.unitsProduced || null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  false,
+                ]);
+              }
+            }
+          }
         }
       }
 
@@ -387,6 +455,8 @@ export default function (pool) {
     const { id } = req.params;
 
     try {
+      await pool.query("BEGIN");
+
       // Check if the work log is processed
       const checkQuery = `
       SELECT status FROM daily_work_logs WHERE id = $1
@@ -394,16 +464,32 @@ export default function (pool) {
       const checkResult = await pool.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
+        await pool.query("ROLLBACK");
         return res.status(404).json({ message: "Work log not found" });
       }
 
       if (checkResult.rows[0].status === "Processed") {
+        await pool.query("ROLLBACK");
         return res.status(400).json({
           message: "Cannot delete processed work log",
         });
       }
 
-      // Delete the work log (cascade will delete related entries)
+      // Delete leave records first (foreign key constraint)
+      await pool.query("DELETE FROM leave_records WHERE work_log_id = $1", [id]);
+
+      // Delete daily work log activities
+      await pool.query(`
+        DELETE FROM daily_work_log_activities 
+        WHERE log_entry_id IN (
+          SELECT id FROM daily_work_log_entries WHERE work_log_id = $1
+        )
+      `, [id]);
+
+      // Delete daily work log entries
+      await pool.query("DELETE FROM daily_work_log_entries WHERE work_log_id = $1", [id]);
+
+      // Finally delete the work log
       const deleteQuery = `
       DELETE FROM daily_work_logs
       WHERE id = $1
@@ -411,8 +497,11 @@ export default function (pool) {
     `;
 
       await pool.query(deleteQuery, [id]);
+      await pool.query("COMMIT");
+
       res.json({ message: "Work log deleted successfully" });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error deleting work log:", error);
       res.status(500).json({
         message: "Error deleting work log",
@@ -537,8 +626,21 @@ export default function (pool) {
         leaveEntries.length > 0
       ) {
         for (const leave of leaveEntries) {
-          const { employeeId, leaveType, amount_paid } = leave;
+          const { employeeId, leaveType, amount_paid, activities } = leave;
 
+          // Get employee's primary job for the leave entry
+          const employeeJobQuery = `
+            SELECT job FROM staffs WHERE id = $1
+          `;
+          const employeeJobResult = await pool.query(employeeJobQuery, [employeeId]);
+          const employeeJobs = employeeJobResult.rows[0]?.job || [];
+          const primaryJob = employeeJobs.length > 0 ? employeeJobs[0] : null;
+
+          if (!primaryJob) {
+            throw new Error(`Employee ${employeeId} has no job assigned`);
+          }
+
+          // Insert leave record
           const leaveQuery = `
             INSERT INTO leave_records (
               employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
@@ -552,6 +654,47 @@ export default function (pool) {
             1.0, // Assuming full day leave for now
             amount_paid || 0,
           ]);
+
+          // Create a leave entry in daily_work_log_entries for activities
+          const leaveEntryQuery = `
+            INSERT INTO daily_work_log_entries (
+              work_log_id, employee_id, job_id, total_hours
+            ) VALUES ($1, $2, $3, $4)
+            RETURNING id
+          `;
+          const leaveEntryResult = await pool.query(leaveEntryQuery, [
+            workLogId,
+            employeeId,
+            primaryJob, // Use employee's primary job
+            8, // Standard 8 hours for leave
+          ]);
+
+          const leaveEntryId = leaveEntryResult.rows[0].id;
+
+          // Insert leave activities
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                const activityQuery = `
+                  INSERT INTO daily_work_log_activities (
+                    log_entry_id, pay_code_id, hours_applied, 
+                    units_produced, rate_used, calculated_amount,
+                    is_manually_added
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `;
+
+                await pool.query(activityQuery, [
+                  leaveEntryId,
+                  activity.payCodeId,
+                  activity.hoursApplied,
+                  activity.unitsProduced || null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  false,
+                ]);
+              }
+            }
+          }
         }
       }
 

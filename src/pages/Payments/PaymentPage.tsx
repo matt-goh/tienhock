@@ -57,6 +57,7 @@ const monthOptions: MonthOption[] = [
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [sortedPayments, setSortedPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -80,7 +81,7 @@ const PaymentPage: React.FC = () => {
         end,
       },
       paymentMethod: null,
-      status: "pending", // Default to pending payments
+      status: "active", // Default to active payments
       searchTerm: "",
     };
   });
@@ -116,6 +117,19 @@ const PaymentPage: React.FC = () => {
 
       const response = await api.get(`/api/payments/all?${params.toString()}`);
       setPayments(response);
+      
+      // Sort payments with pending status at the top, then by date
+      const sorted = [...response].sort((a, b) => {
+        // First priority: pending status
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        
+        // Second priority: sort by payment date (newest first)
+        const dateA = new Date(a.payment_date).getTime();
+        const dateB = new Date(b.payment_date).getTime();
+        return dateB - dateA;
+      });
+      setSortedPayments(sorted);
     } catch (error) {
       console.error("Error fetching payments:", error);
       toast.error("Failed to fetch payments");
@@ -176,7 +190,7 @@ const PaymentPage: React.FC = () => {
   };
 
   return (
-    <div className="-mt-12 p-6 max-w-7xl mx-auto">
+    <div className="-mt-12 p-6 max-w-full mx-auto px-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -335,7 +349,7 @@ const PaymentPage: React.FC = () => {
         </div>
       ) : (
         <PaymentTable
-          payments={payments}
+          payments={sortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
         />
