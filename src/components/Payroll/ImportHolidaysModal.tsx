@@ -250,7 +250,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                       <br />
                       Each holiday should be on a new line. For example:
                     </p>
-                    <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 mb-4">
+                    <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 mb-2">
                       <code>
                         1 Jan Wed New Year's Day
                         <br />
