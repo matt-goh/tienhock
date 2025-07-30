@@ -13,8 +13,8 @@ export default function (pool) {
         CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
         CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
         CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-        is_active, requires_units_input
-      FROM pay_codes ORDER BY id
+        is_active, requires_units_input, created_at, updated_at
+      FROM pay_codes ORDER BY updated_at DESC, created_at DESC
     `;
       const payCodeResult = await pool.query(payCodeQuery);
       const allPayCodes = payCodeResult.rows.map((pc) => ({
@@ -318,6 +318,17 @@ export default function (pool) {
           await pool.query(updateStaffQuery, [jobId]);
         }
 
+        // Update pay code timestamps for all affected pay codes
+        const uniquePayCodeIds = [...new Set(associations.map(a => a.pay_code_id))];
+        if (uniquePayCodeIds.length > 0) {
+          const updatePayCodeQuery = `
+            UPDATE pay_codes 
+            SET updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ANY($1)
+          `;
+          await pool.query(updatePayCodeQuery, [uniquePayCodeIds]);
+        }
+
         await pool.query("COMMIT");
         return res.status(201).json({
           message: `Successfully added ${successCount} of ${associations.length} associations`,
@@ -588,6 +599,17 @@ export default function (pool) {
           WHERE job::jsonb ? $1
         `;
           await pool.query(updateStaffQuery, [jobId]);
+        }
+
+        // Update pay code timestamps for all affected pay codes
+        const uniquePayCodeIds = [...new Set(items.map(i => i.pay_code_id))];
+        if (uniquePayCodeIds.length > 0) {
+          const updatePayCodeQuery = `
+            UPDATE pay_codes 
+            SET updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ANY($1)
+          `;
+          await pool.query(updatePayCodeQuery, [uniquePayCodeIds]);
         }
 
         await pool.query("COMMIT");
