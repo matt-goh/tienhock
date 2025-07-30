@@ -5,8 +5,6 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   IconSortAscending,
   IconSortDescending,
-  IconChevronDown,
-  IconCheck,
 } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
 import StyledListbox from "../../components/StyledListbox";
