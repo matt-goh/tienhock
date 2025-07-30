@@ -50,30 +50,54 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
 
   // Filter pay codes based on search query
   const visiblePayCodes = useMemo(() => {
-    const filtered = availablePayCodes.filter((payCode) =>
-      searchQuery
-        ? payCode.description
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          payCode.id.toLowerCase().includes(searchQuery.toLowerCase())
-        : true
-    );
+    const filtered = availablePayCodes
+      .filter((payCode) =>
+        searchQuery
+          ? payCode.description
+              .toLowerCase()
+              .includes(searchQuery.toLowerCase()) ||
+            payCode.id.toLowerCase().includes(searchQuery.toLowerCase())
+          : true
+      )
+      .sort((a, b) => {
+        // Sort associated pay codes (current) at the top
+        const aAssociated = currentPayCodeIds.includes(a.id);
+        const bAssociated = currentPayCodeIds.includes(b.id);
+        
+        if (aAssociated && !bAssociated) return -1;
+        if (!aAssociated && bAssociated) return 1;
+        
+        // Within each group, sort alphabetically by description
+        return a.description.localeCompare(b.description);
+      });
 
     return filtered.slice(0, loadedItemCount);
-  }, [availablePayCodes, searchQuery, loadedItemCount]);
+  }, [availablePayCodes, searchQuery, loadedItemCount, currentPayCodeIds]);
 
   const hasMoreItems = useMemo(() => {
-    const totalFiltered = availablePayCodes.filter((payCode) =>
-      searchQuery
-        ? payCode.description
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          payCode.id.toLowerCase().includes(searchQuery.toLowerCase())
-        : true
-    ).length;
+    const totalFiltered = availablePayCodes
+      .filter((payCode) =>
+        searchQuery
+          ? payCode.description
+              .toLowerCase()
+              .includes(searchQuery.toLowerCase()) ||
+            payCode.id.toLowerCase().includes(searchQuery.toLowerCase())
+          : true
+      )
+      .sort((a, b) => {
+        // Sort associated pay codes (current) at the top
+        const aAssociated = currentPayCodeIds.includes(a.id);
+        const bAssociated = currentPayCodeIds.includes(b.id);
+        
+        if (aAssociated && !bAssociated) return -1;
+        if (!aAssociated && bAssociated) return 1;
+        
+        // Within each group, sort alphabetically by description
+        return a.description.localeCompare(b.description);
+      }).length;
 
     return totalFiltered > loadedItemCount;
-  }, [availablePayCodes, searchQuery, loadedItemCount]);
+  }, [availablePayCodes, searchQuery, loadedItemCount, currentPayCodeIds]);
 
   const handleLoadMore = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -260,16 +284,26 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                           <IconChevronDown size={16} className="mr-1.5" />
                           <span>
                             Load More Pay Codes (
-                            {availablePayCodes.filter((payCode) =>
-                              searchQuery
-                                ? payCode.description
-                                    .toLowerCase()
-                                    .includes(searchQuery.toLowerCase()) ||
-                                  payCode.id
-                                    .toLowerCase()
-                                    .includes(searchQuery.toLowerCase())
-                                : true
-                            ).length - loadedItemCount}{" "}
+                            {availablePayCodes
+                              .filter((payCode) =>
+                                searchQuery
+                                  ? payCode.description
+                                      .toLowerCase()
+                                      .includes(searchQuery.toLowerCase()) ||
+                                    payCode.id
+                                      .toLowerCase()
+                                      .includes(searchQuery.toLowerCase())
+                                  : true
+                              )
+                              .sort((a, b) => {
+                                const aAssociated = currentPayCodeIds.includes(a.id);
+                                const bAssociated = currentPayCodeIds.includes(b.id);
+                                
+                                if (aAssociated && !bAssociated) return -1;
+                                if (!aAssociated && bAssociated) return 1;
+                                
+                                return a.description.localeCompare(b.description);
+                              }).length - loadedItemCount}{" "}
                             remaining)
                           </span>
                         </button>
