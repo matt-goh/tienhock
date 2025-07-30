@@ -51,6 +51,111 @@ export default function (pool) {
   const router = Router();
 
   /**
+   * GET /api/leave-management/balances/batch?employeeIds=EMP1,EMP2&year=2024
+   * Gets or creates leave balances for multiple employees for a given year.
+   */
+  router.get("/balances/batch", async (req, res) => {
+    const { employeeIds, year } = req.query;
+
+    if (!employeeIds || !year) {
+      return res.status(400).json({ 
+        message: "employeeIds and year query parameters are required" 
+      });
+    }
+
+    try {
+      const employeeIdList = employeeIds.split(',').filter(id => id.trim());
+      if (employeeIdList.length === 0) {
+        return res.status(400).json({ 
+          message: "At least one employee ID is required" 
+        });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        const result = {};
+
+        // Process each employee
+        for (const employeeId of employeeIdList) {
+          let balanceResult = await client.query(
+            `SELECT * FROM employee_leave_balances WHERE employee_id = $1 AND year = $2`,
+            [employeeId, parseInt(year)]
+          );
+
+          if (balanceResult.rows.length === 0) {
+            // If no balance record exists, create one
+            const staffResult = await client.query(
+              `SELECT date_joined FROM staffs WHERE id = $1`,
+              [employeeId]
+            );
+
+            if (staffResult.rows.length === 0) {
+              // Skip employees that don't exist
+              continue;
+            }
+
+            const yearsOfService = calculateYearsOfService(
+              staffResult.rows[0].date_joined
+            );
+            const { cuti_tahunan_total, cuti_sakit_total } =
+              calculateLeaveAllocation(yearsOfService);
+
+            const insertQuery = `
+              INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total)
+              VALUES ($1, $2, $3, $4)
+              RETURNING *;
+            `;
+            balanceResult = await client.query(insertQuery, [
+              employeeId,
+              parseInt(year),
+              cuti_tahunan_total,
+              cuti_sakit_total,
+            ]);
+          }
+
+          // Get the sum of taken leave days for the year
+          const takenLeaveQuery = `
+              SELECT leave_type, SUM(days_taken) as total_taken
+              FROM leave_records
+              WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2 AND status = 'approved'
+              GROUP BY leave_type;
+          `;
+          const takenLeaveResult = await client.query(takenLeaveQuery, [
+            employeeId,
+            parseInt(year),
+          ]);
+
+          const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
+            acc[row.leave_type] = parseFloat(row.total_taken);
+            return acc;
+          }, {});
+
+          result[employeeId] = {
+            balance: balanceResult.rows[0],
+            taken: takenLeave,
+          };
+        }
+
+        await client.query("COMMIT");
+        res.json(result);
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error("Error fetching batch leave balances:", error);
+      res.status(500).json({
+        message: "Error fetching batch leave balances",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
    * GET /api/leave-management/balances/:employeeId/:year
    * Gets or creates leave balances for an employee for a given year.
    */

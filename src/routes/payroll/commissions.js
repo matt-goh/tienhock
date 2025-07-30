@@ -10,6 +10,9 @@ export default function (pool) {
    */
   router.get("/", async (req, res) => {
     const { start_date, end_date, employee_id } = req.query;
+    
+    console.log("Commission API - Query params:", { start_date, end_date, employee_id });
+    
     try {
       let query = `
         SELECT cr.*, s.name as employee_name
@@ -21,12 +24,12 @@ export default function (pool) {
       let paramCount = 1;
 
       if (start_date) {
-        query += ` AND cr.commission_date >= $${paramCount}`;
+        query += ` AND DATE(cr.commission_date) >= $${paramCount}`;
         values.push(start_date);
         paramCount++;
       }
       if (end_date) {
-        query += ` AND cr.commission_date <= $${paramCount}`;
+        query += ` AND DATE(cr.commission_date) <= $${paramCount}`;
         values.push(end_date);
         paramCount++;
       }
@@ -38,7 +41,13 @@ export default function (pool) {
 
       query += " ORDER BY cr.commission_date DESC";
 
+      console.log("Commission API - Final query:", query);
+      console.log("Commission API - Query values:", values);
+
       const result = await pool.query(query, values);
+      
+      console.log("Commission API - Result rows count:", result.rows.length);
+      
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching commission records:", error);

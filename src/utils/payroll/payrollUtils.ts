@@ -104,6 +104,7 @@ export const updateMonthlyPayrollStatus = async (
  * @param section Section
  * @param month Month (1-12)
  * @param year Year
+ * @param leaveRecords Array of leave records for the month (optional)
  * @returns Calculated employee payroll
  */
 export const calculateEmployeePayroll = (
@@ -112,7 +113,8 @@ export const calculateEmployeePayroll = (
   jobType: string,
   section: string,
   month: number,
-  year: number
+  year: number,
+  leaveRecords?: { date: string; leave_type: string; days_taken: number; amount_paid: number }[]
 ): EmployeePayroll => {
   return PayrollCalculationService.processEmployeePayroll(
     workLogs,
@@ -120,7 +122,8 @@ export const calculateEmployeePayroll = (
     jobType,
     section,
     month,
-    year
+    year,
+    leaveRecords
   );
 };
 
@@ -137,45 +140,6 @@ export const getEligibleEmployees = async (id: number) => {
     return response;
   } catch (error) {
     console.error("Error fetching eligible employees:", error);
-    throw error;
-  }
-};
-
-/**
- * Saves an employee payroll to the database
- * @param monthlyPayrollId Monthly payroll ID
- * @param employeePayroll Employee payroll data
- * @returns API response
- */
-export const saveEmployeePayroll = async (
-  monthlyPayrollId: number,
-  employeePayroll: EmployeePayroll & { deductions?: PayrollDeduction[] }
-) => {
-  try {
-    // Transform the employeePayroll object to match API expectations
-    const payload = {
-      monthly_payroll_id: monthlyPayrollId,
-      employee_id: employeePayroll.employee_id,
-      job_type: employeePayroll.job_type,
-      section: employeePayroll.section,
-      gross_pay: employeePayroll.gross_pay,
-      net_pay: employeePayroll.net_pay,
-      items: employeePayroll.items.map((item) => ({
-        pay_code_id: item.pay_code_id,
-        description: item.description,
-        rate: item.rate,
-        rate_unit: item.rate_unit,
-        quantity: item.quantity,
-        amount: item.amount,
-        is_manual: item.is_manual,
-      })),
-      deductions: employeePayroll.deductions || [],
-    };
-
-    const response = await api.post("/api/employee-payrolls", payload);
-    return response;
-  } catch (error) {
-    console.error("Error saving employee payroll:", error);
     throw error;
   }
 };
@@ -200,6 +164,21 @@ export const getEmployeePayrollDetailsBatch = async (
     return response;
   } catch (error) {
     console.error("Error fetching batch employee payrolls:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetches comprehensive employee payroll with all related data (items, deductions, leave records, mid-month payroll, commissions)
+ * @param id Employee payroll ID
+ * @returns Comprehensive employee payroll data
+ */
+export const getEmployeePayrollComprehensive = async (id: number) => {
+  try {
+    const response = await api.get(`/api/employee-payrolls/${id}/comprehensive`);
+    return response;
+  } catch (error) {
+    console.error("Error fetching comprehensive employee payroll details:", error);
     throw error;
   }
 };
@@ -253,6 +232,66 @@ export const addManualPayrollItem = async (
     return response;
   } catch (error) {
     console.error("Error adding manual payroll item:", error);
+    throw error;
+  }
+};
+
+/**
+ * Saves an employee payroll to the server
+ * @param monthlyPayrollId Monthly payroll ID
+ * @param employeePayroll Employee payroll data
+ * @returns API response
+ */
+export const saveEmployeePayroll = async (
+  monthlyPayrollId: number,
+  employeePayroll: EmployeePayroll
+) => {
+  try {
+    const response = await api.post("/api/employee-payrolls", {
+      monthly_payroll_id: monthlyPayrollId,
+      employee_id: employeePayroll.employee_id,
+      job_type: employeePayroll.job_type,
+      section: employeePayroll.section,
+      gross_pay: employeePayroll.gross_pay,
+      net_pay: employeePayroll.net_pay,
+      status: employeePayroll.status || "Processing",
+      items: employeePayroll.items,
+      deductions: employeePayroll.deductions,
+    });
+    return response;
+  } catch (error) {
+    console.error("Error saving employee payroll:", error);
+    throw error;
+  }
+};
+
+/**
+ * Saves multiple employee payrolls to the server in a single batch request
+ * @param monthlyPayrollId Monthly payroll ID
+ * @param employeePayrolls Array of employee payroll data
+ * @returns API response
+ */
+export const saveEmployeePayrollsBatch = async (
+  monthlyPayrollId: number,
+  employeePayrolls: EmployeePayroll[]
+) => {
+  try {
+    const response = await api.post("/api/employee-payrolls/batch", {
+      monthly_payroll_id: monthlyPayrollId,
+      employee_payrolls: employeePayrolls.map(payroll => ({
+        employee_id: payroll.employee_id,
+        job_type: payroll.job_type,
+        section: payroll.section,
+        gross_pay: payroll.gross_pay,
+        net_pay: payroll.net_pay,
+        status: payroll.status || "Processing",
+        items: payroll.items,
+        deductions: payroll.deductions,
+      }))
+    });
+    return response;
+  } catch (error) {
+    console.error("Error saving employee payrolls batch:", error);
     throw error;
   }
 };

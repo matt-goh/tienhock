@@ -267,10 +267,9 @@ const DebtorsReportPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="mt-4 text-gray-600">Loading debtors report...</p>
         </div>
       </div>
     );
@@ -297,7 +296,7 @@ const DebtorsReportPage: React.FC = () => {
   const filteredData = filterData(debtorsData);
 
   return (
-    <div className="max-w-7xl w-full m-6">
+    <div className="max-w-7xl w-full mx-6 mb-4">
       {/* Header Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
         <div className="p-6 border-b border-gray-200">

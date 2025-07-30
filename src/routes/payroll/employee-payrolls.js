@@ -82,6 +82,69 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       amount: parseFloat(item.amount),
     }));
 
+    // Get employee payroll details to fetch year and month for leave records
+    const payrollInfoRes = await pool.query(
+      `
+      SELECT ep.employee_id, mp.year, mp.month
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      WHERE ep.id = $1
+    `,
+      [employeePayrollId]
+    );
+    
+    if (payrollInfoRes.rows.length === 0) {
+      throw new Error("Employee payroll not found");
+    }
+    
+    const { year, month } = payrollInfoRes.rows[0];
+
+    // Get leave records for this employee for the specific month/year
+    const leaveRecordsRes = await pool.query(
+      `
+      SELECT 
+        to_char(leave_date, 'YYYY-MM-DD') as date,
+        leave_type,
+        days_taken,
+        amount_paid
+      FROM leave_records
+      WHERE employee_id = $1 
+        AND EXTRACT(YEAR FROM leave_date) = $2
+        AND EXTRACT(MONTH FROM leave_date) = $3
+        AND status = 'approved'
+      ORDER BY leave_date ASC
+    `,
+      [employee_id, year, month]
+    );
+    
+    const leaveRecords = leaveRecordsRes.rows.map((record) => ({
+      ...record,
+      days_taken: parseFloat(record.days_taken),
+      amount_paid: parseFloat(record.amount_paid || 0),
+    }));
+
+    // Get commission records for this employee for the specific month/year
+    const commissionRecordsRes = await pool.query(
+      `
+      SELECT amount, description
+      FROM commission_records
+      WHERE employee_id = $1
+        AND DATE(commission_date) >= $2
+        AND DATE(commission_date) <= $3
+      ORDER BY commission_date DESC
+    `,
+      [
+        employee_id,
+        `${year}-${month.toString().padStart(2, "0")}-01`,
+        `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`
+      ]
+    );
+    
+    const commissionRecords = commissionRecordsRes.rows.map((record) => ({
+      ...record,
+      amount: parseFloat(record.amount || 0),
+    }));
+
     // Get all active contribution rates
     const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
       await Promise.all([
@@ -138,7 +201,10 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     };
 
     // --- Main Calculation Logic ---
-    const grossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
+    const workGrossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
+    const leaveGrossPay = leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0);
+    const commissionGrossPay = commissionRecords.reduce((sum, record) => sum + record.amount, 0);
+    const grossPay = workGrossPay + leaveGrossPay + commissionGrossPay;
 
     const groupedItems = payrollItems.reduce(
       (acc, item) => {
@@ -152,7 +218,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
 
     const epfGrossPay =
       (groupedItems.Base?.reduce((s, i) => s + i.amount, 0) || 0) +
-      (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0);
+      (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0) +
+      leaveGrossPay +
+      commissionGrossPay;
 
     const age = Math.floor(
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
@@ -248,8 +316,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Calculate Income Tax
     const incomeTaxRate = incomeTaxRates.find(
       (rate) =>
-        totalGrossPay >= parseFloat(rate.wage_from) &&
-        totalGrossPay <= parseFloat(rate.wage_to)
+        grossPay >= parseFloat(rate.wage_from) &&
+        grossPay <= parseFloat(rate.wage_to)
     );
 
     if (incomeTaxRate) {
@@ -296,7 +364,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           deduction_type: "income_tax",
           employee_amount: applicableRate,
           employer_amount: 0,
-          wage_amount: totalGrossPay,
+          wage_amount: grossPay,
           rate_info: {
             rate_id: incomeTaxRate.id,
             employee_rate: `RM${applicableRate}`,
@@ -312,7 +380,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       (sum, d) => sum + d.employee_amount,
       0
     );
-    const netPay = grossPay - totalEmployeeDeductions;
+    // Commission amounts are deducted as advance payments
+    const totalCommissionDeductions = commissionGrossPay;
+    const netPay = grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 
     // Update gross pay and net pay
     await pool.query(
@@ -416,11 +486,112 @@ export default function (pool) {
         {}
       );
 
-      // Merge payrolls with their items and deductions
+      // Get all leave records for these payrolls in a single query
+      const leaveRecordsQuery = `
+      SELECT 
+        ep.id as employee_payroll_id,
+        to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+        lr.leave_type,
+        lr.days_taken,
+        lr.amount_paid
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN leave_records lr ON ep.employee_id = lr.employee_id
+      WHERE ep.id = ANY($1)
+        AND EXTRACT(YEAR FROM lr.leave_date) = mp.year
+        AND EXTRACT(MONTH FROM lr.leave_date) = mp.month
+        AND lr.status = 'approved'
+      ORDER BY ep.id, lr.leave_date ASC
+    `;
+      const leaveRecordsResult = await pool.query(leaveRecordsQuery, [payrollIds]);
+
+      // Group leave records by employee_payroll_id
+      const leaveRecordsByPayrollId = leaveRecordsResult.rows.reduce(
+        (acc, record) => {
+          if (!acc[record.employee_payroll_id]) {
+            acc[record.employee_payroll_id] = [];
+          }
+          acc[record.employee_payroll_id].push({
+            date: record.date,
+            leave_type: record.leave_type,
+            days_taken: parseFloat(record.days_taken),
+            amount_paid: parseFloat(record.amount_paid || 0),
+          });
+          return acc;
+        },
+        {}
+      );
+
+      // Get all mid-month payrolls for these payrolls in a single query
+      const midMonthQuery = `
+      SELECT 
+        ep.id as employee_payroll_id,
+        mmp.*,
+        s.name as employee_name
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN mid_month_payrolls mmp ON ep.employee_id = mmp.employee_id AND mp.year = mmp.year AND mp.month = mmp.month
+      LEFT JOIN staffs s ON mmp.employee_id = s.id
+      WHERE ep.id = ANY($1)
+      ORDER BY ep.id
+    `;
+      const midMonthResult = await pool.query(midMonthQuery, [payrollIds]);
+
+      // Group mid-month payrolls by employee_payroll_id
+      const midMonthByPayrollId = midMonthResult.rows.reduce(
+        (acc, record) => {
+          acc[record.employee_payroll_id] = {
+            ...record,
+            amount: parseFloat(record.amount)
+          };
+          delete acc[record.employee_payroll_id].employee_payroll_id;
+          return acc;
+        },
+        {}
+      );
+
+      // Get all commission records for these payrolls in a single query
+      const commissionsQuery = `
+      SELECT 
+        ep.id as employee_payroll_id,
+        cr.*,
+        s.name as employee_name
+      FROM employee_payrolls ep
+      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN commission_records cr ON ep.employee_id = cr.employee_id
+      JOIN staffs s ON cr.employee_id = s.id
+      WHERE ep.id = ANY($1)
+        AND EXTRACT(YEAR FROM cr.commission_date) = mp.year
+        AND EXTRACT(MONTH FROM cr.commission_date) = mp.month
+      ORDER BY ep.id, cr.commission_date DESC
+    `;
+      const commissionsResult = await pool.query(commissionsQuery, [payrollIds]);
+
+      // Group commission records by employee_payroll_id
+      const commissionsByPayrollId = commissionsResult.rows.reduce(
+        (acc, record) => {
+          if (!acc[record.employee_payroll_id]) {
+            acc[record.employee_payroll_id] = [];
+          }
+          const commissionRecord = { ...record };
+          delete commissionRecord.employee_payroll_id;
+          acc[record.employee_payroll_id].push({
+            ...commissionRecord,
+            amount: parseFloat(commissionRecord.amount)
+          });
+          return acc;
+        },
+        {}
+      );
+
+      // Merge payrolls with their items, deductions, leave records, mid-month payrolls, and commission records
       const response = payrollsResult.rows.map((payroll) => ({
         ...payroll,
         items: itemsByPayrollId[payroll.id] || [],
         deductions: deductionsByPayrollId[payroll.id] || [],
+        leave_records: leaveRecordsByPayrollId[payroll.id] || [],
+        mid_month_payroll: midMonthByPayrollId[payroll.id] || null,
+        commission_records: commissionsByPayrollId[payroll.id] || [],
         gross_pay: parseFloat(payroll.gross_pay),
         net_pay: parseFloat(payroll.net_pay),
       }));
@@ -435,8 +606,8 @@ export default function (pool) {
     }
   });
 
-  // Get employee payroll details with items
-  router.get("/:id", async (req, res) => {
+  // Get comprehensive employee payroll details with all related data
+  router.get("/:id/comprehensive", async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -454,31 +625,73 @@ export default function (pool) {
         return res.status(404).json({ message: "Employee payroll not found" });
       }
 
-      // Get payroll items
-      const itemsQuery = `
-        SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
-              pi.quantity, pi.amount, pi.is_manual, pc.pay_type
-        FROM payroll_items pi
-        LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
-        WHERE pi.employee_payroll_id = $1
-        ORDER BY pi.id
-      `;
-      const itemsResult = await pool.query(itemsQuery, [id]);
-
-      // Get payroll deductions
-      const deductionsQuery = `
-      SELECT pd.*, 
-             CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
-             CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
-             CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
-      FROM payroll_deductions pd
-      WHERE pd.employee_payroll_id = $1
-      ORDER BY pd.deduction_type
-    `;
-      const deductionsResult = await pool.query(deductionsQuery, [id]);
-
-      // Format response
       const payrollData = payrollResult.rows[0];
+
+      // Get all data in parallel for efficiency
+      const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
+        // Get payroll items
+        pool.query(`
+          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
+                pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+          FROM payroll_items pi
+          LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pi.employee_payroll_id = $1
+          ORDER BY pi.id
+        `, [id]),
+
+        // Get payroll deductions
+        pool.query(`
+          SELECT pd.*, 
+                 CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
+                 CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
+                 CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
+          FROM payroll_deductions pd
+          WHERE pd.employee_payroll_id = $1
+          ORDER BY pd.deduction_type
+        `, [id]),
+
+        // Get leave records for this employee for the specific month/year
+        pool.query(`
+          SELECT 
+            to_char(leave_date, 'YYYY-MM-DD') as date,
+            leave_type,
+            days_taken,
+            amount_paid
+          FROM leave_records
+          WHERE employee_id = $1 
+            AND EXTRACT(YEAR FROM leave_date) = $2
+            AND EXTRACT(MONTH FROM leave_date) = $3
+            AND status = 'approved'
+          ORDER BY leave_date ASC
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get mid-month payroll data
+        pool.query(`
+          SELECT 
+            mmp.*,
+            s.name as employee_name
+          FROM mid_month_payrolls mmp
+          LEFT JOIN staffs s ON mmp.employee_id = s.id
+          WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get commission records for the specific month/year
+        pool.query(`
+          SELECT cr.*, s.name as employee_name
+          FROM commission_records cr
+          JOIN staffs s ON cr.employee_id = s.id
+          WHERE cr.employee_id = $1
+            AND DATE(cr.commission_date) >= $2
+            AND DATE(cr.commission_date) <= $3
+          ORDER BY cr.commission_date DESC
+        `, [
+          payrollData.employee_id,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+        ])
+      ]);
+
+      // Format comprehensive response
       const response = {
         ...payrollData,
         gross_pay: parseFloat(payrollData.gross_pay),
@@ -497,6 +710,148 @@ export default function (pool) {
           wage_amount: parseFloat(deduction.wage_amount),
           rate_info: deduction.rate_info || {},
         })),
+        leave_records: leaveRecordsResult.rows.map((record) => ({
+          ...record,
+          days_taken: parseFloat(record.days_taken),
+          amount_paid: parseFloat(record.amount_paid || 0),
+        })),
+        mid_month_payroll: midMonthResult.rows.length > 0 ? {
+          ...midMonthResult.rows[0],
+          amount: parseFloat(midMonthResult.rows[0].amount)
+        } : null,
+        commission_records: commissionsResult.rows.map((record) => ({
+          ...record,
+          amount: parseFloat(record.amount)
+        }))
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("Error fetching comprehensive employee payroll details:", error);
+      res.status(500).json({
+        message: "Error fetching comprehensive employee payroll details",
+        error: error.message,
+      });
+    }
+  });
+
+  // Get employee payroll details with items (now includes comprehensive data)
+  router.get("/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // Get employee payroll details
+      const payrollQuery = `
+        SELECT ep.*, mp.year, mp.month, mp.status as payroll_status, s.name as employee_name
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        LEFT JOIN staffs s ON ep.employee_id = s.id
+        WHERE ep.id = $1
+      `;
+      const payrollResult = await pool.query(payrollQuery, [id]);
+
+      if (payrollResult.rows.length === 0) {
+        return res.status(404).json({ message: "Employee payroll not found" });
+      }
+
+      const payrollData = payrollResult.rows[0];
+
+      // Get all data in parallel for efficiency
+      const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
+        // Get payroll items
+        pool.query(`
+          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
+                pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+          FROM payroll_items pi
+          LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pi.employee_payroll_id = $1
+          ORDER BY pi.id
+        `, [id]),
+
+        // Get payroll deductions
+        pool.query(`
+          SELECT pd.*, 
+                 CAST(pd.employee_amount AS NUMERIC(10, 2)) as employee_amount,
+                 CAST(pd.employer_amount AS NUMERIC(10, 2)) as employer_amount,
+                 CAST(pd.wage_amount AS NUMERIC(10, 2)) as wage_amount
+          FROM payroll_deductions pd
+          WHERE pd.employee_payroll_id = $1
+          ORDER BY pd.deduction_type
+        `, [id]),
+
+        // Get leave records for this employee for the specific month/year
+        pool.query(`
+          SELECT 
+            to_char(leave_date, 'YYYY-MM-DD') as date,
+            leave_type,
+            days_taken,
+            amount_paid
+          FROM leave_records
+          WHERE employee_id = $1 
+            AND EXTRACT(YEAR FROM leave_date) = $2
+            AND EXTRACT(MONTH FROM leave_date) = $3
+            AND status = 'approved'
+          ORDER BY leave_date ASC
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get mid-month payroll data
+        pool.query(`
+          SELECT 
+            mmp.*,
+            s.name as employee_name
+          FROM mid_month_payrolls mmp
+          LEFT JOIN staffs s ON mmp.employee_id = s.id
+          WHERE mmp.employee_id = $1 AND mmp.year = $2 AND mmp.month = $3
+        `, [payrollData.employee_id, payrollData.year, payrollData.month]),
+
+        // Get commission records for the specific month/year
+        pool.query(`
+          SELECT cr.*, s.name as employee_name
+          FROM commission_records cr
+          JOIN staffs s ON cr.employee_id = s.id
+          WHERE cr.employee_id = $1
+            AND DATE(cr.commission_date) >= $2
+            AND DATE(cr.commission_date) <= $3
+          ORDER BY cr.commission_date DESC
+        `, [
+          payrollData.employee_id,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+        ])
+      ]);
+
+      // Format comprehensive response
+      const response = {
+        ...payrollData,
+        gross_pay: parseFloat(payrollData.gross_pay),
+        net_pay: parseFloat(payrollData.net_pay),
+        items: itemsResult.rows.map((item) => ({
+          ...item,
+          rate: parseFloat(item.rate),
+          quantity: parseFloat(item.quantity),
+          amount: parseFloat(item.amount),
+          is_manual: !!item.is_manual,
+        })),
+        deductions: deductionsResult.rows.map((deduction) => ({
+          ...deduction,
+          employee_amount: parseFloat(deduction.employee_amount),
+          employer_amount: parseFloat(deduction.employer_amount),
+          wage_amount: parseFloat(deduction.wage_amount),
+          rate_info: deduction.rate_info || {},
+        })),
+        leave_records: leaveRecordsResult.rows.map((record) => ({
+          ...record,
+          days_taken: parseFloat(record.days_taken),
+          amount_paid: parseFloat(record.amount_paid || 0),
+        })),
+        mid_month_payroll: midMonthResult.rows.length > 0 ? {
+          ...midMonthResult.rows[0],
+          amount: parseFloat(midMonthResult.rows[0].amount)
+        } : null,
+        commission_records: commissionsResult.rows.map((record) => ({
+          ...record,
+          amount: parseFloat(record.amount)
+        }))
       };
 
       res.json(response);
@@ -506,6 +861,202 @@ export default function (pool) {
         message: "Error fetching employee payroll details",
         error: error.message,
       });
+    }
+  });
+
+  // Batch create or update multiple employee payrolls
+  router.post("/batch", async (req, res) => {
+    const {
+      monthly_payroll_id,
+      employee_payrolls = []
+    } = req.body;
+
+    // Validate required fields
+    if (!monthly_payroll_id || !Array.isArray(employee_payrolls) || employee_payrolls.length === 0) {
+      return res.status(400).json({
+        message: "monthly_payroll_id and employee_payrolls array are required",
+      });
+    }
+
+    // Validate each employee payroll
+    for (const payroll of employee_payrolls) {
+      if (!payroll.employee_id || !payroll.job_type || !payroll.section) {
+        return res.status(400).json({
+          message: "Each employee payroll must have employee_id, job_type, and section",
+        });
+      }
+    }
+
+    const client = await pool.connect();
+    const results = [];
+    const errors = [];
+
+    try {
+      await client.query("BEGIN");
+
+      // Process each employee payroll
+      for (let i = 0; i < employee_payrolls.length; i++) {
+        const payroll = employee_payrolls[i];
+        const {
+          employee_id,
+          job_type,
+          section,
+          gross_pay,
+          net_pay,
+          status = "Processing",
+          items = [],
+          deductions = [],
+        } = payroll;
+
+        try {
+          // Check if employee payroll exists
+          const checkQuery = `
+            SELECT id FROM employee_payrolls 
+            WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
+          `;
+          const checkResult = await client.query(checkQuery, [
+            monthly_payroll_id,
+            employee_id,
+            job_type,
+          ]);
+
+          let employeePayrollId;
+
+          if (checkResult.rows.length > 0) {
+            // Update existing employee payroll
+            employeePayrollId = checkResult.rows[0].id;
+
+            const updateQuery = `
+              UPDATE employee_payrolls
+              SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5
+              WHERE id = $6
+              RETURNING *
+            `;
+
+            await client.query(updateQuery, [
+              job_type,
+              section,
+              gross_pay || 0,
+              net_pay || 0,
+              status,
+              employeePayrollId,
+            ]);
+
+            // Delete existing items to replace with new ones
+            await client.query(
+              "DELETE FROM payroll_items WHERE employee_payroll_id = $1",
+              [employeePayrollId]
+            );
+          } else {
+            // Create a new employee payroll
+            const insertQuery = `
+              INSERT INTO employee_payrolls (
+                monthly_payroll_id, employee_id, job_type, section,
+                gross_pay, net_pay, status
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              RETURNING id
+            `;
+
+            const insertResult = await client.query(insertQuery, [
+              monthly_payroll_id,
+              employee_id,
+              job_type,
+              section,
+              gross_pay || 0,
+              net_pay || 0,
+              status,
+            ]);
+
+            employeePayrollId = insertResult.rows[0].id;
+          }
+
+          // Insert new payroll items
+          if (items.length > 0) {
+            const itemValues = items
+              .map((item) => {
+                return `(
+                ${employeePayrollId},
+                '${item.pay_code_id}',
+                '${item.description.replace(/'/g, "''")}',
+                ${item.rate},
+                '${item.rate_unit}',
+                ${item.quantity},
+                ${item.amount},
+                ${item.is_manual || false}
+              )`;
+              })
+              .join(", ");
+
+            const itemsQuery = `
+              INSERT INTO payroll_items (
+                employee_payroll_id, pay_code_id, description, 
+                rate, rate_unit, quantity, amount, is_manual
+              )
+              VALUES ${itemValues}
+              RETURNING id
+            `;
+
+            await client.query(itemsQuery);
+          }
+
+          // Save deductions if provided
+          if (deductions && deductions.length > 0) {
+            await saveDeductions(client, employeePayrollId, deductions);
+          }
+
+          results.push({
+            employee_id,
+            job_type,
+            employee_payroll_id: employeePayrollId,
+            status: "success"
+          });
+
+        } catch (error) {
+          console.error(`Error processing employee ${employee_id}:`, error);
+          errors.push({
+            employee_id,
+            job_type,
+            error: error.message,
+            status: "error"
+          });
+        }
+      }
+
+      await client.query("COMMIT");
+
+      // Run recalculation for all successful payrolls in parallel
+      const recalculationPromises = results.map(async (result) => {
+        try {
+          await recalculateAndUpdatePayroll(pool, result.employee_payroll_id);
+        } catch (error) {
+          console.error(`Error recalculating payroll for employee ${result.employee_id}:`, error);
+          // Don't fail the entire batch for recalculation errors
+        }
+      });
+
+      await Promise.all(recalculationPromises);
+
+      res.status(201).json({
+        message: `Batch processing completed: ${results.length} successful, ${errors.length} errors`,
+        results,
+        errors,
+        summary: {
+          total: employee_payrolls.length,
+          successful: results.length,
+          errors: errors.length
+        }
+      });
+
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error in batch processing employee payrolls:", error);
+      res.status(500).json({
+        message: "Error in batch processing employee payrolls",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 
@@ -631,6 +1182,10 @@ export default function (pool) {
       }
 
       await pool.query("COMMIT");
+
+      // Recalculate the payroll to ensure leave records are included in totals
+      // This is done after commit to avoid nested transactions
+      await recalculateAndUpdatePayroll(pool, employeePayrollId);
 
       res.status(201).json({
         message: "Employee payroll created/updated successfully",

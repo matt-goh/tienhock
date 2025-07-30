@@ -262,255 +262,267 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </div>
           )}
 
-        {/* Employee Details */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-default-800">
-              Employee Details
-            </h2>
-            <div className="text-sm text-default-500">
-              {totalEmployees} employees • {totalHours.toFixed(1)} total hours
+        {/* Employee Details - Only show if there are employee entries */}
+        {workLog.employeeEntries && workLog.employeeEntries.length > 0 && (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-default-800">
+                Employee Details
+              </h2>
+              <div className="text-sm text-default-500">
+                {totalEmployees} employees • {totalHours.toFixed(1)} total hours
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-default-200 rounded-lg">
+              <table className="min-w-full divide-y divide-default-200">
+                <thead className="bg-default-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Employee
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                      Hours
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      Activities
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default-200">
+                  {workLog.employeeEntries
+                    .sort((a: any, b: any) => {
+                      // Sort by job name first, then by employee name
+                      const jobCompare = (a.job_name || "").localeCompare(
+                        b.job_name || ""
+                      );
+                      if (jobCompare !== 0) return jobCompare;
+                      return (a.employee_name || "").localeCompare(
+                        b.employee_name || ""
+                      );
+                    })
+                    .map((entry: any) => {
+                      // ... rest of the existing mapping code remains the same
+                      const employeeTotal = entry.activities.reduce(
+                        (sum: number, activity: any) =>
+                          sum + activity.calculated_amount,
+                        0
+                      );
+
+                      const { contextLinked, regular } = separateActivities(
+                        entry.activities
+                      );
+
+                      // Calculate total activities count
+                      const totalActivities =
+                        contextLinked.length + regular.length;
+                      // Determine if we need to show the expand/collapse button
+                      const needsExpansion = totalActivities > 10;
+                      // Check if this entry is expanded
+                      const isExpanded = expandedEntries[entry.id] || false;
+
+                      // Prepare activities to display based on expansion state
+                      const displayContextLinked = isExpanded
+                        ? contextLinked
+                        : needsExpansion && contextLinked.length > 0
+                        ? contextLinked.slice(
+                            0,
+                            Math.min(contextLinked.length, 10)
+                          )
+                        : contextLinked;
+
+                      const displayRegular = isExpanded
+                        ? regular
+                        : needsExpansion && displayContextLinked.length < 10
+                        ? regular.slice(
+                            0,
+                            Math.min(
+                              regular.length,
+                              10 - displayContextLinked.length
+                            )
+                          )
+                        : needsExpansion
+                        ? []
+                        : regular;
+
+                      return (
+                        <tr key={entry.id}>
+                          <td className="px-4 py-3">
+                            <Link
+                              to={`/catalogue/staff/${entry.employee_id}`}
+                              className="text-sky-600 hover:text-sky-800 font-medium"
+                            >
+                              {entry.employee_name}
+                            </Link>
+                            <p className="text-sm text-default-500">
+                              {entry.employee_id} • {entry.job_name}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {entry.total_hours.toFixed(1)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="space-y-1">
+                              {/* Context-linked activities */}
+                              {displayContextLinked.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-sky-600 mb-1">
+                                    Production Activities
+                                  </p>
+                                  <div className="space-y-2">
+                                    {displayContextLinked.map(
+                                      (activity: any) => (
+                                        <div
+                                          key={activity.id}
+                                          className="flex justify-between text-sm"
+                                        >
+                                          <div>
+                                            <span className="font-medium">
+                                              {activity.description}
+                                            </span>
+                                            <span className="text-default-500 ml-2">
+                                              ({activity.pay_type})
+                                            </span>
+                                            {/* Display rate used for all activity types */}
+                                            <span className="text-default-500 ml-2">
+                                              •{" "}
+                                              {activity.rate_unit === "Percent"
+                                                ? `${activity.rate_used}%`
+                                                : `RM${activity.rate_used}`}
+                                            </span>
+                                            {/* Show units produced for non-Hour units or when explicitly available */}
+                                            {activity.units_produced !== null &&
+                                              activity.rate_unit !== "Day" &&
+                                              activity.rate_unit !==
+                                                "Fixed" && (
+                                                <span className="text-default-500 ml-2">
+                                                  • {activity.units_produced}{" "}
+                                                  {activity.rate_unit ===
+                                                  "Percent"
+                                                    ? "Units"
+                                                    : activity.rate_unit}
+                                                </span>
+                                              )}
+                                          </div>
+                                          <div className="font-medium">
+                                            RM
+                                            {activity.calculated_amount.toFixed(
+                                              2
+                                            )}
+                                          </div>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Regular activities */}
+                              {displayRegular.length > 0 && (
+                                <div>
+                                  {displayContextLinked.length > 0 && (
+                                    <p className="text-xs font-medium text-default-600 mb-1">
+                                      Standard Activities
+                                    </p>
+                                  )}
+                                  <div className="space-y-1">
+                                    {displayRegular.map((activity: any) => (
+                                      <div
+                                        key={activity.id}
+                                        className="flex justify-between text-sm"
+                                      >
+                                        <div>
+                                          <span className="font-medium">
+                                            {activity.description}
+                                          </span>
+                                          <span className="text-default-500 ml-2">
+                                            ({activity.pay_type})
+                                          </span>
+                                          {activity.source === "employee" && (
+                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                                              Staff
+                                            </span>
+                                          )}
+                                          {activity.source === "job" && (
+                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                              Job
+                                            </span>
+                                          )}
+                                          {/* Display rate used for all activity types */}
+                                          <span className="text-default-500 ml-2">
+                                            •{" "}
+                                            {activity.rate_unit === "Percent"
+                                              ? `${activity.rate_used}%`
+                                              : `RM${activity.rate_used}`}
+                                          </span>
+                                          {/* Show units produced for non-Hour units or when explicitly available */}
+                                          {activity.units_produced !== null &&
+                                            activity.rate_unit !== "Hour" && (
+                                              <span className="text-default-500 ml-2">
+                                                • {activity.units_produced}{" "}
+                                                {activity.rate_unit ===
+                                                "Percent"
+                                                  ? "Units"
+                                                  : activity.rate_unit}
+                                              </span>
+                                            )}
+                                        </div>
+                                        <div className="font-medium">
+                                          RM
+                                          {activity.calculated_amount.toFixed(
+                                            2
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Show more/less button when needed */}
+                              {needsExpansion && (
+                                <button
+                                  onClick={() => toggleExpansion(entry.id)}
+                                  className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
+                                >
+                                  {isExpanded
+                                    ? "Show Less"
+                                    : `Show ${
+                                        totalActivities -
+                                        (displayContextLinked.length +
+                                          displayRegular.length)
+                                      } More...`}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium">
+                            RM{employeeTotal.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+                <tfoot className="bg-default-50">
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-4 py-3 text-right font-medium text-default-800"
+                    >
+                      Total
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-default-900">
+                      RM{totalAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
-
-          <div className="overflow-x-auto border border-default-200 rounded-lg">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-100">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                    Employee
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                    Hours
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                    Activities
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
-                    Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-default-200">
-                {workLog.employeeEntries
-                  .sort((a: any, b: any) => {
-                    // Sort by job name first, then by employee name
-                    const jobCompare = (a.job_name || "").localeCompare(
-                      b.job_name || ""
-                    );
-                    if (jobCompare !== 0) return jobCompare;
-                    return (a.employee_name || "").localeCompare(
-                      b.employee_name || ""
-                    );
-                  })
-                  .map((entry: any) => {
-                    const employeeTotal = entry.activities.reduce(
-                      (sum: number, activity: any) =>
-                        sum + activity.calculated_amount,
-                      0
-                    );
-
-                    const { contextLinked, regular } = separateActivities(
-                      entry.activities
-                    );
-
-                    // Calculate total activities count
-                    const totalActivities =
-                      contextLinked.length + regular.length;
-                    // Determine if we need to show the expand/collapse button
-                    const needsExpansion = totalActivities > 10;
-                    // Check if this entry is expanded
-                    const isExpanded = expandedEntries[entry.id] || false;
-
-                    // Prepare activities to display based on expansion state
-                    const displayContextLinked = isExpanded
-                      ? contextLinked
-                      : needsExpansion && contextLinked.length > 0
-                      ? contextLinked.slice(
-                          0,
-                          Math.min(contextLinked.length, 10)
-                        )
-                      : contextLinked;
-
-                    const displayRegular = isExpanded
-                      ? regular
-                      : needsExpansion && displayContextLinked.length < 10
-                      ? regular.slice(
-                          0,
-                          Math.min(
-                            regular.length,
-                            10 - displayContextLinked.length
-                          )
-                        )
-                      : needsExpansion
-                      ? []
-                      : regular;
-
-                    return (
-                      <tr key={entry.id}>
-                        <td className="px-4 py-3">
-                          <Link
-                            to={`/catalogue/staff/${entry.employee_id}`}
-                            className="text-sky-600 hover:text-sky-800 font-medium"
-                          >
-                            {entry.employee_name}
-                          </Link>
-                          <p className="text-sm text-default-500">
-                            {entry.employee_id} • {entry.job_name}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {entry.total_hours.toFixed(1)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="space-y-1">
-                            {/* Context-linked activities */}
-                            {displayContextLinked.length > 0 && (
-                              <div>
-                                <p className="text-xs font-medium text-sky-600 mb-1">
-                                  Production Activities
-                                </p>
-                                <div className="space-y-2">
-                                  {displayContextLinked.map((activity: any) => (
-                                    <div
-                                      key={activity.id}
-                                      className="flex justify-between text-sm"
-                                    >
-                                      <div>
-                                        <span className="font-medium">
-                                          {activity.description}
-                                        </span>
-                                        <span className="text-default-500 ml-2">
-                                          ({activity.pay_type})
-                                        </span>
-                                        {/* Display rate used for all activity types */}
-                                        <span className="text-default-500 ml-2">
-                                          •{" "}
-                                          {activity.rate_unit === "Percent"
-                                            ? `${activity.rate_used}%`
-                                            : `RM${activity.rate_used}`}
-                                        </span>
-                                        {/* Show units produced for non-Hour units or when explicitly available */}
-                                        {activity.units_produced !== null &&
-                                          activity.rate_unit !== "Day" &&
-                                          activity.rate_unit !== "Fixed" && (
-                                            <span className="text-default-500 ml-2">
-                                              • {activity.units_produced}{" "}
-                                              {activity.rate_unit === "Percent"
-                                                ? "Units"
-                                                : activity.rate_unit}
-                                            </span>
-                                          )}
-                                      </div>
-                                      <div className="font-medium">
-                                        RM
-                                        {activity.calculated_amount.toFixed(2)}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Regular activities */}
-                            {displayRegular.length > 0 && (
-                              <div>
-                                {displayContextLinked.length > 0 && (
-                                  <p className="text-xs font-medium text-default-600 mb-1">
-                                    Standard Activities
-                                  </p>
-                                )}
-                                <div className="space-y-1">
-                                  {displayRegular.map((activity: any) => (
-                                    <div
-                                      key={activity.id}
-                                      className="flex justify-between text-sm"
-                                    >
-                                      <div>
-                                        <span className="font-medium">
-                                          {activity.description}
-                                        </span>
-                                        <span className="text-default-500 ml-2">
-                                          ({activity.pay_type})
-                                        </span>
-                                        {activity.source === "employee" && (
-                                          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
-                                            Staff
-                                          </span>
-                                        )}
-                                        {activity.source === "job" && (
-                                          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                            Job
-                                          </span>
-                                        )}
-                                        {/* Display rate used for all activity types */}
-                                        <span className="text-default-500 ml-2">
-                                          •{" "}
-                                          {activity.rate_unit === "Percent"
-                                            ? `${activity.rate_used}%`
-                                            : `RM${activity.rate_used}`}
-                                        </span>
-                                        {/* Show units produced for non-Hour units or when explicitly available */}
-                                        {activity.units_produced !== null &&
-                                          activity.rate_unit !== "Hour" && (
-                                            <span className="text-default-500 ml-2">
-                                              • {activity.units_produced}{" "}
-                                              {activity.rate_unit === "Percent"
-                                                ? "Units"
-                                                : activity.rate_unit}
-                                            </span>
-                                          )}
-                                      </div>
-                                      <div className="font-medium">
-                                        RM
-                                        {activity.calculated_amount.toFixed(2)}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Show more/less button when needed */}
-                            {needsExpansion && (
-                              <button
-                                onClick={() => toggleExpansion(entry.id)}
-                                className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
-                              >
-                                {isExpanded
-                                  ? "Show Less"
-                                  : `Show ${
-                                      totalActivities -
-                                      (displayContextLinked.length +
-                                        displayRegular.length)
-                                    } More...`}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium">
-                          RM{employeeTotal.toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-              <tfoot className="bg-default-50">
-                <tr>
-                  <td
-                    colSpan={3}
-                    className="px-4 py-3 text-right font-medium text-default-800"
-                  >
-                    Total
-                  </td>
-                  <td className="px-4 py-3 text-right font-bold text-default-900">
-                    RM{totalAmount.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
+        )}
 
         {/* Leave Records Section */}
         {workLog.leaveRecords && workLog.leaveRecords.length > 0 && (
