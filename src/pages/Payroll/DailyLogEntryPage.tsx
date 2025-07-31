@@ -227,15 +227,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // Function to normalize objects for comparison (handles key ordering)
   const normalizeForComparison = useCallback((obj: any): string => {
     if (obj === null || obj === undefined) return String(obj);
-    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (typeof obj !== "object") return JSON.stringify(obj);
     if (Array.isArray(obj)) {
       return JSON.stringify(obj.map(normalizeForComparison));
     }
     // Sort keys to ensure consistent ordering
     const sortedObj: any = {};
-    Object.keys(obj).sort().forEach(key => {
-      sortedObj[key] = obj[key];
-    });
+    Object.keys(obj)
+      .sort()
+      .forEach((key) => {
+        sortedObj[key] = obj[key];
+      });
     return JSON.stringify(sortedObj);
   }, []);
 
@@ -246,9 +248,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     // For create mode, also check if we have any meaningful data to compare
     if (mode === "create") {
-      const hasAnySelections = Object.keys(employeeSelectionState.selectedJobs).length > 0 ||
-                              Object.keys(leaveEmployees).some(id => leaveEmployees[id].selected);
-      
+      const hasAnySelections =
+        Object.keys(employeeSelectionState.selectedJobs).length > 0 ||
+        Object.keys(leaveEmployees).some((id) => leaveEmployees[id].selected);
+
       // If no selections made yet, don't show unsaved changes
       if (!hasAnySelections) return false;
     }
@@ -256,18 +259,27 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     // Compare normalized JSON strings for more reliable comparison
     try {
       return (
-        normalizeForComparison(formData) !== normalizeForComparison(initialState.formData) ||
-        normalizeForComparison(employeeSelectionState) !== normalizeForComparison(initialState.employeeSelectionState) ||
-        normalizeForComparison(employeeActivities) !== normalizeForComparison(initialState.employeeActivities) ||
-        normalizeForComparison(locationTypes) !== normalizeForComparison(initialState.locationTypes) ||
-        normalizeForComparison(salesmanIkutRelations) !== normalizeForComparison(initialState.salesmanIkutRelations) ||
-        normalizeForComparison(ikutBagCounts) !== normalizeForComparison(initialState.ikutBagCounts) ||
-        normalizeForComparison(leaveEmployees) !== normalizeForComparison(initialState.leaveEmployees) ||
-        normalizeForComparison(leaveEmployeeActivities) !== normalizeForComparison(initialState.leaveEmployeeActivities) ||
-        normalizeForComparison(leaveBalances) !== normalizeForComparison(initialState.leaveBalances)
+        normalizeForComparison(formData) !==
+          normalizeForComparison(initialState.formData) ||
+        normalizeForComparison(employeeSelectionState) !==
+          normalizeForComparison(initialState.employeeSelectionState) ||
+        normalizeForComparison(employeeActivities) !==
+          normalizeForComparison(initialState.employeeActivities) ||
+        normalizeForComparison(locationTypes) !==
+          normalizeForComparison(initialState.locationTypes) ||
+        normalizeForComparison(salesmanIkutRelations) !==
+          normalizeForComparison(initialState.salesmanIkutRelations) ||
+        normalizeForComparison(ikutBagCounts) !==
+          normalizeForComparison(initialState.ikutBagCounts) ||
+        normalizeForComparison(leaveEmployees) !==
+          normalizeForComparison(initialState.leaveEmployees) ||
+        normalizeForComparison(leaveEmployeeActivities) !==
+          normalizeForComparison(initialState.leaveEmployeeActivities) ||
+        normalizeForComparison(leaveBalances) !==
+          normalizeForComparison(initialState.leaveBalances)
       );
     } catch (error) {
-      console.warn('Error comparing states, defaulting to no changes:', error);
+      console.warn("Error comparing states, defaulting to no changes:", error);
       return false;
     }
   }, [
@@ -431,7 +443,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     if (jobConfig?.id !== "SALESMAN") return [];
     return expandedEmployees.filter(
       (emp: { jobType: string; id: string }) =>
-        emp.jobType === "SALESMAN" && emp.id !== "KILANG" && emp.id !== "TIMOTHY.G"
+        emp.jobType === "SALESMAN" &&
+        emp.id !== "KILANG" &&
+        emp.id !== "TIMOTHY.G"
     );
   }, [expandedEmployees, jobConfig?.id]);
 
@@ -872,7 +886,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
       // Set the correct leave type based on availability or day type
       let leaveTypeToUse: LeaveType;
-      
+
       if (newSelectedState) {
         // When selecting, use the calculated selectedLeaveType from above
         // We need to recalculate it here since it's in a different scope
@@ -889,7 +903,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
         const defaultLeaveType =
           formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
-        
+
         leaveTypeToUse = availableLeaveTypes.includes(defaultLeaveType)
           ? defaultLeaveType
           : availableLeaveTypes[0] || defaultLeaveType;
@@ -1011,19 +1025,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       // Handle SALESMAN selection/deselection cascading to SALESMAN_IKUT employees
       if (jobType === "SALESMAN") {
         const followedEmployees = followedBySalesman[employeeId] || [];
-        
+
         followedEmployees.forEach((ikutEmployeeId) => {
-          const ikutCurrentSelectedJobs = updatedSelectedJobs[ikutEmployeeId] || [];
-          
+          const ikutCurrentSelectedJobs =
+            updatedSelectedJobs[ikutEmployeeId] || [];
+
           if (wasSelected) {
             // Deselecting SALESMAN - also deselect following SALESMAN_IKUT employees
-            updatedSelectedJobs[ikutEmployeeId] = ikutCurrentSelectedJobs.filter(
-              (j) => j !== "SALESMAN_IKUT"
-            );
+            updatedSelectedJobs[ikutEmployeeId] =
+              ikutCurrentSelectedJobs.filter((j) => j !== "SALESMAN_IKUT");
           } else {
             // Selecting SALESMAN - also select following SALESMAN_IKUT employees (if not already selected)
             if (!ikutCurrentSelectedJobs.includes("SALESMAN_IKUT")) {
-              updatedSelectedJobs[ikutEmployeeId] = [...ikutCurrentSelectedJobs, "SALESMAN_IKUT"];
+              updatedSelectedJobs[ikutEmployeeId] = [
+                ...ikutCurrentSelectedJobs,
+                "SALESMAN_IKUT",
+              ];
             }
           }
         });
@@ -1032,41 +1049,54 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         if (!wasSelected && followedEmployees.length > 0) {
           setTimeout(() => {
             const salesmanRowKey = `${employeeId}-SALESMAN`;
-            const salesmanLocationType = locationTypes[salesmanRowKey] || "Local";
-            
+            const salesmanLocationType =
+              locationTypes[salesmanRowKey] || "Local";
+
             // Apply paycode to each auto-selected SALESMAN_IKUT employee - exact same pattern as handleLocationTypeChange
             followedEmployees.forEach((ikutEmployeeId) => {
               const ikutRowKey = `${ikutEmployeeId}-SALESMAN_IKUT`;
-              
+
               // Check if this SALESMAN_IKUT employee is selected and has activities
               if (employeeActivities[ikutRowKey]) {
                 const ikutActivities = employeeActivities[ikutRowKey] || [];
-                
+
                 // Update activities for the SALESMAN_IKUT employee
                 const updatedIkutActivities = ikutActivities.map((activity) => {
                   // Apply location-based paycode logic
-                  if (salesmanLocationType === "Local" && activity.payCodeId === "ELAUN_MT") {
+                  if (
+                    salesmanLocationType === "Local" &&
+                    activity.payCodeId === "ELAUN_MT"
+                  ) {
                     return {
                       ...activity,
                       isSelected: true,
                     };
-                  } else if (salesmanLocationType === "Local" && activity.payCodeId === "ELAUN_MO") {
+                  } else if (
+                    salesmanLocationType === "Local" &&
+                    activity.payCodeId === "ELAUN_MO"
+                  ) {
                     return {
                       ...activity,
                       isSelected: false,
                     };
-                  } else if (salesmanLocationType === "Outstation" && activity.payCodeId === "ELAUN_MO") {
+                  } else if (
+                    salesmanLocationType === "Outstation" &&
+                    activity.payCodeId === "ELAUN_MO"
+                  ) {
                     return {
                       ...activity,
                       isSelected: true,
                     };
-                  } else if (salesmanLocationType === "Outstation" && activity.payCodeId === "ELAUN_MT") {
+                  } else if (
+                    salesmanLocationType === "Outstation" &&
+                    activity.payCodeId === "ELAUN_MT"
+                  ) {
                     return {
                       ...activity,
                       isSelected: false,
                     };
                   }
-                  
+
                   return activity;
                 });
 
@@ -1129,15 +1159,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     // Apply location-based paycodes to SALESMAN_IKUT employees following this salesman
     if (jobConfig?.id === "SALESMAN" && jobType === "SALESMAN") {
       const followedEmployees = followedBySalesman[employeeId] || [];
-      
+
       followedEmployees.forEach((ikutEmployeeId) => {
         // Find the SALESMAN_IKUT row key for this employee
         const ikutRowKey = `${ikutEmployeeId}-SALESMAN_IKUT`;
-        
+
         // Check if this SALESMAN_IKUT employee is selected and has activities
         if (employeeActivities[ikutRowKey]) {
           const ikutActivities = employeeActivities[ikutRowKey] || [];
-          
+
           // Update activities for the SALESMAN_IKUT employee
           const updatedIkutActivities = ikutActivities.map((activity) => {
             // Apply location-based paycode logic
@@ -1146,30 +1176,41 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 ...activity,
                 isSelected: true,
               };
-            } else if (locationType === "Local" && activity.payCodeId === "ELAUN_MO") {
+            } else if (
+              locationType === "Local" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
               return {
                 ...activity,
                 isSelected: false,
               };
-            } else if (locationType === "Outstation" && activity.payCodeId === "ELAUN_MO") {
+            } else if (
+              locationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
               return {
                 ...activity,
                 isSelected: true,
               };
-            } else if (locationType === "Outstation" && activity.payCodeId === "ELAUN_MT") {
+            } else if (
+              locationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
               return {
                 ...activity,
                 isSelected: false,
               };
             }
-            
+
             return activity;
           });
 
           // Recalculate amounts for the SALESMAN_IKUT employee
           const recalculatedIkutActivities = calculateActivitiesAmounts(
             updatedIkutActivities,
-            employeeSelectionState.jobHours[ikutEmployeeId]?.["SALESMAN_IKUT"] || 7,
+            employeeSelectionState.jobHours[ikutEmployeeId]?.[
+              "SALESMAN_IKUT"
+            ] || 7,
             formData.contextData
           );
 
@@ -1394,7 +1435,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     let allSelectedEmployees = Object.entries(
       employeeSelectionState.selectedJobs
     ).filter(([_, jobTypes]) => jobTypes.length > 0);
-    
+
     // Remove excluded employees on SALESMAN page
     if (jobConfig?.id === "SALESMAN") {
       const excludedEmployees = ["KILANG", "TIMOTHY.G"];
@@ -1811,20 +1852,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     if (jobConfig?.id === "SALESMAN") {
       const excludedEmployees = ["KILANG", "TIMOTHY.G"];
       let needsUpdate = false;
-      
+
       setEmployeeSelectionState((prev) => {
         const updatedSelectedJobs = { ...prev.selectedJobs };
-        
+
         excludedEmployees.forEach((employeeId) => {
           if (updatedSelectedJobs[employeeId]?.includes("SALESMAN")) {
-            updatedSelectedJobs[employeeId] = updatedSelectedJobs[employeeId].filter(
-              (jobType) => jobType !== "SALESMAN"
-            );
+            updatedSelectedJobs[employeeId] = updatedSelectedJobs[
+              employeeId
+            ].filter((jobType) => jobType !== "SALESMAN");
             needsUpdate = true;
           }
         });
-        
-        return needsUpdate ? { ...prev, selectedJobs: updatedSelectedJobs } : prev;
+
+        return needsUpdate
+          ? { ...prev, selectedJobs: updatedSelectedJobs }
+          : prev;
       });
     }
   }, [jobConfig?.id]);
@@ -2081,56 +2124,73 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
 
     setEmployeeActivities(newEmployeeActivities);
-    
+
     // Apply location-based paycodes to SALESMAN_IKUT employees after activities are loaded
     // This ensures paycodes are applied whenever activities are fetched/refreshed
-    Object.entries(salesmanIkutRelations).forEach(([ikutRowKey, salesmanId]) => {
-      // Check if this SALESMAN_IKUT employee has activities loaded
-      if (newEmployeeActivities[ikutRowKey] && newEmployeeActivities[ikutRowKey].length > 0) {
-        const salesmanRowKey = `${salesmanId}-SALESMAN`;
-        const salesmanLocationType = locationTypes[salesmanRowKey] || "Local";
-        const ikutActivities = newEmployeeActivities[ikutRowKey];
-        
-        // Update activities for the SALESMAN_IKUT employee
-        const updatedIkutActivities = ikutActivities.map((activity) => {
-          // Apply location-based paycode logic
-          if (salesmanLocationType === "Local" && activity.payCodeId === "ELAUN_MT") {
-            return {
-              ...activity,
-              isSelected: true,
-            };
-          } else if (salesmanLocationType === "Local" && activity.payCodeId === "ELAUN_MO") {
-            return {
-              ...activity,
-              isSelected: false,
-            };
-          } else if (salesmanLocationType === "Outstation" && activity.payCodeId === "ELAUN_MO") {
-            return {
-              ...activity,
-              isSelected: true,
-            };
-          } else if (salesmanLocationType === "Outstation" && activity.payCodeId === "ELAUN_MT") {
-            return {
-              ...activity,
-              isSelected: false,
-            };
-          }
-          
-          return activity;
-        });
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        // Check if this SALESMAN_IKUT employee has activities loaded
+        if (
+          newEmployeeActivities[ikutRowKey] &&
+          newEmployeeActivities[ikutRowKey].length > 0
+        ) {
+          const salesmanRowKey = `${salesmanId}-SALESMAN`;
+          const salesmanLocationType = locationTypes[salesmanRowKey] || "Local";
+          const ikutActivities = newEmployeeActivities[ikutRowKey];
 
-        // Recalculate amounts for the SALESMAN_IKUT employee
-        const recalculatedIkutActivities = calculateActivitiesAmounts(
-          updatedIkutActivities,
-          0, // No hours needed for allowance paycodes
-          formData.contextData
-        );
+          // Update activities for the SALESMAN_IKUT employee
+          const updatedIkutActivities = ikutActivities.map((activity) => {
+            // Apply location-based paycode logic
+            if (
+              salesmanLocationType === "Local" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              salesmanLocationType === "Local" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            } else if (
+              salesmanLocationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              salesmanLocationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            }
 
-        // Update the activities immediately
-        newEmployeeActivities[ikutRowKey] = recalculatedIkutActivities;
+            return activity;
+          });
+
+          // Recalculate amounts for the SALESMAN_IKUT employee
+          const recalculatedIkutActivities = calculateActivitiesAmounts(
+            updatedIkutActivities,
+            0, // No hours needed for allowance paycodes
+            formData.contextData
+          );
+
+          // Update the activities immediately
+          newEmployeeActivities[ikutRowKey] = recalculatedIkutActivities;
+        }
       }
-    });
-    
+    );
+
     // Update with paycode-applied activities
     setEmployeeActivities(newEmployeeActivities);
   };
@@ -2489,14 +2549,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   ]);
 
   // Helper function to get the effective location type for any employee
-  const getEffectiveLocationType = (employee: EmployeeWithHours): "Local" | "Outstation" => {
+  const getEffectiveLocationType = (
+    employee: EmployeeWithHours
+  ): "Local" | "Outstation" => {
     if (!employee.rowKey) return "Local";
-    
+
     // For SALESMAN employees, use their direct location
     if (employee.jobType === "SALESMAN") {
       return locationTypes[employee.rowKey] || "Local";
     }
-    
+
     // For SALESMAN_IKUT employees, use the location of the salesman they're following
     if (employee.jobType === "SALESMAN_IKUT") {
       const salesmanId = salesmanIkutRelations[employee.rowKey];
@@ -2505,7 +2567,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         return locationTypes[salesmanRowKey] || "Local";
       }
     }
-    
+
     // For other employees, return Local as default
     return "Local";
   };
@@ -2517,7 +2579,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     const rowKey = selectedEmployee.rowKey;
 
     // When recalculating activities for salesmen or salesman ikut, consider the location type
-    if (jobConfig?.id === "SALESMAN" && (selectedEmployee.jobType === "SALESMAN" || selectedEmployee.jobType === "SALESMAN_IKUT")) {
+    if (
+      jobConfig?.id === "SALESMAN" &&
+      (selectedEmployee.jobType === "SALESMAN" ||
+        selectedEmployee.jobType === "SALESMAN_IKUT")
+    ) {
       const locationType = getEffectiveLocationType(selectedEmployee);
 
       // Recalculate with location type
@@ -2778,11 +2844,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               <span className="font-medium">{row.name}</span>
                               {(() => {
                                 // Only show followed employees that are actually selected
-                                const selectedFollowers = (followedBySalesman[row.id] || [])
-                                  .filter((ikutEmployeeId) => 
-                                    employeeSelectionState.selectedJobs[ikutEmployeeId]?.includes("SALESMAN_IKUT")
-                                  );
-                                
+                                const selectedFollowers = (
+                                  followedBySalesman[row.id] || []
+                                ).filter((ikutEmployeeId) =>
+                                  employeeSelectionState.selectedJobs[
+                                    ikutEmployeeId
+                                  ]?.includes("SALESMAN_IKUT")
+                                );
+
                                 if (selectedFollowers.length > 0) {
                                   return (
                                     <span className="text-xs text-default-500 block mt-1">
