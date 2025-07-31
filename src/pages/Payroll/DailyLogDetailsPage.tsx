@@ -19,6 +19,22 @@ interface DailyLogDetailsPageProps {
   jobType: string;
 }
 
+interface EmployeeEntry {
+  id: number;
+  work_log_id: number;
+  employee_id: string;
+  total_hours: number;
+  job_id: string;
+  following_salesman_id?: string | null;
+  muat_mee_bags?: number;
+  muat_bihun_bags?: number;
+  location_type?: string;
+  employee_name: string;
+  job_name: string;
+  following_salesman_name?: string | null;
+  activities: any[]; // Kept as any to avoid deep typing complex structure for now
+}
+
 interface LeaveRecord {
   id: number;
   employee_id: string;
@@ -30,22 +46,24 @@ interface LeaveRecord {
   notes?: string;
 }
 
+interface DailyWorkLog {
+  id: number;
+  log_date: string;
+  shift: number;
+  day_type: string;
+  section: string;
+  status: string;
+  context_data: any;
+  employeeEntries: EmployeeEntry[];
+  leaveRecords?: LeaveRecord[];
+}
+
 const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   jobType,
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [workLog, setWorkLog] = useState<{
-    id: number;
-    log_date: string;
-    shift: number;
-    day_type: string;
-    section: string;
-    status: string;
-    context_data: any;
-    employeeEntries: any[];
-    leaveRecords?: LeaveRecord[];
-  } | null>(null);
+  const [workLog, setWorkLog] = useState<DailyWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const jobConfig = getJobConfig(jobType);
   const [expandedEntries, setExpandedEntries] = useState<
@@ -140,11 +158,11 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
 
   const totalEmployees = workLog.employeeEntries.length;
   const totalHours = workLog.employeeEntries.reduce(
-    (sum: number, entry: any) => sum + entry.total_hours,
+    (sum: number, entry: EmployeeEntry) => sum + entry.total_hours,
     0
   );
   const totalAmount = workLog.employeeEntries.reduce(
-    (sum: number, entry: any) =>
+    (sum: number, entry: EmployeeEntry) =>
       sum +
       entry.activities.reduce(
         (actSum: number, activity: any) => actSum + activity.calculated_amount,
@@ -270,7 +288,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 Employee Details
               </h2>
               <div className="text-sm text-default-500">
-                {totalEmployees} employees{jobType !== "SALESMAN" ? ` • ${totalHours.toFixed(1)} total hours` : ""}
+                {totalEmployees} employees
+                {jobType !== "SALESMAN"
+                  ? ` • ${totalHours.toFixed(1)} total hours`
+                  : ""}
               </div>
             </div>
 
@@ -294,7 +315,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 </thead>
                 <tbody className="divide-y divide-default-200">
                   {workLog.employeeEntries
-                    .sort((a: any, b: any) => {
+                    .sort((a: EmployeeEntry, b: EmployeeEntry) => {
                       // Sort by job name first, then by employee name
                       const jobCompare = (a.job_name || "").localeCompare(
                         b.job_name || ""
@@ -304,7 +325,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                         b.employee_name || ""
                       );
                     })
-                    .map((entry: any) => {
+                    .map((entry: EmployeeEntry) => {
                       // ... rest of the existing mapping code remains the same
                       const employeeTotal = entry.activities.reduce(
                         (sum: number, activity: any) =>
@@ -322,7 +343,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                       // Determine if we need to show the expand/collapse button
                       const needsExpansion = totalActivities > 10;
                       // Check if this entry is expanded
-                      const isExpanded = expandedEntries[entry.id] || false;
+                      const isExpanded =
+                        expandedEntries[String(entry.id)] || false;
 
                       // Prepare activities to display based on expansion state
                       const displayContextLinked = isExpanded
@@ -360,9 +382,39 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                             <p className="text-sm text-default-500">
                               {entry.employee_id} • {entry.job_name}
                             </p>
+                            {entry.job_id === "SALESMAN_IKUT" && (
+                              <div className="text-xs text-default-500 mt-1.5 space-y-1 pl-1 border-l-2 border-default-200">
+                                <p>
+                                  <span className="text-default-400">
+                                    Following:
+                                  </span>{" "}
+                                  <span className="font-medium text-default-600">
+                                    {entry.following_salesman_name || "N/A"}
+                                  </span>
+                                </p>
+                                <p>
+                                  <span className="text-default-400">
+                                    Mee Bags:
+                                  </span>{" "}
+                                  <span className="font-medium text-default-600">
+                                    {entry.muat_mee_bags || 0}
+                                  </span>
+                                </p>
+                                <p>
+                                  <span className="text-default-400">
+                                    Bihun Bags:
+                                  </span>{" "}
+                                  <span className="font-medium text-default-600">
+                                    {entry.muat_bihun_bags || 0}
+                                  </span>
+                                </p>
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {jobType === "SALESMAN" ? (entry.location_type || "Local") : entry.total_hours.toFixed(1)}
+                            {jobType === "SALESMAN"
+                              ? entry.location_type || "Local"
+                              : entry.total_hours.toFixed(1)}
                           </td>
                           <td className="px-4 py-3">
                             <div className="space-y-1">
@@ -485,7 +537,9 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                               {/* Show more/less button when needed */}
                               {needsExpansion && (
                                 <button
-                                  onClick={() => toggleExpansion(entry.id)}
+                                  onClick={() =>
+                                    toggleExpansion(String(entry.id))
+                                  }
                                   className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
                                 >
                                   {isExpanded
