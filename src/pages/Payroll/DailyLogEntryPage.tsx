@@ -1454,20 +1454,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       return;
     }
 
-    // Validate that all selected employees have hours
-    const invalidEmployees = allSelectedEmployees.filter(
-      ([employeeId, jobTypes]) => {
-        return jobTypes.some((jobType) => {
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-          return hours <= 0;
-        });
-      }
-    );
+    // Validate that all selected employees have hours, except for Salesman job type
+    if (jobConfig?.id !== "SALESMAN") {
+      const invalidEmployees = allSelectedEmployees.filter(
+        ([employeeId, jobTypes]) => {
+          return jobTypes.some((jobType) => {
+            const hours =
+              employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+            return hours <= 0;
+          });
+        }
+      );
 
-    if (invalidEmployees.length > 0) {
-      toast.error("All selected employees must have hours greater than 0");
-      return;
+      if (invalidEmployees.length > 0) {
+        toast.error("All selected employees must have hours greater than 0");
+        return;
+      }
     }
 
     // Build the employee data with all selected jobs
@@ -1478,7 +1480,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
           const rowKey = `${employeeId}-${jobType}`;
           const activities = employeeActivities[rowKey] || [];
-          const employeeObject = expandedEmployees.find(e => e.rowKey === rowKey);
+          const employeeObject = expandedEmployees.find(
+            (e) => e.rowKey === rowKey
+          );
 
           // Add additional data for different job types
           const additionalData: any = {};
@@ -1488,9 +1492,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             additionalData.muatBihunBags =
               ikutBagCounts[rowKey]?.muatBihun || 0;
           }
-          
+
           if (jobType === "SALESMAN" || jobType === "SALESMAN_IKUT") {
-            additionalData.locationType = employeeObject ? getEffectiveLocationType(employeeObject) : "Local";
+            additionalData.locationType = employeeObject
+              ? getEffectiveLocationType(employeeObject)
+              : "Local";
           }
 
           return {
