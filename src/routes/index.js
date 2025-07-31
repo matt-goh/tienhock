@@ -52,6 +52,7 @@ import commissionRoutes from "./payroll/commissions.js";
 import employeePayrollsRouter from "./payroll/employee-payrolls.js";
 import contributionRatesRouter from "./payroll/contribution-rates.js";
 import midMonthPayrollsRouter from "./payroll/mid-month-payrolls.js";
+import pinjamRecordsRouter from "./payroll/pinjam-records.js";
 
 // Green Target routes
 import greenTargetCustomerRouter from "./greentarget/customers.js";
@@ -142,6 +143,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/commissions", commissionRoutes(pool));
   app.use("/api/contribution-rates", contributionRatesRouter(pool));
   app.use("/api/mid-month-payrolls", midMonthPayrollsRouter(pool));
+  app.use("/api/pinjam-records", pinjamRecordsRouter(pool));
 
   // Green Target routes
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));
