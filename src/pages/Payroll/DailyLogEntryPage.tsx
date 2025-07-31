@@ -2776,22 +2776,32 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
                               <span className="font-medium">{row.name}</span>
-                              {followedBySalesman[row.id] &&
-                                followedBySalesman[row.id].length > 0 && (
-                                  <span className="text-xs text-default-500 block mt-1">
-                                    (Followed by{" "}
-                                    {followedBySalesman[row.id]
-                                      .map((ikutEmployeeId) => {
-                                        const ikutEmployee =
-                                          availableEmployees.find(
-                                            (emp) => emp.id === ikutEmployeeId
-                                          );
-                                        return ikutEmployee?.name;
-                                      })
-                                      .join(", ")}
-                                    )
-                                  </span>
-                                )}
+                              {(() => {
+                                // Only show followed employees that are actually selected
+                                const selectedFollowers = (followedBySalesman[row.id] || [])
+                                  .filter((ikutEmployeeId) => 
+                                    employeeSelectionState.selectedJobs[ikutEmployeeId]?.includes("SALESMAN_IKUT")
+                                  );
+                                
+                                if (selectedFollowers.length > 0) {
+                                  return (
+                                    <span className="text-xs text-default-500 block mt-1">
+                                      (Followed by{" "}
+                                      {selectedFollowers
+                                        .map((ikutEmployeeId) => {
+                                          const ikutEmployee =
+                                            availableEmployees.find(
+                                              (emp) => emp.id === ikutEmployeeId
+                                            );
+                                          return ikutEmployee?.name;
+                                        })
+                                        .join(", ")}
+                                      )
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-700">
                               <SafeLink
