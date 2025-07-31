@@ -1478,6 +1478,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
           const rowKey = `${employeeId}-${jobType}`;
           const activities = employeeActivities[rowKey] || [];
+          const employeeObject = expandedEmployees.find(e => e.rowKey === rowKey);
 
           // Add additional data for different job types
           const additionalData: any = {};
@@ -1486,8 +1487,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
             additionalData.muatBihunBags =
               ikutBagCounts[rowKey]?.muatBihun || 0;
-          } else if (jobType === "SALESMAN") {
-            additionalData.locationType = locationTypes[rowKey] || "Local";
+          }
+          
+          if (jobType === "SALESMAN" || jobType === "SALESMAN_IKUT") {
+            additionalData.locationType = employeeObject ? getEffectiveLocationType(employeeObject) : "Local";
           }
 
           return {
