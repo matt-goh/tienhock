@@ -248,7 +248,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-6 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
             {payment ? "Edit Payment" : "Record New Payment"}
@@ -374,7 +374,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                             <div className="flex items-center gap-3 text-sm">
                               <span className="font-medium">{invoice.id}</span>
                               <span className="text-gray-600 truncate">
-                                {invoice.customerName}
+                                {invoice.customerName} ({invoice.customerid})
                               </span>
                               <span className="text-gray-500 text-xs">
                                 Bal: {formatCurrency(invoice.balance_due)}
@@ -495,7 +495,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t bg-gray-50">
+          <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg">
             <div className="flex justify-between items-center">
               <div className="text-sm text-gray-600">
                 {selectedInvoices.length === 0 ? (
