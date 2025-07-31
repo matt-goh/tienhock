@@ -34,6 +34,7 @@ import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 import CommissionPage from "./Payroll/CommissionPage";
+import PinjamListPage from "./Payroll/PinjamListPage";
 
 // Catalogue related imports
 // Staff
@@ -140,6 +141,12 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Mid-month Pay",
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
+  });
+
+  payrollSubItems.push({
+    name: "Pinjam System",
+    path: "/payroll/pinjam",
+    component: PinjamListPage,
   });
 
   payrollSubItems.push({
