@@ -1,4 +1,4 @@
-// src/pages/Payroll/ProductionDetailsPage.tsx
+// src/pages/Payroll/DailyLogDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
@@ -270,7 +270,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 Employee Details
               </h2>
               <div className="text-sm text-default-500">
-                {totalEmployees} employees • {totalHours.toFixed(1)} total hours
+                {totalEmployees} employees{jobType !== "SALESMAN" ? ` • ${totalHours.toFixed(1)} total hours` : ""}
               </div>
             </div>
 
@@ -282,7 +282,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                       Employee
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                      Hours
+                      {jobType === "SALESMAN" ? "Location" : "Hours"}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
                       Activities
@@ -362,7 +362,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                             </p>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {entry.total_hours.toFixed(1)}
+                            {jobType === "SALESMAN" ? (entry.location_type || "Local") : entry.total_hours.toFixed(1)}
                           </td>
                           <td className="px-4 py-3">
                             <div className="space-y-1">
