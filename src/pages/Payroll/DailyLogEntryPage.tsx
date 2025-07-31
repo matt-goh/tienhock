@@ -386,7 +386,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Update available employees based on dynamic job types
   const availableEmployees = useMemo(() => {
-    return allStaffs
+    let filteredStaffs = allStaffs;
+    if (jobConfig?.id === "SALESMAN") {
+      const excludedIds = ["KILANG", "TIMOTHY.G"];
+      filteredStaffs = allStaffs.filter(
+        (staff) => !excludedIds.includes(staff.id)
+      );
+    }
+
+    return filteredStaffs
       .filter((staff) => {
         if (!staff.job || !Array.isArray(staff.job)) return false;
         return staff.job.some((jobId: string) => JOB_IDS.includes(jobId));
@@ -442,10 +450,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const salesmanEmployees = useMemo(() => {
     if (jobConfig?.id !== "SALESMAN") return [];
     return expandedEmployees.filter(
-      (emp: { jobType: string; id: string }) =>
-        emp.jobType === "SALESMAN" &&
-        emp.id !== "KILANG" &&
-        emp.id !== "TIMOTHY.G"
+      (emp: { jobType: string; id: string }) => emp.jobType === "SALESMAN"
     );
   }, [expandedEmployees, jobConfig?.id]);
 
