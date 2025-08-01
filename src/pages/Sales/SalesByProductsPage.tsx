@@ -580,7 +580,8 @@ const SalesByProductsPage: React.FC = () => {
 
       // Create pie data entries with the shaded colors
       const pieData = topProducts.map((product, index) => ({
-        name: product.description || product.id,
+        name: product.id, // Show product code in labels
+        description: product.description || product.id, // Keep description for tooltips
         value: product.totalSales,
         color: shades[index],
         id: product.id, // Add id to ensure consistency
@@ -590,6 +591,7 @@ const SalesByProductsPage: React.FC = () => {
       if (products.length > limit) {
         pieData.push({
           name: "Others",
+          description: "Other Products",
           value: products
             .slice(limit)
             .reduce((sum, p) => sum + p.totalSales, 0),
@@ -666,7 +668,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full pt-0 max-w-[88rem] mt-4 mx-auto space-y-6">
+    <div className="w-full pt-0 max-w-[90rem] mt-4 mx-auto space-y-6">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
@@ -972,7 +974,7 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1028,7 +1030,7 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1084,7 +1086,7 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
