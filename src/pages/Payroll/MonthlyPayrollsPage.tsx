@@ -6,7 +6,6 @@ import {
   IconPlus,
   IconEye,
   IconClockPlay,
-  IconRefresh,
   IconLock,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";

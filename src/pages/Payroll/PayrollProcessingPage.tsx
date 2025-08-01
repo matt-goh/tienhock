@@ -59,6 +59,7 @@ const PayrollProcessingPage: React.FC = () => {
     total: number;
     stage: string;
   }>({ current: 0, total: 0, stage: "" });
+  const [lastProcessingTime, setLastProcessingTime] = useState<number>(0);
 
   const { jobs, loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
@@ -86,6 +87,13 @@ const PayrollProcessingPage: React.FC = () => {
     });
     return map;
   }, [staffs]);
+
+  // Memoized jobs map for O(1) lookups during processing
+  const jobsMap = useMemo(() => {
+    const map = new Map();
+    jobs.forEach((job) => map.set(job.id, job));
+    return map;
+  }, [jobs]);
 
   useEffect(() => {
     Promise.all([fetchPayrollDetails(), fetchEligibleEmployees()])
@@ -171,11 +179,42 @@ const PayrollProcessingPage: React.FC = () => {
   const handleProcessPayroll = async () => {
     if (!id || !payroll) return;
 
+    // Debounce processing requests (prevent multiple clicks)
+    const now = Date.now();
+    const DEBOUNCE_TIME = 2000; // 2 seconds
+    if (now - lastProcessingTime < DEBOUNCE_TIME) {
+      toast.error("Please wait before processing again");
+      return;
+    }
+
+    // Prevent processing if already in progress
+    if (isProcessing) {
+      toast.error("Processing is already in progress");
+      return;
+    }
+
+    // Early validation before processing
+    if (totalSelectedEmployees === 0) {
+      toast.error("Please select at least one employee to process");
+      return;
+    }
+
+    if (!epfRates.length || !socsoRates.length || !incomeTaxRates.length) {
+      toast.error("Contribution rates not loaded. Please refresh the page.");
+      return;
+    }
+
+    if (loadingStaffs || loadingJobs) {
+      toast.error("Still loading employee data. Please wait.");
+      return;
+    }
+
+    setLastProcessingTime(now);
     setIsProcessing(true);
     setProcessingProgress({
       current: 0,
       total: 100,
-      stage: "Fetching work logs...",
+      stage: "Validating data and fetching work logs...",
     });
 
     try {
@@ -251,8 +290,8 @@ const PayrollProcessingPage: React.FC = () => {
 
       selectedCombinations.forEach(({ employeeId, jobType }) => {
         try {
-          // Get section from job data
-          const job = jobs.find((j) => j.id === jobType);
+          // Get section from job data (O(1) lookup instead of O(n) find)
+          const job = jobsMap.get(jobType);
           const section = job?.section?.[0] || "Unknown";
 
           // Calculate employee payroll
@@ -287,17 +326,73 @@ const PayrollProcessingPage: React.FC = () => {
         setProcessingStatus((prev) => ({ ...prev, ...calculationErrors }));
       }
 
-      setProcessingProgress({
-        current: 70,
-        total: 100,
-        stage: `Saving ${employeePayrolls.length} payroll records...`,
-      });
+      // Process payrolls in chunks to avoid large database operations
+      const CHUNK_SIZE = 50; // Process 50 employees at a time
+      const chunks = [];
+      for (let i = 0; i < employeePayrolls.length; i += CHUNK_SIZE) {
+        chunks.push(employeePayrolls.slice(i, i + CHUNK_SIZE));
+      }
 
-      // Save all payrolls in a single batch request
-      const batchResponse = await saveEmployeePayrollsBatch(
-        payroll.id,
-        employeePayrolls
-      );
+      let allResults: any[] = [];
+      let allErrors: any[] = [];
+      let processedCount = 0;
+
+      // Process each chunk
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        const chunkProgress = 70 + (chunkIndex / chunks.length) * 25; // 70% to 95%
+
+        setProcessingProgress({
+          current: Math.round(chunkProgress),
+          total: 100,
+          stage: `Saving batch ${chunkIndex + 1}/${chunks.length} (${
+            processedCount + chunk.length
+          }/${employeePayrolls.length} employees)...`,
+        });
+
+        try {
+          const chunkResponse = await saveEmployeePayrollsBatch(
+            payroll.id,
+            chunk
+          );
+
+          // Collect results from this chunk
+          if (chunkResponse.results) {
+            allResults.push(...chunkResponse.results);
+          }
+          if (chunkResponse.errors) {
+            allErrors.push(...chunkResponse.errors);
+          }
+
+          processedCount += chunk.length;
+
+          // Small delay to prevent overwhelming the database
+          if (chunkIndex < chunks.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          console.error(`Error processing chunk ${chunkIndex + 1}:`, error);
+          // Mark all employees in this chunk as errors
+          chunk.forEach((payroll) => {
+            allErrors.push({
+              employee_id: payroll.employee_id,
+              job_type: payroll.job_type,
+              error: (error as Error).message || "Failed to save",
+            });
+          });
+        }
+      }
+
+      // Combine all chunk responses into a single response format
+      const batchResponse = {
+        results: allResults,
+        errors: allErrors,
+        summary: {
+          total: employeePayrolls.length,
+          successful: allResults.length,
+          errors: allErrors.length,
+        },
+      };
 
       // Update processing status based on batch response (batched update)
       const statusUpdates: Record<string, "success" | "error"> = {};
