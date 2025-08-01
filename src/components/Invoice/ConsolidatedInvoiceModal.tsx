@@ -190,7 +190,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   };
 
   const handleSelectAllInvoices = () => {
-    /* ... no change ... */
     if (eligibleInvoices.length === 0 || isLoadingEligible) return;
     if (selectedInvoices.size === eligibleInvoices.length) {
       setSelectedInvoices(new Set());
@@ -200,7 +199,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     }
   };
   const handleSelectInvoice = (invoiceId: string) => {
-    /* ... no change ... */
     setSelectedInvoices((prevSelected) => {
       const newSelected = new Set(prevSelected);
       if (newSelected.has(invoiceId)) {
@@ -212,7 +210,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     });
   };
   const handleSubmitConsolidated = async () => {
-    /* ... no change ... */
     if (selectedInvoices.size === 0 || isSubmitting) return;
     setIsSubmitting(true);
     setSubmissionResults(null);
