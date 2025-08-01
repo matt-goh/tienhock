@@ -229,14 +229,31 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
         });
 
         if (response.errors && response.errors.length > 0) {
-          toast.error(
-            `${response.inserted.length} record(s) saved, ${response.errors.length} failed.`
-          );
+          // Show detailed message with what succeeded and what failed
+          let message = '';
+          if (response.created > 0 && response.updated > 0) {
+            message = `✅ Created ${response.created}, updated ${response.updated} record(s). ❌ ${response.errors.length} failed.`;
+          } else if (response.created > 0) {
+            message = `✅ Created ${response.created} record(s). ❌ ${response.errors.length} failed.`;
+          } else if (response.updated > 0) {
+            message = `✅ Updated ${response.updated} record(s). ❌ ${response.errors.length} failed.`;
+          } else {
+            message = `❌ ${response.errors.length} record(s) failed to save.`;
+          }
+          
+          toast.error(message, { duration: 6000 });
           console.error("Batch errors:", response.errors);
         } else {
-          toast.success(
-            `${recordsWithMeta.length} pinjam record(s) saved successfully!`
-          );
+          // All successful - show success message based on what actually happened
+          if (response.created > 0 && response.updated > 0) {
+            toast.success(`Successfully created ${response.created} and updated ${response.updated} pinjam record(s)!`);
+          } else if (response.created > 0) {
+            toast.success(`Successfully created ${response.created} pinjam record(s)!`);
+          } else if (response.updated > 0) {
+            toast.success(`Successfully updated ${response.updated} pinjam record(s) by adding amounts!`);
+          } else {
+            toast.success(response.message || "Pinjam records processed successfully!");
+          }
         }
       }
 
@@ -319,122 +336,125 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                   </p>
                 </div>
 
-                <div className="px-6 pt-1 max-h-[70vh] overflow-y-auto">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full table-fixed">
-                      <thead>
-                        <tr>
-                          <th className="py-2 text-left font-medium text-default-600 w-[35%]">
-                            Staff
-                          </th>
-                          <th className="py-2 px-3 text-left font-medium text-default-600 w-[30%]">
-                            Description
-                          </th>
-                          <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
-                            <div className="bg-blue-50 rounded px-2 py-1">
-                              Mid-Month (RM)
-                            </div>
-                          </th>
-                          <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
-                            <div className="bg-green-50 rounded px-2 py-1">
-                              Monthly (RM)
-                            </div>
-                          </th>
-                          <th className="py-2 text-center font-medium text-default-600 w-12"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {entries.map((entry, index) => (
-                          <tr key={entry.id} className="group">
-                            <td className="py-1 align-top">
-                              <FormCombobox
-                                name={`employee-${index}`}
-                                label=""
-                                value={entry.employeeId ?? undefined}
-                                onChange={(value) =>
-                                  handleEntryChange(index, "employeeId", value)
-                                }
-                                options={allStaffOptions}
-                                query={getStaffQuery(entry.id)}
-                                setQuery={(
-                                  query: React.SetStateAction<string>
-                                ) => setStaffQuery(entry.id, query)}
-                                placeholder="Select Staff..."
-                                mode="single"
-                              />
-                            </td>
-                            <td className="py-1 px-3 align-top">
-                              <FormInput
-                                name={`description-${index}`}
-                                label=""
-                                type="text"
-                                value={entry.description}
-                                onChange={(e) =>
-                                  handleEntryChange(
-                                    index,
-                                    "description",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="e.g., MELTI, HANDPHONE"
-                              />
-                            </td>
-                            <td className="py-1 px-3 align-top">
-                              <div className="bg-blue-50 rounded px-1">
-                                <FormInput
-                                  name={`midMonthAmount-${index}`}
-                                  label=""
-                                  type="number"
-                                  value={entry.midMonthAmount}
-                                  onChange={(e) =>
-                                    handleEntryChange(
-                                      index,
-                                      "midMonthAmount",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="0.00"
-                                  step="1"
-                                />
+                <div className="max-h-[60vh]">
+                  <div className="px-6 pt-1">
+                    <div>
+                      <table className="min-w-full table-fixed">
+                        <thead>
+                          <tr>
+                            <th className="py-2 text-left font-medium text-default-600 w-[35%]">
+                              Staff
+                            </th>
+                            <th className="py-2 px-3 text-left font-medium text-default-600 w-[30%]">
+                              Description
+                            </th>
+                            <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
+                              <div className="bg-blue-50 rounded px-2 py-1">
+                                Mid-Month (RM)
                               </div>
-                            </td>
-                            <td className="py-1 px-3 align-top">
-                              <div className="bg-green-50 rounded px-1">
-                                <FormInput
-                                  name={`monthlyAmount-${index}`}
-                                  label=""
-                                  type="number"
-                                  value={entry.monthlyAmount}
-                                  onChange={(e) =>
-                                    handleEntryChange(
-                                      index,
-                                      "monthlyAmount",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="0.00"
-                                  step="1"
-                                />
+                            </th>
+                            <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
+                              <div className="bg-green-50 rounded px-2 py-1">
+                                Monthly (RM)
                               </div>
-                            </td>
-                            <td className="py-1 align-top text-center">
-                              {entries.length > 1 && (
-                                <button
-                                  onClick={() => removeEntryRow(entry.id)}
-                                  className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Remove row"
-                                >
-                                  <IconX size={18} />
-                                </button>
-                              )}
-                            </td>
+                            </th>
+                            <th className="py-2 text-center font-medium text-default-600 w-12"></th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {entries.map((entry, index) => (
+                            <tr key={entry.id} className="group">
+                              <td className="py-1 align-top relative">
+                                <FormCombobox
+                                  name={`employee-${index}`}
+                                  label=""
+                                  value={entry.employeeId ?? undefined}
+                                  onChange={(value) =>
+                                    handleEntryChange(index, "employeeId", value)
+                                  }
+                                  options={allStaffOptions}
+                                  query={getStaffQuery(entry.id)}
+                                  setQuery={(
+                                    query: React.SetStateAction<string>
+                                  ) => setStaffQuery(entry.id, query)}
+                                  placeholder="Select Staff..."
+                                  mode="single"
+                                />
+                              </td>
+                              <td className="py-1 px-3 align-top">
+                                <FormInput
+                                  name={`description-${index}`}
+                                  label=""
+                                  type="text"
+                                  value={entry.description}
+                                  onChange={(e) =>
+                                    handleEntryChange(
+                                      index,
+                                      "description",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="e.g., MELTI, HANDPHONE"
+                                />
+                              </td>
+                              <td className="py-1 px-3 align-top">
+                                <div className="bg-blue-50 rounded px-1">
+                                  <FormInput
+                                    name={`midMonthAmount-${index}`}
+                                    label=""
+                                    type="number"
+                                    value={entry.midMonthAmount}
+                                    onChange={(e) =>
+                                      handleEntryChange(
+                                        index,
+                                        "midMonthAmount",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    step="1"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-1 px-3 align-top">
+                                <div className="bg-green-50 rounded px-1">
+                                  <FormInput
+                                    name={`monthlyAmount-${index}`}
+                                    label=""
+                                    type="number"
+                                    value={entry.monthlyAmount}
+                                    onChange={(e) =>
+                                      handleEntryChange(
+                                        index,
+                                        "monthlyAmount",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    step="1"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-1 align-top text-center">
+                                {entries.length > 1 && (
+                                  <button
+                                    onClick={() => removeEntryRow(entry.id)}
+                                    className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Remove row"
+                                  >
+                                    <IconX size={18} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="flex justify-between items-center my-4 border-t border-default-200 pt-4">
+                <div className="px-6 flex justify-between items-center my-4 border-t border-default-200 pt-4">
                     <Button
                       variant="outline"
                       onClick={addEntryRow}
@@ -465,7 +485,6 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                       </Button>
                     </div>
                   </div>
-                </div>
               </DialogPanel>
             </TransitionChild>
           </div>

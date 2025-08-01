@@ -348,28 +348,66 @@ export default function (pool) {
         }
 
         try {
-          const insertQuery = `
-            INSERT INTO pinjam_records (
-              employee_id, year, month, amount, description, pinjam_type, created_by
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
+          // First, try to check if a record with same key exists
+          const checkQuery = `
+            SELECT id, amount FROM pinjam_records 
+            WHERE employee_id = $1 AND year = $2 AND month = $3 
+              AND description = $4 AND pinjam_type = $5
           `;
-
-          const insertResult = await client.query(insertQuery, [
+          
+          const existingResult = await client.query(checkQuery, [
             employee_id,
             year,
             month,
-            amount,
             description,
-            pinjam_type,
-            created_by || null,
+            pinjam_type
           ]);
 
-          insertedRecords.push({
-            ...insertResult.rows[0],
-            amount: parseFloat(insertResult.rows[0].amount),
-          });
+          if (existingResult.rows.length > 0) {
+            // Record exists, update by adding amounts
+            const existingRecord = existingResult.rows[0];
+            const newAmount = parseFloat(existingRecord.amount) + parseFloat(amount);
+            
+            const updateQuery = `
+              UPDATE pinjam_records 
+              SET amount = $1, updated_at = CURRENT_TIMESTAMP
+              WHERE id = $2
+              RETURNING *
+            `;
+            
+            const updateResult = await client.query(updateQuery, [newAmount, existingRecord.id]);
+            
+            insertedRecords.push({
+              ...updateResult.rows[0],
+              amount: parseFloat(updateResult.rows[0].amount),
+              _action: 'updated'
+            });
+          } else {
+            // Record doesn't exist, insert new
+            const insertQuery = `
+              INSERT INTO pinjam_records (
+                employee_id, year, month, amount, description, pinjam_type, created_by
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              RETURNING *
+            `;
+
+            const insertResult = await client.query(insertQuery, [
+              employee_id,
+              year,
+              month,
+              amount,
+              description,
+              pinjam_type,
+              created_by || null,
+            ]);
+
+            insertedRecords.push({
+              ...insertResult.rows[0],
+              amount: parseFloat(insertResult.rows[0].amount),
+              _action: 'created'
+            });
+          }
         } catch (insertError) {
           errors.push({
             index: i,
@@ -389,9 +427,28 @@ export default function (pool) {
 
       await client.query('COMMIT');
 
+      const createdCount = insertedRecords.filter(r => r._action === 'created').length;
+      const updatedCount = insertedRecords.filter(r => r._action === 'updated').length;
+      
+      let message = '';
+      if (createdCount > 0 && updatedCount > 0) {
+        message = `Successfully created ${createdCount} and updated ${updatedCount} pinjam record(s)`;
+      } else if (createdCount > 0) {
+        message = `Successfully created ${createdCount} pinjam record(s)`;
+      } else if (updatedCount > 0) {
+        message = `Successfully updated ${updatedCount} pinjam record(s) by adding amounts`;
+      } else {
+        message = `Processed ${insertedRecords.length} pinjam record(s)`;
+      }
+
       res.status(201).json({
-        message: `Successfully created ${insertedRecords.length} pinjam record(s)`,
-        inserted: insertedRecords,
+        message,
+        inserted: insertedRecords.map(record => {
+          const { _action, ...recordData } = record;
+          return recordData;
+        }),
+        created: createdCount,
+        updated: updatedCount,
         errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error) {
