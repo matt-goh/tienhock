@@ -1349,7 +1349,7 @@ export default function (pool, config) {
         // Parse values from string to number
         const quantity = parseInt(product.quantity) || 0;
         const price = parseFloat(product.price) || 0;
-        const total = parseFloat(product.total) || (quantity * price);
+        const total = parseFloat(product.total) || 0;
         const foc = parseInt(product.freeproduct) || 0;
         const returns = parseInt(product.returnproduct) || 0;
 
