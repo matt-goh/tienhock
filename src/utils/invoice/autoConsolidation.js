@@ -294,8 +294,8 @@ async function upsertConsolidationTracking(
  * Get eligible Tien Hock invoices that haven't been consolidated
  */
 async function getEligibleTienhockInvoices(client, month, year) {
-  const startOfMonth = new Date(year, month, 1).getTime().toString();
-  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+  const startOfMonth = new Date(Date.UTC(year, month, 1)).getTime().toString();
+  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
     .getTime()
     .toString();
 
@@ -339,8 +339,8 @@ async function getEligibleTienhockInvoices(client, month, year) {
  * Get eligible Jellypolly invoices that haven't been consolidated
  */
 async function getEligibleJellypollyInvoices(client, month, year) {
-  const startOfMonth = new Date(year, month, 1).getTime().toString();
-  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+  const startOfMonth = new Date(Date.UTC(year, month, 1)).getTime().toString();
+  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
     .getTime()
     .toString();
 
