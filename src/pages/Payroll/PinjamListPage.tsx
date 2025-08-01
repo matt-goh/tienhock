@@ -81,11 +81,12 @@ const PinjamListPage: React.FC = () => {
   // Generate year and month options
   const yearOptions = useMemo(() => {
     const years = [];
-    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
+    const thisYear = new Date().getFullYear();
+    for (let year = thisYear - 2; year <= thisYear + 1; year++) {
       years.push({ id: year, name: year.toString() });
     }
     return years;
-  }, [currentYear]);
+  }, []);
 
   const monthOptions = useMemo(
     () =>
@@ -153,14 +154,10 @@ const PinjamListPage: React.FC = () => {
 
   const fetchEmployeePayrolls = async () => {
     try {
-      // Get all employee payrolls for the current year/month
       const response = await api.get(
         `/api/monthly-payrolls?year=${currentYear}&month=${currentMonth}&include_employee_payrolls=true`
       );
-
-      // Extract employee payroll data from monthly payrolls
       const allEmployeePayrolls: EmployeePayrollSummary[] = [];
-
       if (response && response.length > 0) {
         response.forEach((monthlyPayroll: any) => {
           if (monthlyPayroll.employee_payrolls) {
@@ -174,11 +171,9 @@ const PinjamListPage: React.FC = () => {
           }
         });
       }
-
       setEmployeePayrolls(allEmployeePayrolls);
     } catch (error) {
       console.error("Error fetching employee payrolls:", error);
-      // If the API doesn't work as expected, keep the empty array
       setEmployeePayrolls([]);
     }
   };
@@ -220,55 +215,68 @@ const PinjamListPage: React.FC = () => {
     handleModalClose();
   };
 
-  // Create a combined view of employees with their mid-month pay and pinjam data
   const employeeData = useMemo(() => {
-    const employeeMap = new Map();
+    const employeeMap = new Map<
+      string,
+      {
+        employee_id: string;
+        employee_name: string;
+        midMonthPay: number;
+        netPay: number;
+        midMonthPinjam: number;
+        midMonthPinjamDetails: string[];
+        monthlyPinjam: number;
+        monthlyPinjamDetails: string[];
+      }
+    >();
 
-    // Add mid-month payroll data
-    midMonthPayrolls.forEach((payroll) => {
-      employeeMap.set(payroll.employee_id, {
-        employee_id: payroll.employee_id,
-        employee_name: payroll.employee_name,
-        midMonthPay: payroll.amount,
-        midMonthPinjam: 0,
-        midMonthPinjamDetails: [],
-        monthlyPinjam: 0,
-        monthlyPinjamDetails: [],
-        gajiGenap: 0, // This would come from employee payrolls
+    // 1. Create a master list of all unique employees from all data sources
+    const allUniqueEmployees = new Map<string, { id: string; name: string }>();
+    [...midMonthPayrolls, ...employeePayrolls, ...pinjamSummary].forEach(
+      (record) => {
+        if (!allUniqueEmployees.has(record.employee_id)) {
+          allUniqueEmployees.set(record.employee_id, {
+            id: record.employee_id,
+            name: record.employee_name,
+          });
+        }
+      }
+    );
+
+    // 2. Iterate through the master list and build the final data object for each employee
+    allUniqueEmployees.forEach((employee) => {
+      const midMonthRecord = midMonthPayrolls.find(
+        (p) => p.employee_id === employee.id
+      );
+      const payrollRecord = employeePayrolls.find(
+        (p) => p.employee_id === employee.id
+      );
+      const pinjamRecord = pinjamSummary.find(
+        (p) => p.employee_id === employee.id
+      );
+
+      employeeMap.set(employee.id, {
+        employee_id: employee.id,
+        employee_name: employee.name,
+        midMonthPay: midMonthRecord?.amount || 0,
+        netPay: payrollRecord?.net_pay || 0,
+        midMonthPinjam: pinjamRecord?.mid_month.total_amount || 0,
+        midMonthPinjamDetails: pinjamRecord?.mid_month.details || [],
+        monthlyPinjam: pinjamRecord?.monthly.total_amount || 0,
+        monthlyPinjamDetails: pinjamRecord?.monthly.details || [],
       });
     });
 
-    // Add pinjam data
-    pinjamSummary.forEach((summary) => {
-      const existing = employeeMap.get(summary.employee_id) || {
-        employee_id: summary.employee_id,
-        employee_name: summary.employee_name,
-        midMonthPay: 0,
-        midMonthPinjam: 0,
-        midMonthPinjamDetails: [],
-        monthlyPinjam: 0,
-        monthlyPinjamDetails: [],
-        gajiGenap: 0,
-      };
-
-      existing.midMonthPinjam = summary.mid_month.total_amount;
-      existing.midMonthPinjamDetails = summary.mid_month.details;
-      existing.monthlyPinjam = summary.monthly.total_amount;
-      existing.monthlyPinjamDetails = summary.monthly.details;
-
-      employeeMap.set(summary.employee_id, existing);
-    });
-
-    return Array.from(employeeMap.values()).sort((a, b) =>
-      a.employee_name.localeCompare(b.employee_name)
-    );
-  }, [midMonthPayrolls, pinjamSummary]);
+    // 3. Convert map to array, calculate gajiGenap, and sort
+    return Array.from(employeeMap.values())
+      .map((emp) => ({
+        ...emp,
+        gajiGenap: emp.netPay - emp.midMonthPay,
+      }))
+      .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+  }, [midMonthPayrolls, pinjamSummary, employeePayrolls]);
 
   // Calculate totals
-  const totalMidMonthPay = employeeData.reduce(
-    (sum, emp) => sum + emp.midMonthPay,
-    0
-  );
   const totalMidMonthPinjam = employeeData.reduce(
     (sum, emp) => sum + emp.midMonthPinjam,
     0
@@ -384,37 +392,21 @@ const PinjamListPage: React.FC = () => {
                       <div className="text-sm font-medium text-default-700">
                         Pinjam items:
                       </div>
-                      {employee.midMonthPinjamDetails.map(
-                        (
-                          detail:
-                            | string
-                            | number
-                            | boolean
-                            | React.ReactElement<
-                                any,
-                                string | React.JSXElementConstructor<any>
-                              >
-                            | Iterable<React.ReactNode>
-                            | React.ReactPortal
-                            | null
-                            | undefined,
-                          index: React.Key | null | undefined
-                        ) => (
-                          <div
-                            key={index}
-                            className="text-sm text-default-600 pl-2"
-                          >
-                            {detail}
-                          </div>
-                        )
-                      )}
+                      {employee.midMonthPinjamDetails.map((detail, index) => (
+                        <div
+                          key={index}
+                          className="text-sm text-default-600 pl-2"
+                        >
+                          {detail}
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   <div className="border-t pt-3 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-default-600">
-                        Total pinjam amount:
+                        Jumlah Pinjam:
                       </span>
                       <span className="font-medium text-red-600">
                         {formatCurrency(employee.midMonthPinjam)}
@@ -449,30 +441,14 @@ const PinjamListPage: React.FC = () => {
                       <div className="text-sm font-medium text-default-700">
                         Pinjam items:
                       </div>
-                      {employee.monthlyPinjamDetails.map(
-                        (
-                          detail:
-                            | string
-                            | number
-                            | boolean
-                            | React.ReactElement<
-                                any,
-                                string | React.JSXElementConstructor<any>
-                              >
-                            | Iterable<React.ReactNode>
-                            | React.ReactPortal
-                            | null
-                            | undefined,
-                          index: React.Key | null | undefined
-                        ) => (
-                          <div
-                            key={index}
-                            className="text-sm text-default-600 pl-2"
-                          >
-                            {detail}
-                          </div>
-                        )
-                      )}
+                      {employee.monthlyPinjamDetails.map((detail, index) => (
+                        <div
+                          key={index}
+                          className="text-sm text-default-600 pl-2"
+                        >
+                          {detail}
+                        </div>
+                      ))}
                     </div>
                   )}
 

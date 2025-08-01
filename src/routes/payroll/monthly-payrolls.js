@@ -6,12 +6,55 @@ export default function (pool) {
 
   // Get all monthly payrolls
   router.get("/", async (req, res) => {
+    const { year, month, include_employee_payrolls } = req.query; // Add filters
     try {
-      const query = `
+      let query = `
         SELECT * FROM monthly_payrolls
-        ORDER BY year DESC, month DESC
       `;
-      const result = await pool.query(query);
+      const values = [];
+      const whereClauses = [];
+      let paramCount = 1;
+
+      if (year) {
+        whereClauses.push(`year = $${paramCount++}`);
+        values.push(parseInt(year));
+      }
+      if (month) {
+        whereClauses.push(`month = $${paramCount++}`);
+        values.push(parseInt(month));
+      }
+
+      if (whereClauses.length > 0) {
+        query += ` WHERE ${whereClauses.join(" AND ")}`;
+      }
+
+      query += ` ORDER BY year DESC, month DESC`;
+
+      const result = await pool.query(query, values);
+
+      // If including employee payrolls, fetch and attach them
+      if (include_employee_payrolls === "true") {
+        const payrollsWithEmployees = await Promise.all(
+          result.rows.map(async (payroll) => {
+            const employeePayrollsQuery = `
+              SELECT ep.*, s.name as employee_name
+              FROM employee_payrolls ep
+              LEFT JOIN staffs s ON ep.employee_id = s.id
+              WHERE ep.monthly_payroll_id = $1
+            `;
+            const employeePayrollsResult = await pool.query(
+              employeePayrollsQuery,
+              [payroll.id]
+            );
+            return {
+              ...payroll,
+              employee_payrolls: employeePayrollsResult.rows,
+            };
+          })
+        );
+        return res.json(payrollsWithEmployees);
+      }
+
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching monthly payrolls:", error);
