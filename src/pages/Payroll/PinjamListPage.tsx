@@ -530,10 +530,10 @@ const PinjamListPage: React.FC = () => {
 
                 {/* Body - Horizontal layout for content sections */}
                 <div className="space-y-4">
-                  <div className="flex gap-6">
+                  <div className="flex gap-6 divide-x divide-default-200">
                       {/* Mid-month Pay Section */}
                       {employee.midMonthPinjam > 0 && (
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 pr-6">
                           <div className="mb-3">
                             <p className="text-sm text-default-500 mb-1">
                               Mid-Month Pay (Before Pinjam)
@@ -588,7 +588,7 @@ const PinjamListPage: React.FC = () => {
 
                       {/* Monthly Pay Section */}
                       {employee.monthlyPinjam > 0 && (
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 pl-6">
                           <div className="mb-3">
                             <p className="text-sm text-default-500 mb-1">
                               Gaji Genap (Before Pinjam)

@@ -375,30 +375,42 @@ export const generatePinjamPDF = async (
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } else {
-      // Print
+      // Print - Use hidden iframe to trigger print dialog directly
       const url = URL.createObjectURL(pdfBlob);
-      const printFrame = document.createElement("iframe");
-      printFrame.style.display = "none";
-      document.body.appendChild(printFrame);
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.style.position = "fixed";
+      iframe.style.top = "-1000px";
+      iframe.style.left = "-1000px";
+      document.body.appendChild(iframe);
 
-      printFrame.onload = () => {
-        if (printFrame.contentWindow) {
+      iframe.onload = () => {
+        setTimeout(() => {
           try {
-            printFrame.contentWindow.print();
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
           } catch (e) {
             console.error("Print failed:", e);
-          } finally {
-            // Cleanup after a delay
-            setTimeout(() => {
-              if (document.body.contains(printFrame)) {
-                document.body.removeChild(printFrame);
-              }
-              URL.revokeObjectURL(url);
-            }, 1000);
+            // Fallback: open in new window if iframe print fails
+            window.open(url, '_blank');
           }
-        }
+        }, 1000); // Give more time for PDF to load
       };
-      printFrame.src = url;
+
+      iframe.onerror = () => {
+        console.error("Failed to load PDF in iframe, opening in new window");
+        window.open(url, '_blank');
+      };
+
+      iframe.src = url;
+
+      // Cleanup after print
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+        URL.revokeObjectURL(url);
+      }, 10000);
     }
   } catch (error) {
     console.error("Error generating PDF:", error);
