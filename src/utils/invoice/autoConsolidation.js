@@ -314,6 +314,7 @@ async function getEligibleTienhockInvoices(client, month, year) {
       AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
       AND con.invoice_status != 'cancelled'
     )
+    ORDER BY i.createddate::bigint ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
@@ -359,6 +360,7 @@ async function getEligibleJellypollyInvoices(client, month, year) {
       AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
       AND con.invoice_status != 'cancelled'
     )
+    ORDER BY i.createddate::bigint ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
@@ -399,6 +401,7 @@ async function getEligibleGreentargetInvoices(client, month, year) {
       AND con.consolidated_invoices::jsonb ? CAST(i.invoice_number AS TEXT)
       AND con.status != 'cancelled'
     )
+    ORDER BY i.date_issued ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [month, year]);

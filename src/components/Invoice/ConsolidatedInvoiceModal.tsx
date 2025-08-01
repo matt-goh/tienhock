@@ -215,7 +215,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     setSubmissionResults(null);
     setShowSubmissionResults(true);
     try {
-      const invoicesToSubmit = Array.from(selectedInvoices);
+      // Sort invoices by createddate (oldest to latest) before submitting
+      const selectedInvoiceObjects = eligibleInvoices.filter(invoice => 
+        selectedInvoices.has(invoice.id)
+      ).sort((a, b) => {
+        const timestampA = parseInt(a.createddate);
+        const timestampB = parseInt(b.createddate);
+        return timestampA - timestampB; // Ascending order (oldest first)
+      });
+      
+      const invoicesToSubmit = selectedInvoiceObjects.map(invoice => invoice.id);
       const response = await api.post("/api/einvoice/submit-consolidated", {
         invoices: invoicesToSubmit,
         month,
