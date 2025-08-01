@@ -112,12 +112,15 @@ const PinjamListPage: React.FC = () => {
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([
-        fetchPinjamRecords(),
-        fetchPinjamSummary(),
-        fetchMidMonthPayrolls(),
-        fetchEmployeePayrolls(),
-      ]);
+      const response = await api.get(
+        `/api/pinjam-records/dashboard?year=${currentYear}&month=${currentMonth}`
+      );
+      
+      // Set all state from single response
+      setPinjamRecords(response.pinjamRecords || []);
+      setPinjamSummary(response.pinjamSummary || []);
+      setMidMonthPayrolls(response.midMonthPayrolls || []);
+      setEmployeePayrolls(response.employeePayrolls || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
@@ -126,64 +129,6 @@ const PinjamListPage: React.FC = () => {
     }
   };
 
-  const fetchPinjamRecords = async () => {
-    try {
-      const response = await api.get(
-        `/api/pinjam-records?year=${currentYear}&month=${currentMonth}&limit=1000`
-      );
-      setPinjamRecords(response.records || []);
-    } catch (error) {
-      console.error("Error fetching pinjam records:", error);
-    }
-  };
-
-  const fetchPinjamSummary = async () => {
-    try {
-      const response = await api.get(
-        `/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
-      );
-      setPinjamSummary(response || []);
-    } catch (error) {
-      console.error("Error fetching pinjam summary:", error);
-    }
-  };
-
-  const fetchMidMonthPayrolls = async () => {
-    try {
-      const response = await api.get(
-        `/api/mid-month-payrolls?year=${currentYear}&month=${currentMonth}&limit=1000`
-      );
-      setMidMonthPayrolls(response.payrolls || []);
-    } catch (error) {
-      console.error("Error fetching mid-month payrolls:", error);
-    }
-  };
-
-  const fetchEmployeePayrolls = async () => {
-    try {
-      const response = await api.get(
-        `/api/monthly-payrolls?year=${currentYear}&month=${currentMonth}&include_employee_payrolls=true`
-      );
-      const allEmployeePayrolls: EmployeePayrollSummary[] = [];
-      if (response && response.length > 0) {
-        response.forEach((monthlyPayroll: any) => {
-          if (monthlyPayroll.employee_payrolls) {
-            monthlyPayroll.employee_payrolls.forEach((ep: any) => {
-              allEmployeePayrolls.push({
-                employee_id: ep.employee_id,
-                employee_name: ep.employee_name || ep.name,
-                net_pay: parseFloat(ep.net_pay || 0),
-              });
-            });
-          }
-        });
-      }
-      setEmployeePayrolls(allEmployeePayrolls);
-    } catch (error) {
-      console.error("Error fetching employee payrolls:", error);
-      setEmployeePayrolls([]);
-    }
-  };
 
   const handleEdit = (record: PinjamRecord) => {
     setEditingRecord(record);
