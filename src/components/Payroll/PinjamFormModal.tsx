@@ -14,6 +14,7 @@ import { FormCombobox, FormInput } from "../FormComponents";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { getMonthName } from "../../utils/payroll/payrollUtils";
 
 interface PinjamEntry {
   id: number;
@@ -276,6 +277,8 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
     }
   };
 
+  const monthName = useMemo(() => getMonthName(currentMonth), [currentMonth]);
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={handleClose}>
@@ -311,33 +314,33 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                     {editingRecord ? "Edit Pinjam Record" : "Record Pinjam"}
                   </DialogTitle>
                   <p className="text-sm text-default-600 mt-1">
-                    {currentMonth}/{currentYear} - Enter amounts in the
-                    respective columns (Mid-month or Monthly)
+                    {monthName} {currentYear} - Enter amounts in the respective
+                    columns (Mid-month or Monthly)
                   </p>
                 </div>
 
                 <div className="px-6 pt-1 max-h-[70vh] overflow-y-auto">
                   <div className="overflow-x-auto">
-                    <table className="min-w-full">
+                    <table className="min-w-full table-fixed">
                       <thead>
                         <tr>
-                          <th className="py-2 text-left font-medium text-default-600 w-1/4">
+                          <th className="py-2 text-left font-medium text-default-600 w-[35%]">
                             Staff
                           </th>
-                          <th className="py-2 px-3 text-left font-medium text-default-600 w-1/4">
+                          <th className="py-2 px-3 text-left font-medium text-default-600 w-[30%]">
                             Description
                           </th>
-                          <th className="py-2 px-3 text-center font-medium text-default-600 w-1/6">
+                          <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
                             <div className="bg-blue-50 rounded px-2 py-1">
                               Mid-Month (RM)
                             </div>
                           </th>
-                          <th className="py-2 px-3 text-center font-medium text-default-600 w-1/6">
+                          <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
                             <div className="bg-green-50 rounded px-2 py-1">
                               Monthly (RM)
                             </div>
                           </th>
-                          <th className="py-2 text-center font-medium text-default-600 w-4"></th>
+                          <th className="py-2 text-center font-medium text-default-600 w-12"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -377,7 +380,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                               />
                             </td>
                             <td className="py-1 px-3 align-top">
-                              <div className="bg-blue-50 rounded p-1">
+                              <div className="bg-blue-50 rounded px-1">
                                 <FormInput
                                   name={`midMonthAmount-${index}`}
                                   label=""
@@ -396,7 +399,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                               </div>
                             </td>
                             <td className="py-1 px-3 align-top">
-                              <div className="bg-green-50 rounded p-1">
+                              <div className="bg-green-50 rounded px-1">
                                 <FormInput
                                   name={`monthlyAmount-${index}`}
                                   label=""
