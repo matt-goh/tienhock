@@ -1316,7 +1316,7 @@ export default function (pool, config) {
       let query = `
       SELECT 
         i.id, i.salespersonid, i.invoice_status, i.paymenttype,
-        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, 
+        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, od.total,
         p.type
       FROM invoices i
       JOIN order_details od ON i.id = od.invoiceid
@@ -1325,6 +1325,7 @@ export default function (pool, config) {
         CAST(i.createddate AS bigint) BETWEEN $1 AND $2
         AND i.invoice_status != 'cancelled'
         AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
     `;
 
       const queryParams = [startDate, endDate];
@@ -1348,7 +1349,7 @@ export default function (pool, config) {
         // Parse values from string to number
         const quantity = parseInt(product.quantity) || 0;
         const price = parseFloat(product.price) || 0;
-        const total = quantity * price;
+        const total = parseFloat(product.total) || (quantity * price);
         const foc = parseInt(product.freeproduct) || 0;
         const returns = parseInt(product.returnproduct) || 0;
 
@@ -1367,7 +1368,7 @@ export default function (pool, config) {
           productMap.set(productId, {
             id: productId,
             description: product.description || productId,
-            type: product.type || "OTHER",
+            type: product.type || "OTH",
             quantity,
             totalSales: total,
             foc,
