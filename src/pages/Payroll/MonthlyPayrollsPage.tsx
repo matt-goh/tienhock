@@ -38,19 +38,15 @@ const MonthlyPayrollsPage: React.FC = () => {
 
       // Only redirect if we're on the main entry path
       // And not on the explicit list view
-      if (location.pathname === "/payroll/monthly-payrolls") {
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
-        const currentYear = currentDate.getFullYear();
+      if (location.pathname === "/payroll/monthly-payrolls" && response.length > 0) {
+        // Find the latest payroll by sorting by year and month descending
+        const latestPayroll = response.reduce((latest: MonthlyPayroll, current: MonthlyPayroll) => {
+          if (current.year > latest.year) return current;
+          if (current.year === latest.year && current.month > latest.month) return current;
+          return latest;
+        });
 
-        const currentMonthPayroll = response.find(
-          (payroll: { month: number; year: number }) =>
-            payroll.month === currentMonth && payroll.year === currentYear
-        );
-
-        if (currentMonthPayroll) {
-          navigate(`/payroll/monthly-payrolls/${currentMonthPayroll.id}`);
-        }
+        navigate(`/payroll/monthly-payrolls/${latestPayroll.id}`);
       }
     } catch (error) {
       console.error("Error fetching payrolls:", error);
