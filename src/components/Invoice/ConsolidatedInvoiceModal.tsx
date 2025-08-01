@@ -190,7 +190,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   };
 
   const handleSelectAllInvoices = () => {
-    /* ... no change ... */
     if (eligibleInvoices.length === 0 || isLoadingEligible) return;
     if (selectedInvoices.size === eligibleInvoices.length) {
       setSelectedInvoices(new Set());
@@ -200,7 +199,6 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     }
   };
   const handleSelectInvoice = (invoiceId: string) => {
-    /* ... no change ... */
     setSelectedInvoices((prevSelected) => {
       const newSelected = new Set(prevSelected);
       if (newSelected.has(invoiceId)) {
@@ -212,13 +210,21 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     });
   };
   const handleSubmitConsolidated = async () => {
-    /* ... no change ... */
     if (selectedInvoices.size === 0 || isSubmitting) return;
     setIsSubmitting(true);
     setSubmissionResults(null);
     setShowSubmissionResults(true);
     try {
-      const invoicesToSubmit = Array.from(selectedInvoices);
+      // Sort invoices by createddate (oldest to latest) before submitting
+      const selectedInvoiceObjects = eligibleInvoices.filter(invoice => 
+        selectedInvoices.has(invoice.id)
+      ).sort((a, b) => {
+        const timestampA = parseInt(a.createddate);
+        const timestampB = parseInt(b.createddate);
+        return timestampA - timestampB; // Ascending order (oldest first)
+      });
+      
+      const invoicesToSubmit = selectedInvoiceObjects.map(invoice => invoice.id);
       const response = await api.post("/api/einvoice/submit-consolidated", {
         invoices: invoicesToSubmit,
         month,
@@ -444,8 +450,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     const currentMonth = now.getUTCMonth();
     const currentYear = now.getUTCFullYear();
 
-    if (currentDay <= 7) {
-      // We're in consolidation window for previous month
+    if (currentDay >= 3 && currentDay <= 7) {
+      // We're in consolidation window for previous month (days 3-7)
       let targetMonth = currentMonth - 1;
       let targetYear = currentYear;
 
@@ -454,20 +460,50 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         targetYear = currentYear - 1;
       }
 
+      // Check if consolidation already exists for this target month/year (excluding cancelled)
+      const existingConsolidation = consolidationHistory.find(item => {
+        const consolidatedId = item.id;
+        const yearFromId = parseInt(consolidatedId.substring(4, 8));
+        const monthFromId = parseInt(consolidatedId.substring(8, 10)) - 1; // Convert to 0-based
+        return yearFromId === targetYear && 
+               monthFromId === targetMonth && 
+               item.einvoice_status === 'valid';
+      });
+
       return {
         inWindow: true,
         targetMonth,
         targetYear,
         dayInWindow: currentDay,
         windowEnd: new Date(currentYear, currentMonth, 7),
+        existingConsolidation,
       };
+    }
+
+    // Calculate next consolidation window start
+    let nextWindowMonth = currentMonth + 1;
+    let nextWindowYear = currentYear;
+    
+    // If we're past day 7 of current month, next window is next month day 3
+    // If we're before day 3 of current month, next window is current month day 3
+    let nextWindowStart;
+    if (currentDay < 3) {
+      // Next window is day 3 of current month
+      nextWindowStart = new Date(currentYear, currentMonth, 3);
+    } else {
+      // Next window is day 3 of next month
+      if (nextWindowMonth > 11) {
+        nextWindowMonth = 0;
+        nextWindowYear = currentYear + 1;
+      }
+      nextWindowStart = new Date(nextWindowYear, nextWindowMonth, 3);
     }
 
     return {
       inWindow: false,
       targetMonth: currentMonth,
       targetYear: currentYear,
-      nextWindowStart: new Date(currentYear, currentMonth + 1, 1),
+      nextWindowStart,
     };
   };
 
@@ -527,8 +563,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   Auto Consolidation (Monthly)
                 </div>
                 <p className="text-xs text-default-500 mt-0.5">
-                  Automatically consolidate eligible invoices during the first 7
-                  days of each month for the previous month's invoices.
+                  Automatically consolidate eligible invoices during days 3-7
+                  of each month for the previous month's invoices.
                 </p>
               </div>
             </div>
@@ -569,33 +605,60 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     </h4>
 
                     {windowInfo.inWindow ? (
-                      <div className="text-xs text-default-600 bg-green-50 border border-green-200 rounded-lg p-3">
-                        <div className="flex items-center mb-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                          <strong className="text-green-800">
-                            Active Consolidation Window
-                          </strong>
+                      windowInfo.existingConsolidation ? (
+                        <div className="text-xs text-default-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center mb-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                            <strong className="text-blue-800">
+                              Consolidation Already Completed
+                            </strong>
+                          </div>
+                          <div className="mb-1">
+                            <strong>Month:</strong>{" "}
+                            {new Date(
+                              windowInfo.targetYear,
+                              windowInfo.targetMonth
+                            ).toLocaleDateString("en-US", {
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </div>
+                          <div className="mb-1">
+                            <strong>Status:</strong> Valid consolidated e-invoice already submitted
+                          </div>
+                          <div>
+                            <strong>Invoice ID:</strong> {windowInfo.existingConsolidation.id}
+                          </div>
                         </div>
-                        <div className="mb-1">
-                          <strong>Processing:</strong>{" "}
-                          {new Date(
-                            windowInfo.targetYear,
-                            windowInfo.targetMonth
-                          ).toLocaleDateString("en-US", {
-                            month: "long",
-                            year: "numeric",
-                          })}{" "}
-                          invoices
+                      ) : (
+                        <div className="text-xs text-default-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                          <div className="flex items-center mb-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                            <strong className="text-green-800">
+                              Active Consolidation Window
+                            </strong>
+                          </div>
+                          <div className="mb-1">
+                            <strong>Processing:</strong>{" "}
+                            {new Date(
+                              windowInfo.targetYear,
+                              windowInfo.targetMonth
+                            ).toLocaleDateString("en-US", {
+                              month: "long",
+                              year: "numeric",
+                            })}{" "}
+                            invoices
+                          </div>
+                          <div className="mb-1">
+                            <strong>Day:</strong> {windowInfo.dayInWindow} of 5 in
+                            consolidation window (days 3-7)
+                          </div>
+                          <div>
+                            <strong>Window ends:</strong>{" "}
+                            {windowInfo.windowEnd?.toLocaleDateString("en-GB") || "N/A"}
+                          </div>
                         </div>
-                        <div className="mb-1">
-                          <strong>Day:</strong> {windowInfo.dayInWindow} of 7 in
-                          consolidation window
-                        </div>
-                        <div>
-                          <strong>Window ends:</strong>{" "}
-                          {windowInfo.windowEnd?.toLocaleDateString("en-GB") || "N/A"}
-                        </div>
-                      </div>
+                      )
                     ) : (
                       <div className="text-xs text-default-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <div className="flex items-center mb-2">
@@ -609,7 +672,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                             {windowInfo.nextWindowStart?.toLocaleDateString("en-GB") || "N/A"}
                         </div>
                         <div>
-                          Auto-consolidation runs during the first 7 days of
+                          Auto-consolidation runs during days 3-7 of
                           each month for the previous month's eligible invoices.
                         </div>
                       </div>
@@ -622,10 +685,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-grow p-5 bg-gray-50/30 rounded-b-xl">
+        <div className="flex-grow overflow-auto p-5 bg-gray-50/30 rounded-b-xl">
           {activeTab === "eligible" ? (
             // Eligible invoices tab content (remains largely the same)
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Header and buttons */}
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -820,7 +883,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     </div>
                   </div>
                   {/* Table Container */}
-                  <div className="max-h-[400px] overflow-auto">
+                  <div className="max-h-[380px] overflow-auto">
                     <table className="min-w-full divide-y divide-default-200">
                       {/* thead remains the same */}
                       <thead className="bg-default-50 sticky top-0 z-10">

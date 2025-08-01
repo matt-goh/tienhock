@@ -597,6 +597,8 @@ export interface PayCode {
   rate_umum: number;
   is_active: boolean;
   requires_units_input: boolean;
+  created_at?: string;
+  updated_at?: string;
   section_id?: string; // Optional field to indicate the section when used in section_pay_codes
   override_rate_biasa?: number | null; // Used for section-specific overrides
   override_rate_ahad?: number | null; // Used for section-specific overrides

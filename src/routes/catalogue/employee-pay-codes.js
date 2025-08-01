@@ -14,8 +14,8 @@ export default function (pool) {
           CAST(rate_biasa AS NUMERIC(10, 2)) as rate_biasa,
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
-          is_active, requires_units_input
-        FROM pay_codes ORDER BY id
+          is_active, requires_units_input, created_at, updated_at
+        FROM pay_codes ORDER BY updated_at DESC, created_at DESC
       `;
       const payCodeResult = await pool.query(payCodeQuery);
       const allPayCodes = payCodeResult.rows.map((pc) => ({
@@ -201,6 +201,14 @@ export default function (pool) {
       `;
       await pool.query(updateStaffQuery, [employee_id]);
 
+      // Update pay code's updated_at timestamp
+      const updatePayCodeQuery = `
+        UPDATE pay_codes 
+        SET updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1
+      `;
+      await pool.query(updatePayCodeQuery, [pay_code_id]);
+
       // Commit transaction
       await pool.query("COMMIT");
 
@@ -282,6 +290,9 @@ export default function (pool) {
     values.push(payCodeId);
 
     try {
+      // Begin transaction
+      await pool.query("BEGIN");
+
       const query = `
       UPDATE employee_pay_codes
       SET ${fieldsToUpdate.join(", ")}
@@ -292,6 +303,7 @@ export default function (pool) {
       const result = await pool.query(query, values);
 
       if (result.rows.length === 0) {
+        await pool.query("ROLLBACK");
         return res
           .status(404)
           .json({ message: "Employee-PayCode association not found" });
@@ -305,6 +317,14 @@ export default function (pool) {
   `;
       await pool.query(updateStaffQuery, [employeeId]);
 
+      // Update pay code's updated_at timestamp
+      const updatePayCodeQuery = `
+        UPDATE pay_codes 
+        SET updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1
+      `;
+      await pool.query(updatePayCodeQuery, [payCodeId]);
+
       // Commit transaction
       await pool.query("COMMIT");
 
@@ -312,6 +332,7 @@ export default function (pool) {
         message: "Settings updated successfully",
       });
     } catch (error) {
+      await pool.query("ROLLBACK");
       console.error("Error updating employee-pay code settings:", error);
       res.status(500).json({
         message: "Error updating employee-pay code settings",
@@ -356,6 +377,14 @@ export default function (pool) {
       WHERE id = $1
     `;
       await pool.query(updateStaffQuery, [employeeId]);
+
+      // Update pay code's updated_at timestamp
+      const updatePayCodeQuery = `
+        UPDATE pay_codes 
+        SET updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1
+      `;
+      await pool.query(updatePayCodeQuery, [payCodeId]);
 
       // Commit transaction
       await pool.query("COMMIT");

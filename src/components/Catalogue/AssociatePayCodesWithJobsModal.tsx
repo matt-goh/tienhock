@@ -45,13 +45,24 @@ const AssociatePayCodesWithJobsModal: React.FC<
   }, [isOpen, currentJobIds]);
 
   // Filter jobs based on search query
-  const filteredJobs = searchQuery
+  const filteredJobs = (searchQuery
     ? availableJobs.filter(
         (job) =>
           job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           job.id.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : availableJobs;
+    : availableJobs)
+    .sort((a, b) => {
+      // Sort associated jobs (current) at the top
+      const aAssociated = currentJobIds.includes(a.id);
+      const bAssociated = currentJobIds.includes(b.id);
+      
+      if (aAssociated && !bAssociated) return -1;
+      if (!aAssociated && bAssociated) return 1;
+      
+      // Within each group, sort alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
 
   const handleToggleJob = (jobId: string) => {
     setSelectedJobIds((prev) => {

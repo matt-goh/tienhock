@@ -70,7 +70,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
     { id: "paid", name: "Paid" },
     { id: "Unpaid", name: "Unpaid" },
     { id: "cancelled", name: "Cancelled" },
-    { id: "overdue", name: "Overdue" },
+    { id: "Overdue", name: "Overdue" },
   ];
 
   const eInvoiceStatusOptions = [
@@ -148,7 +148,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
       salespersonId: null,
       customerId: null,
       paymentType: null,
-      invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
+      invoiceStatus: ["paid", "Unpaid", "Overdue", "cancelled"], // Default invoice status
       eInvoiceStatus: [], // Default e-invoice status
       consolidation: "all",
     };

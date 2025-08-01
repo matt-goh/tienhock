@@ -15,7 +15,7 @@ export default function (pool) {
           CAST(rate_ahad AS NUMERIC(10, 2)) as rate_ahad,
           CAST(rate_umum AS NUMERIC(10, 2)) as rate_umum,
           is_active, requires_units_input, created_at, updated_at
-        FROM pay_codes ORDER BY id`; // Order by ID or description now
+        FROM pay_codes ORDER BY updated_at DESC, created_at DESC`; // Order by latest modified/created
       const result = await pool.query(query);
       // Parse numeric values
       const payCodes = result.rows.map((pc) => ({

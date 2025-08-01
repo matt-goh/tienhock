@@ -793,7 +793,7 @@ const CustomerFormPage: React.FC = () => {
                       "tin_number",
                       "TIN Number",
                       "text",
-                      "Company TIN"
+                      "Company or Individual TIN"
                     )}
                   </div>
 
