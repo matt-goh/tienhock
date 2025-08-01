@@ -1,5 +1,5 @@
 // src/pages/Payroll/PayrollProcessingPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   IconClock,
@@ -54,11 +54,38 @@ const PayrollProcessingPage: React.FC = () => {
   const [processingStatus, setProcessingStatus] = useState<
     Record<string, "pending" | "processing" | "success" | "error">
   >({});
+  const [processingProgress, setProcessingProgress] = useState<{
+    current: number;
+    total: number;
+    stage: string;
+  }>({ current: 0, total: 0, stage: "" });
 
   const { jobs, loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
   const { epfRates, socsoRates, sipRates, incomeTaxRates } =
     useContributionRatesCache();
+
+  // Memoized lookup maps for performance
+  const staffsMap = useMemo(() => {
+    const map = new Map();
+    staffs.forEach((staff) => map.set(staff.id, staff));
+    return map;
+  }, [staffs]);
+
+  const jobNameMap = useMemo(() => {
+    const map = new Map();
+    staffs.forEach((staff) => {
+      if (Array.isArray(staff.job) && Array.isArray(staff.jobType)) {
+        const jobTypeArray = staff.jobType; // Ensures TS knows it's an array
+        staff.job.forEach((jobId, index) => {
+          if (!map.has(jobId) && jobTypeArray[index]) {
+            map.set(jobId, jobTypeArray[index]);
+          }
+        });
+      }
+    });
+    return map;
+  }, [staffs]);
 
   useEffect(() => {
     Promise.all([fetchPayrollDetails(), fetchEligibleEmployees()])
@@ -108,46 +135,49 @@ const PayrollProcessingPage: React.FC = () => {
     }
   };
 
+  // Memoized employees by job map for performance
+  const employeesByJobMap = useMemo(() => {
+    const map = new Map();
+    if (!eligibleData) return map;
+
+    Object.entries(eligibleData.jobEmployeeMap).forEach(
+      ([jobId, employeeIds]) => {
+        const employees = (employeeIds as string[])
+          .map((id) => staffsMap.get(id))
+          .filter(Boolean)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        map.set(jobId, employees);
+      }
+    );
+    return map;
+  }, [eligibleData, staffsMap]);
+
   // Get filtered employees for a specific job
   const getEmployeesForJob = useCallback(
     (jobId: string) => {
-      if (!eligibleData || !eligibleData.jobEmployeeMap[jobId]) {
-        return [];
-      }
-
-      const eligibleEmployeeIds = eligibleData.jobEmployeeMap[jobId];
-      return staffs
-        .filter((staff) => eligibleEmployeeIds.includes(staff.id))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      return employeesByJobMap.get(jobId) || [];
     },
-    [eligibleData, staffs]
+    [employeesByJobMap]
   );
 
   // Get job name by ID
   const getJobName = useCallback(
     (jobId: string) => {
-      // Try to find a staff with this job to get the job name
-      const staffWithJob = staffs.find(
-        (staff) => Array.isArray(staff.job) && staff.job.includes(jobId)
-      );
-
-      if (staffWithJob) {
-        // Find which job in the array matches
-        const jobIndex = staffWithJob.job.indexOf(jobId);
-        if (jobIndex >= 0 && Array.isArray(staffWithJob.jobType)) {
-          return staffWithJob.jobType[jobIndex] || jobId;
-        }
-      }
-
-      return jobId; // Fallback to ID if name not found
+      return jobNameMap.get(jobId) || jobId; // Fallback to ID if name not found
     },
-    [staffs]
+    [jobNameMap]
   );
 
   const handleProcessPayroll = async () => {
     if (!id || !payroll) return;
 
     setIsProcessing(true);
+    setProcessingProgress({
+      current: 0,
+      total: 100,
+      stage: "Fetching work logs...",
+    });
+
     try {
       // Fetch work logs for this month/year
       const processResponse = await processMonthlyPayroll(Number(id));
@@ -155,8 +185,15 @@ const PayrollProcessingPage: React.FC = () => {
       if (processResponse.work_logs.length === 0) {
         toast.error("No work logs found for this month");
         setIsProcessing(false);
+        setProcessingProgress({ current: 0, total: 0, stage: "" });
         return;
       }
+
+      setProcessingProgress({
+        current: 20,
+        total: 100,
+        stage: "Processing employee payrolls...",
+      });
 
       // Start processing for selected employees
       await processSelectedEmployees(processResponse.work_logs);
@@ -167,6 +204,7 @@ const PayrollProcessingPage: React.FC = () => {
       toast.error("Failed to process payroll");
     } finally {
       setIsProcessing(false);
+      setProcessingProgress({ current: 0, total: 0, stage: "" });
     }
   };
 
@@ -188,7 +226,7 @@ const PayrollProcessingPage: React.FC = () => {
       });
     });
 
-    // Set initial processing status
+    // Set initial processing status (batched update)
     const initialStatus: Record<
       string,
       "pending" | "processing" | "success" | "error"
@@ -203,6 +241,13 @@ const PayrollProcessingPage: React.FC = () => {
     try {
       // Calculate payrolls for all selected employees
       const employeePayrolls: EmployeePayroll[] = [];
+      const calculationErrors: Record<string, "error"> = {};
+
+      setProcessingProgress({
+        current: 30,
+        total: 100,
+        stage: `Calculating payrolls for ${selectedCombinations.length} employees...`,
+      });
 
       selectedCombinations.forEach(({ employeeId, jobType }) => {
         try {
@@ -228,47 +273,84 @@ const PayrollProcessingPage: React.FC = () => {
 
           employeePayrolls.push(employeePayroll);
         } catch (error) {
-          console.error(`Error calculating payroll for employee ${employeeId}:`, error);
+          console.error(
+            `Error calculating payroll for employee ${employeeId}:`,
+            error
+          );
           const key = `${employeeId}-${jobType}`;
-          setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
+          calculationErrors[key] = "error";
         }
       });
 
-      // Save all payrolls in a single batch request
-      const batchResponse = await saveEmployeePayrollsBatch(payroll.id, employeePayrolls);
+      // Batch update calculation errors
+      if (Object.keys(calculationErrors).length > 0) {
+        setProcessingStatus((prev) => ({ ...prev, ...calculationErrors }));
+      }
 
-      // Update processing status based on batch response
+      setProcessingProgress({
+        current: 70,
+        total: 100,
+        stage: `Saving ${employeePayrolls.length} payroll records...`,
+      });
+
+      // Save all payrolls in a single batch request
+      const batchResponse = await saveEmployeePayrollsBatch(
+        payroll.id,
+        employeePayrolls
+      );
+
+      // Update processing status based on batch response (batched update)
+      const statusUpdates: Record<string, "success" | "error"> = {};
+
       if (batchResponse.results) {
         batchResponse.results.forEach((result: any) => {
           const key = `${result.employee_id}-${result.job_type}`;
-          setProcessingStatus((prev) => ({ ...prev, [key]: "success" }));
+          statusUpdates[key] = "success";
         });
       }
 
       if (batchResponse.errors) {
         batchResponse.errors.forEach((error: any) => {
           const key = `${error.employee_id}-${error.job_type}`;
-          setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
+          statusUpdates[key] = "error";
         });
+      }
+
+      // Single batched status update
+      if (Object.keys(statusUpdates).length > 0) {
+        setProcessingStatus((prev) => ({ ...prev, ...statusUpdates }));
       }
 
       setProcessedPayrolls(employeePayrolls);
 
+      setProcessingProgress({
+        current: 100,
+        total: 100,
+        stage: "Processing completed!",
+      });
+
       // Show batch processing summary
-      const { successful = 0, errors: errorCount = 0, total = 0 } = batchResponse.summary || {};
+      const {
+        successful = 0,
+        errors: errorCount = 0,
+        total = 0,
+      } = batchResponse.summary || {};
       if (errorCount > 0) {
-        toast.error(`Processing completed with ${errorCount} errors out of ${total} employees`);
+        toast.error(
+          `Processing completed with ${errorCount} errors out of ${total} employees`
+        );
       } else {
         toast.success(`Successfully processed ${successful} employees`);
       }
-
     } catch (error) {
       console.error("Error in batch processing:", error);
-      // Mark all as error if batch processing fails
+      // Mark all as error if batch processing fails (batched update)
+      const errorUpdates: Record<string, "error"> = {};
       selectedCombinations.forEach(({ employeeId, jobType }) => {
         const key = `${employeeId}-${jobType}`;
-        setProcessingStatus((prev) => ({ ...prev, [key]: "error" }));
+        errorUpdates[key] = "error";
       });
+      setProcessingStatus((prev) => ({ ...prev, ...errorUpdates }));
       toast.error("Failed to process employee payrolls");
     }
 
@@ -294,7 +376,7 @@ const PayrollProcessingPage: React.FC = () => {
     const employees = getEmployeesForJob(jobId);
     const newSelections: Record<string, boolean> = {};
 
-    employees.forEach((emp) => {
+    employees.forEach((emp: { id: string | number }) => {
       newSelections[emp.id] = selected;
     });
 
@@ -375,15 +457,30 @@ const PayrollProcessingPage: React.FC = () => {
 
         {isProcessing ? (
           <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
-            <div className="flex items-center">
+            <div className="flex items-center mb-3">
               <IconClock className="text-sky-500 mr-3" size={24} />
-              <div>
+              <div className="flex-1">
                 <h3 className="font-medium text-sky-800">Processing Payroll</h3>
                 <p className="text-sm text-sky-600">
-                  Please wait while employee payrolls are being calculated...
+                  {processingProgress.stage ||
+                    "Please wait while employee payrolls are being calculated..."}
                 </p>
               </div>
             </div>
+            {processingProgress.total > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-sky-600">
+                  <span>Progress</span>
+                  <span>{processingProgress.current}%</span>
+                </div>
+                <div className="w-full bg-sky-200 rounded-full h-2">
+                  <div
+                    className="bg-sky-500 h-2 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${processingProgress.current}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -475,7 +572,8 @@ const PayrollProcessingPage: React.FC = () => {
                   {eligibleData.eligibleJobs.map((jobId) => {
                     const employees = getEmployeesForJob(jobId);
                     const selectedCount = employees.filter(
-                      (emp) => selectedEmployees[jobId]?.[emp.id]
+                      (emp: { id: string | number }) =>
+                        selectedEmployees[jobId]?.[emp.id]
                     ).length;
 
                     return (
