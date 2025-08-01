@@ -80,6 +80,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   );
   const [searchTerm, setSearchTerm] = useState<string>("");
   const isSalesman = jobType === "SALESMAN";
+  const isSalesmanIkut = jobType === "SALESMAN_IKUT";
   const jobConfig = getJobConfig(jobType);
   const prevEmployeeIdRef = useRef<string | null>(null);
   const prevActivitiesRef = useRef<ActivityItem[]>([]);
@@ -158,7 +159,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
           // Recalculate all amounts
           const calculatedActivities = calculateActivitiesAmounts(
             activitiesWithContext,
-            isSalesman ? 0 : employeeHours,
+            (isSalesman || isSalesmanIkut) ? 0 : employeeHours,
             contextData,
             locationType
           );
@@ -230,7 +231,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     // Use the centralized calculation function
     const updatedActivities = calculateActivitiesAmounts(
       newActivities,
-      isSalesman ? 0 : employeeHours, // Use 0 hours for salesmen
+      (isSalesman || isSalesmanIkut) ? 0 : employeeHours, // Use 0 hours for salesmen and salesman ikut
       contextData,
       locationType
     );
@@ -308,10 +309,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">
-                        {isSalesman && locationType ? "Location" : "Hours"}
+                        {(isSalesman || isSalesmanIkut) && locationType ? "Location" : "Hours"}
                       </p>
                       <p className="font-medium">
-                        {isSalesman && locationType ? (
+                        {(isSalesman || isSalesmanIkut) && locationType ? (
                           <span className="flex items-center">
                             {locationType}
                           </span>

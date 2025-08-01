@@ -92,12 +92,12 @@ const SalesByProductsPage: React.FC = () => {
   });
   const [isGeneratingChart, setIsGeneratingChart] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>(() => {
-    // Create start date (1st of the selected month)
-    const startDate = new Date(currentYear, currentMonth, 1);
+    // Create start date (today)
+    const startDate = new Date();
     startDate.setHours(0, 0, 0, 0);
 
-    // Create end date (last day of the selected month)
-    const endDate = new Date(currentYear, currentMonth + 1, 0);
+    // Create end date (today)
+    const endDate = new Date();
     endDate.setHours(23, 59, 59, 999);
 
     return { start: startDate, end: endDate };
@@ -136,6 +136,7 @@ const SalesByProductsPage: React.FC = () => {
       BH: "#4299e1", // Blue
       MEE: "#48bb78", // Green
       JP: "#ed8936", // Orange
+      OTH: "#9f7aea", // Purple
       OTHER: "#a0aec0", // Gray
     };
 
@@ -187,6 +188,7 @@ const SalesByProductsPage: React.FC = () => {
     const options = [
       { id: "MEE", name: "Mee Products" },
       { id: "BH", name: "Bihun Products" },
+      { id: "OTH", name: "Other Products" },
     ];
 
     // Add individual products from cache
@@ -229,9 +231,9 @@ const SalesByProductsPage: React.FC = () => {
   useEffect(() => {
     if (productOptions.length > 0) {
       // Take the first few products up to the maximum limit
-      // Start with categories (MEE, BH) if available
+      // Start with categories (MEE, BH, OTH) if available
       const categoryOptions = productOptions
-        .filter((option) => ["MEE", "BH"].includes(option.id))
+        .filter((option) => ["MEE", "BH", "OTH"].includes(option.id))
         .map((option) => option.id);
 
       // Take up to the limit
@@ -240,7 +242,7 @@ const SalesByProductsPage: React.FC = () => {
       // If we still have room, add some individual products
       if (initialSelection.length < maxChartProducts) {
         const individualProducts = productOptions
-          .filter((option) => !["MEE", "BH"].includes(option.id))
+          .filter((option) => !["MEE", "BH", "OTH"].includes(option.id))
           .slice(0, maxChartProducts - initialSelection.length)
           .map((option) => option.id);
 
@@ -537,6 +539,7 @@ const SalesByProductsPage: React.FC = () => {
     // Separate product data by type
     const bhProducts: ProductSalesData[] = [];
     const meeProducts: ProductSalesData[] = [];
+    const othProducts: ProductSalesData[] = [];
 
     salesData.forEach((product) => {
       const category = product.type;
@@ -553,12 +556,15 @@ const SalesByProductsPage: React.FC = () => {
         bhProducts.push(product);
       } else if (product.type === "MEE") {
         meeProducts.push(product);
+      } else if (product.type === "OTH") {
+        othProducts.push(product);
       }
     });
 
     // Sort products by sales for each type
     bhProducts.sort((a, b) => b.totalSales - a.totalSales);
     meeProducts.sort((a, b) => b.totalSales - a.totalSales);
+    othProducts.sort((a, b) => b.totalSales - a.totalSales);
 
     // Create pie data for each type with shaded colors
     const createPieData = (
@@ -574,7 +580,8 @@ const SalesByProductsPage: React.FC = () => {
 
       // Create pie data entries with the shaded colors
       const pieData = topProducts.map((product, index) => ({
-        name: product.description || product.id,
+        name: product.id, // Show product code in labels
+        description: product.description || product.id, // Keep description for tooltips
         value: product.totalSales,
         color: shades[index],
         id: product.id, // Add id to ensure consistency
@@ -584,6 +591,7 @@ const SalesByProductsPage: React.FC = () => {
       if (products.length > limit) {
         pieData.push({
           name: "Others",
+          description: "Other Products",
           value: products
             .slice(limit)
             .reduce((sum, p) => sum + p.totalSales, 0),
@@ -606,6 +614,7 @@ const SalesByProductsPage: React.FC = () => {
 
     const bhTotal = bhProducts.reduce((sum, p) => sum + p.totalSales, 0);
     const meeTotal = meeProducts.reduce((sum, p) => sum + p.totalSales, 0);
+    const othTotal = othProducts.reduce((sum, p) => sum + p.totalSales, 0);
 
     return {
       categorySummary,
@@ -616,8 +625,13 @@ const SalesByProductsPage: React.FC = () => {
         meeProducts,
         categoryColors["MEE"] || "#48bb78"
       ),
+      othPieData: createPieData(
+        othProducts,
+        categoryColors["OTH"] || "#9f7aea"
+      ),
       bhTotal,
       meeTotal,
+      othTotal,
     };
   }, [salesData, categoryColors]);
 
@@ -654,7 +668,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full pt-0 max-w-[88rem] mt-4 mx-auto space-y-6">
+    <div className="w-full pt-0 max-w-[90rem] mt-4 mx-auto space-y-6">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
@@ -925,8 +939,8 @@ const SalesByProductsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Dashboard content - Two separate doughnut charts without legends */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Dashboard content - Three separate doughnut charts without legends */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* BH Products Doughnut Chart */}
             <div className="bg-white rounded-lg border shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
@@ -960,7 +974,7 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1016,7 +1030,7 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1035,6 +1049,62 @@ const SalesByProductsPage: React.FC = () => {
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
                   No Mee products data available
+                </div>
+              )}
+            </div>
+
+            {/* OTH Products Doughnut Chart */}
+            <div className="bg-white rounded-lg border shadow p-4">
+              <h2 className="text-lg font-semibold mb-4">
+                Other Products Distribution
+              </h2>
+              {summary.othPieData && summary.othPieData.length > 0 ? (
+                <>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={summary.othPieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) =>
+                            percent > 0.05
+                              ? `${name.substring(0, 12)}${
+                                  name.length > 12 ? "..." : ""
+                                }: ${(percent * 100).toFixed(1)}%`
+                              : ""
+                          }
+                          outerRadius={100}
+                          innerRadius={50}
+                          fill="#8884d8"
+                          dataKey="value"
+                          paddingAngle={2}
+                        >
+                          {summary.othPieData.map((entry) => (
+                            <Cell key={entry.id} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div
+                    className="text-center mt-2 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: `${categoryColors["OTH"]}15`,
+                      color: categoryColors["OTH"] || "#9f7aea",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Total: {formatCurrency(summary.othTotal)}
+                  </div>
+                </>
+              ) : (
+                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
+                  No Other products data available
                 </div>
               )}
             </div>
@@ -1145,6 +1215,8 @@ const SalesByProductsPage: React.FC = () => {
                               ? "All Mee Products"
                               : key === "BH"
                               ? "All Bihun Products"
+                              : key === "OTH"
+                              ? "All Other Products"
                               : products.find((p) => p.id === key)
                                   ?.description || key;
 

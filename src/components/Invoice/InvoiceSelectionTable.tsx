@@ -124,7 +124,8 @@ const InvoiceSelectionTable: React.FC<InvoiceSelectionTableProps> = ({
                       {invoice.id}
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {invoice.customerName || invoice.customerid}
+                      {invoice.customerName || invoice.customerid} (
+                      {invoice.customerid})
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(invoice.createddate)}

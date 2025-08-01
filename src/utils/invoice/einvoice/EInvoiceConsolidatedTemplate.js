@@ -66,12 +66,16 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
       totalRounding += Number(invoice.rounding) || 0;
     });
 
-    // Calculate tax amount - prefer product-level calculation but fall back if needed
+    // Calculate tax amount - prefer product-level calculation
     let taxAmount = totalProductTax;
-    if (taxAmount === 0) {
-      // If no product-level taxes found, calculate based on totals and account for rounding
-      taxAmount = totalPayableAmount - totalExcludingTax - totalRounding;
+    
+    // Only use fallback calculation if we have a meaningful difference that suggests tax
+    if (taxAmount === 0 && invoices.some(inv => inv.tax_amount && Number(inv.tax_amount) > 0)) {
+      // If no product-level taxes found but invoice has tax_amount field, use that
+      taxAmount = invoices.reduce((sum, inv) => sum + (Number(inv.tax_amount) || 0), 0);
     }
+    
+    // If still no tax found, it's likely tax-exempt - keep taxAmount as 0
 
     totalInclusiveTax = totalExcludingTax + taxAmount;
 

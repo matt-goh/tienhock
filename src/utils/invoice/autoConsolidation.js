@@ -20,7 +20,7 @@ import {
 
 /**
  * Checks for consolidations that should be processed and handles them
- * Now includes immediate processing for eligible invoices in the 7-day window after month-end
+ * Now includes immediate processing for eligible invoices in the 5-day window (days 3-7) after month-end
  */
 export const checkAndProcessDueConsolidations = async (pool) => {
   const client = await pool.connect();
@@ -35,7 +35,7 @@ export const checkAndProcessDueConsolidations = async (pool) => {
       `[${now.toISOString()}] Starting auto-consolidation check for ${currentDate}`
     );
 
-    // Check if we're in the 7-day window after month-end
+    // Check if we're in the 5-day window (days 3-7) after month-end
     const isInConsolidationWindow = checkIfInConsolidationWindow(now);
     console.log(
       `[${now.toISOString()}] In consolidation window: ${
@@ -221,7 +221,7 @@ export const checkAndProcessDueConsolidations = async (pool) => {
 };
 
 /**
- * Check if current date is within 7 days after month-end
+ * Check if current date is within days 3-7 after month-end
  */
 function checkIfInConsolidationWindow(currentDate) {
   const now = new Date(currentDate);
@@ -229,8 +229,8 @@ function checkIfInConsolidationWindow(currentDate) {
   const currentMonth = now.getUTCMonth();
   const currentYear = now.getUTCFullYear();
 
-  // Check if we're in the first 7 days of the month (consolidating previous month)
-  if (currentDay <= 7) {
+  // Check if we're between days 3-7 of the month (consolidating previous month)
+  if (currentDay >= 3 && currentDay <= 7) {
     // We're in the consolidation window for the previous month
     let targetMonth = currentMonth - 1;
     let targetYear = currentYear;
@@ -294,8 +294,8 @@ async function upsertConsolidationTracking(
  * Get eligible Tien Hock invoices that haven't been consolidated
  */
 async function getEligibleTienhockInvoices(client, month, year) {
-  const startOfMonth = new Date(year, month, 1).getTime().toString();
-  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+  const startOfMonth = new Date(Date.UTC(year, month, 1)).getTime().toString();
+  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
     .getTime()
     .toString();
 
@@ -314,6 +314,7 @@ async function getEligibleTienhockInvoices(client, month, year) {
       AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
       AND con.invoice_status != 'cancelled'
     )
+    ORDER BY i.createddate::bigint ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
@@ -339,8 +340,8 @@ async function getEligibleTienhockInvoices(client, month, year) {
  * Get eligible Jellypolly invoices that haven't been consolidated
  */
 async function getEligibleJellypollyInvoices(client, month, year) {
-  const startOfMonth = new Date(year, month, 1).getTime().toString();
-  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999)
+  const startOfMonth = new Date(Date.UTC(year, month, 1)).getTime().toString();
+  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
     .getTime()
     .toString();
 
@@ -359,6 +360,7 @@ async function getEligibleJellypollyInvoices(client, month, year) {
       AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
       AND con.invoice_status != 'cancelled'
     )
+    ORDER BY i.createddate::bigint ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
@@ -399,6 +401,7 @@ async function getEligibleGreentargetInvoices(client, month, year) {
       AND con.consolidated_invoices::jsonb ? CAST(i.invoice_number AS TEXT)
       AND con.status != 'cancelled'
     )
+    ORDER BY i.date_issued ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [month, year]);

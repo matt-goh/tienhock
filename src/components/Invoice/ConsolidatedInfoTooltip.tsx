@@ -78,7 +78,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
-              maxHeight: "280px",
+              maxHeight: "400px",
               overflowY: "auto",
               opacity: isVisible ? 1 : 0,
             }}
