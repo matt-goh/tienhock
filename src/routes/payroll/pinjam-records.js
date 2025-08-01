@@ -96,6 +96,135 @@ export default function (pool) {
     }
   });
 
+  // Get consolidated pinjam dashboard data (all data needed for PinjamListPage)
+  router.get("/dashboard", async (req, res) => {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({
+        message: "Year and month are required"
+      });
+    }
+
+    try {
+      const yearInt = parseInt(year);
+      const monthInt = parseInt(month);
+
+      // Execute all queries in parallel for maximum efficiency
+      const [
+        pinjamRecordsResult,
+        pinjamSummaryResult,
+        midMonthPayrollsResult,
+        monthlyPayrollsResult
+      ] = await Promise.all([
+        // 1. Pinjam Records
+        pool.query(`
+          SELECT p.*, s.name as employee_name
+          FROM pinjam_records p
+          LEFT JOIN staffs s ON p.employee_id = s.id
+          WHERE p.year = $1 AND p.month = $2
+          ORDER BY p.year DESC, p.month DESC, p.employee_id, p.pinjam_type, p.description
+          LIMIT 1000
+        `, [yearInt, monthInt]),
+
+        // 2. Pinjam Summary
+        pool.query(`
+          SELECT 
+            p.employee_id,
+            s.name as employee_name,
+            p.pinjam_type,
+            SUM(p.amount) as total_amount,
+            COUNT(*) as record_count,
+            STRING_AGG(p.description || ': ' || p.amount::text, ', ' ORDER BY p.description) as details
+          FROM pinjam_records p
+          LEFT JOIN staffs s ON p.employee_id = s.id
+          WHERE p.year = $1 AND p.month = $2
+          GROUP BY p.employee_id, s.name, p.pinjam_type
+          ORDER BY s.name, p.pinjam_type
+        `, [yearInt, monthInt]),
+
+        // 3. Mid-Month Payrolls
+        pool.query(`
+          SELECT p.*, s.name as employee_name
+          FROM mid_month_payrolls p
+          LEFT JOIN staffs s ON p.employee_id = s.id
+          WHERE p.year = $1 AND p.month = $2
+          ORDER BY p.year DESC, p.month DESC, p.employee_id
+          LIMIT 1000
+        `, [yearInt, monthInt]),
+
+        // 4. Monthly Payrolls with Employee Payrolls
+        pool.query(`
+          SELECT mp.*, ep.employee_id, s.name as employee_name, ep.net_pay
+          FROM monthly_payrolls mp
+          LEFT JOIN employee_payrolls ep ON mp.id = ep.monthly_payroll_id
+          LEFT JOIN staffs s ON ep.employee_id = s.id
+          WHERE mp.year = $1 AND mp.month = $2
+          ORDER BY mp.year DESC, mp.month DESC
+        `, [yearInt, monthInt])
+      ]);
+
+      // Process pinjam summary data
+      const pinjamSummary = {};
+      pinjamSummaryResult.rows.forEach(row => {
+        if (!pinjamSummary[row.employee_id]) {
+          pinjamSummary[row.employee_id] = {
+            employee_id: row.employee_id,
+            employee_name: row.employee_name,
+            mid_month: { total_amount: 0, details: [], record_count: 0 },
+            monthly: { total_amount: 0, details: [], record_count: 0 }
+          };
+        }
+
+        const type = row.pinjam_type === 'mid_month' ? 'mid_month' : 'monthly';
+        pinjamSummary[row.employee_id][type] = {
+          total_amount: parseFloat(row.total_amount),
+          details: row.details ? row.details.split(', ') : [],
+          record_count: parseInt(row.record_count)
+        };
+      });
+
+      // Process employee payrolls data
+      const employeePayrolls = [];
+      monthlyPayrollsResult.rows.forEach(row => {
+        if (row.employee_id) {
+          employeePayrolls.push({
+            employee_id: row.employee_id,
+            employee_name: row.employee_name,
+            net_pay: parseFloat(row.net_pay || 0)
+          });
+        }
+      });
+
+      // Format response
+      res.json({
+        pinjamRecords: pinjamRecordsResult.rows.map(row => ({
+          ...row,
+          amount: parseFloat(row.amount)
+        })),
+        pinjamSummary: Object.values(pinjamSummary),
+        midMonthPayrolls: midMonthPayrollsResult.rows,
+        employeePayrolls: employeePayrolls,
+        meta: {
+          year: yearInt,
+          month: monthInt,
+          recordCounts: {
+            pinjamRecords: pinjamRecordsResult.rows.length,
+            pinjamSummary: Object.keys(pinjamSummary).length,
+            midMonthPayrolls: midMonthPayrollsResult.rows.length,
+            employeePayrolls: employeePayrolls.length
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching pinjam dashboard data:", error);
+      res.status(500).json({
+        message: "Error fetching pinjam dashboard data",
+        error: error.message,
+      });
+    }
+  });
+
   // Get pinjam records summary by employee for a specific month
   router.get("/summary", async (req, res) => {
     const { year, month, employee_ids } = req.query;
