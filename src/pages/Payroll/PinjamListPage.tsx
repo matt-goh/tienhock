@@ -10,6 +10,9 @@ import {
   IconBuildingBank,
   IconPrinter,
   IconDownload,
+  IconSquare,
+  IconSquareCheckFilled,
+  IconSquareMinusFilled,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -388,21 +391,31 @@ const PinjamListPage: React.FC = () => {
       {employeeData.length > 0 && (
         <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  ref={input => {
-                    if (input) input.indeterminate = isPartiallySelected;
-                  }}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 rounded focus:ring-sky-500 focus:ring-2"
-                />
+            <div 
+              className="flex items-center space-x-4 cursor-pointer flex-1"
+              onClick={() => handleSelectAll(!isAllSelected)}
+            >
+              <div className="flex items-center space-x-2">
+                {isAllSelected ? (
+                  <IconSquareCheckFilled
+                    className="text-blue-600"
+                    size={20}
+                  />
+                ) : isPartiallySelected ? (
+                  <IconSquareMinusFilled
+                    className="text-blue-600"
+                    size={20}
+                  />
+                ) : (
+                  <IconSquare
+                    className="text-default-400 group-hover:text-blue-500 transition-colors"
+                    size={20}
+                  />
+                )}
                 <span className="text-sm font-medium text-default-700">
                   Select All ({employeeData.length})
                 </span>
-              </label>
+              </div>
               {selectedEmployees.size > 0 && (
                 <span className="text-sm text-sky-600 font-medium">
                   {selectedEmployees.size} employee{selectedEmployees.size > 1 ? 's' : ''} selected
@@ -411,7 +424,10 @@ const PinjamListPage: React.FC = () => {
             </div>
             {selectedEmployees.size > 0 && (
               <button
-                onClick={() => setSelectedEmployees(new Set())}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedEmployees(new Set());
+                }}
                 className="text-sm text-default-500 hover:text-default-700"
               >
                 Clear Selection
@@ -436,166 +452,209 @@ const PinjamListPage: React.FC = () => {
             className={`grid gap-4 ${
               employeeData.length === 1
                 ? "grid-cols-1 max-w-2xl mx-auto"
-                : employeeData.length === 2
-                ? "grid-cols-1 lg:grid-cols-2"
-                : "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
+                : "grid-cols-1 lg:grid-cols-2"
             }`}
           >
             {employeeData.map((employee) => {
               const isSelected = selectedEmployees.has(employee.employee_id);
+              
+              const handleCardClick = (e: React.MouseEvent) => {
+                // Prevent navigation if clicking specifically on the checkbox icon/wrapper
+                // OR the header section itself (which now handles selection)
+                if (
+                  (e.target as HTMLElement).closest(".employee-card-select-action") ||
+                  (e.target as HTMLElement).closest(".employee-card-header")
+                ) {
+                  return;
+                }
+                // Add any additional card click behavior here if needed
+              };
+
+              const handleHeaderClick = (e: React.MouseEvent) => {
+                // If the click was directly on the checkbox icon area within the header,
+                // let its specific handler manage it (avoids double toggling).
+                if ((e.target as HTMLElement).closest(".employee-card-select-action")) {
+                  return;
+                }
+                e.stopPropagation(); // Prevent card navigation click
+                handleEmployeeSelect(employee.employee_id, !isSelected); // Trigger selection
+              };
+
+              const handleSelectIconClick = (e: React.MouseEvent) => {
+                e.stopPropagation(); // Prevent card click handler AND header click handler
+                handleEmployeeSelect(employee.employee_id, !isSelected);
+              };
+
               return (
                 <div
                   key={employee.employee_id}
-                  className={`bg-white rounded-lg border border-default-200 ${
+                  className={`relative border rounded-lg overflow-hidden bg-white transition-shadow duration-200 group ${
                     isSelected
                       ? "shadow-md ring-2 ring-blue-500 ring-offset-1"
                       : "shadow-sm hover:shadow-md"
-                  }`}
+                  } border-default-200 p-4 space-y-3`}
+                  onClick={handleCardClick}
                 >
-                {/* Employee header */}
-                <div className="px-4 py-3 border-b border-default-200 bg-default-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-default-800 truncate">
-                        {employee.employee_name}
-                      </h3>
-                      <p className="text-sm text-default-500">
-                        {employee.employee_id}
-                      </p>
-                    </div>
-                    <label className="flex items-center ml-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => handleEmployeeSelect(employee.employee_id, e.target.checked)}
-                        className="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 rounded focus:ring-sky-500 focus:ring-2"
+                {/* Employee header - Now clickable for selection */}
+                <div 
+                  className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 -mt-4 px-4 py-3 rounded-t-lg cursor-pointer"
+                  onClick={handleHeaderClick}
+                >
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-default-800 truncate">
+                      {employee.employee_name}
+                    </h3>
+                    <p className="text-sm text-default-500">
+                      {employee.employee_id}
+                    </p>
+                  </div>
+                  
+                  {/* Selection Checkbox Area - Still clickable individually */}
+                  <div
+                    className="employee-card-select-action flex-shrink-0 z-0"
+                    onClick={handleSelectIconClick}
+                  >
+                    {isSelected ? (
+                      <IconSquareCheckFilled
+                        className="text-blue-600 cursor-pointer"
+                        size={22}
                       />
-                    </label>
+                    ) : (
+                      <IconSquare
+                        className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer"
+                        size={22}
+                      />
+                    )}
                   </div>
                 </div>
 
-                <div className="p-4 space-y-4">
-                  {/* Mid-month Pay Section */}
-                  {employee.midMonthPinjam > 0 && (
-                    <div className="border-b border-default-100 pb-4">
-                      <div className="mb-3">
-                        <p className="text-sm text-default-500 mb-1">
-                          Mid-Month Pay (Before Pinjam)
-                        </p>
-                        <p className="text-xl font-bold text-default-800">
-                          {formatCurrency(employee.midMonthPay)}
-                        </p>
-                      </div>
+                {/* Body - Horizontal layout for content sections */}
+                <div className="space-y-4">
+                  <div className="flex gap-6">
+                      {/* Mid-month Pay Section */}
+                      {employee.midMonthPinjam > 0 && (
+                        <div className="flex-1 min-w-0">
+                          <div className="mb-3">
+                            <p className="text-sm text-default-500 mb-1">
+                              Mid-Month Pay (Before Pinjam)
+                            </p>
+                            <p className="text-xl font-bold text-default-800">
+                              {formatCurrency(employee.midMonthPay)}
+                            </p>
+                          </div>
 
-                      {employee.midMonthPinjamDetails.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-sm font-medium text-default-700 mb-2">
-                            Pinjam Items:
-                          </p>
-                          <div className="space-y-1 text-sm text-default-600">
-                            {employee.midMonthPinjamDetails.map(
-                              (detail, index) => (
-                                <div key={index} className="flex items-start">
-                                  <span className="text-default-400 mr-2 mt-0.5">
-                                    •
-                                  </span>
-                                  <span>{detail}</span>
-                                </div>
-                              )
-                            )}
+                          {employee.midMonthPinjamDetails.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-sm font-medium text-default-700 mb-2">
+                                Pinjam Items:
+                              </p>
+                              <div className="space-y-1 text-sm text-default-600">
+                                {employee.midMonthPinjamDetails.map(
+                                  (detail, index) => (
+                                    <div key={index} className="flex items-start">
+                                      <span className="text-default-400 mr-2 mt-0.5">
+                                        •
+                                      </span>
+                                      <span>{detail}</span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="text-sm">
+                            <div className="flex justify-between mb-2">
+                              <span className="text-default-600">
+                                Jumlah Pinjam:
+                              </span>
+                              <span className="font-semibold text-red-600">
+                                - {formatCurrency(employee.midMonthPinjam)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-default-800">
+                                Final Mid-month pay:
+                              </span>
+                              <span className="text-lg font-bold text-sky-600">
+                                {formatCurrency(
+                                  employee.midMonthPay - employee.midMonthPinjam
+                                )}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
 
-                      <div className="text-sm">
-                        <div className="flex justify-between mb-2">
-                          <span className="text-default-600">
-                            Jumlah Pinjam:
-                          </span>
-                          <span className="font-semibold text-red-600">
-                            - {formatCurrency(employee.midMonthPinjam)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between font-semibold">
-                          <span className="text-default-800">
-                            Final Mid-month pay:
-                          </span>
-                          <span className="text-lg font-bold text-sky-600">
-                            {formatCurrency(
-                              employee.midMonthPay - employee.midMonthPinjam
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                      {/* Monthly Pay Section */}
+                      {employee.monthlyPinjam > 0 && (
+                        <div className="flex-1 min-w-0">
+                          <div className="mb-3">
+                            <p className="text-sm text-default-500 mb-1">
+                              Gaji Genap (Before Pinjam)
+                            </p>
+                            <p className="text-xl font-bold text-default-800">
+                              {formatCurrency(employee.gajiGenap)}
+                            </p>
+                          </div>
 
-                  {/* Monthly Pay Section */}
-                  {employee.monthlyPinjam > 0 && (
-                    <div>
-                      <div className="mb-3">
-                        <p className="text-sm text-default-500 mb-1">
-                          Gaji Genap (Before Pinjam)
-                        </p>
-                        <p className="text-xl font-bold text-default-800">
-                          {formatCurrency(employee.gajiGenap)}
-                        </p>
-                      </div>
+                          {employee.monthlyPinjamDetails.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-sm font-medium text-default-700 mb-2">
+                                Pinjam Items:
+                              </p>
+                              <div className="space-y-1 text-sm text-default-600">
+                                {employee.monthlyPinjamDetails.map(
+                                  (detail, index) => (
+                                    <div key={index} className="flex items-start">
+                                      <span className="text-default-400 mr-2 mt-0.5">
+                                        •
+                                      </span>
+                                      <span>{detail}</span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
 
-                      {employee.monthlyPinjamDetails.length > 0 && (
-                        <div className="mb-3">
-                          <p className="text-sm font-medium text-default-700 mb-2">
-                            Pinjam Items:
-                          </p>
-                          <div className="space-y-1 text-sm text-default-600">
-                            {employee.monthlyPinjamDetails.map(
-                              (detail, index) => (
-                                <div key={index} className="flex items-start">
-                                  <span className="text-default-400 mr-2 mt-0.5">
-                                    •
-                                  </span>
-                                  <span>{detail}</span>
-                                </div>
-                              )
-                            )}
+                          <div className="text-sm">
+                            <div className="flex justify-between mb-2">
+                              <span className="text-default-600">
+                                Jumlah Pinjam:
+                              </span>
+                              <span className="font-semibold text-red-600">
+                                - {formatCurrency(employee.monthlyPinjam)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-default-800 flex items-center">
+                                <IconBuildingBank className="w-4 h-4 mr-1.5" />
+                                Jumlah Masuk Bank:
+                              </span>
+                              <span className="text-lg font-bold text-sky-600">
+                                {formatCurrency(
+                                  employee.gajiGenap - employee.monthlyPinjam
+                                )}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
 
-                      <div className="text-sm">
-                        <div className="flex justify-between mb-2">
-                          <span className="text-default-600">
-                            Jumlah Pinjam:
-                          </span>
-                          <span className="font-semibold text-red-600">
-                            - {formatCurrency(employee.monthlyPinjam)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between font-semibold">
-                          <span className="text-default-800 flex items-center">
-                            <IconBuildingBank className="w-4 h-4 mr-1.5" />
-                            Jumlah Masuk Bank:
-                          </span>
-                          <span className="text-lg font-bold text-sky-600">
-                            {formatCurrency(
-                              employee.gajiGenap - employee.monthlyPinjam
-                            )}
-                          </span>
-                        </div>
-                      </div>
+                      {/* No pinjam state */}
+                      {employee.midMonthPinjam === 0 &&
+                        employee.monthlyPinjam === 0 && (
+                          <div className="flex-1 flex items-center justify-center text-default-400 py-6">
+                            <div className="text-center">
+                              <IconCash className="mx-auto h-8 w-8 text-default-300 mb-2" />
+                              <p className="text-sm">No pinjam recorded</p>
+                            </div>
+                          </div>
+                        )}
                     </div>
-                  )}
-
-                  {/* No pinjam state */}
-                  {employee.midMonthPinjam === 0 &&
-                    employee.monthlyPinjam === 0 && (
-                      <div className="text-center text-default-400 py-6">
-                        <IconCash className="mx-auto h-8 w-8 text-default-300 mb-2" />
-                        <p className="text-sm">No pinjam recorded</p>
-                      </div>
-                    )}
+                  </div>
                 </div>
-              </div>
               );
             })}
           </div>
