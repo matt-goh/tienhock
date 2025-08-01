@@ -230,44 +230,31 @@ const PinjamListPage: React.FC = () => {
       }
     >();
 
-    // 1. Create a master list of all unique employees from all data sources
-    const allUniqueEmployees = new Map<string, { id: string; name: string }>();
-    [...midMonthPayrolls, ...employeePayrolls, ...pinjamSummary].forEach(
-      (record) => {
-        if (!allUniqueEmployees.has(record.employee_id)) {
-          allUniqueEmployees.set(record.employee_id, {
-            id: record.employee_id,
-            name: record.employee_name,
-          });
-        }
-      }
-    );
+    // 1. Iterate through pinjamSummary as the source of truth for employees with pinjam
+    pinjamSummary.forEach((pinjamRecord) => {
+      const employeeId = pinjamRecord.employee_id;
 
-    // 2. Iterate through the master list and build the final data object for each employee
-    allUniqueEmployees.forEach((employee) => {
+      // Find corresponding pay data
       const midMonthRecord = midMonthPayrolls.find(
-        (p) => p.employee_id === employee.id
+        (p) => p.employee_id === employeeId
       );
       const payrollRecord = employeePayrolls.find(
-        (p) => p.employee_id === employee.id
-      );
-      const pinjamRecord = pinjamSummary.find(
-        (p) => p.employee_id === employee.id
+        (p) => p.employee_id === employeeId
       );
 
-      employeeMap.set(employee.id, {
-        employee_id: employee.id,
-        employee_name: employee.name,
+      employeeMap.set(employeeId, {
+        employee_id: employeeId,
+        employee_name: pinjamRecord.employee_name,
         midMonthPay: midMonthRecord?.amount || 0,
         netPay: payrollRecord?.net_pay || 0,
-        midMonthPinjam: pinjamRecord?.mid_month.total_amount || 0,
-        midMonthPinjamDetails: pinjamRecord?.mid_month.details || [],
-        monthlyPinjam: pinjamRecord?.monthly.total_amount || 0,
-        monthlyPinjamDetails: pinjamRecord?.monthly.details || [],
+        midMonthPinjam: pinjamRecord.mid_month.total_amount || 0,
+        midMonthPinjamDetails: pinjamRecord.mid_month.details || [],
+        monthlyPinjam: pinjamRecord.monthly.total_amount || 0,
+        monthlyPinjamDetails: pinjamRecord.monthly.details || [],
       });
     });
 
-    // 3. Convert map to array, calculate gajiGenap, and sort
+    // 2. Convert map to array, calculate gajiGenap, and sort
     return Array.from(employeeMap.values())
       .map((emp) => ({
         ...emp,
@@ -376,101 +363,131 @@ const PinjamListPage: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2">
                 {/* Left Column - Mid-month Pay */}
                 <div className="p-4 border-r border-default-200">
-                  <div className="bg-blue-50 rounded p-3 mb-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-blue-700">
-                        Mid-month pay:
-                      </span>
-                      <span className="text-lg font-semibold text-blue-600">
-                        {formatCurrency(employee.midMonthPay)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {employee.midMonthPinjamDetails.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      <div className="text-sm font-medium text-default-700">
-                        Pinjam items:
-                      </div>
-                      {employee.midMonthPinjamDetails.map((detail, index) => (
-                        <div
-                          key={index}
-                          className="text-sm text-default-600 pl-2"
-                        >
-                          {detail}
+                  {employee.midMonthPinjam > 0 ? (
+                    <>
+                      <div className="bg-blue-50 rounded p-3 mb-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-blue-700">
+                            Mid-month pay:
+                          </span>
+                          <span className="text-lg font-semibold text-blue-600">
+                            {formatCurrency(employee.midMonthPay)}
+                          </span>
                         </div>
-                      ))}
+                      </div>
+
+                      {employee.midMonthPinjamDetails.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          <div className="text-sm font-medium text-default-700">
+                            Pinjam items:
+                          </div>
+                          {employee.midMonthPinjamDetails.map(
+                            (detail, index) => (
+                              <div
+                                key={index}
+                                className="text-sm text-default-600 pl-2"
+                              >
+                                {detail}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+
+                      <div className="border-t pt-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">
+                            Jumlah Pinjam:
+                          </span>
+                          <span className="font-medium text-red-600">
+                            {formatCurrency(employee.midMonthPinjam)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-medium">
+                          <span className="text-default-700">
+                            Mid-month pay:
+                          </span>
+                          <span className="text-green-600">
+                            {formatCurrency(
+                              employee.midMonthPay - employee.midMonthPinjam
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center text-default-400 p-4">
+                        <IconCash className="mx-auto h-8 w-8 text-default-300 mb-2" />
+                        <p className="text-sm">No mid-month pinjam recorded.</p>
+                      </div>
                     </div>
                   )}
-
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-default-600">
-                        Jumlah Pinjam:
-                      </span>
-                      <span className="font-medium text-red-600">
-                        {formatCurrency(employee.midMonthPinjam)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-medium">
-                      <span className="text-default-700">Mid-month pay:</span>
-                      <span className="text-green-600">
-                        {formatCurrency(
-                          employee.midMonthPay - employee.midMonthPinjam
-                        )}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Right Column - Monthly Pay */}
                 <div className="p-4">
-                  <div className="bg-green-50 rounded p-3 mb-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-green-700">
-                        Gaji Genap:
-                      </span>
-                      <span className="text-lg font-semibold text-green-600">
-                        {formatCurrency(employee.gajiGenap)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {employee.monthlyPinjamDetails.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      <div className="text-sm font-medium text-default-700">
-                        Pinjam items:
-                      </div>
-                      {employee.monthlyPinjamDetails.map((detail, index) => (
-                        <div
-                          key={index}
-                          className="text-sm text-default-600 pl-2"
-                        >
-                          {detail}
+                  {employee.monthlyPinjam > 0 ? (
+                    <>
+                      <div className="bg-green-50 rounded p-3 mb-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-green-700">
+                            Gaji Genap:
+                          </span>
+                          <span className="text-lg font-semibold text-green-600">
+                            {formatCurrency(employee.gajiGenap)}
+                          </span>
                         </div>
-                      ))}
+                      </div>
+
+                      {employee.monthlyPinjamDetails.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          <div className="text-sm font-medium text-default-700">
+                            Pinjam items:
+                          </div>
+                          {employee.monthlyPinjamDetails.map(
+                            (detail, index) => (
+                              <div
+                                key={index}
+                                className="text-sm text-default-600 pl-2"
+                              >
+                                {detail}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+
+                      <div className="border-t pt-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">
+                            Jumlah Pinjam:
+                          </span>
+                          <span className="font-medium text-red-600">
+                            {formatCurrency(employee.monthlyPinjam)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-medium">
+                          <span className="text-default-700 flex items-center">
+                            <IconBuildingBank className="w-4 h-4 mr-1" />
+                            Jumlah Masuk Bank:
+                          </span>
+                          <span className="text-blue-600">
+                            {formatCurrency(
+                              employee.gajiGenap - employee.monthlyPinjam
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center text-default-400 p-4">
+                        <IconCash className="mx-auto h-8 w-8 text-default-300 mb-2" />
+                        <p className="text-sm">No monthly pinjam recorded.</p>
+                      </div>
                     </div>
                   )}
-
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-default-600">Jumlah Pinjam:</span>
-                      <span className="font-medium text-red-600">
-                        {formatCurrency(employee.monthlyPinjam)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-medium">
-                      <span className="text-default-700 flex items-center">
-                        <IconBuildingBank className="w-4 h-4 mr-1" />
-                        Jumlah Masuk Bank:
-                      </span>
-                      <span className="text-blue-600">
-                        {formatCurrency(
-                          employee.gajiGenap - employee.monthlyPinjam
-                        )}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
