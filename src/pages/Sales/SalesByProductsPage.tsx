@@ -659,9 +659,7 @@ const SalesByProductsPage: React.FC = () => {
     return (
       <div className="w-full p-6">
         <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
-          {typeof productsError === "object" && productsError instanceof Error
-            ? productsError.message
-            : productsError || error}
+          {productsError ? String(productsError) : error}
         </div>
       </div>
     );
@@ -687,7 +685,7 @@ const SalesByProductsPage: React.FC = () => {
             <div className="w-40">
               <StyledListbox
                 value={selectedMonth.id}
-                onChange={handleMonthChange}
+                onChange={(value) => handleMonthChange(value)}
                 options={monthOptions}
               />
             </div>
@@ -696,7 +694,7 @@ const SalesByProductsPage: React.FC = () => {
             <div className="w-40">
               <StyledListbox
                 value={selectedSalesman}
-                onChange={(value) => setSelectedSalesman(value.toString())}
+                onChange={(value) => setSelectedSalesman(String(value))}
                 options={salesmen.map((salesman) => ({
                   id: salesman,
                   name: salesman,
