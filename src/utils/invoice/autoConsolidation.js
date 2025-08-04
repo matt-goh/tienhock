@@ -61,10 +61,19 @@ export const checkAndProcessDueConsolidations = async (pool) => {
         );
 
         try {
-          // Check if we already have a completed consolidation for this month
+          // Check if we already have a completed consolidation for this month that is not cancelled
           const existingConsolidationQuery = `
-            SELECT * FROM consolidation_tracking 
-            WHERE company_id = $1 AND year = $2 AND month = $3 AND status = 'completed'
+            SELECT ct.*, 
+                   CASE 
+                     WHEN $1 = 'greentarget' THEN gt.status
+                     WHEN $1 = 'jellypolly' THEN jp.invoice_status  
+                     ELSE th.invoice_status
+                   END as consolidated_invoice_status
+            FROM consolidation_tracking ct
+            LEFT JOIN greentarget.invoices gt ON ct.consolidated_invoice_id = gt.invoice_number AND $1 = 'greentarget'
+            LEFT JOIN jellypolly.invoices jp ON ct.consolidated_invoice_id = jp.id AND $1 = 'jellypolly'  
+            LEFT JOIN invoices th ON ct.consolidated_invoice_id = th.id AND $1 = 'tienhock'
+            WHERE ct.company_id = $1 AND ct.year = $2 AND ct.month = $3 AND ct.status = 'completed'
           `;
 
           const existingResult = await client.query(
@@ -77,12 +86,30 @@ export const checkAndProcessDueConsolidations = async (pool) => {
           );
 
           if (existingResult.rows.length > 0) {
-            console.log(
-              `[${now.toISOString()}] ${company} already has completed consolidation for ${
-                isInConsolidationWindow.targetYear
-              }-${isInConsolidationWindow.targetMonth + 1}`
-            );
-            continue;
+            const existingConsolidation = existingResult.rows[0];
+            const consolidatedInvoiceStatus = existingConsolidation.consolidated_invoice_status;
+            
+            // If the consolidated invoice is not cancelled, skip this consolidation
+            if (consolidatedInvoiceStatus && consolidatedInvoiceStatus !== 'cancelled') {
+              console.log(
+                `[${now.toISOString()}] ${company} already has completed consolidation for ${
+                  isInConsolidationWindow.targetYear
+                }-${isInConsolidationWindow.targetMonth + 1} (${existingConsolidation.consolidated_invoice_id}) with status: ${consolidatedInvoiceStatus}`
+              );
+              continue;
+            } else {
+              // The consolidated invoice was cancelled or doesn't exist, reset the tracking to allow re-consolidation
+              console.log(
+                `[${now.toISOString()}] ${company} has cancelled consolidated invoice ${existingConsolidation.consolidated_invoice_id}, resetting tracking to allow re-consolidation`
+              );
+              
+              await client.query(
+                `UPDATE consolidation_tracking 
+                 SET status = 'reset', error = 'Previous consolidated invoice was cancelled', last_attempt = CURRENT_TIMESTAMP
+                 WHERE company_id = $1 AND year = $2 AND month = $3`,
+                [company, isInConsolidationWindow.targetYear, isInConsolidationWindow.targetMonth]
+              );
+            }
           }
 
           // Get eligible invoices that haven't been consolidated yet
