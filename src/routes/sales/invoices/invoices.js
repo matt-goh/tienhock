@@ -1041,7 +1041,7 @@ export default function (pool, config) {
         const code = product.code;
         const quantity = parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
-        const total = quantity * price;
+        const total = (code === "OTH" || code === "LESS") ? price : quantity * price;
         const returnQty = parseInt(product.returnproduct || 0);
 
         // Group products by category
