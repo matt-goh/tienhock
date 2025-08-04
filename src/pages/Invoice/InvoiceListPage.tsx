@@ -1605,7 +1605,6 @@ const InvoiceListPage: React.FC = () => {
                 >
                   Today
                 </Button>
-                <InvoiceDailyPrintMenu filters={filters} />
               </div>
             </div>
 
@@ -1988,6 +1987,7 @@ const InvoiceListPage: React.FC = () => {
               </>
             )}
 
+            <InvoiceDailyPrintMenu filters={filters} size="sm" />
             <Button
               onClick={() => setShowConsolidatedModal(true)}
               icon={IconFiles}
@@ -2011,6 +2011,7 @@ const InvoiceListPage: React.FC = () => {
             >
               Refresh
             </Button>
+            <InvoiceDailyPrintMenu filters={filters} size="sm" />
             <Button
               onClick={handleCreateNewInvoice}
               icon={IconPlus}

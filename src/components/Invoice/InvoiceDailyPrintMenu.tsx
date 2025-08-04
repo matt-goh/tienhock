@@ -13,6 +13,7 @@ import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 
 interface InvoiceDailyPrintMenuProps {
   filters: InvoiceFilters;
+  size?: "sm" | "md";
 }
 
 interface SalesmanOption {
@@ -23,6 +24,7 @@ interface SalesmanOption {
 
 const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
   filters,
+  size = "md",
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -227,6 +229,12 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
     setInvoicesToPrint([]);
   };
 
+  const buttonClasses = size === "sm" 
+    ? "flex items-center px-3 h-8 text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors"
+    : "flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors";
+
+  const iconSize = size === "sm" ? 16 : 18;
+
   return (
     <>
       <button
@@ -234,10 +242,10 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={() => setIsVisible(true)}
-        className="flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors"
+        className={buttonClasses}
         type="button"
       >
-        <IconCalendarEvent size={18} className="mr-2" />
+        <IconCalendarEvent size={iconSize} className="mr-2" />
         Daily
       </button>
 
