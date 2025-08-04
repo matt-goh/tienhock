@@ -35,147 +35,215 @@ const styles = StyleSheet.create({
     padding: 20,
     fontFamily: "Helvetica",
     fontSize: 9,
-    lineHeight: 1.3,
+    lineHeight: 1.4,
+    color: "#1f2937",
+  },
+  // Header Styles
+  headerSection: {
+    marginBottom: 12,
+    paddingBottom: 6,
+    borderBottomWidth: 2,
   },
   companyHeader: {
-    fontSize: 12,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 6,
     textAlign: "left",
+    color: "#0f172a",
   },
   reportTitle: {
+    fontSize: 12,
     fontFamily: "Helvetica",
-    marginBottom: 8,
     textAlign: "left",
+    color: "#475569",
   },
-  summarySection: {
-    marginBottom: 10,
-    padding: 8,
-    backgroundColor: "#f8f8f8",
-    borderWidth: 0.5,
-    borderColor: "#ccc",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 3,
-  },
-  summaryLabel: {
-    fontFamily: "Helvetica-Bold",
-  },
-  summaryValue: {
-    fontFamily: "Helvetica-Bold",
-  },
-  employeeSection: {
+
+  // Employee Card Styles
+  employeeCard: {
     marginBottom: 12,
-    borderWidth: 0.5,
-    borderColor: "#333",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 6,
+    // Prevent page breaks within employee cards
+    break: false,
   },
   employeeHeader: {
-    backgroundColor: "#f0f0f0",
-    padding: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#333",
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
   },
   employeeName: {
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    fontSize: 10,
+    color: "#1e293b",
+    marginBottom: 2,
   },
   employeeId: {
     fontSize: 8,
-    color: "#666",
-    marginTop: 1,
+    color: "#64748b",
   },
   employeeContent: {
-    padding: 6,
+    padding: 10,
   },
+
+  // Two Column Layout
+  employeeContentColumns: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  columnDivider: {
+    width: 0.5,
+    backgroundColor: "#e5e7eb",
+    marginHorizontal: 6,
+  },
+  payColumn: {
+    flex: 1,
+  },
+
+  // Pay Section Styles
   paySection: {
-    marginBottom: 8,
+    backgroundColor: "#fefefe",
+    minHeight: 100,
   },
   paySectionTitle: {
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
-    fontSize: 9,
+    marginBottom: 6,
+    color: "#374151",
+    paddingBottom: 3,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e5e7eb",
   },
   payRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 2,
-    paddingVertical: 1,
+    alignItems: "center",
+    paddingVertical: 1.5,
   },
   payLabel: {
+    fontSize: 9,
     flex: 2,
+    color: "#4b5563",
   },
   payAmount: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
     flex: 1,
     textAlign: "right",
+    color: "#111827",
   },
-  pinjamItems: {
-    marginBottom: 4,
-    paddingLeft: 8,
+
+  // Pinjam Details Styles
+  pinjamDetailsSection: {
+    marginVertical: 4,
+    paddingHorizontal: 6,
+    paddingTop: 6,
+    backgroundColor: "#f9fafb",
+    borderLeftWidth: 2,
+    borderLeftColor: "#f59e0b",
+  },
+  pinjamDetailsTitle: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: "#92400e",
+    marginBottom: 2,
   },
   pinjamItem: {
     fontSize: 8,
-    marginBottom: 1,
-    color: "#555",
+    marginBottom: 2,
+    color: "#6b7280",
   },
+
+  // Amount Styles
   finalAmountRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingTop: 3,
-    borderTopWidth: 0.5,
-    borderTopColor: "#333",
-    marginTop: 2,
+    alignItems: "center",
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#d1d5db",
   },
   finalAmountLabel: {
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     flex: 2,
+    color: "#374151",
   },
   finalAmount: {
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
     flex: 1,
     textAlign: "right",
-    color: "#0066cc",
+    color: "#0ea5e9",
   },
   deductionAmount: {
-    color: "#cc0000",
+    color: "#dc2626",
   },
+  positiveAmount: {
+    color: "#059669",
+  },
+
+  // No Pinjam State
+  noPinjamSection: {
+    padding: 4,
+    textAlign: "center",
+    backgroundColor: "#f9fafb",
+    borderRadius: 4,
+    minHeight: 100,
+    justifyContent: "center",
+    alignItems: "center",
+    flex: 1,
+  },
+  noPinjamText: {
+    fontSize: 9,
+    color: "#9ca3af",
+    fontFamily: "Helvetica",
+  },
+  noPinjamTitle: {
+    fontSize: 9,
+    color: "#6b7280",
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 2,
+  },
+
+  // Total Section Styles
   totalSection: {
-    marginTop: 15,
-    padding: 8,
-    backgroundColor: "#f0f0f0",
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: "#f1f5f9",
     borderWidth: 1,
-    borderColor: "#333",
+    borderColor: "#94a3b8",
+    borderRadius: 6,
+  },
+  totalSectionTitle: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 8,
+    textAlign: "center",
+    color: "#1e293b",
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 3,
+    alignItems: "center",
+    marginBottom: 4,
+    paddingVertical: 2,
   },
   totalLabel: {
-    fontFamily: "Helvetica-Bold",
     fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: "#475569",
   },
   totalValue: {
-    fontFamily: "Helvetica-Bold",
     fontSize: 10,
-  },
-  grandTotalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: "#333",
-    paddingTop: 4,
-    marginTop: 4,
-  },
-  grandTotalLabel: {
     fontFamily: "Helvetica-Bold",
-    fontSize: 11,
-  },
-  grandTotalValue: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 11,
-    color: "#0066cc",
+    color: "#1e293b",
   },
 });
 
@@ -187,170 +255,164 @@ const formatCurrency = (amount: number): string => {
 };
 
 const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
-  const { employees, year, month, totalMidMonthPinjam, totalMonthlyPinjam } = data;
+  const { employees, year, month, totalMidMonthPinjam, totalMonthlyPinjam } =
+    data;
   const monthName = getMonthName(month);
 
   return (
     <Document title={`Pinjam Summary - ${monthName} ${year}`}>
       <Page size="A4" style={styles.page}>
         {/* Header */}
-        <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
-        <Text style={styles.reportTitle}>
-          Pinjam Summary for {monthName} {year}
-        </Text>
-
-        {/* Summary Section */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Mid-Month Pinjam:</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(totalMidMonthPinjam)}
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Monthly Pinjam:</Text>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(totalMonthlyPinjam)}
-            </Text>
-          </View>
-          <View style={[styles.summaryRow, styles.grandTotalRow]}>
-            <Text style={styles.grandTotalLabel}>Grand Total Pinjam:</Text>
-            <Text style={styles.grandTotalValue}>
-              {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
-            </Text>
-          </View>
+        <View style={styles.headerSection}>
+          <Text style={styles.companyHeader}>
+            TIEN HOCK FOOD INDUSTRIES S/B
+          </Text>
         </View>
 
         {/* Employee Details */}
         {employees.map((employee, index) => (
-          <View key={employee.employee_id} style={styles.employeeSection}>
+          <View
+            key={employee.employee_id}
+            style={styles.employeeCard}
+            break={false}
+          >
             {/* Employee Header */}
             <View style={styles.employeeHeader}>
               <Text style={styles.employeeName}>{employee.employee_name}</Text>
               <Text style={styles.employeeId}>{employee.employee_id}</Text>
             </View>
 
-            {/* Employee Content */}
+            {/* Employee Content - Two Column Layout */}
             <View style={styles.employeeContent}>
-              {/* Mid-Month Pay Section */}
-              {employee.midMonthPinjam > 0 && (
-                <View style={styles.paySection}>
-                  <Text style={styles.paySectionTitle}>Mid-Month Pay</Text>
-                  
-                  <View style={styles.payRow}>
-                    <Text style={styles.payLabel}>Original Mid-Month Pay:</Text>
-                    <Text style={styles.payAmount}>
-                      {formatCurrency(employee.midMonthPay)}
-                    </Text>
-                  </View>
+              <View style={styles.employeeContentColumns}>
+                {/* Mid-Month Pay Column */}
+                <View style={styles.payColumn}>
+                  {employee.midMonthPinjam > 0 ? (
+                    <View style={styles.paySection}>
+                      <Text style={styles.paySectionTitle}>Mid-Month Pay</Text>
 
-                  {employee.midMonthPinjamDetails.length > 0 && (
-                    <View style={styles.pinjamItems}>
-                      <Text style={[styles.payLabel, { fontFamily: "Helvetica-Bold", fontSize: 8 }]}>
-                        Pinjam Items:
-                      </Text>
-                      {employee.midMonthPinjamDetails.map((detail, idx) => (
-                        <Text key={idx} style={styles.pinjamItem}>
-                          • {detail}
+                      <View style={styles.payRow}>
+                        <Text style={styles.payLabel}>
+                          Original Mid-Month Pay:
                         </Text>
-                      ))}
+                        <Text style={styles.payAmount}>
+                          {formatCurrency(employee.midMonthPay)}
+                        </Text>
+                      </View>
+
+                      {employee.midMonthPinjamDetails.length > 0 && (
+                        <View style={styles.pinjamDetailsSection}>
+                          <Text style={styles.pinjamDetailsTitle}>
+                            Pinjam Items:
+                          </Text>
+                          {employee.midMonthPinjamDetails.map((detail, idx) => (
+                            <Text key={idx} style={styles.pinjamItem}>
+                              • {detail}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      <View style={styles.payRow}>
+                        <Text style={styles.payLabel}>Total Pinjam:</Text>
+                        <Text
+                          style={[styles.payAmount, styles.deductionAmount]}
+                        >
+                          -{formatCurrency(employee.midMonthPinjam)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.finalAmountRow}>
+                        <Text style={styles.finalAmountLabel}>
+                          Jumlah Bayaran Pendahuluan:
+                        </Text>
+                        <Text
+                          style={[styles.finalAmount, styles.positiveAmount]}
+                        >
+                          {formatCurrency(
+                            employee.midMonthPay - employee.midMonthPinjam
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.noPinjamSection}>
+                      <Text style={styles.noPinjamTitle}>Mid-Month Pay</Text>
+                      <Text style={styles.noPinjamText}>
+                        No pinjam recorded
+                      </Text>
                     </View>
                   )}
-
-                  <View style={styles.payRow}>
-                    <Text style={styles.payLabel}>Total Pinjam:</Text>
-                    <Text style={[styles.payAmount, styles.deductionAmount]}>
-                      -{formatCurrency(employee.midMonthPinjam)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.finalAmountRow}>
-                    <Text style={styles.finalAmountLabel}>Final Mid-Month Pay:</Text>
-                    <Text style={styles.finalAmount}>
-                      {formatCurrency(employee.midMonthPay - employee.midMonthPinjam)}
-                    </Text>
-                  </View>
                 </View>
-              )}
 
-              {/* Monthly Pay Section */}
-              {employee.monthlyPinjam > 0 && (
-                <View style={styles.paySection}>
-                  <Text style={styles.paySectionTitle}>Monthly Pay (Gaji Genap)</Text>
-                  
-                  <View style={styles.payRow}>
-                    <Text style={styles.payLabel}>Original Gaji Genap:</Text>
-                    <Text style={styles.payAmount}>
-                      {formatCurrency(employee.gajiGenap)}
-                    </Text>
-                  </View>
+                {/* Column Divider */}
+                <View style={styles.columnDivider} />
 
-                  {employee.monthlyPinjamDetails.length > 0 && (
-                    <View style={styles.pinjamItems}>
-                      <Text style={[styles.payLabel, { fontFamily: "Helvetica-Bold", fontSize: 8 }]}>
-                        Pinjam Items:
+                {/* Monthly Pay Column */}
+                <View style={styles.payColumn}>
+                  {employee.monthlyPinjam > 0 ? (
+                    <View style={styles.paySection}>
+                      <Text style={styles.paySectionTitle}>
+                        Monthly Pay (Gaji Genap)
                       </Text>
-                      {employee.monthlyPinjamDetails.map((detail, idx) => (
-                        <Text key={idx} style={styles.pinjamItem}>
-                          • {detail}
+
+                      <View style={styles.payRow}>
+                        <Text style={styles.payLabel}>
+                          Original Gaji Genap:
                         </Text>
-                      ))}
+                        <Text style={styles.payAmount}>
+                          {formatCurrency(employee.gajiGenap)}
+                        </Text>
+                      </View>
+
+                      {employee.monthlyPinjamDetails.length > 0 && (
+                        <View style={styles.pinjamDetailsSection}>
+                          <Text style={styles.pinjamDetailsTitle}>
+                            Pinjam Items:
+                          </Text>
+                          {employee.monthlyPinjamDetails.map((detail, idx) => (
+                            <Text key={idx} style={styles.pinjamItem}>
+                              • {detail}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      <View style={styles.payRow}>
+                        <Text style={styles.payLabel}>Total Pinjam:</Text>
+                        <Text
+                          style={[styles.payAmount, styles.deductionAmount]}
+                        >
+                          -{formatCurrency(employee.monthlyPinjam)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.finalAmountRow}>
+                        <Text style={styles.finalAmountLabel}>
+                          Jumlah Masuk Bank:
+                        </Text>
+                        <Text
+                          style={[styles.finalAmount, styles.positiveAmount]}
+                        >
+                          {formatCurrency(
+                            employee.gajiGenap - employee.monthlyPinjam
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.noPinjamSection}>
+                      <Text style={styles.noPinjamTitle}>Monthly Pay</Text>
+                      <Text style={styles.noPinjamText}>
+                        No pinjam recorded
+                      </Text>
                     </View>
                   )}
-
-                  <View style={styles.payRow}>
-                    <Text style={styles.payLabel}>Total Pinjam:</Text>
-                    <Text style={[styles.payAmount, styles.deductionAmount]}>
-                      -{formatCurrency(employee.monthlyPinjam)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.finalAmountRow}>
-                    <Text style={styles.finalAmountLabel}>Amount to Bank:</Text>
-                    <Text style={styles.finalAmount}>
-                      {formatCurrency(employee.gajiGenap - employee.monthlyPinjam)}
-                    </Text>
-                  </View>
                 </View>
-              )}
-
-              {/* No pinjam state */}
-              {employee.midMonthPinjam === 0 && employee.monthlyPinjam === 0 && (
-                <View style={styles.paySection}>
-                  <Text style={{ textAlign: "center", color: "#666", fontStyle: "italic" }}>
-                    No pinjam recorded for this employee
-                  </Text>
-                </View>
-              )}
+              </View>
             </View>
           </View>
         ))}
-
-        {/* Total Section */}
-        <View style={styles.totalSection}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Employees:</Text>
-            <Text style={styles.totalValue}>{employees.length}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Mid-Month Pinjam:</Text>
-            <Text style={styles.totalValue}>
-              {formatCurrency(totalMidMonthPinjam)}
-            </Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Monthly Pinjam:</Text>
-            <Text style={styles.totalValue}>
-              {formatCurrency(totalMonthlyPinjam)}
-            </Text>
-          </View>
-          <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>Grand Total Pinjam:</Text>
-            <Text style={styles.grandTotalValue}>
-              {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
-            </Text>
-          </View>
-        </View>
       </Page>
     </Document>
   );
@@ -389,28 +451,53 @@ export const generatePinjamPDF = async (
           try {
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
+
+            // Listen for print dialog events
+            iframe.contentWindow?.addEventListener("afterprint", () => {
+              // Cleanup after user finishes printing
+              setTimeout(() => {
+                if (document.body.contains(iframe)) {
+                  document.body.removeChild(iframe);
+                }
+                URL.revokeObjectURL(url);
+              }, 500);
+            });
           } catch (e) {
             console.error("Print failed:", e);
             // Fallback: open in new window if iframe print fails
-            window.open(url, '_blank');
+            window.open(url, "_blank");
+            // Cleanup immediately for fallback
+            setTimeout(() => {
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
+              URL.revokeObjectURL(url);
+            }, 1000);
           }
-        }, 1000); // Give more time for PDF to load
+        }, 1000);
       };
 
       iframe.onerror = () => {
         console.error("Failed to load PDF in iframe, opening in new window");
-        window.open(url, '_blank');
+        window.open(url, "_blank");
+        // Cleanup immediately for error case
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          URL.revokeObjectURL(url);
+        }, 1000);
       };
 
       iframe.src = url;
 
-      // Cleanup after print
+      // Fallback cleanup in case afterprint event doesn't fire (after 5 minutes)
       setTimeout(() => {
         if (document.body.contains(iframe)) {
           document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
         }
-        URL.revokeObjectURL(url);
-      }, 10000);
+      }, 300000);
     }
   } catch (error) {
     console.error("Error generating PDF:", error);
