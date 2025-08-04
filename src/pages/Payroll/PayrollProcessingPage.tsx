@@ -340,10 +340,11 @@ const PayrollProcessingPage: React.FC = () => {
       // Process each chunk
       for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
         const chunk = chunks[chunkIndex];
-        const chunkProgress = 70 + (chunkIndex / chunks.length) * 25; // 70% to 95%
+        const baseProgress = 70 + (chunkIndex / chunks.length) * 25; // 70% to 95%
 
+        // Show progress at start of chunk
         setProcessingProgress({
-          current: Math.round(chunkProgress),
+          current: Math.round(baseProgress),
           total: 100,
           stage: `Saving batch ${chunkIndex + 1}/${chunks.length} (${
             processedCount + chunk.length
@@ -351,10 +352,30 @@ const PayrollProcessingPage: React.FC = () => {
         });
 
         try {
+          // Show mid-chunk progress during database operation
+          const midProgress = baseProgress + (25 / chunks.length) * 0.5;
+          setProcessingProgress({
+            current: Math.round(midProgress),
+            total: 100,
+            stage: `Processing batch ${chunkIndex + 1}/${
+              chunks.length
+            } - saving to database...`,
+          });
+
           const chunkResponse = await saveEmployeePayrollsBatch(
             payroll.id,
             chunk
           );
+
+          // Show completion progress for this chunk
+          const completeProgress = 70 + ((chunkIndex + 1) / chunks.length) * 25;
+          setProcessingProgress({
+            current: Math.round(completeProgress),
+            total: 100,
+            stage: `Batch ${chunkIndex + 1}/${chunks.length} completed - ${
+              processedCount + chunk.length
+            }/${employeePayrolls.length} employees processed`,
+          });
 
           // Collect results from this chunk
           if (chunkResponse.results) {
