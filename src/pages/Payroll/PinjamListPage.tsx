@@ -22,7 +22,11 @@ import { getMonthName } from "../../utils/payroll/payrollUtils";
 import PinjamFormModal from "../../components/Payroll/PinjamFormModal";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
-import { generatePinjamPDF, PinjamPDFData, PinjamEmployee } from "../../utils/payroll/PinjamPDF";
+import {
+  generatePinjamPDF,
+  PinjamPDFData,
+  PinjamEmployee,
+} from "../../utils/payroll/PinjamPDF";
 
 interface PinjamRecord {
   id: number;
@@ -79,9 +83,11 @@ const PinjamListPage: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<PinjamRecord | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
+
   // Selection state
-  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(
+    new Set()
+  );
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Filters
@@ -118,7 +124,7 @@ const PinjamListPage: React.FC = () => {
       const response = await api.get(
         `/api/pinjam-records/dashboard?year=${currentYear}&month=${currentMonth}`
       );
-      
+
       // Set all state from single response
       setPinjamRecords(response.pinjamRecords || []);
       setPinjamSummary(response.pinjamSummary || []);
@@ -131,7 +137,6 @@ const PinjamListPage: React.FC = () => {
       setIsLoading(false);
     }
   };
-
 
   const handleEdit = (record: PinjamRecord) => {
     setEditingRecord(record);
@@ -241,15 +246,19 @@ const PinjamListPage: React.FC = () => {
 
   const handleSelectAll = (isSelected: boolean) => {
     if (isSelected) {
-      const allEmployeeIds = new Set(employeeData.map(emp => emp.employee_id));
+      const allEmployeeIds = new Set(
+        employeeData.map((emp) => emp.employee_id)
+      );
       setSelectedEmployees(allEmployeeIds);
     } else {
       setSelectedEmployees(new Set());
     }
   };
 
-  const isAllSelected = employeeData.length > 0 && selectedEmployees.size === employeeData.length;
-  const isPartiallySelected = selectedEmployees.size > 0 && selectedEmployees.size < employeeData.length;
+  const isAllSelected =
+    employeeData.length > 0 && selectedEmployees.size === employeeData.length;
+  const isPartiallySelected =
+    selectedEmployees.size > 0 && selectedEmployees.size < employeeData.length;
 
   // PDF generation function
   const generatePDFForSelected = async (action: "download" | "print") => {
@@ -260,27 +269,31 @@ const PinjamListPage: React.FC = () => {
 
     setIsGeneratingPDF(true);
     try {
-      const selectedEmployeeData = employeeData.filter(emp => 
+      const selectedEmployeeData = employeeData.filter((emp) =>
         selectedEmployees.has(emp.employee_id)
       );
 
-      const pinjamEmployees: PinjamEmployee[] = selectedEmployeeData.map(emp => ({
-        employee_id: emp.employee_id,
-        employee_name: emp.employee_name,
-        midMonthPay: emp.midMonthPay,
-        netPay: emp.netPay,
-        midMonthPinjam: emp.midMonthPinjam,
-        midMonthPinjamDetails: emp.midMonthPinjamDetails,
-        monthlyPinjam: emp.monthlyPinjam,
-        monthlyPinjamDetails: emp.monthlyPinjamDetails,
-        gajiGenap: emp.gajiGenap,
-      }));
+      const pinjamEmployees: PinjamEmployee[] = selectedEmployeeData.map(
+        (emp) => ({
+          employee_id: emp.employee_id,
+          employee_name: emp.employee_name,
+          midMonthPay: emp.midMonthPay,
+          netPay: emp.netPay,
+          midMonthPinjam: emp.midMonthPinjam,
+          midMonthPinjamDetails: emp.midMonthPinjamDetails,
+          monthlyPinjam: emp.monthlyPinjam,
+          monthlyPinjamDetails: emp.monthlyPinjamDetails,
+          gajiGenap: emp.gajiGenap,
+        })
+      );
 
       const selectedTotalMidMonth = selectedEmployeeData.reduce(
-        (sum, emp) => sum + emp.midMonthPinjam, 0
+        (sum, emp) => sum + emp.midMonthPinjam,
+        0
       );
       const selectedTotalMonthly = selectedEmployeeData.reduce(
-        (sum, emp) => sum + emp.monthlyPinjam, 0
+        (sum, emp) => sum + emp.monthlyPinjam,
+        0
       );
 
       const pdfData: PinjamPDFData = {
@@ -292,8 +305,9 @@ const PinjamListPage: React.FC = () => {
       };
 
       await generatePinjamPDF(pdfData, action);
-      
-      const actionText = action === "download" ? "downloaded" : "sent to printer";
+
+      const actionText =
+        action === "download" ? "downloaded" : "sent to printer";
       toast.success(`Pinjam summary ${actionText} successfully`);
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -389,23 +403,17 @@ const PinjamListPage: React.FC = () => {
 
       {/* Selection Controls */}
       {employeeData.length > 0 && (
-        <div className="bg-white rounded-lg cursor-pointer border border-default-200 shadow-sm p-4"
-              onClick={() => handleSelectAll(!isAllSelected)}>
+        <div
+          className="bg-white rounded-lg cursor-pointer border border-default-200 shadow-sm p-4"
+          onClick={() => handleSelectAll(!isAllSelected)}
+        >
           <div className="flex items-center justify-between">
-            <div 
-              className="flex items-center space-x-4 flex-1"
-            >
+            <div className="flex items-center space-x-4 flex-1">
               <div className="flex items-center space-x-2">
                 {isAllSelected ? (
-                  <IconSquareCheckFilled
-                    className="text-blue-600"
-                    size={20}
-                  />
+                  <IconSquareCheckFilled className="text-blue-600" size={20} />
                 ) : isPartiallySelected ? (
-                  <IconSquareMinusFilled
-                    className="text-blue-600"
-                    size={20}
-                  />
+                  <IconSquareMinusFilled className="text-blue-600" size={20} />
                 ) : (
                   <IconSquare
                     className="text-default-400 group-hover:text-blue-500 transition-colors"
@@ -418,7 +426,8 @@ const PinjamListPage: React.FC = () => {
               </div>
               {selectedEmployees.size > 0 && (
                 <span className="text-sm text-sky-600 font-medium">
-                  {selectedEmployees.size} employee{selectedEmployees.size > 1 ? 's' : ''} selected
+                  {selectedEmployees.size} employee
+                  {selectedEmployees.size > 1 ? "s" : ""} selected
                 </span>
               )}
             </div>
@@ -457,12 +466,14 @@ const PinjamListPage: React.FC = () => {
           >
             {employeeData.map((employee) => {
               const isSelected = selectedEmployees.has(employee.employee_id);
-              
+
               const handleCardClick = (e: React.MouseEvent) => {
                 // Prevent navigation if clicking specifically on the checkbox icon/wrapper
                 // OR the header section itself (which now handles selection)
                 if (
-                  (e.target as HTMLElement).closest(".employee-card-select-action") ||
+                  (e.target as HTMLElement).closest(
+                    ".employee-card-select-action"
+                  ) ||
                   (e.target as HTMLElement).closest(".employee-card-header")
                 ) {
                   return;
@@ -473,7 +484,11 @@ const PinjamListPage: React.FC = () => {
               const handleHeaderClick = (e: React.MouseEvent) => {
                 // If the click was directly on the checkbox icon area within the header,
                 // let its specific handler manage it (avoids double toggling).
-                if ((e.target as HTMLElement).closest(".employee-card-select-action")) {
+                if (
+                  (e.target as HTMLElement).closest(
+                    ".employee-card-select-action"
+                  )
+                ) {
                   return;
                 }
                 e.stopPropagation(); // Prevent card navigation click
@@ -495,42 +510,42 @@ const PinjamListPage: React.FC = () => {
                   } border-default-200 p-4 space-y-3`}
                   onClick={handleCardClick}
                 >
-                {/* Employee header - Now clickable for selection */}
-                <div 
-                  className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 -mt-4 px-4 py-3 rounded-t-lg cursor-pointer"
-                  onClick={handleHeaderClick}
-                >
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-default-800 truncate">
-                      {employee.employee_name}
-                    </h3>
-                    <p className="text-sm text-default-500">
-                      {employee.employee_id}
-                    </p>
-                  </div>
-                  
-                  {/* Selection Checkbox Area - Still clickable individually */}
+                  {/* Employee header - Now clickable for selection */}
                   <div
-                    className="employee-card-select-action flex-shrink-0 z-0"
-                    onClick={handleSelectIconClick}
+                    className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 -mt-4 px-4 py-3 rounded-t-lg cursor-pointer"
+                    onClick={handleHeaderClick}
                   >
-                    {isSelected ? (
-                      <IconSquareCheckFilled
-                        className="text-blue-600 cursor-pointer"
-                        size={22}
-                      />
-                    ) : (
-                      <IconSquare
-                        className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer"
-                        size={22}
-                      />
-                    )}
-                  </div>
-                </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-default-800 truncate">
+                        {employee.employee_name}
+                      </h3>
+                      <p className="text-sm text-default-500">
+                        {employee.employee_id}
+                      </p>
+                    </div>
 
-                {/* Body - Horizontal layout for content sections */}
-                <div className="space-y-4">
-                  <div className="flex gap-6 divide-x divide-default-200">
+                    {/* Selection Checkbox Area - Still clickable individually */}
+                    <div
+                      className="employee-card-select-action flex-shrink-0 z-0"
+                      onClick={handleSelectIconClick}
+                    >
+                      {isSelected ? (
+                        <IconSquareCheckFilled
+                          className="text-blue-600 cursor-pointer"
+                          size={22}
+                        />
+                      ) : (
+                        <IconSquare
+                          className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer"
+                          size={22}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Body - Horizontal layout for content sections */}
+                  <div className="space-y-4">
+                    <div className="flex gap-6 divide-x divide-default-200">
                       {/* Mid-month Pay Section */}
                       {employee.midMonthPinjam > 0 && (
                         <div className="flex-1 min-w-0 pr-6">
@@ -551,7 +566,10 @@ const PinjamListPage: React.FC = () => {
                               <div className="space-y-1 text-sm text-default-600">
                                 {employee.midMonthPinjamDetails.map(
                                   (detail, index) => (
-                                    <div key={index} className="flex items-start">
+                                    <div
+                                      key={index}
+                                      className="flex items-start"
+                                    >
                                       <span className="text-default-400 mr-2 mt-0.5">
                                         •
                                       </span>
@@ -606,7 +624,10 @@ const PinjamListPage: React.FC = () => {
                               <div className="space-y-1 text-sm text-default-600">
                                 {employee.monthlyPinjamDetails.map(
                                   (detail, index) => (
-                                    <div key={index} className="flex items-start">
+                                    <div
+                                      key={index}
+                                      className="flex items-start"
+                                    >
                                       <span className="text-default-400 mr-2 mt-0.5">
                                         •
                                       </span>
