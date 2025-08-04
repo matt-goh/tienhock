@@ -64,6 +64,7 @@ import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
+import StyledListbox from "../../components/StyledListbox";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -336,6 +337,7 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
   const [searchParams] = useSearchParams();
   const [initialParamsApplied, setInitialParamsApplied] = useState(false);
+  const [selectedSalesmanId, setSelectedSalesmanId] = useState<string | number>("");
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo((): InvoiceFilters => {
@@ -403,6 +405,17 @@ const InvoiceListPage: React.FC = () => {
   );
   // Fetch customer names based on IDs present in the currently loaded invoices
   const { customerNames } = useCustomerNames(customerIds);
+
+  // Salesman options for single selection dropdown
+  const salesmanOptions = useMemo(() => {
+    const options = [{ id: "", name: "All Salesmen" }];
+    return options.concat(
+      salesmen.map((s) => ({
+        id: s.id,
+        name: s.name || s.id,
+      }))
+    );
+  }, [salesmen]);
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -789,6 +802,31 @@ const InvoiceListPage: React.FC = () => {
     },
     [filters, handleApplyFilters] // Depends on current filters and the apply function
   );
+
+  // Single Salesman Selection Handler
+  const handleSalesmanChange = useCallback((salesmanId: string | number) => {
+    setSelectedSalesmanId(salesmanId);
+    
+    // Update filters to sync with the single selection
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      salespersonId: salesmanId === "" ? null : [salesmanId as string],
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Effect to sync selectedSalesmanId with filters when filters change externally
+  useEffect(() => {
+    const currentSalespersonIds = filters.salespersonId;
+    if (!currentSalespersonIds || currentSalespersonIds.length === 0) {
+      setSelectedSalesmanId("");
+    } else if (currentSalespersonIds.length === 1) {
+      setSelectedSalesmanId(currentSalespersonIds[0]);
+    } else {
+      // Multiple salesmen selected - show empty for single dropdown
+      setSelectedSalesmanId("");
+    }
+  }, [filters.salespersonId]);
 
   // Search Handlers - Update state locally, trigger fetch on blur/enter
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1639,6 +1677,16 @@ const InvoiceListPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Salesman Filter */}
+              <div className="w-full sm:w-40">
+                <StyledListbox
+                  value={selectedSalesmanId}
+                  onChange={handleSalesmanChange}
+                  options={salesmanOptions}
+                  placeholder="All Salesmen"
+                />
+              </div>
+
               {/* Filter Menu Button */}
               <div className="relative w-full sm:w-auto sm:flex-shrink-0">
                 <InvoiceFilterMenu
@@ -2011,7 +2059,6 @@ const InvoiceListPage: React.FC = () => {
             >
               Refresh
             </Button>
-            <InvoiceDailyPrintMenu filters={filters} size="sm" />
             <Button
               onClick={handleCreateNewInvoice}
               icon={IconPlus}
