@@ -389,11 +389,11 @@ const PinjamListPage: React.FC = () => {
 
       {/* Selection Controls */}
       {employeeData.length > 0 && (
-        <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
+        <div className="bg-white rounded-lg cursor-pointer border border-default-200 shadow-sm p-4"
+              onClick={() => handleSelectAll(!isAllSelected)}>
           <div className="flex items-center justify-between">
             <div 
-              className="flex items-center space-x-4 cursor-pointer flex-1"
-              onClick={() => handleSelectAll(!isAllSelected)}
+              className="flex items-center space-x-4 flex-1"
             >
               <div className="flex items-center space-x-2">
                 {isAllSelected ? (
