@@ -17,7 +17,6 @@ import {
   getInvoiceById,
   getPaymentsForInvoice,
   cancelInvoice,
-  createPayment,
   cancelPayment,
   syncCancellationStatus,
   confirmPayment,
@@ -1443,21 +1442,21 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
               </Button>
             )}
-          {invoiceData.einvoice_status === "pending" ||
-            (invoiceData.einvoice_status === "invalid" && (
-              <Button
-                variant="outline"
-                color="orange"
-                onClick={handleClearEInvoiceClick}
-                disabled={isClearingEInvoice || isCancelled}
-                title="Clear E-Invoice Pending Status"
-              >
-                <span className="flex items-center gap-1">
-                  <IconRefresh size={16} />
-                  {isClearingEInvoice ? "Clearing..." : "Clear Status"}
-                </span>
-              </Button>
-            ))}
+          {(invoiceData.einvoice_status === "pending" ||
+            invoiceData.einvoice_status === "invalid") && (
+            <Button
+              variant="outline"
+              color="orange"
+              onClick={handleClearEInvoiceClick}
+              disabled={isClearingEInvoice || isCancelled}
+              title="Clear E-Invoice Pending Status, only do this if the e-invoice is not valid at myinvois.hasil.gov.my and needs to be resubmitted"
+            >
+              <span className="flex items-center gap-1">
+                <IconRefresh size={16} />
+                {isClearingEInvoice ? "Clearing..." : "Clear Status"}
+              </span>
+            </Button>
+          )}
           {!isCancelled &&
             (invoiceData.einvoice_status === null ||
               invoiceData.einvoice_status === "invalid" ||
