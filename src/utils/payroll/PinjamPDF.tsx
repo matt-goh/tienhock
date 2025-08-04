@@ -55,7 +55,6 @@ const styles = StyleSheet.create({
   // Employee Card Styles
   employeeCard: {
     marginBottom: 12,
-    backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#d1d5db",
     borderRadius: 6,
@@ -63,7 +62,6 @@ const styles = StyleSheet.create({
     break: false,
   },
   employeeHeader: {
-    backgroundColor: "#f1f5f9",
     paddingHorizontal: 10,
     paddingTop: 10,
     paddingBottom: 6,
@@ -138,7 +136,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     paddingHorizontal: 6,
     paddingTop: 6,
-    backgroundColor: "#f9fafb",
     borderLeftWidth: 2,
     borderLeftColor: "#f59e0b",
   },
@@ -187,7 +184,6 @@ const styles = StyleSheet.create({
   noPinjamSection: {
     padding: 4,
     textAlign: "center",
-    backgroundColor: "#f9fafb",
     borderRadius: 4,
     minHeight: 100,
     justifyContent: "center",
