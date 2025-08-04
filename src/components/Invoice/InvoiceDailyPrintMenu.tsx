@@ -309,7 +309,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
             </div>
 
             {/* Salesmen Options */}
-            <div className="flex-grow overflow-y-auto py-2 max-h-80">
+            <div className="flex-grow overflow-y-auto py-1 max-h-80">
               <div className="px-1 space-y-1">
                 {salesmenOptions.map((salesman) => (
                   <div
