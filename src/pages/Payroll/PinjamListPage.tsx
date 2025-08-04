@@ -8,6 +8,11 @@ import {
   IconCash,
   IconRefresh,
   IconBuildingBank,
+  IconPrinter,
+  IconDownload,
+  IconSquare,
+  IconSquareCheckFilled,
+  IconSquareMinusFilled,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -17,6 +22,11 @@ import { getMonthName } from "../../utils/payroll/payrollUtils";
 import PinjamFormModal from "../../components/Payroll/PinjamFormModal";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import {
+  generatePinjamPDF,
+  PinjamPDFData,
+  PinjamEmployee,
+} from "../../utils/payroll/PinjamPDF";
 
 interface PinjamRecord {
   id: number;
@@ -74,6 +84,12 @@ const PinjamListPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  // Selection state
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(
+    new Set()
+  );
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -81,11 +97,12 @@ const PinjamListPage: React.FC = () => {
   // Generate year and month options
   const yearOptions = useMemo(() => {
     const years = [];
-    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
+    const thisYear = new Date().getFullYear();
+    for (let year = thisYear - 2; year <= thisYear + 1; year++) {
       years.push({ id: year, name: year.toString() });
     }
     return years;
-  }, [currentYear]);
+  }, []);
 
   const monthOptions = useMemo(
     () =>
@@ -104,82 +121,20 @@ const PinjamListPage: React.FC = () => {
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      await Promise.all([
-        fetchPinjamRecords(),
-        fetchPinjamSummary(),
-        fetchMidMonthPayrolls(),
-        fetchEmployeePayrolls(),
-      ]);
+      const response = await api.get(
+        `/api/pinjam-records/dashboard?year=${currentYear}&month=${currentMonth}`
+      );
+
+      // Set all state from single response
+      setPinjamRecords(response.pinjamRecords || []);
+      setPinjamSummary(response.pinjamSummary || []);
+      setMidMonthPayrolls(response.midMonthPayrolls || []);
+      setEmployeePayrolls(response.employeePayrolls || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchPinjamRecords = async () => {
-    try {
-      const response = await api.get(
-        `/api/pinjam-records?year=${currentYear}&month=${currentMonth}&limit=1000`
-      );
-      setPinjamRecords(response.records || []);
-    } catch (error) {
-      console.error("Error fetching pinjam records:", error);
-    }
-  };
-
-  const fetchPinjamSummary = async () => {
-    try {
-      const response = await api.get(
-        `/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
-      );
-      setPinjamSummary(response || []);
-    } catch (error) {
-      console.error("Error fetching pinjam summary:", error);
-    }
-  };
-
-  const fetchMidMonthPayrolls = async () => {
-    try {
-      const response = await api.get(
-        `/api/mid-month-payrolls?year=${currentYear}&month=${currentMonth}&limit=1000`
-      );
-      setMidMonthPayrolls(response.payrolls || []);
-    } catch (error) {
-      console.error("Error fetching mid-month payrolls:", error);
-    }
-  };
-
-  const fetchEmployeePayrolls = async () => {
-    try {
-      // Get all employee payrolls for the current year/month
-      const response = await api.get(
-        `/api/monthly-payrolls?year=${currentYear}&month=${currentMonth}&include_employee_payrolls=true`
-      );
-
-      // Extract employee payroll data from monthly payrolls
-      const allEmployeePayrolls: EmployeePayrollSummary[] = [];
-
-      if (response && response.length > 0) {
-        response.forEach((monthlyPayroll: any) => {
-          if (monthlyPayroll.employee_payrolls) {
-            monthlyPayroll.employee_payrolls.forEach((ep: any) => {
-              allEmployeePayrolls.push({
-                employee_id: ep.employee_id,
-                employee_name: ep.employee_name || ep.name,
-                net_pay: parseFloat(ep.net_pay || 0),
-              });
-            });
-          }
-        });
-      }
-
-      setEmployeePayrolls(allEmployeePayrolls);
-    } catch (error) {
-      console.error("Error fetching employee payrolls:", error);
-      // If the API doesn't work as expected, keep the empty array
-      setEmployeePayrolls([]);
     }
   };
 
@@ -220,55 +175,55 @@ const PinjamListPage: React.FC = () => {
     handleModalClose();
   };
 
-  // Create a combined view of employees with their mid-month pay and pinjam data
   const employeeData = useMemo(() => {
-    const employeeMap = new Map();
+    const employeeMap = new Map<
+      string,
+      {
+        employee_id: string;
+        employee_name: string;
+        midMonthPay: number;
+        netPay: number;
+        midMonthPinjam: number;
+        midMonthPinjamDetails: string[];
+        monthlyPinjam: number;
+        monthlyPinjamDetails: string[];
+      }
+    >();
 
-    // Add mid-month payroll data
-    midMonthPayrolls.forEach((payroll) => {
-      employeeMap.set(payroll.employee_id, {
-        employee_id: payroll.employee_id,
-        employee_name: payroll.employee_name,
-        midMonthPay: payroll.amount,
-        midMonthPinjam: 0,
-        midMonthPinjamDetails: [],
-        monthlyPinjam: 0,
-        monthlyPinjamDetails: [],
-        gajiGenap: 0, // This would come from employee payrolls
+    // 1. Iterate through pinjamSummary as the source of truth for employees with pinjam
+    pinjamSummary.forEach((pinjamRecord) => {
+      const employeeId = pinjamRecord.employee_id;
+
+      // Find corresponding pay data
+      const midMonthRecord = midMonthPayrolls.find(
+        (p) => p.employee_id === employeeId
+      );
+      const payrollRecord = employeePayrolls.find(
+        (p) => p.employee_id === employeeId
+      );
+
+      employeeMap.set(employeeId, {
+        employee_id: employeeId,
+        employee_name: pinjamRecord.employee_name,
+        midMonthPay: midMonthRecord?.amount || 0,
+        netPay: payrollRecord?.net_pay || 0,
+        midMonthPinjam: pinjamRecord.mid_month.total_amount || 0,
+        midMonthPinjamDetails: pinjamRecord.mid_month.details || [],
+        monthlyPinjam: pinjamRecord.monthly.total_amount || 0,
+        monthlyPinjamDetails: pinjamRecord.monthly.details || [],
       });
     });
 
-    // Add pinjam data
-    pinjamSummary.forEach((summary) => {
-      const existing = employeeMap.get(summary.employee_id) || {
-        employee_id: summary.employee_id,
-        employee_name: summary.employee_name,
-        midMonthPay: 0,
-        midMonthPinjam: 0,
-        midMonthPinjamDetails: [],
-        monthlyPinjam: 0,
-        monthlyPinjamDetails: [],
-        gajiGenap: 0,
-      };
-
-      existing.midMonthPinjam = summary.mid_month.total_amount;
-      existing.midMonthPinjamDetails = summary.mid_month.details;
-      existing.monthlyPinjam = summary.monthly.total_amount;
-      existing.monthlyPinjamDetails = summary.monthly.details;
-
-      employeeMap.set(summary.employee_id, existing);
-    });
-
-    return Array.from(employeeMap.values()).sort((a, b) =>
-      a.employee_name.localeCompare(b.employee_name)
-    );
-  }, [midMonthPayrolls, pinjamSummary]);
+    // 2. Convert map to array, calculate gajiGenap, and sort
+    return Array.from(employeeMap.values())
+      .map((emp) => ({
+        ...emp,
+        gajiGenap: emp.netPay - emp.midMonthPay,
+      }))
+      .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+  }, [midMonthPayrolls, pinjamSummary, employeePayrolls]);
 
   // Calculate totals
-  const totalMidMonthPay = employeeData.reduce(
-    (sum, emp) => sum + emp.midMonthPay,
-    0
-  );
   const totalMidMonthPinjam = employeeData.reduce(
     (sum, emp) => sum + emp.midMonthPinjam,
     0
@@ -277,6 +232,89 @@ const PinjamListPage: React.FC = () => {
     (sum, emp) => sum + emp.monthlyPinjam,
     0
   );
+
+  // Selection handlers
+  const handleEmployeeSelect = (employeeId: string, isSelected: boolean) => {
+    const newSelected = new Set(selectedEmployees);
+    if (isSelected) {
+      newSelected.add(employeeId);
+    } else {
+      newSelected.delete(employeeId);
+    }
+    setSelectedEmployees(newSelected);
+  };
+
+  const handleSelectAll = (isSelected: boolean) => {
+    if (isSelected) {
+      const allEmployeeIds = new Set(
+        employeeData.map((emp) => emp.employee_id)
+      );
+      setSelectedEmployees(allEmployeeIds);
+    } else {
+      setSelectedEmployees(new Set());
+    }
+  };
+
+  const isAllSelected =
+    employeeData.length > 0 && selectedEmployees.size === employeeData.length;
+  const isPartiallySelected =
+    selectedEmployees.size > 0 && selectedEmployees.size < employeeData.length;
+
+  // PDF generation function
+  const generatePDFForSelected = async (action: "download" | "print") => {
+    if (selectedEmployees.size === 0) {
+      toast.error("Please select at least one employee to generate PDF");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      const selectedEmployeeData = employeeData.filter((emp) =>
+        selectedEmployees.has(emp.employee_id)
+      );
+
+      const pinjamEmployees: PinjamEmployee[] = selectedEmployeeData.map(
+        (emp) => ({
+          employee_id: emp.employee_id,
+          employee_name: emp.employee_name,
+          midMonthPay: emp.midMonthPay,
+          netPay: emp.netPay,
+          midMonthPinjam: emp.midMonthPinjam,
+          midMonthPinjamDetails: emp.midMonthPinjamDetails,
+          monthlyPinjam: emp.monthlyPinjam,
+          monthlyPinjamDetails: emp.monthlyPinjamDetails,
+          gajiGenap: emp.gajiGenap,
+        })
+      );
+
+      const selectedTotalMidMonth = selectedEmployeeData.reduce(
+        (sum, emp) => sum + emp.midMonthPinjam,
+        0
+      );
+      const selectedTotalMonthly = selectedEmployeeData.reduce(
+        (sum, emp) => sum + emp.monthlyPinjam,
+        0
+      );
+
+      const pdfData: PinjamPDFData = {
+        employees: pinjamEmployees,
+        year: currentYear,
+        month: currentMonth,
+        totalMidMonthPinjam: selectedTotalMidMonth,
+        totalMonthlyPinjam: selectedTotalMonthly,
+      };
+
+      await generatePinjamPDF(pdfData, action);
+
+      const actionText = action === "download" ? "downloaded" : "generated";
+      toast.success(`Pinjam summary ${actionText} successfully`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -301,6 +339,26 @@ const PinjamListPage: React.FC = () => {
           >
             Refresh
           </Button>
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => generatePDFForSelected("print")}
+              icon={IconPrinter}
+              color="green"
+              variant="outline"
+              disabled={selectedEmployees.size === 0 || isGeneratingPDF}
+            >
+              Print ({selectedEmployees.size})
+            </Button>
+            <Button
+              onClick={() => generatePDFForSelected("download")}
+              icon={IconDownload}
+              color="blue"
+              variant="outline"
+              disabled={selectedEmployees.size === 0 || isGeneratingPDF}
+            >
+              Download ({selectedEmployees.size})
+            </Button>
+          </div>
           <Button
             onClick={() => setShowAddModal(true)}
             icon={IconPlus}
@@ -342,8 +400,53 @@ const PinjamListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Individual Employee Records - Two-column layout */}
-      <div className="space-y-4">
+      {/* Selection Controls */}
+      {employeeData.length > 0 && (
+        <div
+          className="bg-white rounded-lg cursor-pointer border border-default-200 shadow-sm p-4"
+          onClick={() => handleSelectAll(!isAllSelected)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 flex-1">
+              <div className="flex items-center space-x-2">
+                {isAllSelected ? (
+                  <IconSquareCheckFilled className="text-blue-600" size={20} />
+                ) : isPartiallySelected ? (
+                  <IconSquareMinusFilled className="text-blue-600" size={20} />
+                ) : (
+                  <IconSquare
+                    className="text-default-400 group-hover:text-blue-500 transition-colors"
+                    size={20}
+                  />
+                )}
+                <span className="text-sm font-medium text-default-700">
+                  Select All ({employeeData.length})
+                </span>
+              </div>
+              {selectedEmployees.size > 0 && (
+                <span className="text-sm text-sky-600 font-medium">
+                  {selectedEmployees.size} employee
+                  {selectedEmployees.size > 1 ? "s" : ""} selected
+                </span>
+              )}
+            </div>
+            {selectedEmployees.size > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedEmployees(new Set());
+                }}
+                className="text-sm text-default-500 hover:text-default-700"
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Individual Employee Records - Card Grid Layout */}
+      <div>
         {employeeData.length === 0 ? (
           <div className="bg-white rounded-lg border border-default-200 shadow-sm">
             <div className="text-center py-12 text-default-500">
@@ -353,152 +456,246 @@ const PinjamListPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          employeeData.map((employee) => (
-            <div
-              key={employee.employee_id}
-              className="bg-white rounded-lg border border-default-200 shadow-sm"
-            >
-              {/* Employee header */}
-              <div className="px-6 py-3 border-b border-default-200 bg-default-50">
-                <h3 className="text-lg font-medium text-default-800">
-                  {employee.employee_name} ({employee.employee_id})
-                </h3>
-              </div>
+          <div
+            className={`grid gap-4 ${
+              employeeData.length === 1
+                ? "grid-cols-1 max-w-2xl mx-auto"
+                : "grid-cols-1 lg:grid-cols-2"
+            }`}
+          >
+            {employeeData.map((employee) => {
+              const isSelected = selectedEmployees.has(employee.employee_id);
 
-              <div className="grid grid-cols-1 lg:grid-cols-2">
-                {/* Left Column - Mid-month Pay */}
-                <div className="p-4 border-r border-default-200">
-                  <div className="bg-blue-50 rounded p-3 mb-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-blue-700">
-                        Mid-month pay:
-                      </span>
-                      <span className="text-lg font-semibold text-blue-600">
-                        {formatCurrency(employee.midMonthPay)}
-                      </span>
+              const handleCardClick = (e: React.MouseEvent) => {
+                // Prevent navigation if clicking specifically on the checkbox icon/wrapper
+                // OR the header section itself (which now handles selection)
+                if (
+                  (e.target as HTMLElement).closest(
+                    ".employee-card-select-action"
+                  ) ||
+                  (e.target as HTMLElement).closest(".employee-card-header")
+                ) {
+                  return;
+                }
+                // Add any additional card click behavior here if needed
+              };
+
+              const handleHeaderClick = (e: React.MouseEvent) => {
+                // If the click was directly on the checkbox icon area within the header,
+                // let its specific handler manage it (avoids double toggling).
+                if (
+                  (e.target as HTMLElement).closest(
+                    ".employee-card-select-action"
+                  )
+                ) {
+                  return;
+                }
+                e.stopPropagation(); // Prevent card navigation click
+                handleEmployeeSelect(employee.employee_id, !isSelected); // Trigger selection
+              };
+
+              const handleSelectIconClick = (e: React.MouseEvent) => {
+                e.stopPropagation(); // Prevent card click handler AND header click handler
+                handleEmployeeSelect(employee.employee_id, !isSelected);
+              };
+
+              return (
+                <div
+                  key={employee.employee_id}
+                  className={`relative border rounded-lg overflow-hidden bg-white transition-shadow duration-200 group ${
+                    isSelected
+                      ? "shadow-md ring-2 ring-blue-500 ring-offset-1"
+                      : "shadow-sm hover:shadow-md"
+                  } border-default-200 p-4 space-y-3`}
+                  onClick={handleCardClick}
+                >
+                  {/* Employee header - Now clickable for selection */}
+                  <div
+                    className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 -mt-4 px-4 py-3 rounded-t-lg cursor-pointer"
+                    onClick={handleHeaderClick}
+                  >
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-default-800 truncate">
+                        {employee.employee_name}
+                      </h3>
+                      <p className="text-sm text-default-500">
+                        {employee.employee_id}
+                      </p>
+                    </div>
+
+                    {/* Selection Checkbox Area - Still clickable individually */}
+                    <div
+                      className="employee-card-select-action flex-shrink-0 z-0"
+                      onClick={handleSelectIconClick}
+                    >
+                      {isSelected ? (
+                        <IconSquareCheckFilled
+                          className="text-blue-600 cursor-pointer"
+                          size={22}
+                        />
+                      ) : (
+                        <IconSquare
+                          className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer"
+                          size={22}
+                        />
+                      )}
                     </div>
                   </div>
 
-                  {employee.midMonthPinjamDetails.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      <div className="text-sm font-medium text-default-700">
-                        Pinjam items:
-                      </div>
-                      {employee.midMonthPinjamDetails.map(
-                        (
-                          detail:
-                            | string
-                            | number
-                            | boolean
-                            | React.ReactElement<
-                                any,
-                                string | React.JSXElementConstructor<any>
-                              >
-                            | Iterable<React.ReactNode>
-                            | React.ReactPortal
-                            | null
-                            | undefined,
-                          index: React.Key | null | undefined
-                        ) => (
-                          <div
-                            key={index}
-                            className="text-sm text-default-600 pl-2"
-                          >
-                            {detail}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
+                  {/* Body - Horizontal layout for content sections */}
+                  <div className="space-y-4">
+                    <div className="flex gap-6 divide-x divide-default-200 h-full">
+                      {/* Mid-month Pay Section - Always visible */}
+                      <div className="flex-1 min-w-0 pr-6 flex flex-col">
+                        {employee.midMonthPinjam > 0 ? (
+                          <>
+                            <div className="mb-3">
+                              <p className="text-sm text-default-500 mb-1">
+                                Mid-Month Pay (Before Pinjam)
+                              </p>
+                              <p className="text-xl font-bold text-default-800">
+                                {formatCurrency(employee.midMonthPay)}
+                              </p>
+                            </div>
 
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-default-600">
-                        Total pinjam amount:
-                      </span>
-                      <span className="font-medium text-red-600">
-                        {formatCurrency(employee.midMonthPinjam)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-medium">
-                      <span className="text-default-700">Mid-month pay:</span>
-                      <span className="text-green-600">
-                        {formatCurrency(
-                          employee.midMonthPay - employee.midMonthPinjam
+                            {employee.midMonthPinjamDetails.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-sm font-medium text-default-700 mb-2">
+                                  Pinjam Items:
+                                </p>
+                                <div className="space-y-1 text-sm text-default-600">
+                                  {employee.midMonthPinjamDetails.map(
+                                    (detail, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-start"
+                                      >
+                                        <span className="text-default-400 mr-2 mt-0.5">
+                                          •
+                                        </span>
+                                        <span>{detail}</span>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="text-sm">
+                              <div className="flex justify-between mb-2">
+                                <span className="text-default-600">
+                                  Jumlah Pinjam:
+                                </span>
+                                <span className="font-semibold text-red-600">
+                                  - {formatCurrency(employee.midMonthPinjam)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between font-semibold">
+                                <span className="text-default-800">
+                                  Final Mid-month pay:
+                                </span>
+                                <span className="text-lg font-bold text-sky-600">
+                                  {formatCurrency(
+                                    employee.midMonthPay -
+                                      employee.midMonthPinjam
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center text-default-400 h-full">
+                            <div className="text-center">
+                              <IconCash className="mx-auto h-6 w-6 text-default-300 mb-2" />
+                              <p className="text-sm font-medium text-default-500">
+                                Mid-Month Pay
+                              </p>
+                              <p className="text-xs text-default-400 mt-1">
+                                No pinjam recorded
+                              </p>
+                            </div>
+                          </div>
                         )}
-                      </span>
+                      </div>
+
+                      {/* Monthly Pay Section - Always visible */}
+                      <div className="flex-1 min-w-0 pl-6 flex flex-col">
+                        {employee.monthlyPinjam > 0 ? (
+                          <>
+                            <div className="mb-3">
+                              <p className="text-sm text-default-500 mb-1">
+                                Gaji Genap (Before Pinjam)
+                              </p>
+                              <p className="text-xl font-bold text-default-800">
+                                {formatCurrency(employee.gajiGenap)}
+                              </p>
+                            </div>
+
+                            {employee.monthlyPinjamDetails.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-sm font-medium text-default-700 mb-2">
+                                  Pinjam Items:
+                                </p>
+                                <div className="space-y-1 text-sm text-default-600">
+                                  {employee.monthlyPinjamDetails.map(
+                                    (detail, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-start"
+                                      >
+                                        <span className="text-default-400 mr-2 mt-0.5">
+                                          •
+                                        </span>
+                                        <span>{detail}</span>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="text-sm">
+                              <div className="flex justify-between mb-2">
+                                <span className="text-default-600">
+                                  Jumlah Pinjam:
+                                </span>
+                                <span className="font-semibold text-red-600">
+                                  - {formatCurrency(employee.monthlyPinjam)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between font-semibold">
+                                <span className="text-default-800 flex items-center">
+                                  <IconBuildingBank className="w-4 h-4 mr-1.5" />
+                                  Jumlah Masuk Bank:
+                                </span>
+                                <span className="text-lg font-bold text-sky-600">
+                                  {formatCurrency(
+                                    employee.gajiGenap - employee.monthlyPinjam
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-center text-default-400 h-full">
+                            <div className="text-center">
+                              <IconBuildingBank className="mx-auto h-6 w-6 text-default-300 mb-2" />
+                              <p className="text-sm font-medium text-default-500">
+                                Monthly Pay
+                              </p>
+                              <p className="text-xs text-default-400 mt-1">
+                                No pinjam recorded
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                {/* Right Column - Monthly Pay */}
-                <div className="p-4">
-                  <div className="bg-green-50 rounded p-3 mb-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-green-700">
-                        Gaji Genap:
-                      </span>
-                      <span className="text-lg font-semibold text-green-600">
-                        {formatCurrency(employee.gajiGenap)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {employee.monthlyPinjamDetails.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      <div className="text-sm font-medium text-default-700">
-                        Pinjam items:
-                      </div>
-                      {employee.monthlyPinjamDetails.map(
-                        (
-                          detail:
-                            | string
-                            | number
-                            | boolean
-                            | React.ReactElement<
-                                any,
-                                string | React.JSXElementConstructor<any>
-                              >
-                            | Iterable<React.ReactNode>
-                            | React.ReactPortal
-                            | null
-                            | undefined,
-                          index: React.Key | null | undefined
-                        ) => (
-                          <div
-                            key={index}
-                            className="text-sm text-default-600 pl-2"
-                          >
-                            {detail}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
-
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-default-600">Jumlah Pinjam:</span>
-                      <span className="font-medium text-red-600">
-                        {formatCurrency(employee.monthlyPinjam)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between font-medium">
-                      <span className="text-default-700 flex items-center">
-                        <IconBuildingBank className="w-4 h-4 mr-1" />
-                        Jumlah Masuk Bank:
-                      </span>
-                      <span className="text-blue-600">
-                        {formatCurrency(
-                          employee.gajiGenap - employee.monthlyPinjam
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -565,7 +762,7 @@ const PinjamListPage: React.FC = () => {
                           : "Monthly"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-800">
                       {formatCurrency(record.amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">

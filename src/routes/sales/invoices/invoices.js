@@ -3,6 +3,160 @@ import { Router } from "express";
 import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 
+// Map to track pending invoices with their timeout handlers
+const pendingInvoiceTimeouts = new Map();
+
+/**
+ * Schedule automatic e-invoice status check after 5 minutes for pending invoices
+ * @param {string} invoiceId - The invoice ID to check
+ * @param {object} pool - Database connection pool
+ * @param {object} apiClient - E-invoice API client
+ */
+const schedulePendingInvoiceCheck = (invoiceId, pool, apiClient) => {
+  // Clear existing timeout if any
+  if (pendingInvoiceTimeouts.has(invoiceId)) {
+    clearTimeout(pendingInvoiceTimeouts.get(invoiceId));
+  }
+
+  // Schedule new check after 5 minutes (300,000 ms)
+  const timeoutId = setTimeout(async () => {
+    try {
+      await checkAndUpdatePendingInvoice(invoiceId, pool, apiClient);
+    } catch (error) {
+      console.error(`Error in scheduled pending invoice check for ${invoiceId}:`, error);
+    } finally {
+      // Remove from tracking map
+      pendingInvoiceTimeouts.delete(invoiceId);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+
+  pendingInvoiceTimeouts.set(invoiceId, timeoutId);
+  console.log(`Scheduled pending invoice check for ${invoiceId} in 5 minutes`);
+};
+
+/**
+ * Check and update a pending e-invoice status
+ * @param {string} invoiceId - The invoice ID to check
+ * @param {object} pool - Database connection pool
+ * @param {object} apiClient - E-invoice API client
+ */
+const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Get current invoice status
+    const invoiceQuery = `
+      SELECT id, uuid, einvoice_status, submission_uid, long_id
+      FROM invoices 
+      WHERE id = $1 AND einvoice_status = 'pending' AND uuid IS NOT NULL
+    `;
+    const invoiceResult = await client.query(invoiceQuery, [invoiceId]);
+
+    if (invoiceResult.rows.length === 0) {
+      console.log(`Invoice ${invoiceId} is no longer pending or doesn't exist`);
+      return;
+    }
+
+    const invoice = invoiceResult.rows[0];
+    console.log(`Checking pending invoice ${invoiceId} with UUID ${invoice.uuid}`);
+
+    // Call MyInvois API to check current status
+    const documentDetails = await apiClient.makeApiCall(
+      "GET",
+      `/api/v1.0/documents/${invoice.uuid}/details`
+    );
+
+    let newStatus = "pending"; // Default to keep current status
+    let longId = null;
+    let datetimeValidated = null;
+
+    // Determine new status based on response
+    if (documentDetails.longId) {
+      newStatus = "valid";
+      longId = documentDetails.longId;
+      datetimeValidated = documentDetails.dateTimeValidated ? new Date(documentDetails.dateTimeValidated) : null;
+    } else if (
+      documentDetails.status === "Invalid" ||
+      documentDetails.status === "Rejected" ||
+      documentDetails.status === "Cancelled"
+    ) {
+      newStatus = "invalid";
+    }
+
+    // Update in database if status changed
+    if (newStatus !== "pending") {
+      const updateQuery = `
+        UPDATE invoices 
+        SET einvoice_status = $1, 
+            long_id = $2, 
+            datetime_validated = $3
+        WHERE id = $4
+      `;
+      
+      await client.query(updateQuery, [
+        newStatus,
+        longId,
+        datetimeValidated,
+        invoiceId
+      ]);
+
+      await client.query("COMMIT");
+      console.log(`Updated invoice ${invoiceId} status from pending to ${newStatus}`);
+    } else {
+      await client.query("ROLLBACK");
+      console.log(`Invoice ${invoiceId} status remains pending`);
+    }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`Error checking pending invoice ${invoiceId}:`, error);
+    
+    // If invoice is invalid due to API error, clear the e-invoice status
+    if (error.status === 404 || error.message?.includes('not found')) {
+      try {
+        await client.query("BEGIN");
+        const clearQuery = `
+          UPDATE invoices 
+          SET einvoice_status = NULL, 
+              uuid = NULL, 
+              submission_uid = NULL, 
+              long_id = NULL, 
+              datetime_validated = NULL
+          WHERE id = $1
+        `;
+        await client.query(clearQuery, [invoiceId]);
+        await client.query("COMMIT");
+        console.log(`Cleared e-invoice status for invoice ${invoiceId} due to API error`);
+      } catch (clearError) {
+        await client.query("ROLLBACK");
+        console.error(`Failed to clear e-invoice status for invoice ${invoiceId}:`, clearError);
+      }
+    }
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Detect when an invoice is marked as pending and schedule auto-update
+ * @param {string} invoiceId - The invoice ID
+ * @param {string} newStatus - The new e-invoice status
+ * @param {object} pool - Database connection pool
+ * @param {object} apiClient - E-invoice API client
+ */
+const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
+  if (newStatus === 'pending') {
+    schedulePendingInvoiceCheck(invoiceId, pool, apiClient);
+  } else {
+    // Clear any existing timeout if status is no longer pending
+    if (pendingInvoiceTimeouts.has(invoiceId)) {
+      clearTimeout(pendingInvoiceTimeouts.get(invoiceId));
+      pendingInvoiceTimeouts.delete(invoiceId);
+      console.log(`Cleared pending check timeout for invoice ${invoiceId}`);
+    }
+  }
+};
+
 const fetchCustomerData = async (pool, customerId) => {
   try {
     const query = `
@@ -60,6 +214,45 @@ export default function (pool, config) {
   const router = Router();
 
   const apiClient = EInvoiceApiClientFactory.getInstance(config);
+
+  // Initialize automatic checks for existing pending invoices on server start
+  const initializePendingInvoiceChecks = async () => {
+    try {
+      const pendingQuery = `
+        SELECT id, uuid, createddate
+        FROM invoices 
+        WHERE einvoice_status = 'pending' AND uuid IS NOT NULL
+      `;
+      const pendingResult = await pool.query(pendingQuery);
+      
+      for (const invoice of pendingResult.rows) {
+        const createdTime = parseInt(invoice.createddate);
+        const currentTime = Date.now();
+        const ageMinutes = (currentTime - createdTime) / (1000 * 60);
+        
+        // If invoice is older than 5 minutes, check immediately
+        // Otherwise, schedule check for the remaining time
+        if (ageMinutes >= 5) {
+          // Check immediately
+          setTimeout(() => {
+            checkAndUpdatePendingInvoice(invoice.id, pool, apiClient)
+              .catch(error => console.error(`Error in initialization check for ${invoice.id}:`, error));
+          }, 1000); // Small delay to avoid overwhelming the API
+        } else {
+          // Schedule for remaining time
+          const remainingMs = (5 * 60 * 1000) - (ageMinutes * 60 * 1000);
+          schedulePendingInvoiceCheck(invoice.id, pool, apiClient);
+        }
+      }
+      
+      console.log(`Initialized automatic checks for ${pendingResult.rows.length} pending invoices`);
+    } catch (error) {
+      console.error('Error initializing pending invoice checks:', error);
+    }
+  };
+  
+  // Initialize on server start
+  initializePendingInvoiceChecks();
 
   // Customer data cache
   const customerCache = new Map();
@@ -2188,6 +2381,11 @@ export default function (pool, config) {
                     status,
                     doc.internalId,
                   ]);
+                  
+                  // Schedule automatic check for pending invoices
+                  if (status === 'pending') {
+                    handleEInvoiceStatusChange(doc.internalId, status, pool, apiClient);
+                  }
                 } catch (updateError) {
                   einvoiceUpdateErrors.push({
                     invoiceId: doc.internalId,
@@ -3581,6 +3779,148 @@ export default function (pool, config) {
         .json({ message: error.message || "Error updating date/time" });
     } finally {
       client.release();
+    }
+  });
+
+  // POST /api/invoices/check-pending - Manually trigger pending invoice status checks
+  router.post("/check-pending", async (req, res) => {
+    try {
+      const { invoiceIds } = req.body;
+      
+      if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+        return res.status(400).json({
+          message: "Invoice IDs array is required"
+        });
+      }
+
+      const results = {
+        checked: [],
+        errors: [],
+        notFound: []
+      };
+
+      // Process each invoice ID
+      for (const invoiceId of invoiceIds) {
+        try {
+          // Check if invoice exists and is pending
+          const invoiceQuery = `
+            SELECT id, uuid, einvoice_status
+            FROM invoices 
+            WHERE id = $1 AND einvoice_status = 'pending' AND uuid IS NOT NULL
+          `;
+          const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
+
+          if (invoiceResult.rows.length === 0) {
+            results.notFound.push({
+              invoiceId,
+              reason: "Invoice not found or not in pending status"
+            });
+            continue;
+          }
+
+          // Trigger the check immediately
+          await checkAndUpdatePendingInvoice(invoiceId, pool, apiClient);
+          
+          results.checked.push({
+            invoiceId,
+            message: "Status check completed"
+          });
+        } catch (error) {
+          console.error(`Error checking invoice ${invoiceId}:`, error);
+          results.errors.push({
+            invoiceId,
+            error: error.message
+          });
+        }
+      }
+
+      res.json({
+        message: "Pending invoice checks completed",
+        results
+      });
+    } catch (error) {
+      console.error("Error in check-pending endpoint:", error);
+      res.status(500).json({
+        message: "Error checking pending invoices",
+        error: error.message
+      });
+    }
+  });
+
+  // GET /api/invoices/pending-status - Get all pending invoices and their scheduled check status
+  router.get("/pending-status", async (req, res) => {
+    try {
+      // Get all pending invoices from database
+      const pendingQuery = `
+        SELECT id, uuid, einvoice_status, datetime_validated, 
+               EXTRACT(EPOCH FROM NOW()) * 1000 - CAST(createddate AS bigint) as age_ms
+        FROM invoices 
+        WHERE einvoice_status = 'pending' AND uuid IS NOT NULL
+        ORDER BY createddate DESC
+      `;
+      const pendingResult = await pool.query(pendingQuery);
+      
+      const pendingInvoices = pendingResult.rows.map(invoice => ({
+        id: invoice.id,
+        uuid: invoice.uuid,
+        einvoice_status: invoice.einvoice_status,
+        datetime_validated: invoice.datetime_validated,
+        age_minutes: Math.floor(invoice.age_ms / (1000 * 60)),
+        has_scheduled_check: pendingInvoiceTimeouts.has(invoice.id),
+        scheduled_at: pendingInvoiceTimeouts.has(invoice.id) ? 
+          "Within 5 minutes" : "Not scheduled"
+      }));
+
+      res.json({
+        message: "Pending invoices status retrieved",
+        total_pending: pendingInvoices.length,
+        total_scheduled: Array.from(pendingInvoiceTimeouts.keys()).length,
+        pending_invoices: pendingInvoices
+      });
+    } catch (error) {
+      console.error("Error getting pending status:", error);
+      res.status(500).json({
+        message: "Error retrieving pending invoices status",
+        error: error.message
+      });
+    }
+  });
+
+  // POST /api/invoices/schedule-pending-checks - Schedule checks for all pending invoices
+  router.post("/schedule-pending-checks", async (req, res) => {
+    try {
+      // Get all pending invoices
+      const pendingQuery = `
+        SELECT id, uuid
+        FROM invoices 
+        WHERE einvoice_status = 'pending' AND uuid IS NOT NULL
+      `;
+      const pendingResult = await pool.query(pendingQuery);
+      
+      let scheduled = 0;
+      let alreadyScheduled = 0;
+      
+      for (const invoice of pendingResult.rows) {
+        if (pendingInvoiceTimeouts.has(invoice.id)) {
+          alreadyScheduled++;
+        } else {
+          schedulePendingInvoiceCheck(invoice.id, pool, apiClient);
+          scheduled++;
+        }
+      }
+
+      res.json({
+        message: "Pending invoice checks scheduled",
+        total_pending: pendingResult.rows.length,
+        newly_scheduled: scheduled,
+        already_scheduled: alreadyScheduled
+      });
+    } catch (error) {
+      console.error("Error scheduling pending checks:", error);
+      res.status(500).json({
+        message: "Error scheduling pending invoice checks",
+        error: error.message
+      });
     }
   });
 

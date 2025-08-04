@@ -1025,18 +1025,7 @@ export default function (pool) {
 
       await client.query("COMMIT");
 
-      // Run recalculation for all successful payrolls in parallel
-      const recalculationPromises = results.map(async (result) => {
-        try {
-          await recalculateAndUpdatePayroll(pool, result.employee_payroll_id);
-        } catch (error) {
-          console.error(`Error recalculating payroll for employee ${result.employee_id}:`, error);
-          // Don't fail the entire batch for recalculation errors
-        }
-      });
-
-      await Promise.all(recalculationPromises);
-
+      // Send response immediately to unblock frontend
       res.status(201).json({
         message: `Batch processing completed: ${results.length} successful, ${errors.length} errors`,
         results,
@@ -1047,6 +1036,24 @@ export default function (pool) {
           errors: errors.length
         }
       });
+
+      // Run recalculation asynchronously after response is sent
+      if (results.length > 0) {
+        setImmediate(async () => {
+          console.log(`Starting async recalculation for ${results.length} payrolls...`);
+          const recalculationPromises = results.map(async (result) => {
+            try {
+              await recalculateAndUpdatePayroll(pool, result.employee_payroll_id);
+            } catch (error) {
+              console.error(`Error recalculating payroll for employee ${result.employee_id}:`, error);
+              // Don't fail the entire batch for recalculation errors
+            }
+          });
+
+          await Promise.all(recalculationPromises);
+          console.log(`Async recalculation completed for ${results.length} payrolls`);
+        });
+      }
 
     } catch (error) {
       await client.query("ROLLBACK");
