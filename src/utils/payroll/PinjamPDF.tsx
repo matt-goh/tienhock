@@ -100,7 +100,6 @@ const styles = StyleSheet.create({
 
   // Pay Section Styles
   paySection: {
-    backgroundColor: "#fefefe",
     minHeight: 100,
   },
   paySectionTitle: {
