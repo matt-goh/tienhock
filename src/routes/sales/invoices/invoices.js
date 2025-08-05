@@ -23,7 +23,10 @@ const schedulePendingInvoiceCheck = (invoiceId, pool, apiClient) => {
     try {
       await checkAndUpdatePendingInvoice(invoiceId, pool, apiClient);
     } catch (error) {
-      console.error(`Error in scheduled pending invoice check for ${invoiceId}:`, error);
+      console.error(
+        `Error in scheduled pending invoice check for ${invoiceId}:`,
+        error
+      );
     } finally {
       // Remove from tracking map
       pendingInvoiceTimeouts.delete(invoiceId);
@@ -59,7 +62,9 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
     }
 
     const invoice = invoiceResult.rows[0];
-    console.log(`Checking pending invoice ${invoiceId} with UUID ${invoice.uuid}`);
+    console.log(
+      `Checking pending invoice ${invoiceId} with UUID ${invoice.uuid}`
+    );
 
     // Call MyInvois API to check current status
     const documentDetails = await apiClient.makeApiCall(
@@ -75,7 +80,9 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
     if (documentDetails.longId) {
       newStatus = "valid";
       longId = documentDetails.longId;
-      datetimeValidated = documentDetails.dateTimeValidated ? new Date(documentDetails.dateTimeValidated) : null;
+      datetimeValidated = documentDetails.dateTimeValidated
+        ? new Date(documentDetails.dateTimeValidated)
+        : null;
     } else if (
       documentDetails.status === "Invalid" ||
       documentDetails.status === "Rejected" ||
@@ -93,16 +100,18 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
             datetime_validated = $3
         WHERE id = $4
       `;
-      
+
       await client.query(updateQuery, [
         newStatus,
         longId,
         datetimeValidated,
-        invoiceId
+        invoiceId,
       ]);
 
       await client.query("COMMIT");
-      console.log(`Updated invoice ${invoiceId} status from pending to ${newStatus}`);
+      console.log(
+        `Updated invoice ${invoiceId} status from pending to ${newStatus}`
+      );
     } else {
       await client.query("ROLLBACK");
       console.log(`Invoice ${invoiceId} status remains pending`);
@@ -110,9 +119,9 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error(`Error checking pending invoice ${invoiceId}:`, error);
-    
+
     // If invoice is invalid due to API error, clear the e-invoice status
-    if (error.status === 404 || error.message?.includes('not found')) {
+    if (error.status === 404 || error.message?.includes("not found")) {
       try {
         await client.query("BEGIN");
         const clearQuery = `
@@ -126,10 +135,15 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
         `;
         await client.query(clearQuery, [invoiceId]);
         await client.query("COMMIT");
-        console.log(`Cleared e-invoice status for invoice ${invoiceId} due to API error`);
+        console.log(
+          `Cleared e-invoice status for invoice ${invoiceId} due to API error`
+        );
       } catch (clearError) {
         await client.query("ROLLBACK");
-        console.error(`Failed to clear e-invoice status for invoice ${invoiceId}:`, clearError);
+        console.error(
+          `Failed to clear e-invoice status for invoice ${invoiceId}:`,
+          clearError
+        );
       }
     }
   } finally {
@@ -145,7 +159,7 @@ const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
  * @param {object} apiClient - E-invoice API client
  */
 const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
-  if (newStatus === 'pending') {
+  if (newStatus === "pending") {
     schedulePendingInvoiceCheck(invoiceId, pool, apiClient);
   } else {
     // Clear any existing timeout if status is no longer pending
@@ -224,33 +238,40 @@ export default function (pool, config) {
         WHERE einvoice_status = 'pending' AND uuid IS NOT NULL
       `;
       const pendingResult = await pool.query(pendingQuery);
-      
+
       for (const invoice of pendingResult.rows) {
         const createdTime = parseInt(invoice.createddate);
         const currentTime = Date.now();
         const ageMinutes = (currentTime - createdTime) / (1000 * 60);
-        
+
         // If invoice is older than 5 minutes, check immediately
         // Otherwise, schedule check for the remaining time
         if (ageMinutes >= 5) {
           // Check immediately
           setTimeout(() => {
-            checkAndUpdatePendingInvoice(invoice.id, pool, apiClient)
-              .catch(error => console.error(`Error in initialization check for ${invoice.id}:`, error));
+            checkAndUpdatePendingInvoice(invoice.id, pool, apiClient).catch(
+              (error) =>
+                console.error(
+                  `Error in initialization check for ${invoice.id}:`,
+                  error
+                )
+            );
           }, 1000); // Small delay to avoid overwhelming the API
         } else {
           // Schedule for remaining time
-          const remainingMs = (5 * 60 * 1000) - (ageMinutes * 60 * 1000);
+          const remainingMs = 5 * 60 * 1000 - ageMinutes * 60 * 1000;
           schedulePendingInvoiceCheck(invoice.id, pool, apiClient);
         }
       }
-      
-      console.log(`Initialized automatic checks for ${pendingResult.rows.length} pending invoices`);
+
+      console.log(
+        `Initialized automatic checks for ${pendingResult.rows.length} pending invoices`
+      );
     } catch (error) {
-      console.error('Error initializing pending invoice checks:', error);
+      console.error("Error initializing pending invoice checks:", error);
     }
   };
-  
+
   // Initialize on server start
   initializePendingInvoiceChecks();
 
@@ -1041,7 +1062,8 @@ export default function (pool, config) {
         const code = product.code;
         const quantity = parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
-        const total = (code === "OTH" || code === "LESS") ? price : quantity * price;
+        const total =
+          code === "OTH" || code === "LESS" ? price : quantity * price;
         const returnQty = parseInt(product.returnproduct || 0);
 
         // Group products by category
@@ -1505,8 +1527,8 @@ export default function (pool, config) {
         return res.status(400).json({ message: "Date range is required" });
       }
 
-      // Base query to get invoices and their products within date range
-      let query = `
+      // Query for main invoices
+      let mainQuery = `
       SELECT 
         i.id, i.salespersonid, i.invoice_status, i.paymenttype,
         od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, od.total,
@@ -1521,21 +1543,46 @@ export default function (pool, config) {
         AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
     `;
 
+      // Query for JellyPolly invoices
+      let jellypollyQuery = `
+      SELECT 
+        i.id, i.salespersonid, i.invoice_status, i.paymenttype,
+        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, od.total,
+        p.type
+      FROM jellypolly.invoices i
+      JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE 
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    `;
+
       const queryParams = [startDate, endDate];
       let paramCount = 3;
 
-      // Add optional salesman filter
+      // Add optional salesman filter to both queries
       if (salesman && salesman !== "All Salesmen") {
-        query += ` AND i.salespersonid = $${paramCount++}`;
+        mainQuery += ` AND i.salespersonid = $${paramCount}`;
+        jellypollyQuery += ` AND i.salespersonid = $${paramCount}`;
         queryParams.push(salesman);
+        paramCount++;
       }
 
-      const result = await pool.query(query, queryParams);
+      // Execute both queries in parallel
+      const [mainResult, jellypollyResult] = await Promise.all([
+        pool.query(mainQuery, queryParams),
+        pool.query(jellypollyQuery, queryParams),
+      ]);
+
+      // Combine results from both schemas
+      const allProducts = [...mainResult.rows, ...jellypollyResult.rows];
 
       // Process data - group by product
       const productMap = new Map();
 
-      result.rows.forEach((product) => {
+      allProducts.forEach((product) => {
         const productId = product.code;
         if (!productId) return;
 
@@ -1598,8 +1645,8 @@ export default function (pool, config) {
         return res.status(400).json({ message: "Date range is required" });
       }
 
-      // Query to get sales statistics grouped by salesperson
-      const query = `
+      // Query for main invoices
+      const mainQuery = `
       WITH invoice_totals AS (
         SELECT 
           i.id, i.salespersonid, i.paymenttype,
@@ -1622,21 +1669,86 @@ export default function (pool, config) {
         COUNT(CASE WHEN it.paymenttype = 'CASH' THEN 1 END) as cash_count
       FROM invoice_totals it
       GROUP BY it.salespersonid
-      ORDER BY total_sales DESC
     `;
 
-      const result = await pool.query(query, [startDate, endDate]);
+      // Query for JellyPolly invoices
+      const jellypollyQuery = `
+      WITH invoice_totals AS (
+        SELECT 
+          i.id, i.salespersonid, i.paymenttype,
+          SUM(od.quantity * od.price) as total_amount,
+          SUM(od.quantity) as total_quantity
+        FROM jellypolly.invoices i
+        JOIN jellypolly.order_details od ON i.id = od.invoiceid
+        WHERE 
+          CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+          AND i.invoice_status != 'cancelled'
+          AND od.issubtotal IS NOT TRUE
+        GROUP BY i.id, i.salespersonid, i.paymenttype
+      )
+      SELECT 
+        it.salespersonid as id,
+        SUM(it.total_amount) as total_sales,
+        SUM(it.total_quantity) as total_quantity,
+        COUNT(it.id) as sales_count,
+        COUNT(CASE WHEN it.paymenttype = 'INVOICE' THEN 1 END) as invoice_count,
+        COUNT(CASE WHEN it.paymenttype = 'CASH' THEN 1 END) as cash_count
+      FROM invoice_totals it
+      GROUP BY it.salespersonid
+    `;
 
-      res.json(
-        result.rows.map((row) => ({
-          id: row.id,
+      // Execute both queries in parallel
+      const [mainResult, jellypollyResult] = await Promise.all([
+        pool.query(mainQuery, [startDate, endDate]),
+        pool.query(jellypollyQuery, [startDate, endDate]),
+      ]);
+
+      // Combine and aggregate results by salesperson
+      const salesmanMap = new Map();
+
+      // Process main results
+      mainResult.rows.forEach((row) => {
+        const salesmanId = row.id;
+        salesmanMap.set(salesmanId, {
+          id: salesmanId,
           totalSales: parseFloat(row.total_sales) || 0,
           totalQuantity: parseInt(row.total_quantity) || 0,
           salesCount: parseInt(row.sales_count) || 0,
           invoiceCount: parseInt(row.invoice_count) || 0,
           cashCount: parseInt(row.cash_count) || 0,
-        }))
+        });
+      });
+
+      // Process JellyPolly results and combine with main results
+      jellypollyResult.rows.forEach((row) => {
+        const salesmanId = row.id;
+        if (salesmanMap.has(salesmanId)) {
+          // Add to existing salesman data
+          const existing = salesmanMap.get(salesmanId);
+          existing.totalSales += parseFloat(row.total_sales) || 0;
+          existing.totalQuantity += parseInt(row.total_quantity) || 0;
+          existing.salesCount += parseInt(row.sales_count) || 0;
+          existing.invoiceCount += parseInt(row.invoice_count) || 0;
+          existing.cashCount += parseInt(row.cash_count) || 0;
+        } else {
+          // Create new salesman data
+          salesmanMap.set(salesmanId, {
+            id: salesmanId,
+            totalSales: parseFloat(row.total_sales) || 0,
+            totalQuantity: parseInt(row.total_quantity) || 0,
+            salesCount: parseInt(row.sales_count) || 0,
+            invoiceCount: parseInt(row.invoice_count) || 0,
+            cashCount: parseInt(row.cash_count) || 0,
+          });
+        }
+      });
+
+      // Convert to array and sort by total sales
+      const salesmanData = Array.from(salesmanMap.values()).sort(
+        (a, b) => b.totalSales - a.totalSales
       );
+
+      res.json(salesmanData);
     } catch (error) {
       console.error("Error fetching salesman sales data:", error);
       res.status(500).json({
@@ -1665,12 +1777,12 @@ export default function (pool, config) {
       const idArray = ids ? ids.split(",") : [];
 
       // Different SQL logic based on type
-      let query;
+      let mainQuery, jellypollyQuery;
       const queryParams = [startDate, endDate];
 
       if (type === "products") {
-        // Product trends - include category level (BH, MEE) and individual products
-        query = `
+        // Product trends - main schema
+        mainQuery = `
         WITH monthly_data AS (
           SELECT 
             DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
@@ -1694,9 +1806,35 @@ export default function (pool, config) {
         FROM monthly_data
         ORDER BY month, product_id
       `;
+
+        // Product trends - JellyPolly schema
+        jellypollyQuery = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            od.code as product_id,
+            p.type as product_type,
+            SUM(od.quantity * od.price) as total_sales
+          FROM jellypolly.invoices i
+          JOIN jellypolly.order_details od ON i.id = od.invoiceid
+          LEFT JOIN products p ON od.code = p.id
+          WHERE 
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+          GROUP BY month, product_id, product_type
+        )
+        SELECT 
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          product_id,
+          product_type,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, product_id
+        `;
       } else {
-        // Salesman trends
-        query = `
+        // Salesman trends - main schema
+        mainQuery = `
         WITH monthly_data AS (
           SELECT 
             DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
@@ -1717,16 +1855,47 @@ export default function (pool, config) {
           total_sales
         FROM monthly_data
         ORDER BY month, salespersonid
-      `;
+        `;
+
+        // Salesman trends - JellyPolly schema
+        jellypollyQuery = `
+        WITH monthly_data AS (
+          SELECT 
+            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            i.salespersonid,
+            SUM(od.quantity * od.price) as total_sales
+          FROM jellypolly.invoices i
+          JOIN jellypolly.order_details od ON i.id = od.invoiceid
+          WHERE 
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+            ${idArray.length > 0 ? "AND i.salespersonid = ANY($3)" : ""}
+          GROUP BY month, i.salespersonid
+        )
+        SELECT 
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          salespersonid,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, salespersonid
+        `;
 
         if (idArray.length > 0) {
           queryParams.push(idArray);
         }
       }
 
-      const result = await pool.query(query, queryParams);
+      // Execute both queries in parallel
+      const [mainResult, jellypollyResult] = await Promise.all([
+        pool.query(mainQuery, queryParams),
+        pool.query(jellypollyQuery, queryParams),
+      ]);
 
-      // Transform data for frontend consumption
+      // Combine results from both schemas
+      const allTrendData = [...mainResult.rows, ...jellypollyResult.rows];
+
+      // Transform data for frontend consumption - need to aggregate data from both schemas
       const monthlyData = new Map();
 
       // For products, we also track by product type (BH, MEE)
@@ -1735,7 +1904,7 @@ export default function (pool, config) {
         idArray.forEach((id) => trackedItems.add(id));
       }
 
-      result.rows.forEach((row) => {
+      allTrendData.forEach((row) => {
         const monthYear = row.month_year;
 
         if (!monthlyData.has(monthYear)) {
@@ -1751,9 +1920,9 @@ export default function (pool, config) {
           const productType = row.product_type;
           const sales = parseFloat(row.total_sales) || 0;
 
-          // Track product ID and product type both when needed
+          // Track product ID and product type both when needed - aggregate if already exists
           if (trackedItems.has(productId)) {
-            monthData[productId] = sales;
+            monthData[productId] = (monthData[productId] || 0) + sales;
           }
 
           if (trackedItems.has(productType)) {
@@ -1761,9 +1930,10 @@ export default function (pool, config) {
             monthData[productType] = (monthData[productType] || 0) + sales;
           }
         } else {
-          // Salesman data - more straightforward
+          // Salesman data - aggregate if already exists
           const salesmanId = row.salespersonid;
-          monthData[salesmanId] = parseFloat(row.total_sales) || 0;
+          monthData[salesmanId] =
+            (monthData[salesmanId] || 0) + parseFloat(row.total_sales) || 0;
         }
       });
 
@@ -2381,10 +2551,15 @@ export default function (pool, config) {
                     status,
                     doc.internalId,
                   ]);
-                  
+
                   // Schedule automatic check for pending invoices
-                  if (status === 'pending') {
-                    handleEInvoiceStatusChange(doc.internalId, status, pool, apiClient);
+                  if (status === "pending") {
+                    handleEInvoiceStatusChange(
+                      doc.internalId,
+                      status,
+                      pool,
+                      apiClient
+                    );
                   }
                 } catch (updateError) {
                   einvoiceUpdateErrors.push({
@@ -3786,17 +3961,21 @@ export default function (pool, config) {
   router.post("/check-pending", async (req, res) => {
     try {
       const { invoiceIds } = req.body;
-      
-      if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+
+      if (
+        !invoiceIds ||
+        !Array.isArray(invoiceIds) ||
+        invoiceIds.length === 0
+      ) {
         return res.status(400).json({
-          message: "Invoice IDs array is required"
+          message: "Invoice IDs array is required",
         });
       }
 
       const results = {
         checked: [],
         errors: [],
-        notFound: []
+        notFound: [],
       };
 
       // Process each invoice ID
@@ -3813,36 +3992,36 @@ export default function (pool, config) {
           if (invoiceResult.rows.length === 0) {
             results.notFound.push({
               invoiceId,
-              reason: "Invoice not found or not in pending status"
+              reason: "Invoice not found or not in pending status",
             });
             continue;
           }
 
           // Trigger the check immediately
           await checkAndUpdatePendingInvoice(invoiceId, pool, apiClient);
-          
+
           results.checked.push({
             invoiceId,
-            message: "Status check completed"
+            message: "Status check completed",
           });
         } catch (error) {
           console.error(`Error checking invoice ${invoiceId}:`, error);
           results.errors.push({
             invoiceId,
-            error: error.message
+            error: error.message,
           });
         }
       }
 
       res.json({
         message: "Pending invoice checks completed",
-        results
+        results,
       });
     } catch (error) {
       console.error("Error in check-pending endpoint:", error);
       res.status(500).json({
         message: "Error checking pending invoices",
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -3859,29 +4038,30 @@ export default function (pool, config) {
         ORDER BY createddate DESC
       `;
       const pendingResult = await pool.query(pendingQuery);
-      
-      const pendingInvoices = pendingResult.rows.map(invoice => ({
+
+      const pendingInvoices = pendingResult.rows.map((invoice) => ({
         id: invoice.id,
         uuid: invoice.uuid,
         einvoice_status: invoice.einvoice_status,
         datetime_validated: invoice.datetime_validated,
         age_minutes: Math.floor(invoice.age_ms / (1000 * 60)),
         has_scheduled_check: pendingInvoiceTimeouts.has(invoice.id),
-        scheduled_at: pendingInvoiceTimeouts.has(invoice.id) ? 
-          "Within 5 minutes" : "Not scheduled"
+        scheduled_at: pendingInvoiceTimeouts.has(invoice.id)
+          ? "Within 5 minutes"
+          : "Not scheduled",
       }));
 
       res.json({
         message: "Pending invoices status retrieved",
         total_pending: pendingInvoices.length,
         total_scheduled: Array.from(pendingInvoiceTimeouts.keys()).length,
-        pending_invoices: pendingInvoices
+        pending_invoices: pendingInvoices,
       });
     } catch (error) {
       console.error("Error getting pending status:", error);
       res.status(500).json({
         message: "Error retrieving pending invoices status",
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -3896,10 +4076,10 @@ export default function (pool, config) {
         WHERE einvoice_status = 'pending' AND uuid IS NOT NULL
       `;
       const pendingResult = await pool.query(pendingQuery);
-      
+
       let scheduled = 0;
       let alreadyScheduled = 0;
-      
+
       for (const invoice of pendingResult.rows) {
         if (pendingInvoiceTimeouts.has(invoice.id)) {
           alreadyScheduled++;
@@ -3913,13 +4093,13 @@ export default function (pool, config) {
         message: "Pending invoice checks scheduled",
         total_pending: pendingResult.rows.length,
         newly_scheduled: scheduled,
-        already_scheduled: alreadyScheduled
+        already_scheduled: alreadyScheduled,
       });
     } catch (error) {
       console.error("Error scheduling pending checks:", error);
       res.status(500).json({
         message: "Error scheduling pending invoice checks",
-        error: error.message
+        error: error.message,
       });
     }
   });

@@ -188,6 +188,7 @@ const SalesByProductsPage: React.FC = () => {
     const options = [
       { id: "MEE", name: "Mee Products" },
       { id: "BH", name: "Bihun Products" },
+      { id: "JP", name: "JellyPolly Products" },
       { id: "OTH", name: "Other Products" },
     ];
 
@@ -231,9 +232,9 @@ const SalesByProductsPage: React.FC = () => {
   useEffect(() => {
     if (productOptions.length > 0) {
       // Take the first few products up to the maximum limit
-      // Start with categories (MEE, BH, OTH) if available
+      // Start with categories (MEE, BH, JP, OTH) if available
       const categoryOptions = productOptions
-        .filter((option) => ["MEE", "BH", "OTH"].includes(option.id))
+        .filter((option) => ["MEE", "BH", "JP", "OTH"].includes(option.id))
         .map((option) => option.id);
 
       // Take up to the limit
@@ -242,7 +243,7 @@ const SalesByProductsPage: React.FC = () => {
       // If we still have room, add some individual products
       if (initialSelection.length < maxChartProducts) {
         const individualProducts = productOptions
-          .filter((option) => !["MEE", "BH", "OTH"].includes(option.id))
+          .filter((option) => !["MEE", "BH", "JP", "OTH"].includes(option.id))
           .slice(0, maxChartProducts - initialSelection.length)
           .map((option) => option.id);
 
@@ -556,7 +557,8 @@ const SalesByProductsPage: React.FC = () => {
         bhProducts.push(product);
       } else if (product.type === "MEE") {
         meeProducts.push(product);
-      } else if (product.type === "OTH") {
+      } else if (product.type === "OTH" || product.type === "JP") {
+        // Include both OTH and JP products in the "Other Products" category
         othProducts.push(product);
       }
     });
@@ -614,7 +616,7 @@ const SalesByProductsPage: React.FC = () => {
 
     const bhTotal = bhProducts.reduce((sum, p) => sum + p.totalSales, 0);
     const meeTotal = meeProducts.reduce((sum, p) => sum + p.totalSales, 0);
-    const othTotal = othProducts.reduce((sum, p) => sum + p.totalSales, 0);
+    const othTotal = othProducts.reduce((sum, p) => sum + p.totalSales, 0); // Now includes both OTH and JP products
 
     return {
       categorySummary,
@@ -666,7 +668,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full pt-0 max-w-[90rem] mt-4 mx-auto space-y-6">
+    <div className="w-full pt-0 mt-4 space-y-4">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
@@ -1213,6 +1215,8 @@ const SalesByProductsPage: React.FC = () => {
                               ? "All Mee Products"
                               : key === "BH"
                               ? "All Bihun Products"
+                              : key === "JP"
+                              ? "All JellyPolly Products"
                               : key === "OTH"
                               ? "All Other Products"
                               : products.find((p) => p.id === key)
