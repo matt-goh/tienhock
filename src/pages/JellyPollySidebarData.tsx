@@ -10,8 +10,8 @@ import InvoiceListPage from "./JellyPolly/InvoiceListPage";
 import InvoiceFormPage from "./JellyPolly/InvoiceFormPage";
 import InvoiceDetailsPage from "./JellyPolly/InvoiceDetailsPage";
 
-// Sales related imports (to be created)
-import SalesSummaryPage from "./JellyPolly/SalesSummaryPage";
+// Sales related imports
+import SalesSummaryPage from "./Sales/SalesSummaryPage";
 import PaymentPage from "./JellyPolly/PaymentPage";
 
 // Accounting related imports (to be created)
