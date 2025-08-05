@@ -1,5 +1,5 @@
-// src/components/Payroll/AddCommissionModal.tsx
-import React, { useState, useMemo, Fragment } from "react";
+// src/components/Payroll/AddIncentiveModal.tsx
+import React, { useState, useMemo, Fragment, useEffect } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -15,38 +15,55 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
 
-interface CommissionEntry {
+type IncentiveType = "Commission" | "Bonus";
+
+interface IncentiveEntry {
   id: number; // For unique key in list
   employeeId: string | null;
   amount: string;
   description: string;
 }
 
-interface AddCommissionModalProps {
+interface AddIncentiveModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   currentYear: number;
   currentMonth: number;
+  incentiveType: IncentiveType;
 }
 
-const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
+const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
   currentYear,
   currentMonth,
+  incentiveType,
 }) => {
   const { staffs } = useStaffsCache();
   const { user } = useAuth();
-  const [commissionDate, setCommissionDate] = useState(
-    `${currentYear}-${currentMonth.toString().padStart(2, "0")}-01`
+  const [incentiveDate, setIncentiveDate] = useState(
+    new Date().toISOString().split("T")[0]
   );
-  const [entries, setEntries] = useState<CommissionEntry[]>([
-    { id: Date.now(), employeeId: null, amount: "", description: "Commission" },
-  ]);
+  const [entries, setEntries] = useState<IncentiveEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [staffQueries, setStaffQueries] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset state when modal opens
+      const initialEntry = {
+        id: Date.now(),
+        employeeId: null,
+        amount: "",
+        description: incentiveType,
+      };
+      setEntries([initialEntry]);
+      setStaffQueries({});
+      setIncentiveDate(new Date().toISOString().split("T")[0]);
+    }
+  }, [isOpen, incentiveType, currentYear, currentMonth]);
 
   const allStaffOptions = useMemo(
     () =>
@@ -59,7 +76,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
 
   const handleEntryChange = (
     index: number,
-    field: keyof CommissionEntry,
+    field: keyof IncentiveEntry,
     value: any
   ) => {
     const newEntries = [...entries];
@@ -72,10 +89,14 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
     return staffQueries[entryId] || "";
   };
 
-  const setStaffQuery = (entryId: number, query: React.SetStateAction<string>) => {
-    setStaffQueries(prev => ({
+  const setStaffQuery = (
+    entryId: number,
+    query: React.SetStateAction<string>
+  ) => {
+    setStaffQueries((prev) => ({
       ...prev,
-      [entryId]: typeof query === 'function' ? query(prev[entryId] || '') : query
+      [entryId]:
+        typeof query === "function" ? query(prev[entryId] || "") : query,
     }));
   };
 
@@ -86,7 +107,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
         id: Date.now(),
         employeeId: null,
         amount: "",
-        description: "Commission",
+        description: incentiveType,
       },
     ]);
   };
@@ -94,8 +115,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
   const removeEntryRow = (id: number) => {
     if (entries.length > 1) {
       setEntries(entries.filter((entry) => entry.id !== id));
-      // Clean up the staff query for this entry
-      setStaffQueries(prev => {
+      setStaffQueries((prev) => {
         const newQueries = { ...prev };
         delete newQueries[id];
         return newQueries;
@@ -109,7 +129,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
     );
     if (validEntries.length === 0) {
       toast.error(
-        "Please add at least one valid commission entry with staff, amount, and description."
+        `Please add at least one valid ${incentiveType.toLowerCase()} entry with staff, amount, and description.`
       );
       return;
     }
@@ -119,35 +139,28 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
     const promises = validEntries.map((entry) => {
       const payload = {
         employee_id: entry.employeeId,
-        commission_date: commissionDate,
+        commission_date: incentiveDate,
         amount: parseFloat(entry.amount),
         description: entry.description,
         created_by: user?.id,
       };
-      return api.post("/api/commissions", payload);
+      return api.post("/api/incentives", payload);
     });
 
     try {
       await Promise.all(promises);
       toast.success(
-        `${validEntries.length} commission record(s) saved successfully!`
+        `${
+          validEntries.length
+        } ${incentiveType.toLowerCase()} record(s) saved successfully!`
       );
-      setEntries([
-        {
-          id: Date.now(),
-          employeeId: null,
-          amount: "",
-          description: "Commission",
-        },
-      ]);
-      setStaffQueries({});
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error("Failed to save commissions:", error);
+      console.error(`Failed to save ${incentiveType}s:`, error);
       toast.error(
         error.response?.data?.message ||
-          "Failed to save one or more commissions."
+          `Failed to save one or more ${incentiveType.toLowerCase()}s.`
       );
     } finally {
       setIsSaving(false);
@@ -156,18 +169,6 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
 
   const handleClose = () => {
     if (!isSaving) {
-      setEntries([
-        {
-          id: Date.now(),
-          employeeId: null,
-          amount: "",
-          description: "Commission",
-        },
-      ]);
-      setStaffQueries({});
-      setCommissionDate(
-        `${currentYear}-${currentMonth.toString().padStart(2, "0")}-01`
-      );
       onClose();
     }
   };
@@ -204,18 +205,18 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800"
                   >
-                    Record Staff Commission
+                    Record Staff {incentiveType}
                   </DialogTitle>
                 </div>
 
                 <div className="px-6 py-4 max-h-[70vh]">
                   <div className="max-w-xs mb-4">
                     <FormInput
-                      name="commissionDate"
-                      label="Commission Date"
+                      name="incentiveDate"
+                      label={`${incentiveType} Date`}
                       type="date"
-                      value={commissionDate}
-                      onChange={(e) => setCommissionDate(e.target.value)}
+                      value={incentiveDate}
+                      onChange={(e) => setIncentiveDate(e.target.value)}
                       required
                     />
                   </div>
@@ -248,7 +249,9 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
                               }
                               options={allStaffOptions}
                               query={getStaffQuery(entry.id)}
-                              setQuery={(query: React.SetStateAction<string>) => setStaffQuery(entry.id, query)}
+                              setQuery={(query: React.SetStateAction<string>) =>
+                                setStaffQuery(entry.id, query)
+                              }
                               placeholder="Select Staff..."
                               mode="single"
                             />
@@ -324,7 +327,7 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
                         disabled={isSaving}
                         icon={IconDeviceFloppy}
                       >
-                        {isSaving ? "Saving..." : "Save Commissions"}
+                        {isSaving ? "Saving..." : `Save ${incentiveType}s`}
                       </Button>
                     </div>
                   </div>
@@ -338,4 +341,4 @@ const AddCommissionModal: React.FC<AddCommissionModalProps> = ({
   );
 };
 
-export default AddCommissionModal;
+export default AddIncentiveModal;

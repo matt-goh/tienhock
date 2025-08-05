@@ -1,4 +1,4 @@
-// src/components/Payroll/EditCommissionModal.tsx
+// src/components/Payroll/EditIncentiveModal.tsx
 import React, { useState, useEffect, Fragment } from "react";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { FormInput } from "../FormComponents";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 
-interface Commission {
+interface Incentive {
   id: number;
   employee_id: string;
   employee_name: string;
@@ -24,34 +24,34 @@ interface Commission {
   created_at: string;
 }
 
-interface EditCommissionModalProps {
+interface EditIncentiveModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  commission: Commission | null;
+  incentive: Incentive | null;
 }
 
-const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
+const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  commission,
+  incentive,
 }) => {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [commissionDate, setCommissionDate] = useState("");
+  const [incentiveDate, setIncentiveDate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (commission) {
-      setAmount(commission.amount.toString());
-      setDescription(commission.description);
-      setCommissionDate(commission.commission_date.split("T")[0]);
+    if (incentive) {
+      setAmount(incentive.amount.toString());
+      setDescription(incentive.description);
+      setIncentiveDate(incentive.commission_date.split("T")[0]);
     }
-  }, [commission]);
+  }, [incentive]);
 
   const handleSave = async () => {
-    if (!commission) return;
+    if (!incentive) return;
 
     if (!amount || parseFloat(amount) <= 0) {
       toast.error("Please enter a valid amount.");
@@ -66,19 +66,19 @@ const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
     setIsSaving(true);
 
     try {
-      await api.put(`/api/commissions/${commission.id}`, {
+      await api.put(`/api/incentives/${incentive.id}`, {
         amount: parseFloat(amount),
         description: description.trim(),
-        commission_date: commissionDate,
+        commission_date: incentiveDate,
       });
 
-      toast.success("Commission updated successfully!");
+      toast.success("Incentive updated successfully!");
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error("Failed to update commission:", error);
+      console.error("Failed to update incentive:", error);
       toast.error(
-        error.response?.data?.message || "Failed to update commission."
+        error.response?.data?.message || "Failed to update incentive."
       );
     } finally {
       setIsSaving(false);
@@ -91,7 +91,7 @@ const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
     }
   };
 
-  if (!commission) return null;
+  if (!incentive) return null;
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -125,22 +125,22 @@ const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800"
                   >
-                    Edit Commission
+                    Edit Incentive
                   </DialogTitle>
                   <p className="text-sm text-default-600 mt-1">
-                    Employee: {commission.employee_name} (
-                    {commission.employee_id})
+                    Employee: {incentive.employee_name} ({incentive.employee_id}
+                    )
                   </p>
                 </div>
 
                 <div className="px-6 py-4">
                   <div className="space-y-4">
                     <FormInput
-                      name="commissionDate"
-                      label="Commission Date"
+                      name="incentiveDate"
+                      label="Incentive Date"
                       type="date"
-                      value={commissionDate}
-                      onChange={(e) => setCommissionDate(e.target.value)}
+                      value={incentiveDate}
+                      onChange={(e) => setIncentiveDate(e.target.value)}
                       required
                     />
 
@@ -161,7 +161,7 @@ const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
                       type="text"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="e.g., Commission, bonus work"
+                      placeholder="e.g., Commission, Bonus"
                       required
                     />
                   </div>
@@ -180,7 +180,7 @@ const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
                       disabled={isSaving}
                       icon={IconDeviceFloppy}
                     >
-                      {isSaving ? "Updating..." : "Update Commission"}
+                      {isSaving ? "Updating..." : "Update Incentive"}
                     </Button>
                   </div>
                 </div>
@@ -193,4 +193,4 @@ const EditCommissionModal: React.FC<EditCommissionModalProps> = ({
   );
 };
 
-export default EditCommissionModal;
+export default EditIncentiveModal;
