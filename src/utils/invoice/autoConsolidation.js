@@ -87,27 +87,39 @@ export const checkAndProcessDueConsolidations = async (pool) => {
 
           if (existingResult.rows.length > 0) {
             const existingConsolidation = existingResult.rows[0];
-            const consolidatedInvoiceStatus = existingConsolidation.consolidated_invoice_status;
-            
+            const consolidatedInvoiceStatus =
+              existingConsolidation.consolidated_invoice_status;
+
             // If the consolidated invoice is not cancelled, skip this consolidation
-            if (consolidatedInvoiceStatus && consolidatedInvoiceStatus !== 'cancelled') {
+            if (
+              consolidatedInvoiceStatus &&
+              consolidatedInvoiceStatus !== "cancelled"
+            ) {
               console.log(
                 `[${now.toISOString()}] ${company} already has completed consolidation for ${
                   isInConsolidationWindow.targetYear
-                }-${isInConsolidationWindow.targetMonth + 1} (${existingConsolidation.consolidated_invoice_id}) with status: ${consolidatedInvoiceStatus}`
+                }-${isInConsolidationWindow.targetMonth + 1} (${
+                  existingConsolidation.consolidated_invoice_id
+                }) with status: ${consolidatedInvoiceStatus}`
               );
               continue;
             } else {
               // The consolidated invoice was cancelled or doesn't exist, reset the tracking to allow re-consolidation
               console.log(
-                `[${now.toISOString()}] ${company} has cancelled consolidated invoice ${existingConsolidation.consolidated_invoice_id}, resetting tracking to allow re-consolidation`
+                `[${now.toISOString()}] ${company} has cancelled consolidated invoice ${
+                  existingConsolidation.consolidated_invoice_id
+                }, resetting tracking to allow re-consolidation`
               );
-              
+
               await client.query(
                 `UPDATE consolidation_tracking 
                  SET status = 'reset', error = 'Previous consolidated invoice was cancelled', last_attempt = CURRENT_TIMESTAMP
                  WHERE company_id = $1 AND year = $2 AND month = $3`,
-                [company, isInConsolidationWindow.targetYear, isInConsolidationWindow.targetMonth]
+                [
+                  company,
+                  isInConsolidationWindow.targetYear,
+                  isInConsolidationWindow.targetMonth,
+                ]
               );
             }
           }
@@ -321,38 +333,56 @@ async function upsertConsolidationTracking(
  * Get eligible Tien Hock invoices that haven't been consolidated
  */
 async function getEligibleTienhockInvoices(client, month, year) {
-  const startOfMonth = new Date(Date.UTC(year, month, 1)).getTime().toString();
-  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
-    .getTime()
-    .toString();
+  // Use MYT (UTC+8) timezone like the manual modal does
+  const startDate = new Date(
+    `${year}-${String(month + 1).padStart(2, "0")}-01T00:00:00+08:00`
+  );
+  const endYear = month === 11 ? year + 1 : year;
+  const endMonth = month === 11 ? 0 : month + 1;
+  const endDate = new Date(
+    `${endYear}-${String(endMonth + 1).padStart(2, "0")}-01T00:00:00+08:00`
+  );
+
+  const startTimestamp = startDate.getTime().toString();
+  const endTimestamp = endDate.getTime().toString();
 
   const invoiceQuery = `
-    SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
+    SELECT 
+      i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+      i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.balance_due, i.invoice_status,
+      c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
     FROM invoices i
     JOIN customers c ON i.customerid = c.id
-    WHERE i.createddate::bigint >= $1
-    AND i.createddate::bigint <= $2
-    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
-    AND i.invoice_status != 'cancelled'
+    WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+    AND (i.invoice_status != 'cancelled')
     AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
     AND NOT EXISTS (
-      SELECT 1 FROM invoices con 
-      WHERE con.is_consolidated = true 
-      AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
-      AND con.invoice_status != 'cancelled'
+      SELECT 1 FROM invoices consolidated 
+      WHERE consolidated.is_consolidated = true
+      AND consolidated.consolidated_invoices IS NOT NULL
+      AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+      AND consolidated.invoice_status != 'cancelled' 
+      AND consolidated.einvoice_status != 'cancelled'
     )
-    ORDER BY i.createddate::bigint ASC
+    ORDER BY CAST(i.createddate AS bigint) ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
-    startOfMonth,
-    endOfMonth,
+    startTimestamp,
+    endTimestamp,
   ]);
 
   // Get order details for each invoice
   for (const invoice of invoiceResult.rows) {
     const orderDetailsQuery = `
-      SELECT * FROM order_details WHERE invoiceid = $1 ORDER BY id
+      SELECT 
+        id, code, price, quantity, freeproduct, returnproduct, 
+        description, tax, total, issubtotal
+      FROM order_details 
+      WHERE invoiceid = $1 
+      ORDER BY id
     `;
     const orderDetailsResult = await client.query(orderDetailsQuery, [
       invoice.id,
@@ -365,40 +395,59 @@ async function getEligibleTienhockInvoices(client, month, year) {
 
 /**
  * Get eligible Jellypolly invoices that haven't been consolidated
+ * Updated to match manual selection logic from modal
  */
 async function getEligibleJellypollyInvoices(client, month, year) {
-  const startOfMonth = new Date(Date.UTC(year, month, 1)).getTime().toString();
-  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999))
-    .getTime()
-    .toString();
+  // Use MYT (UTC+8) timezone like the manual modal does
+  const startDate = new Date(
+    `${year}-${String(month + 1).padStart(2, "0")}-01T00:00:00+08:00`
+  );
+  const endYear = month === 11 ? year + 1 : year;
+  const endMonth = month === 11 ? 0 : month + 1;
+  const endDate = new Date(
+    `${endYear}-${String(endMonth + 1).padStart(2, "0")}-01T00:00:00+08:00`
+  );
+
+  const startTimestamp = startDate.getTime().toString();
+  const endTimestamp = endDate.getTime().toString();
 
   const invoiceQuery = `
-    SELECT i.*, c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
+    SELECT 
+      i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
+      i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.balance_due, i.invoice_status,
+      c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
     FROM jellypolly.invoices i
     JOIN customers c ON i.customerid = c.id
-    WHERE i.createddate::bigint >= $1
-    AND i.createddate::bigint <= $2
-    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
-    AND i.invoice_status != 'cancelled'
+    WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+    AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
+    AND (i.invoice_status != 'cancelled')
     AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
     AND NOT EXISTS (
-      SELECT 1 FROM jellypolly.invoices con 
-      WHERE con.is_consolidated = true 
-      AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
-      AND con.invoice_status != 'cancelled'
+      SELECT 1 FROM jellypolly.invoices consolidated 
+      WHERE consolidated.is_consolidated = true
+      AND consolidated.consolidated_invoices IS NOT NULL
+      AND consolidated.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
+      AND consolidated.invoice_status != 'cancelled' 
+      AND consolidated.einvoice_status != 'cancelled'
     )
-    ORDER BY i.createddate::bigint ASC
+    ORDER BY CAST(i.createddate AS bigint) ASC
   `;
 
   const invoiceResult = await client.query(invoiceQuery, [
-    startOfMonth,
-    endOfMonth,
+    startTimestamp,
+    endTimestamp,
   ]);
 
   // Get order details for each invoice
   for (const invoice of invoiceResult.rows) {
     const orderDetailsQuery = `
-      SELECT * FROM jellypolly.order_details WHERE invoiceid = $1 ORDER BY id
+      SELECT 
+        id, code, price, quantity, freeproduct, returnproduct, 
+        description, tax, total, issubtotal
+      FROM jellypolly.order_details 
+      WHERE invoiceid = $1 
+      ORDER BY id
     `;
     const orderDetailsResult = await client.query(orderDetailsQuery, [
       invoice.id,
