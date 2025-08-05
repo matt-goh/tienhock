@@ -48,7 +48,7 @@ export const updateInvoiceStatuses = async () => {
     // --- Update Jellypolly Invoices ---
     const jellypollyUpdateQuery = `
     UPDATE jellypolly.invoices
-    SET invoice_status = 'overdue'
+    SET invoice_status = 'Overdue'
     WHERE invoice_status = 'Unpaid'        -- Only update unpaid ones
       AND COALESCE(balance_due, 0) > 0     -- Must have a balance due
       AND CAST(createddate AS bigint) < $1; -- Older than 30 days

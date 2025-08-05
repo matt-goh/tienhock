@@ -320,7 +320,7 @@ const InvoiceListPage: React.FC = () => {
       salespersonId: null,
       customerId: null,
       paymentType: null,
-      invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"],
+      invoiceStatus: ["paid", "Unpaid", "Overdue", "cancelled"],
       eInvoiceStatus: [],
       consolidation: "all",
     };
@@ -332,7 +332,7 @@ const InvoiceListPage: React.FC = () => {
     salespersonId: null,
     customerId: null,
     paymentType: null,
-    invoiceStatus: ["paid", "Unpaid", "overdue", "cancelled"], // Default invoice status
+    invoiceStatus: ["paid", "Unpaid", "Overdue", "cancelled"], // Default invoice status
     eInvoiceStatus: [], // Default e-invoice status
     consolidation: "all",
   };
@@ -1771,7 +1771,7 @@ const InvoiceListPage: React.FC = () => {
                           filters.invoiceStatus.length === 3 &&
                           filters.invoiceStatus.includes("paid") &&
                           filters.invoiceStatus.includes("Unpaid") &&
-                          filters.invoiceStatus.includes("overdue") &&
+                          filters.invoiceStatus.includes("Overdue") &&
                           filters.invoiceStatus.includes("cancelled")
                         ) && (
                           <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">

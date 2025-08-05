@@ -288,8 +288,8 @@ export default function (pool) {
           if (finalNewBalance <= 0) {
             newStatus = "paid";
           } else {
-            if (invoice.invoice_status === "overdue") {
-              newStatus = "overdue";
+            if (invoice.invoice_status === "Overdue") {
+              newStatus = "Overdue";
             } else {
               newStatus = "Unpaid";
             }
@@ -496,7 +496,7 @@ export default function (pool) {
             invoiceNewStatus = "paid";
           } else {
             invoiceNewStatus =
-              invoice_status === "overdue" ? "overdue" : "Unpaid";
+              invoice_status === "Overdue" ? "Overdue" : "Unpaid";
           }
 
           const updateInvoiceQuery = `
@@ -648,8 +648,8 @@ export default function (pool) {
           newStatus = "paid"; // Fully paid
         } else {
           // If invoice was overdue before, keep it overdue
-          if (currentStatus === "overdue") {
-            newStatus = "overdue";
+          if (currentStatus === "Overdue") {
+            newStatus = "Overdue";
           } else {
             // Otherwise use normal unpaid status
             newStatus = "Unpaid";

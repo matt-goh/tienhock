@@ -1,18 +1,22 @@
-// src/routes/payroll/commissions.js
+// src/routes/payroll/incentives.js
 import { Router } from "express";
 
 export default function (pool) {
   const router = Router();
 
   /**
-   * GET /api/commissions
-   * List commissions with date filtering.
+   * GET /api/incentives
+   * List incentives (commissions, bonuses, etc.) with date filtering.
    */
   router.get("/", async (req, res) => {
     const { start_date, end_date, employee_id } = req.query;
-    
-    console.log("Commission API - Query params:", { start_date, end_date, employee_id });
-    
+
+    console.log("Incentives API - Query params:", {
+      start_date,
+      end_date,
+      employee_id,
+    });
+
     try {
       let query = `
         SELECT cr.*, s.name as employee_name
@@ -41,26 +45,26 @@ export default function (pool) {
 
       query += " ORDER BY cr.commission_date DESC";
 
-      console.log("Commission API - Final query:", query);
-      console.log("Commission API - Query values:", values);
+      console.log("Incentives API - Final query:", query);
+      console.log("Incentives API - Query values:", values);
 
       const result = await pool.query(query, values);
-      
-      console.log("Commission API - Result rows count:", result.rows.length);
-      
+
+      console.log("Incentives API - Result rows count:", result.rows.length);
+
       res.json(result.rows);
     } catch (error) {
-      console.error("Error fetching commission records:", error);
+      console.error("Error fetching incentive records:", error);
       res.status(500).json({
-        message: "Error fetching commission records",
+        message: "Error fetching incentive records",
         error: error.message,
       });
     }
   });
 
   /**
-   * POST /api/commissions
-   * Create a new commission record.
+   * POST /api/incentives
+   * Create a new incentive record.
    */
   router.post("/", async (req, res) => {
     const { employee_id, commission_date, amount, description, created_by } =
@@ -81,17 +85,17 @@ export default function (pool) {
       ]);
       res.status(201).json(result.rows[0]);
     } catch (error) {
-      console.error("Error creating commission record:", error);
+      console.error("Error creating incentive record:", error);
       res.status(500).json({
-        message: "Error creating commission record",
+        message: "Error creating incentive record",
         error: error.message,
       });
     }
   });
 
   /**
-   * PUT /api/commissions/:id
-   * Update an existing commission record.
+   * PUT /api/incentives/:id
+   * Update an existing incentive record.
    */
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
@@ -110,23 +114,21 @@ export default function (pool) {
         id,
       ]);
       if (result.rows.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "Commission record not found." });
+        return res.status(404).json({ message: "Incentive record not found." });
       }
       res.json(result.rows[0]);
     } catch (error) {
-      console.error("Error updating commission record:", error);
+      console.error("Error updating incentive record:", error);
       res.status(500).json({
-        message: "Error updating commission record",
+        message: "Error updating incentive record",
         error: error.message,
       });
     }
   });
 
   /**
-   * DELETE /api/commissions/:id
-   * Deletes a commission record.
+   * DELETE /api/incentives/:id
+   * Deletes an incentive record.
    */
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
@@ -136,15 +138,13 @@ export default function (pool) {
         [id]
       );
       if (result.rows.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "Commission record not found." });
+        return res.status(404).json({ message: "Incentive record not found." });
       }
-      res.status(200).json({ message: "Commission record deleted." });
+      res.status(200).json({ message: "Incentive record deleted." });
     } catch (error) {
-      console.error("Error deleting commission record:", error);
+      console.error("Error deleting incentive record:", error);
       res.status(500).json({
-        message: "Error deleting commission record",
+        message: "Error deleting incentive record",
         error: error.message,
       });
     }

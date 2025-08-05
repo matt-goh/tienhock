@@ -1753,7 +1753,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   className={`font-semibold text-base ${
                     isPaid || isCancelled
                       ? "text-green-600"
-                      : invoiceData.invoice_status === "overdue"
+                      : invoiceData.invoice_status === "Overdue"
                       ? "text-red-600"
                       : "text-amber-600"
                   }`}
