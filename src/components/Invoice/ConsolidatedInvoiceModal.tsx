@@ -650,7 +650,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                             invoices
                           </div>
                           <div className="mb-1">
-                            <strong>Day:</strong> {windowInfo.dayInWindow} of 5 in
+                            <strong>Day:</strong> {(windowInfo.dayInWindow || 0) - 2} of 5 in
                             consolidation window (days 3-7)
                           </div>
                           <div>
