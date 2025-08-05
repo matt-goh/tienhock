@@ -33,7 +33,7 @@ import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
-import CommissionPage from "./Payroll/CommissionPage";
+import IncentivesPage from "./Payroll/IncentivesPage";
 import PinjamListPage from "./Payroll/PinjamListPage";
 
 // Catalogue related imports
@@ -134,7 +134,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   payrollSubItems.push({
     name: "Incentives",
     path: "/payroll/incentives",
-    component: CommissionPage,
+    component: IncentivesPage,
   });
 
   payrollSubItems.push({

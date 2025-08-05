@@ -171,8 +171,8 @@ export default function (pool) {
           newStatus = "paid"; // Always paid if balance is 0
         } else {
           // If still has balance, maintain "overdue" status if it was already overdue
-          if (invoice.invoice_status === "overdue") {
-            newStatus = "overdue"; // Maintain overdue status for partial payments
+          if (invoice.invoice_status === "Overdue") {
+            newStatus = "Overdue"; // Maintain overdue status for partial payments
           } else {
             newStatus = "Unpaid"; // Otherwise use normal unpaid status
           }
@@ -286,8 +286,8 @@ export default function (pool) {
       if (finalNewBalance <= 0) {
         newStatus = "paid";
       } else {
-        if (invoice_status === "overdue") {
-          newStatus = "overdue";
+        if (invoice_status === "Overdue") {
+          newStatus = "Overdue";
         } else {
           newStatus = "Unpaid";
         }
@@ -418,8 +418,8 @@ export default function (pool) {
           newStatus = "paid"; // Fully paid
         } else {
           // If invoice was overdue before, keep it overdue
-          if (currentStatus === "overdue") {
-            newStatus = "overdue";
+          if (currentStatus === "Overdue") {
+            newStatus = "Overdue";
           } else {
             // Otherwise use normal unpaid status
             newStatus = "Unpaid";

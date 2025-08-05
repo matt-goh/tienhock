@@ -305,7 +305,7 @@ export type InvoiceStatus =
   | "paid"
   | "cancelled"
   | "Unpaid"
-  | "overdue";
+  | "Overdue";
 export type EInvoiceStatus =
   | "valid"
   | "invalid"

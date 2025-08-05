@@ -171,7 +171,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       params.append("salesman", selectedSalesmenIds.join(","));
 
       // Add invoice status filter
-      params.append("invoiceStatus", "paid,Unpaid,overdue,cancelled");
+      params.append("invoiceStatus", "paid,Unpaid,Overdue,cancelled");
 
       // Add limit to ensure we get all invoices
       params.append("limit", "1000");

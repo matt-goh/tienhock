@@ -63,6 +63,16 @@ const Button: React.FC<ButtonProps> = ({
       filled:
         "bg-rose-500 text-white hover:bg-rose-600 active:bg-rose-700 disabled:hover:bg-rose-500",
     },
+    teal: {
+      default:
+        "bg-teal-100 text-teal-700 hover:text-teal-800 hover:bg-teal-200 active:bg-teal-300/75 disabled:hover:bg-teal-100 disabled:hover:text-teal-700",
+      outline:
+        "border border-teal-300 text-teal-700 hover:text-teal-800 hover:bg-teal-100 active:bg-teal-200 disabled:hover:bg-transparent disabled:hover:text-teal-700",
+      boldOutline:
+        "border-2 border-teal-300 text-teal-700 hover:text-teal-800 hover:bg-teal-100 active:bg-teal-200 disabled:hover:bg-transparent disabled:hover:text-teal-700",
+      filled:
+        "bg-teal-500 text-white hover:bg-teal-600 active:bg-teal-700 disabled:hover:bg-teal-500",
+    },
   };
 
   const sizeClasses = {
