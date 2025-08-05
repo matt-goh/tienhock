@@ -305,7 +305,7 @@ const PaymentPage: React.FC = () => {
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
-                  paymentMethod: value === "" ? null : (value as string),
+                  paymentMethod: value === "" ? null : String(value),
                 }))
               }
               options={[
@@ -325,7 +325,7 @@ const PaymentPage: React.FC = () => {
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
-                  status: value === "" ? null : (value as string),
+                  status: value === "" ? null : String(value),
                 }))
               }
               options={[

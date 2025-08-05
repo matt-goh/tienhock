@@ -64,6 +64,7 @@ import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
+import StyledListbox from "../../components/StyledListbox";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -336,6 +337,9 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
   const [searchParams] = useSearchParams();
   const [initialParamsApplied, setInitialParamsApplied] = useState(false);
+  const [selectedSalesmanId, setSelectedSalesmanId] = useState<string | number>(
+    ""
+  );
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo((): InvoiceFilters => {
@@ -403,6 +407,17 @@ const InvoiceListPage: React.FC = () => {
   );
   // Fetch customer names based on IDs present in the currently loaded invoices
   const { customerNames } = useCustomerNames(customerIds);
+
+  // Salesman options for single selection dropdown
+  const salesmanOptions = useMemo(() => {
+    const options = [{ id: "", name: "All Salesmen" }];
+    return options.concat(
+      salesmen.map((s) => ({
+        id: s.id,
+        name: s.name || s.id,
+      }))
+    );
+  }, [salesmen]);
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -789,6 +804,34 @@ const InvoiceListPage: React.FC = () => {
     },
     [filters, handleApplyFilters] // Depends on current filters and the apply function
   );
+
+  // Single Salesman Selection Handler
+  const handleSalesmanChange = useCallback(
+    (salesmanId: string | number) => {
+      setSelectedSalesmanId(salesmanId);
+
+      // Update filters to sync with the single selection
+      const updatedFilters: InvoiceFilters = {
+        ...filters,
+        salespersonId: salesmanId === "" ? null : [salesmanId as string],
+      };
+      handleApplyFilters(updatedFilters);
+    },
+    [filters, handleApplyFilters]
+  );
+
+  // Effect to sync selectedSalesmanId with filters when filters change externally
+  useEffect(() => {
+    const currentSalespersonIds = filters.salespersonId;
+    if (!currentSalespersonIds || currentSalespersonIds.length === 0) {
+      setSelectedSalesmanId("");
+    } else if (currentSalespersonIds.length === 1) {
+      setSelectedSalesmanId(currentSalespersonIds[0]);
+    } else {
+      // Multiple salesmen selected - show empty for single dropdown
+      setSelectedSalesmanId("");
+    }
+  }, [filters.salespersonId]);
 
   // Search Handlers - Update state locally, trigger fetch on blur/enter
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1516,6 +1559,36 @@ const InvoiceListPage: React.FC = () => {
                 />
               </div>
 
+              {/* Date Navigation */}
+              <div className="flex w-full sm:w-auto items-center justify-center">
+                <div className="flex items-center gap-1 w-full">
+                  <button
+                    onClick={handleBackwardOneDay}
+                    title="Previous Day"
+                    aria-label="Previous Day"
+                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <IconChevronLeft size={20} className="mr-[1px]" />
+                  </button>
+                  <Button
+                    onClick={handleTodayClick}
+                    variant="outline"
+                    size="sm"
+                    className="h-[42px] whitespace-nowrap px-3 sm:px-4 min-w-0 flex-grow"
+                  >
+                    Today
+                  </Button>
+                  <button
+                    onClick={handleForwardOneDay}
+                    title="Next Day"
+                    aria-label="Next Day"
+                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <IconChevronRight size={20} className="ml-[1px]" />
+                  </button>
+                </div>
+              </div>
+
               {/* Month Selector */}
               <div className="w-full xl:w-40">
                 <Listbox value={selectedMonth} onChange={handleMonthChange}>
@@ -1576,37 +1649,6 @@ const InvoiceListPage: React.FC = () => {
                   </div>
                 </Listbox>
               </div>
-
-              {/* Date Navigation and Daily Buttons */}
-              <div className="flex w-full xl:w-auto items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleBackwardOneDay}
-                    title="Previous Day"
-                    aria-label="Previous Day"
-                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <IconChevronLeft size={20} className="mr-[1px]" />
-                  </button>
-                  <button
-                    onClick={handleForwardOneDay}
-                    title="Next Day"
-                    aria-label="Next Day"
-                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <IconChevronRight size={20} className="ml-[1px]" />
-                  </button>
-                </div>
-                <Button
-                  onClick={handleTodayClick}
-                  variant="outline"
-                  size="sm"
-                  className="w-full xl:w-auto h-[42px] whitespace-nowrap"
-                >
-                  Today
-                </Button>
-                <InvoiceDailyPrintMenu filters={filters} />
-              </div>
             </div>
 
             {/* Right Group: Search and Main Filters */}
@@ -1638,6 +1680,16 @@ const InvoiceListPage: React.FC = () => {
                     ×
                   </button>
                 )}
+              </div>
+
+              {/* Salesman Filter */}
+              <div className="w-full sm:w-40">
+                <StyledListbox
+                  value={selectedSalesmanId}
+                  onChange={handleSalesmanChange}
+                  options={salesmanOptions}
+                  placeholder="All Salesmen"
+                />
               </div>
 
               {/* Filter Menu Button */}
@@ -1988,6 +2040,7 @@ const InvoiceListPage: React.FC = () => {
               </>
             )}
 
+            <InvoiceDailyPrintMenu filters={filters} size="sm" />
             <Button
               onClick={() => setShowConsolidatedModal(true)}
               icon={IconFiles}

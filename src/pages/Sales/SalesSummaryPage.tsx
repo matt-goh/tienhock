@@ -8,7 +8,7 @@ const SalesSummaryPage: React.FC = () => {
   const [activeTab] = useState(0);
 
   return (
-    <div className="w-full p-6 pt-0 max-w-[88rem] mx-auto">
+    <div className="w-full p-6 pt-0 mx-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Sales Summary</h1>
         <SalesSummarySelectionTooltip activeTab={activeTab} />

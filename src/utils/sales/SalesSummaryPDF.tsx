@@ -811,9 +811,11 @@ const AllSalesSection: React.FC<{
               <Text style={styles.colID}></Text>
               <Text style={styles.colDescription}></Text>
               <Text style={[styles.colQty, styles.boldText]}>
+                {key === "category_returns" && "*"}
                 {formatNumber(category.quantity)}
               </Text>
               <Text style={[styles.colAmount, styles.boldText]}>
+                {key === "category_returns" && "*"}
                 {formatCurrency(category.amount)}
               </Text>
             </View>

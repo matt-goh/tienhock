@@ -13,6 +13,7 @@ import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 
 interface InvoiceDailyPrintMenuProps {
   filters: InvoiceFilters;
+  size?: "sm" | "md";
 }
 
 interface SalesmanOption {
@@ -23,6 +24,7 @@ interface SalesmanOption {
 
 const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
   filters,
+  size = "md",
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -30,6 +32,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
     Record<string, boolean>
   >({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<string>("");
   const [invoicesToPrint, setInvoicesToPrint] = useState<any[]>([]);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -151,6 +154,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
     setIsGenerating(true);
     setIsVisible(false);
+    setLoadingStep("Preparing invoice search...");
 
     try {
       // Build query parameters for invoice fetching
@@ -172,6 +176,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       // Add limit to ensure we get all invoices
       params.append("limit", "1000");
 
+      setLoadingStep("Searching for invoices...");
       // Fetch invoices
       const response = await api.get(`/api/invoices?${params.toString()}`);
 
@@ -180,10 +185,19 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         return;
       }
 
+      setLoadingStep(`Loading details for ${response.data.length} invoices...`);
       // Fetch full invoice details including products for each invoice
       const invoicesWithProducts = await Promise.all(
-        response.data.map(async (invoice: any) => {
+        response.data.map(async (invoice: any, index: number) => {
           try {
+            // Update progress for every 10 invoices processed
+            if (index % 10 === 0) {
+              setLoadingStep(
+                `Loading invoice details (${index + 1}/${
+                  response.data.length
+                })...`
+              );
+            }
             // Fetch full invoice details including products
             const fullInvoice = await api.get(`/api/invoices/${invoice.id}`);
             return fullInvoice || invoice; // Fallback to original if fetch fails
@@ -197,6 +211,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         })
       );
 
+      setLoadingStep("Organizing invoices by salesman...");
       // Sort invoices by salesman and then by date
       const sortedInvoices = invoicesWithProducts.sort((a: any, b: any) => {
         // First sort by salesman
@@ -210,6 +225,9 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       setInvoicesToPrint(sortedInvoices);
 
       if (action === "print") {
+        setLoadingStep("Preparing print view...");
+        // Small delay to show the final step
+        await new Promise((resolve) => setTimeout(resolve, 500));
         setShowPrintOverlay(true);
       }
 
@@ -219,6 +237,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       toast.error("Failed to fetch invoices");
     } finally {
       setIsGenerating(false);
+      setLoadingStep("");
     }
   };
 
@@ -227,6 +246,13 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
     setInvoicesToPrint([]);
   };
 
+  const buttonClasses =
+    size === "sm"
+      ? "flex items-center px-3 h-8 text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors"
+      : "flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors";
+
+  const iconSize = size === "sm" ? 16 : 18;
+
   return (
     <>
       <button
@@ -234,10 +260,11 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={() => setIsVisible(true)}
-        className="flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors"
+        className={buttonClasses}
         type="button"
+        title="Daily Invoice Print Menu"
       >
-        <IconCalendarEvent size={18} className="mr-2" />
+        <IconCalendarEvent size={iconSize} className="mr-2" />
         Daily
       </button>
 
@@ -282,8 +309,8 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
             </div>
 
             {/* Salesmen Options */}
-            <div className="flex-grow overflow-y-auto py-2 max-h-80">
-              <div className="px-2 space-y-1">
+            <div className="flex-grow overflow-y-auto py-1 max-h-80">
+              <div className="px-1 space-y-1">
                 {salesmenOptions.map((salesman) => (
                   <div
                     key={salesman.id}
@@ -346,23 +373,45 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       )}
 
       {/* Loading Overlay */}
-      {isGenerating && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl p-6 transform scale-110">
-            <div className="flex flex-col items-center gap-4">
-              <LoadingSpinner size="lg" hideText />
-              <div className="text-center">
-                <p className="text-lg font-medium text-default-900">
-                  Fetching Invoices
-                </p>
-                <p className="text-sm text-default-600 mt-1">
-                  This may take a few moments...
-                </p>
+      {isGenerating &&
+        createPortal(
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 mx-4 max-w-sm w-full transform scale-105 animate-pulse-slow">
+              <div className="flex flex-col items-center gap-6">
+                {/* Animated Icon */}
+                <div className="relative">
+                  <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center animate-bounce">
+                    <IconCalendarEvent size={32} className="text-sky-600" />
+                  </div>
+                  <div className="absolute -inset-1 bg-sky-200 rounded-full animate-ping opacity-20"></div>
+                </div>
+
+                <div className="text-center space-y-3 w-full">
+                  <h3 className="text-xl font-semibold text-default-900">
+                    Processing Daily Invoices
+                  </h3>
+
+                  {/* Loading Steps */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-sky-700 min-h-[20px]">
+                      {loadingStep || "Initializing..."}
+                    </p>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-default-200 rounded-full h-2 overflow-hidden">
+                      <div className="h-2 bg-gradient-to-r from-sky-400 to-sky-600 rounded-full animate-pulse transition-all duration-300"></div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-default-500 mt-2">
+                    Please wait while we gather the invoice data...
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 };
