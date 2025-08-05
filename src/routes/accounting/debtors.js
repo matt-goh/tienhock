@@ -4,32 +4,52 @@ import { Router } from "express";
 export default function (pool, config) {
   const router = Router();
 
-  // GET /api/tienhock/accounting/debtors - Get debtors report grouped by salesman
+  // GET /api/debtors - Get debtors report, with optional filtering by month and year of invoice creation
   router.get("/", async (req, res) => {
+    const { month, year } = req.query;
     try {
+      let filterClause = "";
+      const queryParams = [];
+
+      if (month && year) {
+        const monthInt = parseInt(month, 10);
+        const yearInt = parseInt(year, 10);
+
+        if (!isNaN(monthInt) && !isNaN(yearInt)) {
+          // --- THE FIX IS HERE ---
+          // 1. Cast createddate (text) to a bigint
+          // 2. Divide by 1000 to convert milliseconds to seconds
+          // 3. Use to_timestamp() to convert the seconds-based timestamp to a proper date
+          filterClause = `AND EXTRACT(YEAR FROM to_timestamp(i.createddate::bigint / 1000)) = $2
+                          AND EXTRACT(MONTH FROM to_timestamp(i.createddate::bigint / 1000)) = $1`;
+          queryParams.push(monthInt);
+          queryParams.push(yearInt);
+        }
+      }
+
       const query = `
       WITH invoice_payments AS (
         -- Calculate total payments per invoice
-        SELECT 
+        SELECT
           p.invoice_id,
           SUM(p.amount_paid) as total_paid,
           json_agg(
-        json_build_object(
-          'payment_id', p.payment_id,
-          'payment_method', p.payment_method,
-          'payment_reference', p.payment_reference,
-          'date', p.payment_date,
-          'amount', p.amount_paid,
-          'status', p.status
-        ) ORDER BY p.payment_date
+            json_build_object(
+              'payment_id', p.payment_id,
+              'payment_method', p.payment_method,
+              'payment_reference', p.payment_reference,
+              'date', p.payment_date,
+              'amount', p.amount_paid,
+              'status', p.status
+            ) ORDER BY p.payment_date
           ) as payments
         FROM payments p
         WHERE p.status NOT IN ('cancelled', 'pending')
         GROUP BY p.invoice_id
       ),
       unpaid_invoices AS (
-        -- Get all unpaid/partially paid invoices
-        SELECT 
+        -- Get all unpaid/partially paid invoices, with optional date filter
+        SELECT
           i.id as invoice_id,
           i.salespersonid,
           i.customerid,
@@ -42,10 +62,11 @@ export default function (pool, config) {
         LEFT JOIN invoice_payments ip ON i.id = ip.invoice_id
         WHERE i.invoice_status IN ('Unpaid', 'overdue')
           AND i.balance_due > 0.01
+          ${filterClause}
       ),
       customer_aggregates AS (
         -- Aggregate by customer
-        SELECT 
+        SELECT
           ui.salespersonid,
           ui.customerid,
           c.name as customer_name,
@@ -53,14 +74,14 @@ export default function (pool, config) {
           c.credit_limit,
           MAX(ui.createddate) as latest_invoice_date, -- For ordering customers
           json_agg(
-        json_build_object(
-          'invoice_id', ui.invoice_id,
-          'invoice_number', ui.invoice_id,
-          'date', ui.createddate,
-          'amount', ui.totalamountpayable,
-          'payments', ui.payments,
-          'balance', ui.balance_due
-        ) ORDER BY ui.createddate
+            json_build_object(
+              'invoice_id', ui.invoice_id,
+              'invoice_number', ui.invoice_id,
+              'date', ui.createddate,
+              'amount', ui.totalamountpayable,
+              'payments', ui.payments,
+              'balance', ui.balance_due
+            ) ORDER BY ui.createddate
           ) as invoices,
           SUM(ui.totalamountpayable) as total_amount,
           SUM(ui.total_paid) as total_paid,
@@ -70,20 +91,20 @@ export default function (pool, config) {
         GROUP BY ui.salespersonid, ui.customerid, c.name, c.phone_number, c.credit_limit
       )
       -- Final aggregation by salesman
-      SELECT 
+      SELECT
         s.id as salesman_id,
         s.name as salesman_name,
         json_agg(
           json_build_object(
-        'customer_id', ca.customerid,
-        'customer_name', ca.customer_name,
-        'phone_number', ca.phone_number,
-        'invoices', ca.invoices,
-        'total_amount', ca.total_amount,
-        'total_paid', ca.total_paid,
-        'total_balance', ca.total_amount - ca.total_paid,
-        'credit_limit', ca.credit_limit,
-        'credit_balance', ca.credit_limit - ca.total_balance
+            'customer_id', ca.customerid,
+            'customer_name', ca.customer_name,
+            'phone_number', ca.phone_number,
+            'invoices', ca.invoices,
+            'total_amount', ca.total_amount,
+            'total_paid', ca.total_paid,
+            'total_balance', ca.total_balance,
+            'credit_limit', ca.credit_limit,
+            'credit_balance', ca.credit_limit - ca.total_balance
           ) ORDER BY ca.latest_invoice_date DESC
         ) as customers,
         SUM(ca.total_balance) as total_balance
@@ -93,9 +114,8 @@ export default function (pool, config) {
       ORDER BY SUM(ca.total_balance) DESC
         `;
 
-      const result = await pool.query(query);
+      const result = await pool.query(query, queryParams);
 
-      // Calculate grand totals
       let grand_total_amount = 0;
       let grand_total_paid = 0;
       let grand_total_balance = 0;

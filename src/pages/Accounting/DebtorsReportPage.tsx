@@ -1,5 +1,11 @@
 // src/pages/Accounting/DebtorsReportPage.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -14,7 +20,15 @@ import {
   IconCalendarDollar,
   IconCurrencyDollar,
   IconPhone,
+  IconCheck,
 } from "@tabler/icons-react";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
@@ -66,6 +80,11 @@ interface DebtorsData {
   report_date: string | number;
 }
 
+interface MonthOption {
+  id: number;
+  name: string;
+}
+
 const DebtorsReportPage: React.FC = () => {
   const navigate = useNavigate();
   const { activeCompany } = useCompany();
@@ -81,59 +100,109 @@ const DebtorsReportPage: React.FC = () => {
     new Set()
   );
 
-  useEffect(() => {
-    fetchDebtors();
-  }, []);
+  const monthOptions: MonthOption[] = useMemo(
+    () => [
+      { id: -1, name: "All Time" },
+      ...Array.from({ length: 12 }, (_, i) => ({
+        id: i,
+        name: new Date(0, i).toLocaleString("en", { month: "long" }),
+      })),
+    ],
+    []
+  );
 
-  const fetchDebtors = async (): Promise<void> => {
-    try {
-      setLoading(true);
-      setError(null);
+  const currentMonthIndex = new Date().getMonth();
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
+    monthOptions[currentMonthIndex + 1] // +1 to skip "All Time"
+  );
 
-      const response = await api.get("/api/debtors");
-      const data = response;
+  // Centralized data fetching function with manual URL construction
+  const fetchDebtors = useCallback(
+    async (params?: { month: number; year: number }): Promise<void> => {
+      let url = "/api/debtors";
+      if (params && params.month && params.year) {
+        url += `?month=${params.month}&year=${params.year}`;
+      }
 
-      // Process data with proper date conversion
-      const processedData: DebtorsData = {
-        ...data,
-        report_date: formatDateFromTimestamp(data.report_date),
-        salesmen: data.salesmen.map((salesman: Salesman) => ({
-          ...salesman,
-          customers: salesman.customers.map((customer: Customer) => ({
-            ...customer,
-            invoices: customer.invoices.map((invoice: Invoice) => ({
-              ...invoice,
-              date: formatDate(invoice.date),
-              payments: invoice.payments.map((payment: Payment) => ({
-                ...payment,
-                date: formatDateFromTimestamp(payment.date),
+      console.log("Fetching debtors from URL:", url); // For debugging
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Make the API call with the constructed URL string
+        const response = await api.get(url);
+        const data = response;
+
+        const processedData: DebtorsData = {
+          ...data,
+          report_date: formatDateFromTimestamp(data.report_date),
+          salesmen: data.salesmen.map((salesman: Salesman) => ({
+            ...salesman,
+            customers: salesman.customers.map((customer: Customer) => ({
+              ...customer,
+              invoices: customer.invoices.map((invoice: Invoice) => ({
+                ...invoice,
+                date: formatDate(invoice.date),
+                payments: invoice.payments.map((payment: Payment) => ({
+                  ...payment,
+                  date: formatDateFromTimestamp(payment.date),
+                })),
               })),
             })),
           })),
-        })),
-      };
+        };
 
-      setDebtorsData(processedData);
+        setDebtorsData(processedData);
 
-      // Expand all salesmen by default
-      const salesmenIds = data.salesmen.map((s: Salesman) => s.salesman_id);
-      setExpandedSalesmen(new Set(salesmenIds));
-    } catch (err) {
-      setError("Failed to fetch debtors data. Please try again later.");
-      console.error("Error fetching debtors:", err);
-    } finally {
-      setLoading(false);
-    }
+        const salesmenIds = data.salesmen.map((s: Salesman) => s.salesman_id);
+        setExpandedSalesmen(new Set(salesmenIds));
+      } catch (err) {
+        setError("Failed to fetch debtors data. Please try again later.");
+        console.error("Error fetching debtors:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Initial data fetch for the default (current) month
+  useEffect(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentYear = now.getFullYear();
+    fetchDebtors({ month: currentMonth, year: currentYear });
+  }, [fetchDebtors]);
+
+  const handleMonthChange = useCallback(
+    (month: MonthOption) => {
+      setSelectedMonth(month);
+
+      if (month.id === -1) {
+        fetchDebtors();
+        return;
+      }
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonthIndex = now.getMonth();
+
+      const targetYear =
+        month.id > currentMonthIndex ? currentYear - 1 : currentYear;
+
+      fetchDebtors({ month: month.id + 1, year: targetYear });
+    },
+    [fetchDebtors]
+  );
+
+  const handleRefresh = () => {
+    handleMonthChange(selectedMonth);
   };
 
-  // Format date strings or timestamps to "DD/MM/YYYY"
-  // Handles both ISO date strings and numeric timestamps
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
-
-    // Check if the string consists only of digits (a timestamp like "1747658034976")
     if (/^\d+$/.test(dateString)) {
-      // Convert the string to a number before creating a Date object
       const date = new Date(parseInt(dateString, 10));
       if (isNaN(date.getTime())) {
         return "Invalid Date";
@@ -144,9 +213,6 @@ const DebtorsReportPage: React.FC = () => {
         year: "numeric",
       });
     }
-
-    // Otherwise, parse it as a regular date string.
-    // This preserves the existing behavior for payment dates which are re-formatted.
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
       return "Invalid Date";
@@ -160,19 +226,15 @@ const DebtorsReportPage: React.FC = () => {
 
   const formatDateFromTimestamp = (timestamp: string | number): string => {
     if (!timestamp) return "N/A";
-    // Handles both ISO string and Unix timestamp (in seconds)
     const date = new Date(
       typeof timestamp === "number" ? timestamp * 1000 : timestamp
     );
-
     if (isNaN(date.getTime())) {
       return "Invalid Date";
     }
-
     const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
-
     return `${day}/${month}/${year}`;
   };
 
@@ -213,15 +275,11 @@ const DebtorsReportPage: React.FC = () => {
 
   const handlePrint = async (): Promise<void> => {
     if (!debtorsData) return;
-
     try {
-      // Show loading toast
       const loadingToast = toast.loading("Generating PDF...");
-
-      // Generate and print PDF
-      await generateDebtorsReportPDF(filteredData, "print");
-
-      // Dismiss loading toast
+      const filterName =
+        selectedMonth.id === -1 ? undefined : selectedMonth.name;
+      await generateDebtorsReportPDF(filteredData, "print", filterName);
       toast.dismiss(loadingToast);
       toast.success("Print dialog opened");
     } catch (error) {
@@ -232,7 +290,6 @@ const DebtorsReportPage: React.FC = () => {
 
   const filterData = (data: DebtorsData): DebtorsData => {
     if (!searchTerm) return data;
-
     const filtered: DebtorsData = {
       ...data,
       salesmen: data.salesmen
@@ -250,8 +307,6 @@ const DebtorsReportPage: React.FC = () => {
         }))
         .filter((salesman) => salesman.customers.length > 0),
     };
-
-    // Recalculate totals
     filtered.grand_total_balance = filtered.salesmen.reduce(
       (sum, salesman) =>
         sum +
@@ -261,7 +316,6 @@ const DebtorsReportPage: React.FC = () => {
         ),
       0
     );
-
     return filtered;
   };
 
@@ -277,16 +331,15 @@ const DebtorsReportPage: React.FC = () => {
 
   if (error || !debtorsData) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="text-center max-w-md mx-auto p-6">
           <IconAlertCircle size={64} className="text-red-500 mb-4 mx-auto" />
           <h2 className="text-2xl font-semibold mb-2 text-gray-900">
             Error Loading Report
           </h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <Button onClick={fetchDebtors} className="flex items-center gap-2">
-            <IconRefresh size={16} />
-            Retry
+          <Button onClick={handleRefresh} icon={IconRefresh}>
+            Refresh
           </Button>
         </div>
       </div>
@@ -321,7 +374,7 @@ const DebtorsReportPage: React.FC = () => {
 
             <div className="flex items-center gap-3">
               <Button
-                onClick={fetchDebtors}
+                onClick={handleRefresh}
                 variant="outline"
                 className="flex-col gap-2"
                 icon={IconRefresh}
@@ -343,28 +396,91 @@ const DebtorsReportPage: React.FC = () => {
         {/* Search and Summary Section */}
         <div className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            {/* Search */}
-            <div className="relative flex items-center sm:max-w-xs">
-              <IconSearch
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Search customers..."
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-full text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {searchTerm && (
-                <button
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                  onClick={() => setSearchTerm("")}
-                  title="Clear search"
-                >
-                  ×
-                </button>
-              )}
+            {/* Filters */}
+            <div className="flex items-center gap-4">
+              {/* Search */}
+              <div className="relative flex items-center sm:max-w-xs">
+                <IconSearch
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 focus:border-blue-500 rounded-full text-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    onClick={() => setSearchTerm("")}
+                    title="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              {/* Month Selector */}
+              <div className="w-full sm:w-40">
+                <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                  <div className="relative">
+                    <ListboxButton className="w-full h-[42px] rounded-full border border-gray-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-blue-500 text-sm">
+                      <span className="block truncate pl-1">
+                        {selectedMonth.name}
+                      </span>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <IconChevronDown
+                          className="h-5 w-5 text-gray-400"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </ListboxButton>
+                    <Transition
+                      leave="transition ease-in duration-100"
+                      leaveFrom="opacity-100"
+                      leaveTo="opacity-0"
+                    >
+                      <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                        {monthOptions.map((month) => (
+                          <ListboxOption
+                            key={month.id}
+                            value={month}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
+                                active
+                                  ? "bg-blue-50 text-blue-900"
+                                  : "text-gray-900"
+                              }`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {month.name}
+                                </span>
+                                {selected && (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
+                                    <IconCheck
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                      stroke={2.5}
+                                    />
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </ListboxOption>
+                        ))}
+                      </ListboxOptions>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </div>
             </div>
 
             {/* Summary Cards */}
@@ -421,7 +537,7 @@ const DebtorsReportPage: React.FC = () => {
             <p className="text-gray-600">
               {searchTerm
                 ? "No customers match your search criteria."
-                : "No debtors data available."}
+                : "No debtors data available for the selected period."}
             </p>
           </div>
         ) : (
