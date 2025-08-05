@@ -264,9 +264,11 @@ export const checkAndProcessDueConsolidations = async (pool) => {
  */
 function checkIfInConsolidationWindow(currentDate) {
   const now = new Date(currentDate);
-  const currentDay = now.getUTCDate();
-  const currentMonth = now.getUTCMonth();
-  const currentYear = now.getUTCFullYear();
+  // Convert to Malaysia Time (UTC+8)
+  const malaysiaTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const currentDay = malaysiaTime.getUTCDate();
+  const currentMonth = malaysiaTime.getUTCMonth();
+  const currentYear = malaysiaTime.getUTCFullYear();
 
   // Check if we're between days 3-7 of the month (consolidating previous month)
   if (currentDay >= 3 && currentDay <= 7) {
