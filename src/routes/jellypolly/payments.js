@@ -49,7 +49,7 @@ export default function (pool) {
 
       // Only include active payments by default
       if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')`;
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
       }
 
       query += " ORDER BY p.payment_date DESC, p.created_at DESC";
@@ -395,48 +395,56 @@ export default function (pool) {
       ]);
       const cancelledPayment = updateResult.rows[0];
 
-      // 3. Update Invoice balance and status
-      // Get current balance *after* locking
-      const currentInvoiceState = await client.query(
-        "SELECT balance_due, invoice_status FROM invoices WHERE id = $1",
-        [invoice_id]
-      );
-      const currentBalance = parseFloat(
-        currentInvoiceState.rows[0].balance_due || 0
-      );
-      const currentStatus = currentInvoiceState.rows[0].invoice_status;
+      // 3. If the payment was active, revert the balance and credit.
+      // If it was pending, no financial changes are needed.
+      if (payment.status === "active") {
+        // Get current balance *after* locking
+        const currentInvoiceState = await client.query(
+          "SELECT balance_due, invoice_status FROM jellypolly.invoices WHERE id = $1",
+          [invoice_id]
+        );
+        const currentBalance = parseFloat(
+          currentInvoiceState.rows[0].balance_due || 0
+        );
+        const currentStatus = currentInvoiceState.rows[0].invoice_status;
 
-      const newBalance = currentBalance + paidAmount;
-      // Round to 2 decimal places
-      const finalNewBalance = parseFloat(newBalance.toFixed(2));
+        const newBalance = currentBalance + paidAmount;
+        // Round to 2 decimal places
+        const finalNewBalance = parseFloat(newBalance.toFixed(2));
 
-      // Determine the new status
-      let newStatus;
-      if (finalNewBalance <= 0) {
-        newStatus = "paid"; // Fully paid
-      } else {
-        // If invoice was overdue before, keep it overdue
-        if (currentStatus === "overdue") {
-          newStatus = "overdue";
+        // Determine the new status
+        let newStatus;
+        if (finalNewBalance <= 0) {
+          newStatus = "paid"; // Fully paid
         } else {
-          // Otherwise use normal unpaid status
-          newStatus = "Unpaid";
+          // If invoice was overdue before, keep it overdue
+          if (currentStatus === "overdue") {
+            newStatus = "overdue";
+          } else {
+            // Otherwise use normal unpaid status
+            newStatus = "Unpaid";
+          }
         }
-      }
 
-      const updateInvoiceQuery = `
-        UPDATE jellypolly.invoices SET balance_due = $1, invoice_status = $2
-        WHERE id = $3
-      `;
-      await client.query(updateInvoiceQuery, [
-        finalNewBalance,
-        newStatus,
-        invoice_id,
-      ]);
+        const updateInvoiceQuery = `
+          UPDATE jellypolly.invoices SET balance_due = $1, invoice_status = $2
+          WHERE id = $3
+        `;
+        await client.query(updateInvoiceQuery, [
+          finalNewBalance,
+          newStatus,
+          invoice_id,
+        ]);
 
-      // 4. Update Customer Credit if it was an INVOICE payment
-      if (paymenttype === "INVOICE") {
-        await updateCustomerCredit(client, customerid, paidAmount); // Add back the amount to credit used
+        // 4. Update Customer Credit if it was an INVOICE payment
+        if (paymenttype === "INVOICE") {
+          await updateCustomerCredit(client, customerid, paidAmount); // Add back the amount to credit used
+        }
+      } else {
+        // For pending payments, no balance or credit adjustments needed
+        console.log(
+          `Cancelled pending payment ${paymentIdNum} - no balance/credit adjustments made`
+        );
       }
 
       await client.query("COMMIT");
@@ -458,6 +466,24 @@ export default function (pool) {
     } finally {
       client.release();
     }
+  });
+
+  // Keep the DELETE endpoint for backward compatibility but mark as deprecated
+  router.delete("/:payment_id", async (req, res) => {
+    const { payment_id } = req.params;
+
+    // Forward the request to the new cancel endpoint
+    req.method = "PUT";
+    req.url = `/${payment_id}/cancel`;
+
+    // Add deprecation warning header
+    res.setHeader(
+      "X-Deprecated-API",
+      "Use PUT /api/payments/:payment_id/cancel instead"
+    );
+
+    // Pass to the cancel endpoint handler
+    router.handle(req, res);
   });
 
   return router;

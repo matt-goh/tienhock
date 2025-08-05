@@ -37,6 +37,9 @@ import {
   IconCircleCheck,
   IconFileInvoice,
   IconUser,
+  IconFileExport,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -56,6 +59,8 @@ import {
 import Pagination from "../../components/Invoice/Pagination";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
+import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
+import StyledListbox from "../../components/StyledListbox";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFiltersJP_v2"; // Use a unique key
@@ -165,6 +170,92 @@ const clearSessionState = () => {
   sessionStorage.removeItem(SESSION_STORAGE_KEY);
 };
 
+/**
+ * Formats an array of invoice data into a string that matches the legacy
+ * SLS_*.txt file format for export.
+ * @param invoices - An array of ExtendedInvoiceData objects.
+ * @returns A string with each invoice formatted as a line, separated by newlines.
+ */
+const formatInvoicesForExport = (invoices: ExtendedInvoiceData[]): string => {
+  const lines = invoices.map((invoice) => {
+    // 1. Format date (dd/MM/yyyy)
+    const dateObj = new Date(Number(invoice.createddate));
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const year = dateObj.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+
+    // 2. Format time (hh:mm am/pm)
+    const formattedTime = dateObj
+      .toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+      .toUpperCase();
+
+    // 3. Format total amount (with comma separator, e.g., 1,234.56)
+    const totalAmountString = (invoice.totalamountpayable || 0).toLocaleString(
+      "en-US",
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        useGrouping: true,
+      }
+    );
+
+    // 4. Map payment type to character
+    const typeChar = invoice.paymenttype === "CASH" ? "C" : "I";
+
+    // 5. Format order details string - CRITICAL: Filter out OTH products with zero quantity
+    const orderDetailsString = (invoice.products || [])
+      .filter((p) => !p.issubtotal && !p.istotal && !(p.code === "OTH" && p.quantity === 0)) // Ensure only product rows are included, exclude OTH with zero quantity
+      .map((p: any) => {
+        const code = p.code || "";
+        const qty = p.quantity || 0;
+        // Price and total are multiplied by 100 and stored as integers
+        const price = Math.round((p.price || 0) * 100);
+        const total = Math.round(parseFloat(p.total) * 100);
+        const foc = p.freeProduct || 0;
+        const returned = p.returnProduct || 0;
+        return `${code}&&${qty}&&${price}&&${total}&&${foc}&&${returned}`;
+      })
+      .join("&E&");
+
+    // 6. Assemble the amount fields (7 fields total, as per legacy format)
+    const amountFields = [
+      totalAmountString,
+      "0.00",
+      totalAmountString,
+      "0.00",
+      totalAmountString,
+      "0.00",
+      totalAmountString,
+    ].join("|");
+
+    // 7. Use customer ID for the customer field
+    const customerField = invoice.customerid;
+
+    // 8. Assemble the final line string for the invoice, ending with "&E&"
+    return (
+      [
+        invoice.id,
+        invoice.id, // orderno is same as invoiceno
+        formattedDate,
+        typeChar,
+        customerField,
+        invoice.salespersonid,
+        amountFields,
+        formattedTime,
+        orderDetailsString,
+      ].join("|") + "&E&"
+    );
+  });
+
+  // Join all invoice lines with a newline and add a trailing newline for compatibility.
+  return lines.join("\r\n") + (lines.length > 0 ? "\r\n" : "");
+};
+
 // --- Component ---
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -216,6 +307,8 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
   const [searchParams] = useSearchParams();
   const [initialParamsApplied, setInitialParamsApplied] = useState(false);
+  const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo((): InvoiceFilters => {
@@ -283,6 +376,17 @@ const InvoiceListPage: React.FC = () => {
   );
   // Fetch customer names based on IDs present in the currently loaded invoices
   const { customerNames } = useCustomerNames(customerIds);
+
+  // Salesman options for single selection dropdown
+  const salesmanOptions = useMemo(() => {
+    const options = [{ id: "", name: "All Salesmen" }];
+    return options.concat(
+      salesmen.map((s) => ({
+        id: s.id,
+        name: s.name || s.id,
+      }))
+    );
+  }, [salesmen]);
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -671,6 +775,91 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  // Today Button Handler
+  const handleTodayClick = useCallback(() => {
+    const today = new Date();
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfToday,
+        end: endOfToday,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Backward one day handler
+  const handleBackwardOneDay = useCallback(() => {
+    const baseDate = filters.dateRange.start || new Date();
+    const newDate = new Date(baseDate);
+    newDate.setDate(newDate.getDate() - 1);
+
+    const startOfDay = new Date(newDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(newDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfDay,
+        end: endOfDay,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Forward one day handler
+  const handleForwardOneDay = useCallback(() => {
+    const baseDate = filters.dateRange.start || new Date();
+    const newDate = new Date(baseDate);
+    newDate.setDate(newDate.getDate() + 1);
+
+    const startOfDay = new Date(newDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(newDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      dateRange: {
+        start: startOfDay,
+        end: endOfDay,
+      },
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Single Salesman Selection Handler
+  const handleSalesmanChange = useCallback((salesmanId: string | number) => {
+    setSelectedSalesmanId(String(salesmanId));
+    
+    // Update filters to sync with the single selection
+    const updatedFilters: InvoiceFilters = {
+      ...filters,
+      salespersonId: salesmanId === "" ? null : [salesmanId as string],
+    };
+    handleApplyFilters(updatedFilters);
+  }, [filters, handleApplyFilters]);
+
+  // Effect to sync selectedSalesmanId with filters when filters change externally
+  useEffect(() => {
+    const currentSalespersonIds = filters.salespersonId;
+    if (!currentSalespersonIds || currentSalespersonIds.length === 0) {
+      setSelectedSalesmanId("");
+    } else if (currentSalespersonIds.length === 1) {
+      setSelectedSalesmanId(currentSalespersonIds[0]);
+    } else {
+      // Multiple salesmen selected - show empty for single dropdown
+      setSelectedSalesmanId("");
+    }
+  }, [filters.salespersonId]);
+
   // Select/Deselect a single invoice
   const handleSelectInvoice = useCallback(
     (invoiceId: string) => {
@@ -841,6 +1030,91 @@ const InvoiceListPage: React.FC = () => {
   const handleRefresh = () => {
     if (!isLoading) {
       setIsFetchTriggered(true); // Trigger a refetch with current settings
+    }
+  };
+
+  // Bulk Export Handler
+  const handleBulkExport = async () => {
+    if (selectedInvoiceIds.size === 0) {
+      toast.error("No invoices selected for export");
+      return;
+    }
+
+    // Check for File System Access API support
+    if (!("showSaveFilePicker" in window)) {
+      toast.error(
+        "Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge."
+      );
+      return;
+    }
+
+    setIsExporting(true);
+    const toastId = toast.loading(
+      `Preparing ${selectedInvoiceIds.size} invoices for export...`
+    );
+
+    try {
+      const selectedIds = Array.from(selectedInvoiceIds);
+
+      // Fetch full data for all selected invoices
+      const BATCH_SIZE = 50;
+      let completeInvoices: ExtendedInvoiceData[] = [];
+      for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
+        const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
+        toast.loading(`Loading invoice data (${i}/${selectedIds.length})...`, {
+          id: toastId,
+        });
+        const batchInvoices = await getInvoicesByIds(batchIds);
+        completeInvoices = completeInvoices.concat(batchInvoices);
+      }
+
+      if (completeInvoices.length === 0) {
+        throw new Error("Could not fetch required invoice details for export.");
+      }
+
+      toast.loading(
+        `Generating export data for ${completeInvoices.length} invoices...`,
+        {
+          id: toastId,
+        }
+      );
+
+      // Format data into the required text format
+      const fileContent = formatInvoicesForExport(completeInvoices);
+
+      // Use File System Access API to save the file with fixed filename
+      const suggestedName = `JP_SLS1.txt`;
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName,
+        types: [
+          {
+            description: "Sales Text File",
+            accept: { "text/plain": [".txt"] },
+          },
+        ],
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(fileContent);
+      await writable.close();
+
+      toast.success(
+        `Successfully exported ${completeInvoices.length} invoices to ${handle.name}`,
+        { id: toastId }
+      );
+    } catch (error: any) {
+      // Don't show toast for user cancellation of the save dialog
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast.dismiss(toastId);
+        return;
+      }
+      console.error("Error during bulk export:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to export invoices.",
+        { id: toastId }
+      );
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -1325,6 +1599,61 @@ const InvoiceListPage: React.FC = () => {
               </Listbox>
             </div>
 
+            {/* Single Salesman Dropdown */}
+            <div className="w-full sm:w-44">
+              <StyledListbox
+                value={selectedSalesmanId}
+                onChange={(value) => {
+                  setSelectedSalesmanId(String(value));
+                  if (value === "") {
+                    // Clear salesman filter - set to empty array to show all
+                    setFilters(prev => ({ ...prev, salespersonId: [] }));
+                  } else {
+                    // Set single salesman filter
+                    setFilters(prev => ({ ...prev, salespersonId: [String(value)] }));
+                  }
+                  setCurrentPage(1); // Reset to first page
+                  setIsFetchTriggered(true); // Trigger fetch
+                }}
+                options={salesmanOptions}
+                placeholder="All Salesmen"
+                className="text-sm h-[42px]"
+              />
+            </div>
+
+            {/* Day Navigation Controls */}
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBackwardOneDay}
+                disabled={isLoading}
+                icon={IconChevronLeft}
+                aria-label="Previous Day"
+                title="Previous Day"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleTodayClick}
+                disabled={isLoading}
+                aria-label="Today"
+                title="Today"
+                className="min-w-[60px]"
+              >
+                Today
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleForwardOneDay}
+                disabled={isLoading}
+                icon={IconChevronRight}
+                aria-label="Next Day"
+                title="Next Day"
+              />
+            </div>
+
             {/* Search Input */}
             <div className="relative w-full sm:flex-1 md:max-w-md">
               <div
@@ -1685,6 +2014,21 @@ const InvoiceListPage: React.FC = () => {
                   title="Print PDF"
                 >
                   Print
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="green"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBulkExport();
+                  }}
+                  icon={IconFileExport}
+                  disabled={isLoading || isExporting}
+                  aria-label="Export Selected Invoices"
+                  title="Export to SLS format"
+                >
+                  {isExporting ? "Exporting..." : "Export"}
                 </Button>
               </>
             )}

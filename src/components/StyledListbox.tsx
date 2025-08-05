@@ -51,7 +51,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
               {options.map((option) => (
                 <ListboxOption
                   key={option.id}

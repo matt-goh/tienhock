@@ -144,7 +144,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Pinjam System",
+    name: "Pinjam",
     path: "/payroll/pinjam",
     component: PinjamListPage,
   });
