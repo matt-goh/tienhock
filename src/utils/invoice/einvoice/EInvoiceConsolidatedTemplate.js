@@ -39,12 +39,19 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
       // Calculate true tax-exclusive amount using product data if available
       if (invoice.orderDetails && Array.isArray(invoice.orderDetails)) {
         // Sum product price * quantity for true tax-exclusive amount
+        // Handle different product types: regular products, OTH (Other), LESS (Discount)
         const invoiceSubtotal = invoice.orderDetails.reduce((sum, product) => {
           if (!product.issubtotal) {
-            return (
-              sum +
-              (Number(product.price) || 0) * (Number(product.quantity) || 0)
-            );
+            const quantity = Number(product.quantity) || 0;
+            const price = Number(product.price) || 0;
+            
+            // For products with no quantity (like OTH, LESS), use the total field directly
+            if (quantity === 0 && product.total) {
+              return sum + (Number(product.total) || 0);
+            }
+            
+            // For regular products, use price * quantity
+            return sum + (price * quantity);
           }
           return sum;
         }, 0);
