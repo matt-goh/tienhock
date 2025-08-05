@@ -132,8 +132,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Commission",
-    path: "/payroll/commission",
+    name: "Incentives",
+    path: "/payroll/incentives",
     component: CommissionPage,
   });
 

@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     color: colors.header.companyDetails,
-    lineHeight: 1,
+    lineHeight: 1.2,
   },
 
   // Salesman Section
@@ -436,10 +436,15 @@ const CustomerSection = ({
   </View>
 );
 
-const DebtorsReportPDF: React.FC<{ data: any; companyName?: string }> = ({
-  data,
-  companyName = TIENHOCK_INFO.name,
-}) => {
+const DebtorsReportPDF: React.FC<{
+  data: any;
+  companyName?: string;
+  filterMonthName?: string;
+}> = ({ data, companyName = TIENHOCK_INFO.name, filterMonthName }) => {
+  const reportTitleText = filterMonthName
+    ? `Unpaid Bills (Invoices from ${filterMonthName}) as at ${data.report_date}`
+    : `Unpaid Bills by Salesmen as at ${data.report_date}`;
+
   return (
     <Document title={`Tien Hock Debtors Report ${data.report_date}`}>
       <Page size="A4" style={styles.page}>
@@ -448,9 +453,7 @@ const DebtorsReportPDF: React.FC<{ data: any; companyName?: string }> = ({
           <Image src={TienHockLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
             <Text style={styles.companyName}>{companyName}</Text>
-            <Text style={styles.reportTitle}>
-              Unpaid Bills by Salesmen as at {data.report_date}
-            </Text>
+            <Text style={styles.reportTitle}>{reportTitleText}</Text>
           </View>
         </View>
 
@@ -519,10 +522,13 @@ const DebtorsReportPDF: React.FC<{ data: any; companyName?: string }> = ({
 
 export const generateDebtorsReportPDF = async (
   data: any,
-  action: "download" | "print"
+  action: "download" | "print",
+  filterMonthName?: string
 ) => {
   try {
-    const doc = <DebtorsReportPDF data={data} />;
+    const doc = (
+      <DebtorsReportPDF data={data} filterMonthName={filterMonthName} />
+    );
     const pdfBlob = await pdf(doc).toBlob();
     if (action === "download") {
       const url = URL.createObjectURL(pdfBlob);
