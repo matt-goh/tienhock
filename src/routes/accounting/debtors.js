@@ -60,7 +60,7 @@ export default function (pool, config) {
           COALESCE(ip.payments, '[]'::json) as payments
         FROM invoices i
         LEFT JOIN invoice_payments ip ON i.id = ip.invoice_id
-        WHERE i.invoice_status IN ('Unpaid', 'overdue')
+        WHERE i.invoice_status IN ('Unpaid', 'Overdue')
           AND i.balance_due > 0.01
           ${filterClause}
       ),

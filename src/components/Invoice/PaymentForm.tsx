@@ -72,7 +72,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     setLoadingInvoices(true);
     try {
       const params = new URLSearchParams({
-        invoiceStatus: "Unpaid,overdue",
+        invoiceStatus: "Unpaid,Overdue",
         all: "true", // Add this to get all invoices without pagination
       });
 
