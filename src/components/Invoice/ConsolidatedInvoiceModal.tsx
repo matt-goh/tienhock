@@ -51,9 +51,11 @@ interface EligibleInvoice {
   customerid: string;
   amount: number;
   rounding: number;
+  tax_amount?: number;
   totalamountpayable: number;
   createddate: string;
   products: any[];
+  orderDetails?: any[];
 }
 
 interface ConsolidationHistory {
@@ -69,6 +71,15 @@ interface ConsolidationHistory {
   totalamountpayable: number;
   created_at: string;
   consolidated_invoices: string[];
+}
+
+interface ConsolidationPreview {
+  totalExcludingTax: number;
+  taxAmount: number;
+  totalRounding: number;
+  totalPayable: number;
+  invoiceCount: number;
+  consolidatedId: string;
 }
 
 const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
@@ -109,6 +120,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     new Date().getFullYear()
   );
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [autoConsolidationEligible, setAutoConsolidationEligible] = useState<
+    EligibleInvoice[]
+  >([]);
+  const [isLoadingAutoPreview, setIsLoadingAutoPreview] = useState(false);
+  const [autoConsolidationPreview, setAutoConsolidationPreview] =
+    useState<ConsolidationPreview | null>(null);
 
   // Create an array of month options (similar to how historyYear works)
   const monthOptions = useMemo(
@@ -134,6 +151,19 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       fetchEligibleInvoices();
       fetchConsolidationHistory();
       fetchAutoConsolidationSettings();
+
+      // Fetch auto-consolidation preview if in consolidation window
+      const windowInfo = getConsolidationWindowInfo();
+      if (
+        windowInfo.inWindow &&
+        windowInfo.targetMonth !== null &&
+        windowInfo.targetYear !== null
+      ) {
+        fetchAutoConsolidationEligible(
+          windowInfo.targetMonth,
+          windowInfo.targetYear
+        );
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -216,15 +246,17 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     setShowSubmissionResults(true);
     try {
       // Sort invoices by createddate (oldest to latest) before submitting
-      const selectedInvoiceObjects = eligibleInvoices.filter(invoice => 
-        selectedInvoices.has(invoice.id)
-      ).sort((a, b) => {
-        const timestampA = parseInt(a.createddate);
-        const timestampB = parseInt(b.createddate);
-        return timestampA - timestampB; // Ascending order (oldest first)
-      });
-      
-      const invoicesToSubmit = selectedInvoiceObjects.map(invoice => invoice.id);
+      const selectedInvoiceObjects = eligibleInvoices
+        .filter((invoice) => selectedInvoices.has(invoice.id))
+        .sort((a, b) => {
+          const timestampA = parseInt(a.createddate);
+          const timestampB = parseInt(b.createddate);
+          return timestampA - timestampB; // Ascending order (oldest first)
+        });
+
+      const invoicesToSubmit = selectedInvoiceObjects.map(
+        (invoice) => invoice.id
+      );
       const response = await api.post("/api/einvoice/submit-consolidated", {
         invoices: invoicesToSubmit,
         month,
@@ -268,6 +300,89 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     return eligibleInvoices
       .filter((invoice) => selectedInvoices.has(invoice.id))
       .reduce((sum, invoice) => sum + (invoice.totalamountpayable || 0), 0);
+  };
+
+  // Calculate consolidation preview that exactly matches EInvoiceConsolidatedTemplate logic
+  const calculateConsolidationPreview = (
+    invoices: EligibleInvoice[],
+    targetMonth: number,
+    targetYear: number
+  ): ConsolidationPreview | null => {
+    if (invoices.length === 0) {
+      return null;
+    }
+
+    let totalExcludingTax = 0;
+    let totalPayableAmount = 0;
+    let totalRounding = 0;
+    let totalProductTax = 0;
+
+    invoices.forEach((invoice) => {
+      // Calculate true tax-exclusive amount using product data if available
+      if (invoice.products && Array.isArray(invoice.products)) {
+        // Sum product price * quantity for true tax-exclusive amount
+        // Handle different product types: regular products, OTH (Other), LESS (Discount)
+        const invoiceSubtotal = invoice.products.reduce((sum, product) => {
+          if (!product.issubtotal) {
+            const quantity = Number(product.quantity) || 0;
+            const price = Number(product.price) || 0;
+
+            // For products with no quantity (like OTH, LESS), use the total field directly
+            if (quantity === 0 && product.total) {
+              return sum + (Number(product.total) || 0);
+            }
+
+            // For regular products, use price * quantity
+            return sum + price * quantity;
+          }
+          return sum;
+        }, 0);
+        totalExcludingTax += invoiceSubtotal;
+
+        // Sum product taxes
+        invoice.products.forEach((product) => {
+          if (!product.issubtotal) {
+            totalProductTax += Number(product.tax) || 0;
+          }
+        });
+      } else {
+        // Fallback: Use amount directly if specified as tax-exclusive
+        totalExcludingTax += Number(invoice.amount) || 0;
+      }
+
+      totalPayableAmount += Number(invoice.totalamountpayable) || 0;
+      totalRounding += Number(invoice.rounding) || 0;
+    });
+
+    // Calculate tax amount - prefer product-level calculation
+    let taxAmount = totalProductTax;
+
+    // Only use fallback calculation if we have a meaningful difference that suggests tax
+    if (
+      taxAmount === 0 &&
+      invoices.some((inv) => inv.tax_amount && Number(inv.tax_amount) > 0)
+    ) {
+      // If no product-level taxes found but invoice has tax_amount field, use that
+      taxAmount = invoices.reduce(
+        (sum, inv) => sum + (Number(inv.tax_amount) || 0),
+        0
+      );
+    }
+
+    // Generate consolidated ID
+    const consolidatedId = `CON-${targetYear}${String(targetMonth + 1).padStart(
+      2,
+      "0"
+    )}`;
+
+    return {
+      totalExcludingTax: Number(totalExcludingTax.toFixed(2)),
+      taxAmount: Number(taxAmount.toFixed(2)),
+      totalRounding: Number(totalRounding.toFixed(2)),
+      totalPayable: Number(totalPayableAmount.toFixed(2)),
+      invoiceCount: invoices.length,
+      consolidatedId,
+    };
   };
 
   // --- Handler to update status (only for pending) ---
@@ -348,6 +463,41 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       toast.error("Couldn't load auto-consolidation settings");
     } finally {
       setIsLoadingSettings(false);
+    }
+  };
+
+  const fetchAutoConsolidationEligible = async (
+    targetMonth: number,
+    targetYear: number
+  ) => {
+    setIsLoadingAutoPreview(true);
+    try {
+      const response = await api.get(
+        `/api/einvoice/eligible-for-consolidation?month=${targetMonth}&year=${targetYear}`
+      );
+      if (response.success) {
+        setAutoConsolidationEligible(response.data || []);
+
+        // Calculate preview using the same logic as the template
+        const preview = calculateConsolidationPreview(
+          response.data || [],
+          targetMonth,
+          targetYear
+        );
+        setAutoConsolidationPreview(preview);
+      } else {
+        setAutoConsolidationEligible([]);
+        setAutoConsolidationPreview(null);
+      }
+    } catch (error: any) {
+      console.error(
+        "Error fetching auto-consolidation eligible invoices:",
+        error
+      );
+      setAutoConsolidationEligible([]);
+      setAutoConsolidationPreview(null);
+    } finally {
+      setIsLoadingAutoPreview(false);
     }
   };
 
@@ -446,9 +596,11 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
   const getConsolidationWindowInfo = () => {
     const now = new Date();
-    const currentDay = now.getUTCDate();
-    const currentMonth = now.getUTCMonth();
-    const currentYear = now.getUTCFullYear();
+    // Convert to Malaysia Time (UTC+8)
+    const malaysiaTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const currentDay = malaysiaTime.getUTCDate();
+    const currentMonth = malaysiaTime.getUTCMonth();
+    const currentYear = malaysiaTime.getUTCFullYear();
 
     if (currentDay >= 3 && currentDay <= 7) {
       // We're in consolidation window for previous month (days 3-7)
@@ -461,13 +613,15 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       }
 
       // Check if consolidation already exists for this target month/year (excluding cancelled)
-      const existingConsolidation = consolidationHistory.find(item => {
+      const existingConsolidation = consolidationHistory.find((item) => {
         const consolidatedId = item.id;
         const yearFromId = parseInt(consolidatedId.substring(4, 8));
         const monthFromId = parseInt(consolidatedId.substring(8, 10)) - 1; // Convert to 0-based
-        return yearFromId === targetYear && 
-               monthFromId === targetMonth && 
-               item.einvoice_status === 'valid';
+        return (
+          yearFromId === targetYear &&
+          monthFromId === targetMonth &&
+          item.einvoice_status === "valid"
+        );
       });
 
       return {
@@ -483,7 +637,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     // Calculate next consolidation window start
     let nextWindowMonth = currentMonth + 1;
     let nextWindowYear = currentYear;
-    
+
     // If we're past day 7 of current month, next window is next month day 3
     // If we're before day 3 of current month, next window is current month day 3
     let nextWindowStart;
@@ -563,8 +717,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   Auto Consolidation (Monthly)
                 </div>
                 <p className="text-xs text-default-500 mt-0.5">
-                  Automatically consolidate eligible invoices during days 3-7
-                  of each month for the previous month's invoices.
+                  Automatically consolidate eligible invoices during days 3-7 of
+                  each month for the previous month's invoices.
                 </p>
               </div>
             </div>
@@ -624,10 +778,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                             })}
                           </div>
                           <div className="mb-1">
-                            <strong>Status:</strong> Valid consolidated e-invoice already submitted
+                            <strong>Status:</strong> Valid consolidated
+                            e-invoice already submitted
                           </div>
                           <div>
-                            <strong>Invoice ID:</strong> {windowInfo.existingConsolidation.id}
+                            <strong>Invoice ID:</strong>{" "}
+                            {windowInfo.existingConsolidation.id}
                           </div>
                         </div>
                       ) : (
@@ -650,12 +806,84 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                             invoices
                           </div>
                           <div className="mb-1">
-                            <strong>Day:</strong> {(windowInfo.dayInWindow || 0) - 2} of 5 in
+                            <strong>Day:</strong>{" "}
+                            {(windowInfo.dayInWindow || 0) - 2} of 5 in
                             consolidation window (days 3-7)
                           </div>
-                          <div>
+                          <div className="mb-2">
                             <strong>Window ends:</strong>{" "}
-                            {windowInfo.windowEnd?.toLocaleDateString("en-GB") || "N/A"}
+                            {windowInfo.windowEnd?.toLocaleDateString(
+                              "en-GB"
+                            ) || "N/A"}
+                          </div>
+
+                          {/* Auto-consolidation preview */}
+                          <div className="mt-3 p-3 bg-white rounded border border-green-300">
+                            <h5 className="font-medium text-green-800 mb-2 text-xs">
+                              Auto-Consolidation Preview
+                            </h5>
+                            {isLoadingAutoPreview ? (
+                              <div className="text-xs text-gray-500">
+                                Loading preview...
+                              </div>
+                            ) : autoConsolidationPreview ? (
+                              <div className="text-xs space-y-1">
+                                <div>
+                                  <strong>Eligible Invoices:</strong>{" "}
+                                  {autoConsolidationPreview.invoiceCount}
+                                </div>
+                                <div>
+                                  <strong>Total Excluding Tax:</strong> RM{" "}
+                                  {autoConsolidationPreview.totalExcludingTax.toLocaleString(
+                                    "en-MY",
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+                                </div>
+                                <div>
+                                  <strong>Tax Amount:</strong> RM{" "}
+                                  {autoConsolidationPreview.taxAmount.toLocaleString(
+                                    "en-MY",
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+                                </div>
+                                <div>
+                                  <strong>Total Payable:</strong> RM{" "}
+                                  {autoConsolidationPreview.totalPayable.toLocaleString(
+                                    "en-MY",
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )}
+                                </div>
+                                {autoConsolidationPreview.totalRounding !==
+                                  0 && (
+                                  <div>
+                                    <strong>Rounding:</strong> RM{" "}
+                                    {autoConsolidationPreview.totalRounding.toLocaleString(
+                                      "en-MY",
+                                      {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      }
+                                    )}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-600 mt-2">
+                                  ID: {autoConsolidationPreview.consolidatedId}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-500">
+                                No eligible invoices for auto-consolidation
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
@@ -669,11 +897,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         </div>
                         <div className="mb-1">
                           <strong>Next window starts:</strong>{" "}
-                            {windowInfo.nextWindowStart?.toLocaleDateString("en-GB") || "N/A"}
+                          {windowInfo.nextWindowStart?.toLocaleDateString(
+                            "en-GB"
+                          ) || "N/A"}
                         </div>
                         <div>
-                          Auto-consolidation runs during days 3-7 of
-                          each month for the previous month's eligible invoices.
+                          Auto-consolidation runs during days 3-7 of each month
+                          for the previous month's eligible invoices.
                         </div>
                       </div>
                     )}
