@@ -283,7 +283,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-default-600">Commission</span>
+                  <span className="text-default-600">
+                    {commissionRecords.length > 0
+                      ? commissionRecords
+                          .map((record) => record.description)
+                          .join(" + ")
+                      : "Commission"}
+                  </span>
                   <span className="font-medium">
                     {formatCurrency(
                       commissionRecords.reduce(
@@ -339,6 +345,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </div>
                 {payroll.deductions
                   ?.filter((d) => d.employee_amount > 0)
+                  .sort((a, b) => {
+                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
+                    const aIndex = order.indexOf(
+                      a.deduction_type.toUpperCase()
+                    );
+                    const bIndex = order.indexOf(
+                      b.deduction_type.toUpperCase()
+                    );
+                    return (
+                      (aIndex === -1 ? 999 : aIndex) -
+                      (bIndex === -1 ? 999 : bIndex)
+                    );
+                  })
                   .map((deduction) => (
                     <div
                       key={deduction.deduction_type}
@@ -356,7 +375,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   ))}
                 {commissionRecords.length > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-sky-700">Commission Advance</span>
+                    <span className="text-sky-700">
+                      {commissionRecords
+                        .map((record) => record.description)
+                        .join(" + ")}{" "}
+                      Advance
+                    </span>
                     <span className="font-medium text-sky-900">
                       -{" "}
                       {formatCurrency(
@@ -376,18 +400,27 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </span>
                   </div>
                 )}
-                {payroll.job_type === "MAINTEN" && monthlyLeaveRecords.filter(record => record.leave_type === "cuti_tahunan").length > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-sky-700">Cuti Tahunan Advance</span>
-                    <span className="font-medium text-sky-900">
-                      - {formatCurrency(
-                        monthlyLeaveRecords
-                          .filter(record => record.leave_type === "cuti_tahunan")
-                          .reduce((sum, record) => sum + record.amount_paid, 0)
-                      )}
-                    </span>
-                  </div>
-                )}
+                {payroll.job_type === "MAINTEN" &&
+                  monthlyLeaveRecords.filter(
+                    (record) => record.leave_type === "cuti_tahunan"
+                  ).length > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-sky-700">Cuti Tahunan Advance</span>
+                      <span className="font-medium text-sky-900">
+                        -{" "}
+                        {formatCurrency(
+                          monthlyLeaveRecords
+                            .filter(
+                              (record) => record.leave_type === "cuti_tahunan"
+                            )
+                            .reduce(
+                              (sum, record) => sum + record.amount_paid,
+                              0
+                            )
+                        )}
+                      </span>
+                    </div>
+                  )}
               </div>
               <div className="border-t border-sky-200 mt-3 pt-3">
                 <div className="flex justify-between font-bold">
@@ -398,15 +431,21 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
                         const isMainten = payroll.job_type === "MAINTEN";
                         const cutiTahunanRecords = monthlyLeaveRecords.filter(
-                          record => record.leave_type === "cuti_tahunan"
+                          (record) => record.leave_type === "cuti_tahunan"
                         );
                         const cutiTahunanAmount = cutiTahunanRecords.reduce(
                           (sum, record) => sum + record.amount_paid,
                           0
                         );
-                        const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
-                        
-                        return payroll.net_pay - (midMonthPayroll?.amount || 0) - additionalMaintenDeduction;
+                        const additionalMaintenDeduction = isMainten
+                          ? cutiTahunanAmount
+                          : 0;
+
+                        return (
+                          payroll.net_pay -
+                          (midMonthPayroll?.amount || 0) -
+                          additionalMaintenDeduction
+                        );
                       })()
                     )}
                   </span>
@@ -501,7 +540,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {commissionRecords.length > 0 && (
                 <div className="border rounded-lg p-4">
                   <h3 className="text-sm font-medium text-default-700 mb-2">
-                    Commission Advance
+                    {commissionRecords
+                      .map((record) => record.description)
+                      .join(" + ")}{" "}
+                    Advance
                   </h3>
                   <div className="space-y-2">
                     <div>
@@ -525,7 +567,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </div>
                     <div className="border-t border-default-200 pt-2 mt-2">
                       <div className="text-xs text-default-500">
-                        Commission payments made in advance, deducted from final pay.
+                        {commissionRecords
+                          .map((record) => record.description)
+                          .join(" + ")}{" "}
+                        payments made in advance, deducted from final pay.
                       </div>
                     </div>
                   </div>
@@ -549,7 +594,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-default-600">Date:</span>
                         <span className="font-medium text-default-900">
-                          {format(new Date(midMonthPayroll.created_at), "dd MMM yyyy")}
+                          {format(
+                            new Date(midMonthPayroll.created_at),
+                            "dd MMM yyyy"
+                          )}
                         </span>
                       </div>
                     </div>
@@ -563,44 +611,66 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               )}
 
               {/* Cuti Tahunan Advance (MAINTEN only) */}
-              {payroll.job_type === "MAINTEN" && 
-                monthlyLeaveRecords.filter(record => record.leave_type === "cuti_tahunan").length > 0 && (
-                <div className="border rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-default-700 mb-2">
-                    Cuti Tahunan Advance
-                  </h3>
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-default-600">Amount:</span>
-                        <span className="font-medium text-default-900">
-                          {formatCurrency(
-                            monthlyLeaveRecords
-                              .filter(record => record.leave_type === "cuti_tahunan")
-                              .reduce((sum, record) => sum + record.amount_paid, 0)
-                          )}
-                        </span>
+              {payroll.job_type === "MAINTEN" &&
+                monthlyLeaveRecords.filter(
+                  (record) => record.leave_type === "cuti_tahunan"
+                ).length > 0 && (
+                  <div className="border rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-default-700 mb-2">
+                      Cuti Tahunan Advance
+                    </h3>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">Amount:</span>
+                          <span className="font-medium text-default-900">
+                            {formatCurrency(
+                              monthlyLeaveRecords
+                                .filter(
+                                  (record) =>
+                                    record.leave_type === "cuti_tahunan"
+                                )
+                                .reduce(
+                                  (sum, record) => sum + record.amount_paid,
+                                  0
+                                )
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-default-600">Days:</span>
+                          <span className="font-medium text-default-900">
+                            {monthlyLeaveRecords
+                              .filter(
+                                (record) => record.leave_type === "cuti_tahunan"
+                              )
+                              .reduce(
+                                (sum, record) => sum + record.days_taken,
+                                0
+                              )}{" "}
+                            day
+                            {monthlyLeaveRecords
+                              .filter(
+                                (record) => record.leave_type === "cuti_tahunan"
+                              )
+                              .reduce(
+                                (sum, record) => sum + record.days_taken,
+                                0
+                              ) !== 1
+                              ? "s"
+                              : ""}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-default-600">Days:</span>
-                        <span className="font-medium text-default-900">
-                          {monthlyLeaveRecords
-                            .filter(record => record.leave_type === "cuti_tahunan")
-                            .reduce((sum, record) => sum + record.days_taken, 0)
-                          } day{monthlyLeaveRecords
-                            .filter(record => record.leave_type === "cuti_tahunan")
-                            .reduce((sum, record) => sum + record.days_taken, 0) !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="border-t border-default-200 pt-2 mt-2">
-                      <div className="text-xs text-default-500">
-                        Annual leave payment for MAINTEN employees, treated as advance for commission deduction.
+                      <div className="border-t border-default-200 pt-2 mt-2">
+                        <div className="text-xs text-default-500">
+                          Annual leave payment for MAINTEN employees, treated as
+                          advance for commission deduction.
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           </div>
         )}
@@ -1014,7 +1084,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             {commissionRecords.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-md font-medium text-default-700 mb-2">
-                  Commission
+                  {commissionRecords.length > 0
+                    ? commissionRecords
+                        .map((record) => record.description)
+                        .join(" + ")
+                    : "Commission"}
                 </h3>
                 <div className="border rounded-lg overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200">
@@ -1071,7 +1145,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           colSpan={2}
                           className="px-6 py-3 text-right text-sm font-medium text-default-600"
                         >
-                          Total Commission
+                          Total{" "}
+                          {commissionRecords.length > 0
+                            ? commissionRecords
+                                .map((record) => record.description)
+                                .join(" + ")
+                            : "Commission"}
                         </td>
                         <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
                           {formatCurrency(

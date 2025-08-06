@@ -59,7 +59,7 @@ import {
 import Pagination from "../../components/Invoice/Pagination";
 import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
-import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
+import InvoiceDailyPrintMenu from "../../components/JellyPolly/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
 
 // --- Constants ---
@@ -1516,8 +1516,8 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="flex flex-col w-full h-full px-4 md:px-12">
-      <div className="space-y-4">
+    <div className="flex flex-col w-full h-full px-4 md:px-12 -mt-6">
+      <div className="space-y-3">
         {/* --- Combined Header and Filters --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
           {/* Title */}
@@ -1525,8 +1525,10 @@ const InvoiceListPage: React.FC = () => {
             Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
           </h1>
 
-          {/* Filters container */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap md:flex-1 md:justify-end">
+          {/* Filters and Actions Container */}
+          <div className="flex flex-col xl:flex-row xl:items-center gap-2 w-full md:flex-1 md:justify-end">
+            {/* Left Group: Date Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap sm:flex-nowrap w-full xl:w-auto">
             {/* Date Range Picker */}
             <div className="w-full sm:w-auto">
               <DateRangePicker
@@ -1538,21 +1540,51 @@ const InvoiceListPage: React.FC = () => {
               />
             </div>
 
-            {/* Month Selector */}
-            <div className="w-full sm:w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                    <span className="block truncate pl-1">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
+              {/* Date Navigation */}
+              <div className="flex w-full sm:w-auto items-center justify-center">
+                <div className="flex items-center gap-1 w-full">
+                  <button
+                    onClick={handleBackwardOneDay}
+                    title="Previous Day"
+                    aria-label="Previous Day"
+                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <IconChevronLeft size={20} className="mr-[1px]" />
+                  </button>
+                  <Button
+                    onClick={handleTodayClick}
+                    variant="outline"
+                    size="sm"
+                    className="h-[42px] whitespace-nowrap px-3 sm:px-4 min-w-0 flex-grow"
+                  >
+                    Today
+                  </Button>
+                  <button
+                    onClick={handleForwardOneDay}
+                    title="Next Day"
+                    aria-label="Next Day"
+                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <IconChevronRight size={20} className="ml-[1px]" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Month Selector */}
+              <div className="w-full xl:w-40">
+                <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                  <div className="relative">
+                    <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                      <span className="block truncate pl-1">
+                        {selectedMonth.name}
+                      </span>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <IconChevronDown
+                          className="h-5 w-5 text-default-400"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </ListboxButton>
                   <Transition
                     leave="transition ease-in duration-100"
                     leaveFrom="opacity-100"
@@ -1595,69 +1627,16 @@ const InvoiceListPage: React.FC = () => {
                       ))}
                     </ListboxOptions>
                   </Transition>
-                </div>
-              </Listbox>
+                  </div>
+                </Listbox>
+              </div>
             </div>
 
-            {/* Single Salesman Dropdown */}
-            <div className="w-full sm:w-44">
-              <StyledListbox
-                value={selectedSalesmanId}
-                onChange={(value) => {
-                  setSelectedSalesmanId(String(value));
-                  if (value === "") {
-                    // Clear salesman filter - set to empty array to show all
-                    setFilters(prev => ({ ...prev, salespersonId: [] }));
-                  } else {
-                    // Set single salesman filter
-                    setFilters(prev => ({ ...prev, salespersonId: [String(value)] }));
-                  }
-                  setCurrentPage(1); // Reset to first page
-                  setIsFetchTriggered(true); // Trigger fetch
-                }}
-                options={salesmanOptions}
-                placeholder="All Salesmen"
-                className="text-sm h-[42px]"
-              />
-            </div>
-
-            {/* Day Navigation Controls */}
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBackwardOneDay}
-                disabled={isLoading}
-                icon={IconChevronLeft}
-                aria-label="Previous Day"
-                title="Previous Day"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleTodayClick}
-                disabled={isLoading}
-                aria-label="Today"
-                title="Today"
-                className="min-w-[60px]"
-              >
-                Today
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleForwardOneDay}
-                disabled={isLoading}
-                icon={IconChevronRight}
-                aria-label="Next Day"
-                title="Next Day"
-              />
-            </div>
-
-            {/* Search Input */}
-            <div className="relative w-full sm:flex-1 md:max-w-md">
+            {/* Right Group: Search and Main Filters */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
+              {/* Search Input */}
               <div
-                className="relative flex-1"
+                className="relative flex-1 w-full sm:w-auto"
                 title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
               >
                 <IconSearch
@@ -1683,10 +1662,19 @@ const InvoiceListPage: React.FC = () => {
                   </button>
                 )}
               </div>
-            </div>
 
-            {/* Filter Menu Button */}
-            <div className="relative">
+              {/* Salesman Filter */}
+              <div className="w-full sm:w-40">
+                <StyledListbox
+                  value={selectedSalesmanId}
+                  onChange={handleSalesmanChange}
+                  options={salesmanOptions}
+                  placeholder="All Salesmen"
+                />
+              </div>
+
+              {/* Filter Menu Button */}
+              <div className="relative w-full sm:w-auto sm:flex-shrink-0">
               <InvoiceFilterMenu
                 currentFilters={filters}
                 onFilterChange={handleApplyFilters}
@@ -1768,7 +1756,7 @@ const InvoiceListPage: React.FC = () => {
                       {filters.invoiceStatus &&
                         filters.invoiceStatus.length > 0 &&
                         !(
-                          filters.invoiceStatus.length === 3 &&
+                          filters.invoiceStatus.length === 4 &&
                           filters.invoiceStatus.includes("paid") &&
                           filters.invoiceStatus.includes("Unpaid") &&
                           filters.invoiceStatus.includes("Overdue") &&
@@ -1846,6 +1834,7 @@ const InvoiceListPage: React.FC = () => {
                   )}
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
@@ -1932,7 +1921,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkCancel();
                   }}
                   icon={IconBan}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Cancel Selected Invoices"
                   title="Cancel"
                 >
@@ -1948,7 +1937,7 @@ const InvoiceListPage: React.FC = () => {
                       handleBatchSyncCancellation();
                     }}
                     icon={IconRefresh}
-                    disabled={isLoading}
+                    disabled={isLoading || isExporting}
                     aria-label="Sync Cancellation Status"
                     title="Sync Cancellation Status"
                   >
@@ -1964,7 +1953,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkSubmitEInvoice();
                   }}
                   icon={IconSend}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Submit Selected for E-Invoice"
                   title="Submit e-Invoice"
                 >
@@ -1980,7 +1969,7 @@ const InvoiceListPage: React.FC = () => {
                       handleDownloadValidEInvoices();
                     }}
                     icon={IconFileDownload}
-                    disabled={isLoading}
+                    disabled={isLoading || isExporting}
                     aria-label="e-Invoice"
                     title="Download e-Invoice"
                   >
@@ -1995,7 +1984,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkDownload();
                   }}
                   icon={IconFileDownload}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Download Selected Invoices"
                   title="Download PDF"
                 >
@@ -2009,7 +1998,7 @@ const InvoiceListPage: React.FC = () => {
                     handleBulkPrint();
                   }}
                   icon={IconPrinter}
-                  disabled={isLoading}
+                  disabled={isLoading || isExporting}
                   aria-label="Print Selected Invoices"
                   title="Print PDF"
                 >
@@ -2018,7 +2007,6 @@ const InvoiceListPage: React.FC = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  color="green"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleBulkExport();
@@ -2026,22 +2014,23 @@ const InvoiceListPage: React.FC = () => {
                   icon={IconFileExport}
                   disabled={isLoading || isExporting}
                   aria-label="Export Selected Invoices"
-                  title="Export to SLS format"
+                  title="Export"
                 >
-                  {isExporting ? "Exporting..." : "Export"}
+                  Export
                 </Button>
               </>
             )}
 
+            <InvoiceDailyPrintMenu filters={filters} size="sm" />
             <Button
               onClick={() => setShowConsolidatedModal(true)}
               icon={IconFiles}
               variant="outline"
               color="amber"
-              disabled={isLoading}
+              disabled={isLoading || isExporting}
               size="sm"
-              aria-label="Consolidated Invoice"
               title="Consolidated Invoice"
+              aria-label="Consolidated Invoice"
             >
               Consolidated
             </Button>
@@ -2049,10 +2038,10 @@ const InvoiceListPage: React.FC = () => {
               onClick={handleRefresh}
               icon={IconRefresh}
               variant="outline"
-              disabled={isLoading}
+              disabled={isLoading || isExporting}
               size="sm"
-              aria-label="Refresh Invoices"
               title="Refresh Invoices"
+              aria-label="Refresh Invoices"
             >
               Refresh
             </Button>
@@ -2062,8 +2051,8 @@ const InvoiceListPage: React.FC = () => {
               variant="filled"
               color="sky"
               size="sm"
-              aria-label="Create New Invoice"
               title="Create New Invoice"
+              aria-label="Create New Invoice"
             >
               Create New
             </Button>

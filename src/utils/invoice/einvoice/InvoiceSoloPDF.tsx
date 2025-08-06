@@ -1,4 +1,4 @@
-// src/utils/invoice/einvoice/EInvoicePDF.tsx
+// src/utils/invoice/einvoice/InvoiceSoloPDF.tsx
 import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { EInvoicePDFData } from "../../../services/einvoice-pdf.service";
@@ -83,11 +83,6 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     lineHeight: 1.3,
   },
-  qrCode: {
-    width: 70,
-    height: 70,
-    alignSelf: "flex-start",
-  },
   invoiceDetails: {
     marginBottom: 6,
   },
@@ -102,12 +97,6 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     flex: 1,
-    textAlign: "right",
-  },
-  title: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
     textAlign: "right",
   },
   infoContainer: {
@@ -136,14 +125,6 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     flex: 1,
-  },
-  infoColumns: {
-    flexDirection: "row",
-    marginTop: 6,
-  },
-  column: {
-    flex: 1,
-    paddingRight: 15,
   },
   bold: {
     fontFamily: "Helvetica-Bold",
@@ -227,20 +208,16 @@ const styles = StyleSheet.create({
 
 interface Props {
   data: EInvoicePDFData;
-  qrCodeData: string;
-  isConsolidated?: boolean;
   companyContext?: "tienhock" | "jellypolly";
 }
 
-const EInvoicePDF: React.FC<Props> = ({
+const InvoiceSoloPDF: React.FC<Props> = ({
   data,
-  qrCodeData,
-  isConsolidated = false,
   companyContext = "tienhock",
 }) => {
   return (
     <Page size="A4" style={styles.page}>
-      {/* Header Section */}
+      {/* Header Section - Only logo and company info, no QR code */}
       <View style={styles.header}>
         <View style={styles.companySection}>
           <Image src={TienHockLogo} style={styles.logo} />
@@ -267,23 +244,13 @@ const EInvoicePDF: React.FC<Props> = ({
             </Text>
           </View>
         </View>
-        <Image src={qrCodeData} style={styles.qrCode} />
       </View>
 
-      {/* E-Invoice Title */}
-      <Text style={styles.title}>
-        {isConsolidated ? "Consolidated e-Invoice" : "e-Invoice"}
-      </Text>
-
-      {/* Key Invoice Details */}
+      {/* Key Invoice Details - No UUID field */}
       <View style={styles.invoiceDetails}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Invoice No.</Text>
           <Text style={styles.detailValue}>{data.invoice.number}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Unique ID No.</Text>
-          <Text style={styles.detailValue}>{data.invoice.uuid}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Invoice Date & Time</Text>
@@ -354,15 +321,15 @@ const EInvoicePDF: React.FC<Props> = ({
           <View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer TIN</Text>
-              <Text style={styles.infoValue}>{data.buyer.tin}</Text>
+              <Text style={styles.infoValue}>{data.buyer.tin || "-"}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer Name</Text>
-              <Text style={styles.infoValue}>{data.buyer.name}</Text>
+              <Text style={styles.infoValue}>{data.buyer.name || "-"}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer Reg No.</Text>
-              <Text style={styles.infoValue}>{data.buyer.reg_no}</Text>
+              <Text style={styles.infoValue}>{data.buyer.reg_no || "-"}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Customer SST No.</Text>
@@ -371,19 +338,24 @@ const EInvoicePDF: React.FC<Props> = ({
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Billing Address</Text>
               <Text style={styles.infoValue}>
-                {data.buyer.address}
-                {data.buyer.city && data.buyer.state
-                  ? `, ${data.buyer.city}, ${getStateName(data.buyer.state)}`
-                  : ""}
+                {data.buyer.address
+                  ? `${data.buyer.address}${
+                      data.buyer.city && data.buyer.state
+                        ? `, ${data.buyer.city}, ${getStateName(
+                            data.buyer.state
+                          )}`
+                        : ""
+                    }`
+                  : "-"}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Contact No.</Text>
-              <Text style={styles.infoValue}>{data.buyer.contact}</Text>
+              <Text style={styles.infoValue}>{data.buyer.contact || "-"}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{data.buyer.email}</Text>
+              <Text style={styles.infoValue}>{data.buyer.email || "-"}</Text>
             </View>
           </View>
         </View>
@@ -491,16 +463,10 @@ const EInvoicePDF: React.FC<Props> = ({
 
       {/* Footer */}
       <Text style={styles.footer}>
-        This document is computer generated e-Invoice.
-        {"\n"}
-        Validated on{" "}
-        {new Date(data.invoice.datetime_validated).toLocaleString("en-GB", {
-          timeZone: "Asia/Kuala_Lumpur",
-          hour12: true,
-        })}
+        This document is computer generated Invoice.
       </Text>
     </Page>
   );
 };
 
-export default EInvoicePDF;
+export default InvoiceSoloPDF;

@@ -71,6 +71,97 @@ export default function (pool) {
     }
   });
 
+  // --- GET /api/payments/all (Get All Payments with Enhanced Filters) ---
+  router.get("/all", async (req, res) => {
+    const {
+      startDate,
+      endDate,
+      paymentMethod,
+      status,
+      search,
+      include_cancelled = "true",
+    } = req.query;
+
+    try {
+      let query = `
+        SELECT
+          p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+          p.payment_method, p.payment_reference, p.internal_reference,
+          p.notes, p.created_at, p.status, p.cancellation_date,
+          i.customerid, i.salespersonid, c.name as customer_name
+        FROM jellypolly.payments p
+        JOIN jellypolly.invoices i ON p.invoice_id = i.id
+        LEFT JOIN customers c ON i.customerid = c.id
+        WHERE 1=1
+      `;
+
+      const queryParams = [];
+      let paramCounter = 1;
+
+      // Date filter
+      if (startDate && endDate) {
+        queryParams.push(
+          new Date(parseInt(startDate)),
+          new Date(parseInt(endDate))
+        );
+        query += ` AND p.payment_date BETWEEN $${paramCounter++} AND $${paramCounter++}`;
+      }
+
+      // Payment method filter
+      if (paymentMethod) {
+        queryParams.push(paymentMethod);
+        query += ` AND p.payment_method = $${paramCounter++}`;
+      }
+
+      // Status filter
+      if (status) {
+        if (status === "active") {
+          query += ` AND (p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
+        } else {
+          queryParams.push(status);
+          query += ` AND p.status = $${paramCounter++}`;
+        }
+      } else if (include_cancelled !== "true") {
+        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
+      }
+
+      // Search filter
+      if (search) {
+        queryParams.push(`%${search}%`);
+        query += ` AND (
+          p.invoice_id ILIKE $${paramCounter++} OR
+          p.payment_reference ILIKE $${paramCounter++} OR
+          p.internal_reference ILIKE $${paramCounter++} OR
+          CAST(p.amount_paid AS TEXT) ILIKE $${paramCounter++} OR
+          c.name ILIKE $${paramCounter++} OR
+          CAST(i.salespersonid AS TEXT) ILIKE $${paramCounter++}
+        )`;
+        
+        // Add the search parameter multiple times for each ILIKE condition
+        for (let i = 1; i < 6; i++) {
+          queryParams.push(`%${search}%`);
+        }
+      }
+
+      query += " ORDER BY p.payment_date DESC, p.created_at DESC";
+
+      const result = await pool.query(query, queryParams);
+
+      // Parse amount_paid to number before sending
+      const payments = result.rows.map((p) => ({
+        ...p,
+        amount_paid: parseFloat(p.amount_paid || 0),
+      }));
+
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching all payments:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching payments", error: error.message });
+    }
+  });
+
   // --- POST /api/payments (Create Payment) ---
   router.post("/", async (req, res) => {
     const {
