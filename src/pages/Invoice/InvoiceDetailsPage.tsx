@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ExtendedInvoiceData,
-  InvoiceData,
   Payment,
   ProductItem,
 } from "../../types/types";

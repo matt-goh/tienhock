@@ -73,22 +73,28 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
               Code
             </th>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[35%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[30%]">
               Description
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
               Qty
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[12%]">
               Price (RM)
+            </th>
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              FOC
+            </th>
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+              RTN
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
               Tax (RM)
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[14%]">
               Total (RM)
             </th>
           </tr>
@@ -128,6 +134,20 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
                   }`}
                 >
                   {isSubtotal ? "" : formatCurrency(item.price)}
+                </td>
+                <td
+                  className={`px-4 py-2 text-right text-sm ${
+                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                  }`}
+                >
+                  {isSubtotal ? "" : item.freeProduct || 0}
+                </td>
+                <td
+                  className={`px-4 py-2 text-right text-sm ${
+                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                  }`}
+                >
+                  {isSubtotal ? "" : item.returnProduct || 0}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
@@ -198,10 +218,19 @@ const InvoiceDetailsPage: React.FC = () => {
     null
   );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
+  const [overpaymentDetails, setOverpaymentDetails] = useState<{
+    totalAmount: number;
+    regularAmount: number;
+    overpaidAmount: number;
+  } | null>(null);
   
   // Edit states
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [customerQuery, setCustomerQuery] = useState<string>("");
   const [isUpdatingCustomer, setIsUpdatingCustomer] = useState<boolean>(false);
 
@@ -383,26 +412,35 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const handleOpenCustomerEdit = () => {
     if (!invoiceData) return;
-    setSelectedCustomerId(invoiceData.customerid);
+    const currentCustomer = customers.find(c => c.id === invoiceData.customerid);
+    if (currentCustomer) {
+      setSelectedCustomer({
+        id: currentCustomer.id,
+        name: currentCustomer.name,
+      });
+    }
     setCustomerQuery("");
     setIsEditingCustomer(true);
   };
 
   const handleCustomerUpdate = async (): Promise<void> => {
-    if (!invoiceData || !selectedCustomerId || isUpdatingCustomer) return;
+    if (!selectedCustomer || selectedCustomer.id === invoiceData?.customerid) {
+      setIsEditingCustomer(false);
+      return;
+    }
 
     // Check if e-invoice status requires confirmation
-    if (invoiceData.einvoice_status && invoiceData.einvoice_status !== "cancelled") {
+    if (invoiceData?.einvoice_status && invoiceData.einvoice_status !== "cancelled") {
       setEInvoiceCancelField("customer");
       setEInvoiceCancelAction({
         type: "customer",
-        data: { customerid: selectedCustomerId },
+        data: { customerid: selectedCustomer.id },
       });
       setShowEInvoiceCancelConfirm(true);
       return;
     }
 
-    await performCustomerUpdate(selectedCustomerId, false);
+    await performCustomerUpdate(selectedCustomer.id, false);
   };
 
   const performCustomerUpdate = async (customerid: string, confirmEInvoiceCancellation: boolean): Promise<void> => {
@@ -419,6 +457,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
       toast.success("Customer updated successfully", { id: toastId });
       setIsEditingCustomer(false);
+      setSelectedCustomer(null);
+      setCustomerQuery("");
       await fetchDetails(); // Refresh data
     } catch (error: any) {
       console.error("Error updating customer:", error);
@@ -1966,7 +2006,11 @@ const InvoiceDetailsPage: React.FC = () => {
                 Change Customer
               </h3>
               <button
-                onClick={() => setIsEditingCustomer(false)}
+                onClick={() => {
+                  setIsEditingCustomer(false);
+                  setSelectedCustomer(null);
+                  setCustomerQuery("");
+                }}
                 className="text-gray-400 hover:text-gray-600"
                 disabled={isUpdatingCustomer}
               >
@@ -1976,9 +2020,9 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="mb-6">
               <CustomerCombobox
                 name="customer"
-                label="Customer"
-                value={selectedCustomerId ? { id: selectedCustomerId, name: customers.find(c => c.id === selectedCustomerId)?.name || selectedCustomerId } : null}
-                onChange={(value) => setSelectedCustomerId(value?.id || null)}
+                label="Select New Customer"
+                value={selectedCustomer}
+                onChange={setSelectedCustomer}
                 options={filteredCustomers}
                 query={customerQuery}
                 setQuery={setCustomerQuery}
@@ -1992,7 +2036,11 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="flex justify-end gap-3">
               <Button
                 variant="outline"
-                onClick={() => setIsEditingCustomer(false)}
+                onClick={() => {
+                  setIsEditingCustomer(false);
+                  setSelectedCustomer(null);
+                  setCustomerQuery("");
+                }}
                 disabled={isUpdatingCustomer}
               >
                 Cancel
@@ -2002,8 +2050,8 @@ const InvoiceDetailsPage: React.FC = () => {
                 onClick={handleCustomerUpdate}
                 disabled={
                   isUpdatingCustomer ||
-                  !selectedCustomerId ||
-                  selectedCustomerId === invoiceData.customerid
+                  !selectedCustomer ||
+                  selectedCustomer.id === invoiceData.customerid
                 }
               >
                 {isUpdatingCustomer ? "Updating..." : "Update Customer"}
@@ -2240,7 +2288,15 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* E-Invoice Cancel Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showEInvoiceCancelConfirm}
-        onClose={() => setShowEInvoiceCancelConfirm(false)}
+        onClose={() => {
+          setShowEInvoiceCancelConfirm(false);
+          // Clear customer edit state if cancelling customer edit
+          if (eInvoiceCancelAction?.type === "customer") {
+            setIsEditingCustomer(false);
+            setSelectedCustomer(null);
+            setCustomerQuery("");
+          }
+        }}
         onConfirm={handleConfirmEInvoiceCancellation}
         title="Cancel E-Invoice"
         message={`Changing the ${eInvoiceCancelField} will require cancelling the e-invoice. This action cannot be undone. Do you want to proceed?`}
