@@ -1,3 +1,4 @@
+// src/components/Invoice/PaymentForm.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import { IconX, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
@@ -76,13 +77,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         all: "true", // Add this to get all invoices without pagination
       });
 
-      // Add date range filter from props
-      if (dateRange.start) {
-        params.append("startDate", dateRange.start.getTime().toString());
-      }
-      if (dateRange.end) {
-        params.append("endDate", dateRange.end.getTime().toString());
-      }
+      // Set date range to show invoices from a year before
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setFullYear(endDate.getFullYear() - 1);
+      
+      params.append("startDate", startDate.getTime().toString());
+      params.append("endDate", endDate.getTime().toString());
 
       const response = await api.get(`/api/invoices?${params.toString()}`);
       // With all=true, the response is directly an array of invoices
@@ -93,7 +94,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     } finally {
       setLoadingInvoices(false);
     }
-  }, [dateRange]);
+  }, []);
 
   const totalPaymentAmount = selectedInvoices.reduce(
     (sum, item) => sum + item.amountToPay,
