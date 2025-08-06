@@ -1,6 +1,7 @@
+// src/components/Invoice/InvoiceSelectionTable.tsx
 import React from "react";
 import { InvoiceData } from "../../types/types";
-import { IconSearch, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconSearch, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
 
 interface InvoiceSelectionTableProps {
@@ -63,17 +64,21 @@ const InvoiceSelectionTable: React.FC<InvoiceSelectionTableProps> = ({
             />
           </div>
           <div className="text-sm text-gray-600">
-            {dateRange.start && dateRange.end
-              ? `${dateRange.start.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })} - ${dateRange.end.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })}`
-              : "All dates"}
+            {(() => {
+              const endDate = new Date();
+              const startDate = new Date();
+              startDate.setFullYear(endDate.getFullYear() - 1);
+
+              return `${startDate.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })} - ${endDate.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })}`;
+            })()}
           </div>
         </div>
       </div>
