@@ -363,7 +363,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
 
       {/* Pay Slip Title - Now separate from header */}
       <Text style={styles.payslipTitle}>
-        Slip Gaji Pajak (Jam/Bag/Commission) Untuk Bulan {monthName} {year}
+        Slip Gaji Pajak (Jam/Bag/{commissionRecords.length > 0 
+          ? commissionRecords.map(record => record.description).join('/') 
+          : 'Commission'
+        }) Untuk Bulan {monthName} {year}
       </Text>
 
       {/* Main Table */}
@@ -498,7 +501,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
               >
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
-                    <Text>{commission.description || "Commission"}</Text>
+                    <Text>{commission.description}</Text>
                   </View>
                 </View>
                 <View style={[styles.tableCol, styles.rateCol]}>
@@ -824,10 +827,8 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
                 : commission.amount;
               const description =
                 isMainten && cutiTahunanRecords.length > 0
-                  ? `${
-                      commission.description || "Commission"
-                    } + Cuti Tahunan (Advance)`
-                  : `${commission.description || "Commission"} (Advance)`;
+                  ? `${commission.description} + Cuti Tahunan (Advance)`
+                  : `${commission.description} (Advance)`;
 
               return (
                 <View
