@@ -1440,5 +1440,116 @@ export default function (pool, config) {
     }
   });
 
+  // Get submission details by UUID
+  router.get("/submission/:uuid", async (req, res) => {
+    const { uuid } = req.params;
+    
+    try {
+      // Call MyInvois API to get submission details
+      const submissionDetails = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${uuid}/details`
+      );
+
+      res.json({
+        success: true,
+        data: submissionDetails,
+      });
+    } catch (error) {
+      console.error(`Error fetching submission details for UUID ${uuid}:`, error);
+      
+      if (error.status === 404) {
+        return res.status(404).json({
+          success: false,
+          message: "Submission not found",
+          error: "Document with the specified UUID was not found",
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch submission details",
+        error: error.message,
+      });
+    }
+  });
+
+  // Clear e-invoice status for an invoice (reset to allow resubmission)
+  router.post("/clear-status/:id", async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists
+      const checkQuery = `
+        SELECT id, einvoice_status, invoice_status
+        FROM jellypolly.invoices 
+        WHERE id = $1
+      `;
+      const checkResult = await client.query(checkQuery, [id]);
+
+      if (checkResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found",
+        });
+      }
+
+      const invoice = checkResult.rows[0];
+
+      // Don't allow clearing if invoice is cancelled
+      if (invoice.invoice_status === "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: "Cannot clear e-invoice status for cancelled invoices",
+        });
+      }
+
+      // Clear all e-invoice related fields
+      const clearQuery = `
+        UPDATE jellypolly.invoices 
+        SET 
+          einvoice_status = NULL,
+          uuid = NULL,
+          submission_uid = NULL,
+          long_id = NULL,
+          datetime_validated = NULL
+        WHERE id = $1
+        RETURNING *
+      `;
+      
+      const result = await client.query(clearQuery, [id]);
+      
+      await client.query("COMMIT");
+
+      res.json({
+        success: true,
+        message: "E-invoice status cleared successfully",
+        invoice: {
+          id: result.rows[0].id,
+          einvoice_status: result.rows[0].einvoice_status,
+          uuid: result.rows[0].uuid,
+          submission_uid: result.rows[0].submission_uid,
+          long_id: result.rows[0].long_id,
+          datetime_validated: result.rows[0].datetime_validated,
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(`Error clearing e-invoice status for invoice ${id}:`, error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to clear e-invoice status",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }

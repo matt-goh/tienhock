@@ -376,7 +376,7 @@ async function getEligibleTienhockInvoices(client, month, year) {
     endTimestamp,
   ]);
 
-  // Get order details for each invoice
+  // Get order details for each invoice and map to products for consistent calculation
   for (const invoice of invoiceResult.rows) {
     const orderDetailsQuery = `
       SELECT 
@@ -390,6 +390,8 @@ async function getEligibleTienhockInvoices(client, month, year) {
       invoice.id,
     ]);
     invoice.orderDetails = orderDetailsResult.rows;
+    // Map orderDetails to products for consistent calculation logic
+    invoice.products = orderDetailsResult.rows;
   }
 
   return invoiceResult.rows;
@@ -441,7 +443,7 @@ async function getEligibleJellypollyInvoices(client, month, year) {
     endTimestamp,
   ]);
 
-  // Get order details for each invoice
+  // Get order details for each invoice and map to products for consistent calculation
   for (const invoice of invoiceResult.rows) {
     const orderDetailsQuery = `
       SELECT 
@@ -455,6 +457,8 @@ async function getEligibleJellypollyInvoices(client, month, year) {
       invoice.id,
     ]);
     invoice.orderDetails = orderDetailsResult.rows;
+    // Map orderDetails to products for consistent calculation logic
+    invoice.products = orderDetailsResult.rows;
   }
 
   return invoiceResult.rows;
