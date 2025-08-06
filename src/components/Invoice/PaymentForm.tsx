@@ -18,6 +18,8 @@ interface PaymentFormProps {
     start: Date | null;
     end: Date | null;
   };
+  apiEndpoint?: string; // Optional API endpoint for different companies
+  invoicesEndpoint?: string; // Optional invoices endpoint for different companies
 }
 
 interface InvoicePaymentAllocation {
@@ -30,6 +32,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   onClose,
   onSuccess,
   dateRange,
+  apiEndpoint = "/api/payments", // Default to main company endpoint
+  invoicesEndpoint = "/api/invoices", // Default to main company invoices endpoint
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -85,7 +89,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       params.append("startDate", startDate.getTime().toString());
       params.append("endDate", endDate.getTime().toString());
 
-      const response = await api.get(`/api/invoices?${params.toString()}`);
+      const response = await api.get(`${invoicesEndpoint}?${params.toString()}`);
       // With all=true, the response is directly an array of invoices
       setAvailableInvoices(Array.isArray(response) ? response : []);
     } catch (error) {
@@ -148,7 +152,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       // Create payment for each selected invoice
       const paymentPromises = selectedInvoices.map(({ invoice, amountToPay }) =>
-        api.post("/api/payments", {
+        api.post(apiEndpoint, {
           invoice_id: invoice.id,
           payment_date: formData.payment_date,
           amount_paid: amountToPay,

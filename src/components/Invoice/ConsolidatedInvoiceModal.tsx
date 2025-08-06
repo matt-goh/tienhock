@@ -319,10 +319,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
     invoices.forEach((invoice) => {
       // Calculate true tax-exclusive amount using product data if available
-      if (invoice.products && Array.isArray(invoice.products)) {
+      // Handle both products and orderDetails arrays for different company systems
+      const productData = invoice.products || invoice.orderDetails;
+      
+      if (productData && Array.isArray(productData)) {
         // Sum product price * quantity for true tax-exclusive amount
         // Handle different product types: regular products, OTH (Other), LESS (Discount)
-        const invoiceSubtotal = invoice.products.reduce((sum, product) => {
+        const invoiceSubtotal = productData.reduce((sum, product) => {
           if (!product.issubtotal) {
             const quantity = Number(product.quantity) || 0;
             const price = Number(product.price) || 0;
@@ -340,7 +343,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         totalExcludingTax += invoiceSubtotal;
 
         // Sum product taxes
-        invoice.products.forEach((product) => {
+        productData.forEach((product) => {
           if (!product.issubtotal) {
             totalProductTax += Number(product.tax) || 0;
           }

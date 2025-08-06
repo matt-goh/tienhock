@@ -1,3 +1,4 @@
+// src/pages/HomePage.tsx
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCompany } from "../contexts/CompanyContext";

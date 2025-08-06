@@ -956,5 +956,121 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/export - Export selected invoices in SLS format
+  router.get("/export", async (req, res) => {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res.status(400).json({ 
+        message: "Missing required ids parameter for export" 
+      });
+    }
+
+    try {
+      const invoiceIds = ids.split(",");
+      
+      if (invoiceIds.length > 500) {
+        return res.status(400).json({
+          message: "Too many invoices requested for export. Maximum is 500.",
+        });
+      }
+
+      // Generate placeholders for query
+      const placeholders = invoiceIds.map((_, i) => `$${i + 1}`).join(",");
+
+      // Query to get invoice data with products for export
+      const query = `
+        SELECT
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+          i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+          c.name as customerName,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal,
+                'istotal', CASE WHEN od.code = 'TOTAL' THEN true ELSE false END
+              )
+              ORDER BY od.id
+            ) FILTER (WHERE od.id IS NOT NULL AND od.issubtotal = false AND od.code != 'TOTAL'),
+            '[]'::json
+          ) as products
+        FROM jellypolly.invoices i
+        LEFT JOIN customers c ON i.customerid = c.id
+        LEFT JOIN jellypolly.order_details od ON i.id = od.invoiceid
+        WHERE i.id IN (${placeholders})
+          AND i.invoice_status != 'cancelled'
+        GROUP BY i.id, c.name
+        ORDER BY CAST(i.createddate AS bigint) DESC
+      `;
+
+      const result = await pool.query(query, invoiceIds);
+      
+      // Format data into SLS text format
+      const formatInvoicesForExport = (invoices) => {
+        return invoices.map((invoice) => {
+          // 1. Format date (dd/MM/yyyy)
+          const dateObj = new Date(Number(invoice.createddate));
+          const day = String(dateObj.getDate()).padStart(2, "0");
+          const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+          const year = dateObj.getFullYear();
+          const formattedDate = `${day}/${month}/${year}`;
+
+          // 2. Format time (hh:mm am/pm)
+          const formattedTime = dateObj.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+
+          // 3. Calculate totals excluding OTH products (issubtotal and istotal)
+          const products = invoice.products || [];
+          const validProducts = products.filter(
+            (p) => !p.issubtotal && !p.istotal && p.code !== 'TOTAL'
+          );
+
+          const totalQty = validProducts.reduce((sum, p) => sum + (p.quantity || 0), 0);
+          const totalAmount = validProducts.reduce((sum, p) => sum + parseFloat(p.total || 0), 0);
+
+          // 4. Build the line
+          const fields = [
+            formattedDate,                                    // Date
+            formattedTime,                                    // Time  
+            invoice.id,                                       // Invoice ID
+            invoice.customerName || `Customer ${invoice.customerid}`, // Customer name
+            invoice.salespersonid || "1",                     // Salesperson ID
+            totalQty.toString(),                              // Total quantity
+            totalAmount.toFixed(2),                           // Total amount
+            invoice.paymenttype || "INVOICE",                 // Payment type
+          ];
+
+          return fields.join("\t");
+        }).join("\n");
+      };
+
+      const fileContent = formatInvoicesForExport(result.rows);
+      
+      // Set response headers for file download
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', 'attachment; filename="SLS_JellyPolly.txt"');
+      
+      res.send(fileContent);
+
+    } catch (error) {
+      console.error("Error exporting invoices:", error);
+      res.status(500).json({
+        message: "Error exporting invoices",
+        error: error.message,
+      });
+    }
+  });
+
   return router;
 }
