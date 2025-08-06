@@ -204,7 +204,7 @@ const InvoiceSoloPrintOverlay: React.FC<InvoiceSoloPrintOverlayProps> = ({
     <div className="fixed inset-0 flex items-center justify-center z-50">
       <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl p-6 border border-default-200">
         <div className="flex items-center space-x-4">
-          <LoadingSpinner />
+          <LoadingSpinner hideText/>
           <div>
             <p className="text-default-800 font-medium">
               {isGenerating ? "Generating PDF..." : "Opening print dialog..."}
