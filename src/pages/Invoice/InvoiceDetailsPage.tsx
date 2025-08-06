@@ -42,13 +42,14 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
-import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
+import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
@@ -1495,15 +1496,6 @@ const InvoiceDetailsPage: React.FC = () => {
                   : "Submit e-Invoice"}
               </Button>
             )}
-          {invoiceData.einvoice_status === "valid" && (
-            <div className="inline-block">
-              <EInvoicePDFHandler
-                invoices={invoiceData ? [invoiceData] : []}
-                disabled={isLoading}
-                size="md"
-              />
-            </div>
-          )}
           {/* Print Button */}
           <Button
             onClick={handlePrintInvoice}
@@ -1518,8 +1510,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
           {/* Download PDF Button */}
           {invoiceData && (
-            <PDFDownloadHandler
-              invoices={[invoiceData as InvoiceData]}
+            <InvoiceSoloPDFHandler
+              invoices={[invoiceData]}
               customerNames={customerNamesForPDF}
               disabled={isLoading}
             />
@@ -2188,8 +2180,8 @@ const InvoiceDetailsPage: React.FC = () => {
       />
       {/* Print PDF Overlay */}
       {isPrinting && invoiceData && (
-        <PrintPDFOverlay
-          invoices={[invoiceData as InvoiceData]}
+        <InvoiceSoloPrintOverlay
+          invoices={[invoiceData]}
           customerNames={customerNamesForPDF}
           onComplete={handlePrintComplete}
         />
