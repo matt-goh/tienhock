@@ -345,6 +345,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </div>
                 {payroll.deductions
                   ?.filter((d) => d.employee_amount > 0)
+                  .sort((a, b) => {
+                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
+                    const aIndex = order.indexOf(
+                      a.deduction_type.toUpperCase()
+                    );
+                    const bIndex = order.indexOf(
+                      b.deduction_type.toUpperCase()
+                    );
+                    return (
+                      (aIndex === -1 ? 999 : aIndex) -
+                      (bIndex === -1 ? 999 : bIndex)
+                    );
+                  })
                   .map((deduction) => (
                     <div
                       key={deduction.deduction_type}
