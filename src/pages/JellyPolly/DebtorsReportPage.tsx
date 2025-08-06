@@ -91,7 +91,7 @@ const DebtorsReportPage: React.FC = () => {
       setError(null);
 
       // Use JellyPolly-specific API endpoint
-      const response = await api.get("/api/jellypolly/debtors");
+      const response = await api.get("/jellypolly/api/debtors");
       const data = response;
 
       // Process data with proper date conversion

@@ -1,3 +1,4 @@
+// src/pages/HomePage.tsx
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCompany } from "../contexts/CompanyContext";
@@ -129,21 +130,38 @@ const HomePage: React.FC = () => {
     }));
   };
 
+  const getDescriptionForJellyPolly = (name: string): string => {
+    const descriptions: Record<string, string> = {
+      Accounting: "Financial reports and debtors management",
+      Sales: "Sales and invoice management",
+      Invoice: "Create and manage invoices",
+      "Sales Summary": "Sales analytics and reporting", 
+      Payments: "Track and manage payments",
+      Debtors: "Monitor outstanding receivables",
+    };
+    return descriptions[name] || "";
+  };
+
   // Build Jelly Polly items as simple navigation cards
   const buildJellyPollyItems = (): NavigationItem[] => {
-    const salesItem = JellyPollySidebarData[0];
-    const invoiceSubItem = salesItem?.subItems?.[0];
+    const items: NavigationItem[] = [];
 
-    return [
-      {
-        name: "Sales",
-        path: invoiceSubItem?.path
-          ? `/jellypolly${invoiceSubItem.path}`
-          : "/jellypolly",
-        icon: salesItem?.icon,
-        description: "Sales and invoice management",
-      },
-    ];
+    JellyPollySidebarData.forEach((category) => {
+      if (category.subItems) {
+        category.subItems.forEach((subItem) => {
+          if (subItem.path && !subItem.path.includes(":") && !subItem.name.includes("New") && !subItem.name.includes("Details")) {
+            items.push({
+              name: subItem.name,
+              path: `/jellypolly${subItem.path}`,
+              icon: category.icon,
+              description: getDescriptionForJellyPolly(subItem.name),
+            });
+          }
+        });
+      }
+    });
+
+    return items;
   };
 
   // Build company sections and reorder based on the current URL

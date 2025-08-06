@@ -42,13 +42,14 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
-import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
+import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
@@ -1403,6 +1404,7 @@ const InvoiceDetailsPage: React.FC = () => {
             {invoiceData.invoice_status.charAt(0).toUpperCase() +
               invoiceData.invoice_status.slice(1)}
           </span>
+          {/* E-Invoice Status Badge */}
           {eInvoiceStatusInfo && EInvoiceIcon && (
             <a
               href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
@@ -1416,15 +1418,19 @@ const InvoiceDetailsPage: React.FC = () => {
               e-Invoice: {eInvoiceStatusInfo.text}
             </a>
           )}
-          {/* Add Consolidated Status Badge */}
+          {/* Consolidated Status Badge */}
           {consolidatedStatusInfo && ConsolidatedIcon && (
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color}`}
-              title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
+            <a
+              href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color} hover:underline`}
+              title={`View consolidated invoice ${consolidatedStatusInfo.info.id} in MyInvois Portal`}
             >
               <ConsolidatedIcon size={14} />
               Consolidated Invoice
-            </span>
+            </a>
           )}
         </h1>
 
@@ -1490,15 +1496,6 @@ const InvoiceDetailsPage: React.FC = () => {
                   : "Submit e-Invoice"}
               </Button>
             )}
-          {invoiceData.einvoice_status === "valid" && (
-            <div className="inline-block">
-              <EInvoicePDFHandler
-                invoices={invoiceData ? [invoiceData] : []}
-                disabled={isLoading}
-                size="md"
-              />
-            </div>
-          )}
           {/* Print Button */}
           <Button
             onClick={handlePrintInvoice}
@@ -1513,8 +1510,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
           {/* Download PDF Button */}
           {invoiceData && (
-            <PDFDownloadHandler
-              invoices={[invoiceData as InvoiceData]}
+            <InvoiceSoloPDFHandler
+              invoices={[invoiceData]}
               customerNames={customerNamesForPDF}
               disabled={isLoading}
             />
@@ -2183,8 +2180,8 @@ const InvoiceDetailsPage: React.FC = () => {
       />
       {/* Print PDF Overlay */}
       {isPrinting && invoiceData && (
-        <PrintPDFOverlay
-          invoices={[invoiceData as InvoiceData]}
+        <InvoiceSoloPrintOverlay
+          invoices={[invoiceData]}
           customerNames={customerNamesForPDF}
           onComplete={handlePrintComplete}
         />

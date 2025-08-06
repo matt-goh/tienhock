@@ -1,3 +1,4 @@
+// src/pages/JellyPolly/PaymentPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -115,19 +116,13 @@ const PaymentPage: React.FC = () => {
         params.append("search", filters.searchTerm.trim());
       }
 
+      params.append("include_cancelled", "true"); // Include cancelled payments
+
       // Use JellyPolly-specific API endpoint
       const response = await api.get(
-        `/api/jellypolly/payments?${params.toString()}`
+        `/jellypolly/api/payments/all?${params.toString()}`
       );
-      
-      if (Array.isArray(response)) {
-        setPayments(response);
-      } else if (response.data && Array.isArray(response.data)) {
-        setPayments(response.data);
-      } else {
-        console.warn("Unexpected payment data format:", response);
-        setPayments([]);
-      }
+      setPayments(response);
     } catch (error: any) {
       console.error("Error fetching payments:", error);
       toast.error(
@@ -139,12 +134,17 @@ const PaymentPage: React.FC = () => {
     }
   }, [filters]);
 
-  // Sort payments effect
+  // Sort payments effect - match main company logic
   useEffect(() => {
     const sorted = [...payments].sort((a, b) => {
+      // First priority: pending status
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      
+      // Second priority: sort by payment date (newest first)
       const dateA = new Date(a.payment_date).getTime();
       const dateB = new Date(b.payment_date).getTime();
-      return dateB - dateA; // Most recent first
+      return dateB - dateA;
     });
     setSortedPayments(sorted);
   }, [payments]);
@@ -202,232 +202,188 @@ const PaymentPage: React.FC = () => {
 
   // Status filter options
   const statusOptions = [
-    { id: "active", name: "Active" },
-    { id: "cancelled", name: "Cancelled" },
-    { id: "pending", name: "Pending" },
     { id: "", name: "All Status" },
+    { id: "active", name: "Active" },
+    { id: "pending", name: "Pending" },
+    { id: "overpaid", name: "Overpaid" },
+    { id: "cancelled", name: "Cancelled" },
   ];
 
-  // Payment summary calculations
-  const paymentSummary = useMemo(() => {
-    const activePayments = sortedPayments.filter(p => p.status !== 'cancelled');
-    const totalAmount = activePayments.reduce((sum, payment) => sum + payment.amount_paid, 0);
-    const averagePayment = activePayments.length > 0 ? totalAmount / activePayments.length : 0;
-    
-    const methodBreakdown = activePayments.reduce((acc, payment) => {
-      const method = payment.payment_method || 'unknown';
-      acc[method] = (acc[method] || 0) + payment.amount_paid;
-      return acc;
-    }, {} as Record<string, number>);
 
-    return {
-      totalPayments: activePayments.length,
-      totalAmount,
-      averagePayment,
-      methodBreakdown,
-    };
-  }, [sortedPayments]);
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("en-MY", {
-      style: "currency",
-      currency: "MYR",
-    }).format(amount);
+  const handleNewPayment = () => {
+    setSelectedPayment(null);
+    setShowPaymentForm(true);
   };
 
-  // Payment creation success handler
-
-  const handlePaymentFormSuccess = () => {
+  const handlePaymentCreated = () => {
     setShowPaymentForm(false);
-    setSelectedPayment(null);
-    fetchPayments(); // Refresh the list
+    fetchPayments();
+  };
+
+  const handleViewPayment = (payment: Payment) => {
+    navigate(`/jellypolly/sales/invoice/${payment.invoice_id}`, {
+      state: { scrollToPayments: true },
+    });
   };
 
   return (
-    <div className="flex flex-col w-full h-full px-4 md:px-12 -mt-6">
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
-          <h1 className="text-2xl md:text-3xl font-semibold text-default-900 md:mr-4">
-            JellyPolly Payments {paymentSummary.totalPayments > 0 && `(${paymentSummary.totalPayments})`}
-          </h1>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => {
-                setSelectedPayment(null);
-                setShowPaymentForm(true);
-              }}
-              icon={IconPlus}
-              variant="filled"
-              color="sky"
-              size="sm"
-            >
-              Add Payment
-            </Button>
-          </div>
-        </div>
+    <div className="-mt-12 p-6 max-w-full mx-auto px-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <IconCash size={28} className="text-gray-700" />
+          JellyPolly Payment Management
+        </h1>
+        <Button onClick={handleNewPayment} icon={IconPlus} size="md">
+          New Payment
+        </Button>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-            {/* Date Range */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date Range
-              </label>
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+        <div className="p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <IconSearch
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search"
+                title="Search payments by invoice, reference, or amount"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                value={filters.searchTerm}
+                onChange={handleSearchChange}
+              />
+            </div>
+
+            {/* Date Range Picker */}
+            <div className="w-full sm:w-auto">
               <DateRangePicker
                 dateRange={{
                   start: filters.dateRange.start || new Date(),
-                  end: filters.dateRange.end || new Date()
+                  end: filters.dateRange.end || new Date(),
                 }}
                 onDateChange={handleDateRangeChange}
               />
             </div>
 
             {/* Month Selector */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Month
-              </label>
-              <StyledListbox
-                value={selectedMonth.id}
-                onChange={(value) => {
-                  const month = monthOptions.find(m => m.id === value);
-                  if (month) handleMonthChange(month);
-                }}
-                options={monthOptions.map(m => ({ id: m.id, name: m.name }))}
-                placeholder="Select Month"
-              />
+            <div className="w-full sm:w-40">
+              <Listbox value={selectedMonth} onChange={handleMonthChange}>
+                <div className="relative">
+                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                    <span className="block truncate pl-1">
+                      {selectedMonth.name}
+                    </span>
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <IconChevronDown
+                        className="h-5 w-5 text-default-400"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </ListboxButton>
+                  <Transition
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                      {monthOptions.map((month) => (
+                        <ListboxOption
+                          key={month.id}
+                          value={month}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
+                              active
+                                ? "bg-default-100 text-default-900"
+                                : "text-gray-900"
+                            }`
+                          }
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span
+                                className={`block truncate ${
+                                  selected ? "font-medium" : "font-normal"
+                                }`}
+                              >
+                                {month.name}
+                              </span>
+                              {selected && (
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                  <IconCheck
+                                    className="h-5 w-5"
+                                    aria-hidden="true"
+                                    stroke={2.5}
+                                  />
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </ListboxOption>
+                      ))}
+                    </ListboxOptions>
+                  </Transition>
+                </div>
+              </Listbox>
             </div>
 
             {/* Payment Method Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Payment Method
-              </label>
-              <StyledListbox
-                value={filters.paymentMethod || ""}
-                onChange={(value) => setFilters(prev => ({ ...prev, paymentMethod: String(value) || null }))}
-                options={paymentMethodOptions}
-                placeholder="All Methods"
-              />
-            </div>
+            <StyledListbox
+              value={filters.paymentMethod || ""}
+              onChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  paymentMethod: value === "" ? null : String(value),
+                }))
+              }
+              options={paymentMethodOptions}
+              className="w-full sm:w-40"
+              placeholder="All Methods"
+            />
 
             {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <StyledListbox
-                value={filters.status || ""}
-                onChange={(value) => setFilters(prev => ({ ...prev, status: String(value) || null }))}
-                options={statusOptions}
-                placeholder="All Status"
-              />
-            </div>
-
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Search
-              </label>
-              <div className="relative">
-                <IconSearch
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                  size={16}
-                />
-                <input
-                  type="text"
-                  placeholder="Search payments..."
-                  className="w-full h-[42px] pl-10 pr-3 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
-                  value={filters.searchTerm}
-                  onChange={handleSearchChange}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Payments</p>
-                <p className="text-2xl font-bold text-gray-900">{paymentSummary.totalPayments}</p>
-              </div>
-              <IconCash className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(paymentSummary.totalAmount)}</p>
-              </div>
-              <IconCash className="h-8 w-8 text-green-500" />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Average Payment</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(paymentSummary.averagePayment)}</p>
-              </div>
-              <IconCash className="h-8 w-8 text-purple-500" />
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Top Method</p>
-                <p className="text-lg font-bold text-gray-900 capitalize">
-                  {Object.entries(paymentSummary.methodBreakdown).sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A'}
-                </p>
-              </div>
-              <IconCash className="h-8 w-8 text-orange-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Table */}
-        <div className="flex-1 min-h-[400px] relative">
-          {loading ? (
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
-              <LoadingSpinner />
-            </div>
-          ) : (
-            <PaymentTable
-              payments={sortedPayments}
-              onViewPayment={(payment) => {
-                // Navigate to JellyPolly invoice instead of main company invoice
-                navigate(`/jellypolly/sales/invoice/${payment.invoice_id}`, {
-                  state: { scrollToPayments: true },
-                });
-              }}
-              onRefresh={fetchPayments}
+            <StyledListbox
+              value={filters.status || ""}
+              onChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: value === "" ? null : String(value),
+                }))
+              }
+              options={statusOptions}
+              className="w-full sm:w-40"
+              placeholder="All Status"
             />
-          )}
+          </div>
         </div>
       </div>
+
+      {/* Payments Table */}
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner />
+        </div>
+      ) : (
+        <PaymentTable
+          payments={sortedPayments}
+          onViewPayment={handleViewPayment}
+          onRefresh={fetchPayments}
+        />
+      )}
 
       {/* Payment Form Modal */}
       {showPaymentForm && (
         <PaymentForm
           payment={selectedPayment}
-          onClose={() => {
-            setShowPaymentForm(false);
-            setSelectedPayment(null);
-          }}
-          onSuccess={handlePaymentFormSuccess}
-          dateRange={{
-            start: filters.dateRange.start || new Date(),
-            end: filters.dateRange.end || new Date()
-          }}
+          onClose={() => setShowPaymentForm(false)}
+          onSuccess={handlePaymentCreated}
+          dateRange={filters.dateRange}
+          apiEndpoint="/jellypolly/api/payments"
+          invoicesEndpoint="/jellypolly/api/invoices"
         />
       )}
     </div>

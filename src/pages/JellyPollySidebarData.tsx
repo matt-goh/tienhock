@@ -1,7 +1,7 @@
+// src/pages/JellyPollySidebarData.tsx
 import {
   IconFileInvoice,
   IconReportMoney,
-  IconBookmark,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -18,12 +18,6 @@ import PaymentPage from "./JellyPolly/PaymentPage";
 import DebtorsReportPage from "./JellyPolly/DebtorsReportPage";
 
 export const JellyPollySidebarData: SidebarItem[] = [
-  {
-    name: "Bookmarks",
-    icon: IconBookmark,
-    subItems: [],
-    defaultOpen: true,
-  },
   {
     name: "Accounting",
     icon: IconReportMoney,
