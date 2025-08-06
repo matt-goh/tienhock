@@ -138,9 +138,7 @@ const HomePage: React.FC = () => {
     return [
       {
         name: "Sales",
-        path: invoiceSubItem?.path
-          ? `/jellypolly${invoiceSubItem.path}`
-          : "/jellypolly",
+        path: `/jellypolly/sales/invoice`,
         icon: salesItem?.icon,
         description: "Sales and invoice management",
       },
