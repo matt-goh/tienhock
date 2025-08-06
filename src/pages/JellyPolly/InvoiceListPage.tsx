@@ -18,6 +18,8 @@ import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
+import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
@@ -57,7 +59,6 @@ import {
   getInvoicesByIds,
 } from "../../utils/JellyPolly/InvoiceUtils";
 import Pagination from "../../components/Invoice/Pagination";
-import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/JellyPolly/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
@@ -282,12 +283,10 @@ const InvoiceListPage: React.FC = () => {
   const [submissionResults, setSubmissionResults] = useState(null);
   const [isSubmittingInvoices, setIsSubmittingInvoices] = useState(false);
   const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
-  const [showEInvoiceDownloader, setShowEInvoiceDownloader] = useState(false);
-  const [eInvoicesToDownload, setEInvoicesToDownload] = useState<
-    ExtendedInvoiceData[]
-  >([]);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
+  const [showSoloPrintOverlay, setShowSoloPrintOverlay] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isGeneratingSoloPDF, setIsGeneratingSoloPDF] = useState(false);
   const [selectedInvoicesForPDF, setSelectedInvoicesForPDF] = useState<
     ExtendedInvoiceData[]
   >([]);
@@ -430,11 +429,6 @@ const InvoiceListPage: React.FC = () => {
     };
   }, [selectedInvoiceIds, invoices]);
 
-  const hasValidEInvoices = useCallback(() => {
-    return invoices.some(
-      (inv) => selectedInvoiceIds.has(inv.id) && inv.einvoice_status === "valid"
-    );
-  }, [invoices, selectedInvoiceIds]);
 
   // --- Callbacks ---
 
@@ -486,23 +480,6 @@ const InvoiceListPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFetchTriggered, currentPage]); // Only re-run when page changes or triggered manually
 
-  useEffect(() => {
-    if (showEInvoiceDownloader && eInvoicesToDownload.length > 0) {
-      // The component is now in the DOM, but we need to programmatically click its button
-      // Find the button and click it
-      const downloadButton = document.querySelector(
-        '[data-einvoice-download="true"]'
-      );
-      if (downloadButton && downloadButton instanceof HTMLButtonElement) {
-        downloadButton.click();
-      }
-      // Reset the state after a delay
-      setTimeout(() => {
-        setShowEInvoiceDownloader(false);
-        setEInvoicesToDownload([]);
-      }, 500);
-    }
-  }, [showEInvoiceDownloader, eInvoicesToDownload]);
 
   // Effect to calculate active filter count comparing against defaults
   useEffect(() => {
@@ -1374,21 +1351,6 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleDownloadValidEInvoices = () => {
-    // Get only the invoices with valid e-invoice status
-    const validEInvoices = invoices.filter(
-      (inv) => selectedInvoiceIds.has(inv.id) && inv.einvoice_status === "valid"
-    );
-
-    if (validEInvoices.length === 0) {
-      toast.error("No valid e-invoices found in selection");
-      return;
-    }
-
-    // Pass the filtered invoices directly to the downloader
-    setEInvoicesToDownload(validEInvoices);
-    setShowEInvoiceDownloader(true);
-  };
 
   // Bulk Download PDF Handler
   const handleBulkDownload = async () => {
@@ -1397,14 +1359,50 @@ const InvoiceListPage: React.FC = () => {
       return;
     }
 
+    const selectedIds = Array.from(selectedInvoiceIds);
+    
+    // Check if only one invoice is selected
+    if (selectedIds.length === 1) {
+      const toastId = toast.loading("Preparing invoice PDF...");
+      
+      try {
+        const invoiceData = await getInvoicesByIds(selectedIds);
+        if (invoiceData.length === 0) {
+          throw new Error("Could not fetch invoice details");
+        }
+
+        setSelectedInvoicesForPDF(invoiceData);
+        setIsGeneratingSoloPDF(true);
+
+        setTimeout(() => {
+          const downloadButton = document.querySelector(
+            '[data-pdf-download="true"]'
+          );
+          if (downloadButton && downloadButton instanceof HTMLButtonElement) {
+            downloadButton.click();
+            toast.success("Generating PDF download...", { id: toastId });
+          } else {
+            throw new Error("Download button not found");
+          }
+        }, 100);
+      } catch (error) {
+        console.error("Error preparing PDF download:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to prepare PDF",
+          { id: toastId }
+        );
+        setIsGeneratingSoloPDF(false);
+        setSelectedInvoicesForPDF([]);
+      }
+      return;
+    }
+
+    // Handle multiple invoices with regular handler
     const toastId = toast.loading(
-      `Preparing ${selectedInvoiceIds.size} invoice PDFs...`
+      `Preparing ${selectedIds.length} invoice PDFs...`
     );
 
     try {
-      // Get ALL selected invoice IDs from the Set
-      const selectedIds = Array.from(selectedInvoiceIds);
-
       // Process in chunks of 50 to avoid overwhelming the server
       const BATCH_SIZE = 50;
       let completeInvoices:
@@ -1466,14 +1464,37 @@ const InvoiceListPage: React.FC = () => {
       return;
     }
 
+    const selectedIds = Array.from(selectedInvoiceIds);
+    
+    // Check if only one invoice is selected
+    if (selectedIds.length === 1) {
+      const toastId = toast.loading("Preparing invoice for printing...");
+      
+      try {
+        const invoiceData = await getInvoicesByIds(selectedIds);
+        if (invoiceData.length === 0) {
+          throw new Error("Could not fetch invoice details");
+        }
+
+        toast.success("Opening print dialog...", { id: toastId });
+        setSelectedInvoicesForPDF(invoiceData);
+        setShowSoloPrintOverlay(true);
+      } catch (error) {
+        console.error("Error preparing for print:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to prepare print view",
+          { id: toastId }
+        );
+      }
+      return;
+    }
+
+    // Handle multiple invoices with regular handler
     const toastId = toast.loading(
-      `Preparing ${selectedInvoiceIds.size} invoices for printing...`
+      `Preparing ${selectedIds.length} invoices for printing...`
     );
 
     try {
-      // Get ALL selected invoice IDs from the Set
-      const selectedIds = Array.from(selectedInvoiceIds);
-
       // Process in chunks of 50 to avoid overwhelming the server
       const BATCH_SIZE = 50;
       let completeInvoices:
@@ -1959,23 +1980,6 @@ const InvoiceListPage: React.FC = () => {
                 >
                   Submit e-Invoice
                 </Button>
-                {hasValidEInvoices() && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    color="sky"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDownloadValidEInvoices();
-                    }}
-                    icon={IconFileDownload}
-                    disabled={isLoading || isExporting}
-                    aria-label="e-Invoice"
-                    title="Download e-Invoice"
-                  >
-                    Download e-Invoice
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -2161,15 +2165,6 @@ const InvoiceListPage: React.FC = () => {
         confirmButtonText="Submit e-Invoices"
         variant="default"
       />
-      {/* E-Invoice PDF Downloader (invisible, triggered by state) */}
-      {showEInvoiceDownloader && eInvoicesToDownload.length > 0 && (
-        <div style={{ display: "none" }}>
-          <EInvoicePDFHandler
-            invoices={eInvoicesToDownload} // Changed from einvoices to invoices
-            disabled={false}
-          />
-        </div>
-      )}
       {/* PDF Download Handler - Hidden but functional */}
       {isGeneratingPDF && selectedInvoicesForPDF.length > 0 && (
         <div style={{ display: "none" }}>
@@ -2185,6 +2180,21 @@ const InvoiceListPage: React.FC = () => {
         </div>
       )}
 
+      {/* Solo PDF Download Handler - Hidden but functional */}
+      {isGeneratingSoloPDF && selectedInvoicesForPDF.length > 0 && (
+        <div style={{ display: "none" }}>
+          <InvoiceSoloPDFHandler
+            invoices={selectedInvoicesForPDF}
+            disabled={false}
+            customerNames={customerNames}
+            onComplete={() => {
+              setIsGeneratingSoloPDF(false);
+              setSelectedInvoicesForPDF([]);
+            }}
+          />
+        </div>
+      )}
+
       {/* Print Overlay */}
       {showPrintOverlay && selectedInvoicesForPDF.length > 0 && (
         <PrintPDFOverlay
@@ -2192,6 +2202,18 @@ const InvoiceListPage: React.FC = () => {
           customerNames={customerNames}
           onComplete={() => {
             setShowPrintOverlay(false);
+            setSelectedInvoicesForPDF([]);
+          }}
+        />
+      )}
+
+      {/* Solo Print Overlay */}
+      {showSoloPrintOverlay && selectedInvoicesForPDF.length > 0 && (
+        <InvoiceSoloPrintOverlay
+          invoices={selectedInvoicesForPDF}
+          customerNames={customerNames}
+          onComplete={() => {
+            setShowSoloPrintOverlay(false);
             setSelectedInvoicesForPDF([]);
           }}
         />
