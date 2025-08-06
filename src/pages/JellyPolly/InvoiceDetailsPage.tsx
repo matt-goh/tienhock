@@ -41,10 +41,11 @@ import {
   IconPrinter,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
-import EInvoicePDFHandler from "../../utils/invoice/einvoice/EInvoicePDFHandler";
 import { api } from "../../routes/utils/api";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
+import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -195,6 +196,7 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [isSyncingCancellation, setIsSyncingCancellation] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showSoloPrintOverlay, setShowSoloPrintOverlay] = useState(false);
 
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
@@ -383,12 +385,12 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const handlePrintInvoice = () => {
     if (invoiceData) {
-      setIsPrinting(true);
+      setShowSoloPrintOverlay(true);
     }
   };
 
   const handlePrintComplete = () => {
-    setIsPrinting(false);
+    setShowSoloPrintOverlay(false);
   };
 
   // --- Payment Form Handling ---
@@ -792,15 +794,6 @@ const InvoiceDetailsPage: React.FC = () => {
                   : "Submit e-Invoice"}
               </Button>
             )}
-          {invoiceData.einvoice_status === "valid" && (
-            <div className="inline-block">
-              <EInvoicePDFHandler
-                invoices={invoiceData ? [invoiceData] : []}
-                disabled={isLoading}
-                size="md"
-              />
-            </div>
-          )}
           {!isCancelled && !isPaid && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -820,15 +813,15 @@ const InvoiceDetailsPage: React.FC = () => {
             variant="outline"
             color="default"
             size="md"
-            disabled={isLoading || isPrinting || !invoiceData}
+            disabled={isLoading || showSoloPrintOverlay || !invoiceData}
           >
-            {isPrinting ? "Printing..." : "Print"}
+            {showSoloPrintOverlay ? "Printing..." : "Print"}
           </Button>
 
           {/* Download PDF Button */}
           {invoiceData && (
-            <PDFDownloadHandler
-              invoices={[invoiceData as InvoiceData]}
+            <InvoiceSoloPDFHandler
+              invoices={[invoiceData]}
               customerNames={customerNamesForPDF}
               disabled={isLoading}
             />
@@ -1366,10 +1359,10 @@ const InvoiceDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
-      {/* Print PDF Overlay */}
-      {isPrinting && invoiceData && (
-        <PrintPDFOverlay
-          invoices={[invoiceData as InvoiceData]}
+      {/* Solo Print PDF Overlay */}
+      {showSoloPrintOverlay && invoiceData && (
+        <InvoiceSoloPrintOverlay
+          invoices={[invoiceData]}
           customerNames={customerNamesForPDF}
           onComplete={handlePrintComplete}
         />
