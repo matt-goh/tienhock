@@ -152,7 +152,7 @@ const CustomerFormPage: React.FC = () => {
       const cachedCustomer = customers.find((customer) => customer.id === id);
 
       if (!cachedCustomer) {
-        throw new Error(`Customer with ID ${id} not found in cache`);
+        throw new Error(`Customer with ID ${id} not found in cache, please refresh the customers at Customer page.`);
       }
 
       // Create the form data object
