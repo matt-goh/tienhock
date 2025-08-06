@@ -152,7 +152,6 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     contextFields: [],
   },
 
-  // Salesman Commission
   SALESMAN: {
     id: "SALESMAN",
     name: "Salesman",
@@ -160,6 +159,22 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     replaceUnits: "Bag", // This triggers the alternative DailyLogEntryPage behavior
     contextFields: [], // No context fields for salesmen
     jobIds: ["SALESMAN", "SALESMAN_IKUT"], // Job IDs for salesmen
+  },
+
+  OFFICE: {
+    id: "OFFICE",
+    name: "Office",
+    section: ["OFFICE"],
+    contextFields: [],
+    jobIds: ["OFFICE"],
+  },
+
+  TUKANG_SAPU: {
+    id: "TUKANG_SAPU",
+    name: "Tukang Sapu",
+    section: ["SAPU"],
+    contextFields: [],
+    jobIds: ["SAPU"],
   },
 };
 
