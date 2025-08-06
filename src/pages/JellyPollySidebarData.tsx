@@ -19,12 +19,6 @@ import DebtorsReportPage from "./JellyPolly/DebtorsReportPage";
 
 export const JellyPollySidebarData: SidebarItem[] = [
   {
-    name: "Bookmarks",
-    icon: IconBookmark,
-    subItems: [],
-    defaultOpen: true,
-  },
-  {
     name: "Accounting",
     icon: IconReportMoney,
     subItems: [
