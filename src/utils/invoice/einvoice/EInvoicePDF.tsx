@@ -478,7 +478,10 @@ const EInvoicePDF: React.FC<Props> = ({
       <Text style={styles.footer}>
         This document is computer generated e-Invoice.
         {"\n"}
-        Validated on {data.invoice.datetime_validated}
+        Validated on{" "}
+        {new Date(data.invoice.datetime_validated).toLocaleString("en-GB", {
+          timeZone: "Asia/Kuala_Lumpur",
+        })}
       </Text>
     </Page>
   );
