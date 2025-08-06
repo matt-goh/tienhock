@@ -1,7 +1,7 @@
+// src/pages/JellyPollySidebarData.tsx
 import {
   IconFileInvoice,
   IconReportMoney,
-  IconBookmark,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
