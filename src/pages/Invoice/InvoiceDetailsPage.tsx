@@ -1403,6 +1403,7 @@ const InvoiceDetailsPage: React.FC = () => {
             {invoiceData.invoice_status.charAt(0).toUpperCase() +
               invoiceData.invoice_status.slice(1)}
           </span>
+          {/* E-Invoice Status Badge */}
           {eInvoiceStatusInfo && EInvoiceIcon && (
             <a
               href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
@@ -1416,15 +1417,19 @@ const InvoiceDetailsPage: React.FC = () => {
               e-Invoice: {eInvoiceStatusInfo.text}
             </a>
           )}
-          {/* Add Consolidated Status Badge */}
+          {/* Consolidated Status Badge */}
           {consolidatedStatusInfo && ConsolidatedIcon && (
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color}`}
-              title={`Part of consolidated invoice ${consolidatedStatusInfo.info.id}`}
+            <a
+              href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color} hover:underline`}
+              title={`View consolidated invoice ${consolidatedStatusInfo.info.id} in MyInvois Portal`}
             >
               <ConsolidatedIcon size={14} />
               Consolidated Invoice
-            </span>
+            </a>
           )}
         </h1>
 
