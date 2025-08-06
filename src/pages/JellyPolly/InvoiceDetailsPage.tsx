@@ -1,9 +1,8 @@
 // src/pages/JellyPolly/InvoiceDetailsPage.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ExtendedInvoiceData,
-  InvoiceData,
   Payment,
   ProductItem,
 } from "../../types/types";
@@ -39,9 +38,17 @@ import {
   IconRefresh,
   IconFiles,
   IconPrinter,
+  IconPencil,
+  IconX,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import { api } from "../../routes/utils/api";
+import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
+import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
+import LineItemsTable from "../../components/Invoice/LineItemsTable";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
 import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
@@ -191,6 +198,61 @@ const InvoiceDetailsPage: React.FC = () => {
     null
   );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  
+  // Edit states
+  const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerQuery, setCustomerQuery] = useState<string>("");
+  const [isUpdatingCustomer, setIsUpdatingCustomer] = useState<boolean>(false);
+
+  // Pagination state for customer loading
+  const [displayedCustomers, setDisplayedCustomers] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [customerPage, setCustomerPage] = useState<number>(1);
+  const [isLoadingMoreCustomers, setIsLoadingMoreCustomers] = useState<boolean>(false);
+  const [hasMoreCustomers, setHasMoreCustomers] = useState<boolean>(true);
+  const { customers } = useCustomersCache();
+  const CUSTOMERS_PER_PAGE = 50;
+
+  // Salesman edit states
+  const [isEditingSalesman, setIsEditingSalesman] = useState(false);
+  const [selectedSalesmanId, setSelectedSalesmanId] = useState<string | null>(null);
+  const [isUpdatingSalesman, setIsUpdatingSalesman] = useState(false);
+  const { salesmen, isLoading: isLoadingSalesmen } = useSalesmanCache();
+
+  // Payment type edit states
+  const [isEditingPaymentType, setIsEditingPaymentType] = useState<boolean>(false);
+  const [selectedPaymentType, setSelectedPaymentType] = useState<"CASH" | "INVOICE">("CASH");
+  const [isUpdatingPaymentType, setIsUpdatingPaymentType] = useState<boolean>(false);
+
+  // Date/time edit states
+  const [isEditingDateTime, setIsEditingDateTime] = useState<boolean>(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [isUpdatingDateTime, setIsUpdatingDateTime] = useState<boolean>(false);
+
+  // UUID edit states
+  const [isEditingUUID, setIsEditingUUID] = useState<boolean>(false);
+  const [selectedUUID, setSelectedUUID] = useState<string>("");
+  const [isUpdatingUUID, setIsUpdatingUUID] = useState<boolean>(false);
+
+  // Order details edit states
+  const { products: productsCache, isLoading: productsLoading } = useProductsCache("jp");
+  const [isEditingOrderDetails, setIsEditingOrderDetails] = useState<boolean>(false);
+  const [editedProducts, setEditedProducts] = useState<ProductItem[]>([]);
+  const [isUpdatingOrderDetails, setIsUpdatingOrderDetails] = useState<boolean>(false);
+
+  // Note: ProductOptions are created inline in the LineItemsTable component
+
+  // E-Invoice cancellation confirmation
+  const [showEInvoiceCancelConfirm, setShowEInvoiceCancelConfirm] = useState<boolean>(false);
+  const [eInvoiceCancelField, setEInvoiceCancelField] = useState<string>("");
+  const [eInvoiceCancelAction, setEInvoiceCancelAction] = useState<{
+    type: "customer" | "datetime" | "salesman" | "paymenttype" | "orderdetails";
+    data: any;
+  } | null>(null);
+
   // E-Invoice submission handler
   const [showSubmitEInvoiceConfirm, setShowSubmitEInvoiceConfirm] =
     useState(false);
@@ -252,6 +314,385 @@ const InvoiceDetailsPage: React.FC = () => {
   useEffect(() => {
     fetchDetails();
   }, [fetchDetails]); // fetchDetails dependency is stable due to useCallback
+
+  // Initialize displayed customers when customers cache loads
+  useEffect(() => {
+    if (customers.length > 0) {
+      const initialCustomers = customers
+        .slice(0, CUSTOMERS_PER_PAGE)
+        .map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+        }));
+      setDisplayedCustomers(initialCustomers);
+      setHasMoreCustomers(customers.length > CUSTOMERS_PER_PAGE);
+      setCustomerPage(1);
+    }
+  }, [customers]);
+
+  // Filter customers based on query
+  const filteredCustomers = useMemo(() => {
+    if (!customerQuery.trim()) {
+      return displayedCustomers;
+    }
+
+    // Filter from all customers (not just displayed ones) when searching
+    const filtered = customers
+      .filter((customer) =>
+        customer.name.toLowerCase().includes(customerQuery.toLowerCase()) ||
+        customer.id.toLowerCase().includes(customerQuery.toLowerCase())
+      )
+      .slice(0, CUSTOMERS_PER_PAGE)
+      .map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+      }));
+
+    return filtered;
+  }, [customers, customerQuery, displayedCustomers]);
+
+  // Handle loading more customers
+  const handleLoadMoreCustomers = useCallback(() => {
+    if (isLoadingMoreCustomers || !hasMoreCustomers || customerQuery.trim()) return;
+
+    setIsLoadingMoreCustomers(true);
+    
+    setTimeout(() => {
+      const startIndex = customerPage * CUSTOMERS_PER_PAGE;
+      const endIndex = startIndex + CUSTOMERS_PER_PAGE;
+      const nextCustomers = customers
+        .slice(startIndex, endIndex)
+        .map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+        }));
+
+      if (nextCustomers.length > 0) {
+        setDisplayedCustomers(prev => [...prev, ...nextCustomers]);
+        setCustomerPage(prev => prev + 1);
+        setHasMoreCustomers(endIndex < customers.length);
+      } else {
+        setHasMoreCustomers(false);
+      }
+      
+      setIsLoadingMoreCustomers(false);
+    }, 300);
+  }, [customers, customerPage, isLoadingMoreCustomers, hasMoreCustomers, customerQuery]);
+
+  // --- Edit Handlers ---
+
+  const handleOpenCustomerEdit = () => {
+    if (!invoiceData) return;
+    setSelectedCustomerId(invoiceData.customerid);
+    setCustomerQuery("");
+    setIsEditingCustomer(true);
+  };
+
+  const handleCustomerUpdate = async (): Promise<void> => {
+    if (!invoiceData || !selectedCustomerId || isUpdatingCustomer) return;
+
+    // Check if e-invoice status requires confirmation
+    if (invoiceData.einvoice_status && invoiceData.einvoice_status !== "cancelled") {
+      setEInvoiceCancelField("customer");
+      setEInvoiceCancelAction({
+        type: "customer",
+        data: { customerid: selectedCustomerId },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    await performCustomerUpdate(selectedCustomerId, false);
+  };
+
+  const performCustomerUpdate = async (customerid: string, confirmEInvoiceCancellation: boolean): Promise<void> => {
+    if (!invoiceData || isUpdatingCustomer) return;
+
+    setIsUpdatingCustomer(true);
+    const toastId = toast.loading("Updating customer...");
+
+    try {
+      const response = await api.put(`/jellypolly/api/invoices/${invoiceData.id}/customer`, {
+        customerid,
+        confirmEInvoiceCancellation,
+      });
+
+      toast.success("Customer updated successfully", { id: toastId });
+      setIsEditingCustomer(false);
+      await fetchDetails(); // Refresh data
+    } catch (error: any) {
+      console.error("Error updating customer:", error);
+      if (error.response?.data?.requiresConfirmation) {
+        setEInvoiceCancelField("customer");
+        setEInvoiceCancelAction({
+          type: "customer",
+          data: { customerid },
+        });
+        setShowEInvoiceCancelConfirm(true);
+        toast.error("E-Invoice cancellation confirmation required", { id: toastId });
+      } else {
+        toast.error(error.response?.data?.message || "Failed to update customer", { id: toastId });
+      }
+    } finally {
+      setIsUpdatingCustomer(false);
+    }
+  };
+
+  const handleOpenSalesmanEdit = () => {
+    if (!invoiceData) return;
+    setSelectedSalesmanId(invoiceData.salespersonid);
+    setIsEditingSalesman(true);
+  };
+
+  const handleSalesmanUpdate = async (): Promise<void> => {
+    if (!invoiceData || isUpdatingSalesman) return;
+
+    setIsUpdatingSalesman(true);
+    const toastId = toast.loading("Updating salesman...");
+
+    try {
+      await api.put(`/jellypolly/api/invoices/${invoiceData.id}/salesman`, {
+        salespersonid: selectedSalesmanId,
+      });
+
+      toast.success("Salesman updated successfully", { id: toastId });
+      setIsEditingSalesman(false);
+      await fetchDetails(); // Refresh data
+    } catch (error: any) {
+      console.error("Error updating salesman:", error);
+      toast.error(error.response?.data?.message || "Failed to update salesman", { id: toastId });
+    } finally {
+      setIsUpdatingSalesman(false);
+    }
+  };
+
+  const handleOpenPaymentTypeEdit = (): void => {
+    if (!invoiceData) return;
+    setSelectedPaymentType(invoiceData.paymenttype as any);
+    setIsEditingPaymentType(true);
+  };
+
+  const handlePaymentTypeUpdate = async (): Promise<void> => {
+    if (!invoiceData || isUpdatingPaymentType) return;
+
+    // Check if e-invoice status requires confirmation
+    if (invoiceData.einvoice_status && invoiceData.einvoice_status !== "cancelled") {
+      setEInvoiceCancelField("payment type");
+      setEInvoiceCancelAction({
+        type: "paymenttype",
+        data: { paymenttype: selectedPaymentType },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    await performPaymentTypeUpdate(selectedPaymentType, false);
+  };
+
+  const performPaymentTypeUpdate = async (paymenttype: string, confirmEInvoiceCancellation: boolean): Promise<void> => {
+    if (!invoiceData || isUpdatingPaymentType) return;
+
+    setIsUpdatingPaymentType(true);
+    const toastId = toast.loading("Updating payment type...");
+
+    try {
+      await api.put(`/jellypolly/api/invoices/${invoiceData.id}/paymenttype`, {
+        paymenttype,
+        confirmEInvoiceCancellation,
+      });
+
+      toast.success("Payment type updated successfully", { id: toastId });
+      setIsEditingPaymentType(false);
+      await fetchDetails(); // Refresh data
+    } catch (error: any) {
+      console.error("Error updating payment type:", error);
+      if (error.response?.data?.requiresConfirmation) {
+        setEInvoiceCancelField("payment type");
+        setEInvoiceCancelAction({
+          type: "paymenttype",
+          data: { paymenttype },
+        });
+        setShowEInvoiceCancelConfirm(true);
+        toast.error("E-Invoice cancellation confirmation required", { id: toastId });
+      } else {
+        toast.error(error.response?.data?.message || "Failed to update payment type", { id: toastId });
+      }
+    } finally {
+      setIsUpdatingPaymentType(false);
+    }
+  };
+
+  const handleOpenDateTimeEdit = (): void => {
+    if (!invoiceData) return;
+    const date = new Date(Number(invoiceData.createddate) * 1000);
+    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedTime(date.toTimeString().slice(0, 5));
+    setIsEditingDateTime(true);
+  };
+
+  const handleDateTimeUpdate = async (): Promise<void> => {
+    if (!invoiceData || isUpdatingDateTime) return;
+
+    const combinedDateTime = new Date(`${selectedDate}T${selectedTime}`);
+    const timestamp = Math.floor(combinedDateTime.getTime() / 1000);
+
+    // Check if e-invoice status requires confirmation
+    if (invoiceData.einvoice_status && invoiceData.einvoice_status !== "cancelled") {
+      setEInvoiceCancelField("date/time");
+      setEInvoiceCancelAction({
+        type: "datetime",
+        data: { createddate: timestamp },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    await performDateTimeUpdate(timestamp, false);
+  };
+
+  const performDateTimeUpdate = async (createddate: number, confirmEInvoiceCancellation: boolean): Promise<void> => {
+    if (!invoiceData || isUpdatingDateTime) return;
+
+    setIsUpdatingDateTime(true);
+    const toastId = toast.loading("Updating date/time...");
+
+    try {
+      await api.put(`/jellypolly/api/invoices/${invoiceData.id}/datetime`, {
+        createddate,
+        confirmEInvoiceCancellation,
+      });
+
+      toast.success("Date/time updated successfully", { id: toastId });
+      setIsEditingDateTime(false);
+      await fetchDetails(); // Refresh data
+    } catch (error: any) {
+      console.error("Error updating date/time:", error);
+      if (error.response?.data?.requiresConfirmation) {
+        setEInvoiceCancelField("date/time");
+        setEInvoiceCancelAction({
+          type: "datetime",
+          data: { createddate },
+        });
+        setShowEInvoiceCancelConfirm(true);
+        toast.error("E-Invoice cancellation confirmation required", { id: toastId });
+      } else {
+        toast.error(error.response?.data?.message || "Failed to update date/time", { id: toastId });
+      }
+    } finally {
+      setIsUpdatingDateTime(false);
+    }
+  };
+
+  const handleOpenOrderDetailsEdit = (): void => {
+    if (!invoiceData) return;
+    setEditedProducts(invoiceData.products);
+    setIsEditingOrderDetails(true);
+  };
+
+  const handleOrderDetailsUpdate = async (): Promise<void> => {
+    if (!invoiceData || isUpdatingOrderDetails || editedProducts.length === 0) return;
+
+    // Check if e-invoice status requires confirmation
+    if (invoiceData.einvoice_status && invoiceData.einvoice_status !== "cancelled") {
+      setEInvoiceCancelField("order details");
+      setEInvoiceCancelAction({
+        type: "orderdetails",
+        data: { products: editedProducts },
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    await performOrderDetailsUpdate(editedProducts, false);
+  };
+
+  const performOrderDetailsUpdate = async (products: ProductItem[], confirmEInvoiceCancellation: boolean): Promise<void> => {
+    if (!invoiceData || isUpdatingOrderDetails) return;
+
+    setIsUpdatingOrderDetails(true);
+    const toastId = toast.loading("Updating order details...");
+
+    try {
+      await api.put(`/jellypolly/api/invoices/${invoiceData.id}/order-details`, {
+        products,
+        confirmEInvoiceCancellation,
+      });
+
+      toast.success("Order details updated successfully", { id: toastId });
+      setIsEditingOrderDetails(false);
+      setEditedProducts([]);
+      await fetchDetails(); // Refresh data
+    } catch (error: any) {
+      console.error("Error updating order details:", error);
+      if (error.response?.data?.requiresConfirmation) {
+        setEInvoiceCancelField("order details");
+        setEInvoiceCancelAction({
+          type: "orderdetails",
+          data: { products },
+        });
+        setShowEInvoiceCancelConfirm(true);
+        toast.error("E-Invoice cancellation confirmation required", { id: toastId });
+      } else {
+        toast.error(error.response?.data?.message || "Failed to update order details", { id: toastId });
+      }
+    } finally {
+      setIsUpdatingOrderDetails(false);
+    }
+  };
+
+  const handleOpenUUIDEdit = (): void => {
+    if (!invoiceData) return;
+    setSelectedUUID(invoiceData.uuid || "");
+    setIsEditingUUID(true);
+  };
+
+  const handleUUIDUpdate = async (): Promise<void> => {
+    if (!invoiceData || isUpdatingUUID) return;
+
+    setIsUpdatingUUID(true);
+    const toastId = toast.loading("Updating UUID...");
+
+    try {
+      await api.put(`/jellypolly/api/invoices/${invoiceData.id}/uuid`, {
+        uuid: selectedUUID.trim(),
+      });
+
+      toast.success("UUID updated successfully", { id: toastId });
+      setIsEditingUUID(false);
+      await fetchDetails(); // Refresh data
+    } catch (error: any) {
+      console.error("Error updating UUID:", error);
+      toast.error(error.response?.data?.message || "Failed to update UUID", { id: toastId });
+    } finally {
+      setIsUpdatingUUID(false);
+    }
+  };
+
+  const handleConfirmEInvoiceCancellation = async (): Promise<void> => {
+    if (!eInvoiceCancelAction) return;
+
+    setShowEInvoiceCancelConfirm(false);
+
+    try {
+      switch (eInvoiceCancelAction.type) {
+        case "customer":
+          await performCustomerUpdate(eInvoiceCancelAction.data.customerid, true);
+          break;
+        case "datetime":
+          await performDateTimeUpdate(eInvoiceCancelAction.data.createddate, true);
+          break;
+        case "paymenttype":
+          await performPaymentTypeUpdate(eInvoiceCancelAction.data.paymenttype, true);
+          break;
+        case "orderdetails":
+          await performOrderDetailsUpdate(eInvoiceCancelAction.data.products, true);
+          break;
+      }
+    } finally {
+      setEInvoiceCancelAction(null);
+      setEInvoiceCancelField("");
+    }
+  };
 
   // --- Actions ---
 
@@ -726,8 +1167,9 @@ const InvoiceDetailsPage: React.FC = () => {
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${invoiceStatusStyle}`}
           >
-            {invoiceData.invoice_status.charAt(0).toUpperCase() +
-              invoiceData.invoice_status.slice(1)}
+            {invoiceData.invoice_status 
+              ? invoiceData.invoice_status.charAt(0).toUpperCase() + invoiceData.invoice_status.slice(1)
+              : "Unknown"}
           </span>
           {eInvoiceStatusInfo && EInvoiceIcon && (
             <span
@@ -930,46 +1372,98 @@ const InvoiceDetailsPage: React.FC = () => {
             Invoice Details
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Customer
               </span>
-              <span className="text-gray-900 font-medium">
-                {invoiceData.customerName || invoiceData.customerid}
-              </span>
+              <div className="flex items-center">
+                <span className="text-gray-900 font-medium">
+                  {invoiceData.customerName || invoiceData.customerid}
+                </span>
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenCustomerEdit();
+                  }}
+                  title="Change customer"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
+              </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Salesman
               </span>
-              <span className="text-gray-900 font-medium">
-                {invoiceData.salespersonid}
-              </span>
+              <div className="flex items-center">
+                <span className="text-gray-900 font-medium">
+                  {invoiceData.salespersonid || "No Salesman"}
+                </span>
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenSalesmanEdit();
+                  }}
+                  title="Change salesman"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
+              </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Date / Time
               </span>
-              <span className="flex text-gray-900 font-medium gap-2">
-                <span>{formatDisplayDate(createdDate)}</span>
-                <span className="text-gray-600">
-                  {parseDatabaseTimestamp(
-                    invoiceData.createddate
-                  ).date?.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  }) || ""}
+              <div className="flex items-center">
+                <span className="flex text-gray-900 font-medium gap-2">
+                  <span>{formatDisplayDate(createdDate)}</span>
+                  <span className="text-gray-600">
+                    {parseDatabaseTimestamp(
+                      invoiceData.createddate
+                    ).date?.toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    }) || ""}
+                  </span>
                 </span>
-              </span>
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDateTimeEdit();
+                  }}
+                  title="Change date/time"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
+              </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Payment Type
               </span>
-              <span className="text-gray-900 font-medium capitalize">
-                {invoiceData.paymenttype.toLowerCase()}
-              </span>
+              <div className="flex items-center">
+                <span className="text-gray-900 font-medium capitalize">
+                  {invoiceData.paymenttype.toLowerCase()}
+                </span>
+                <button
+                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenPaymentTypeEdit();
+                  }}
+                  title="Change payment type"
+                  disabled={isLoading}
+                >
+                  <IconPencil size={14} className="text-sky-600" />
+                </button>
+              </div>
             </div>
             <div className="md:col-span-2 flex flex-col">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
@@ -1003,10 +1497,23 @@ const InvoiceDetailsPage: React.FC = () => {
         </section>
 
         {/* Line Items Display */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
-          <h2 className="text-lg font-semibold mb-3 text-gray-800">
-            Line Items
-          </h2>
+        <section className="p-4 group border rounded-lg bg-white shadow-sm">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+              Line Items
+            </h2>
+            <button
+              className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenOrderDetailsEdit();
+              }}
+              title="Edit line items"
+              disabled={isLoading}
+            >
+              <IconPencil size={16} className="text-sky-600" />
+            </button>
+          </div>
           <LineItemsDisplayTable items={invoiceData.products} />
         </section>
 
@@ -1139,6 +1646,33 @@ const InvoiceDetailsPage: React.FC = () => {
                 </>
               )}
             </div>
+            {/* Manual UUID Input - Only show for null einvoice_status and on hover */}
+            {invoiceData.einvoice_status === null && (
+              <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300 mt-4">
+                <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
+                  Manual UUID
+                </span>
+                <div className="flex items-center">
+                  <span className="text-gray-600 font-mono text-sm break-all">
+                    {invoiceData.uuid || "No UUID set"}
+                  </span>
+                  <button
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenUUIDEdit();
+                    }}
+                    title="Set UUID manually"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={14} className="text-sky-600" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Use this to manually set UUID if e-invoice submission didn't record it properly
+                </p>
+              </div>
+            )}
           </section>
         )}
 
@@ -1359,6 +1893,361 @@ const InvoiceDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
+
+      {/* Order Details Edit Modal */}
+      {isEditingOrderDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Edit Line Items
+              </h3>
+              <button
+                onClick={() => {
+                  setIsEditingOrderDetails(false);
+                  setEditedProducts([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingOrderDetails}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="flex-1 p-6 overflow-auto">
+              {invoiceData && (
+                <LineItemsTable
+                  items={editedProducts.length > 0 ? editedProducts : invoiceData.products}
+                  onItemsChange={setEditedProducts}
+                  customerProducts={[]} // No customer products for JellyPolly
+                  productsCache={productsCache.map(p => ({
+                    uid: p.id,
+                    code: p.id,
+                    price: Number(p.price_per_unit || 0),
+                    quantity: 0,
+                    description: p.description,
+                    freeProduct: 0,
+                    returnProduct: 0,
+                    tax: 0,
+                    total: "0.00",
+                  }))}
+                  readOnly={false}
+                />
+              )}
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditingOrderDetails(false);
+                  setEditedProducts([]);
+                }}
+                disabled={isUpdatingOrderDetails}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleOrderDetailsUpdate}
+                disabled={isUpdatingOrderDetails || editedProducts.length === 0}
+              >
+                {isUpdatingOrderDetails ? "Updating..." : "Update Line Items"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Edit Modal */}
+      {isEditingCustomer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Customer
+              </h3>
+              <button
+                onClick={() => setIsEditingCustomer(false)}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingCustomer}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="mb-6">
+              <CustomerCombobox
+                name="customer"
+                label="Customer"
+                value={selectedCustomerId ? { id: selectedCustomerId, name: customers.find(c => c.id === selectedCustomerId)?.name || selectedCustomerId } : null}
+                onChange={(value) => setSelectedCustomerId(value?.id || null)}
+                options={filteredCustomers}
+                query={customerQuery}
+                setQuery={setCustomerQuery}
+                onLoadMore={handleLoadMoreCustomers}
+                hasMore={hasMoreCustomers}
+                isLoading={isLoadingMoreCustomers}
+                placeholder="Search customers..."
+                disabled={isUpdatingCustomer}
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingCustomer(false)}
+                disabled={isUpdatingCustomer}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleCustomerUpdate}
+                disabled={
+                  isUpdatingCustomer ||
+                  !selectedCustomerId ||
+                  selectedCustomerId === invoiceData.customerid
+                }
+              >
+                {isUpdatingCustomer ? "Updating..." : "Update Customer"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Salesman Edit Modal */}
+      {isEditingSalesman && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Salesman
+              </h3>
+              <button
+                onClick={() => setIsEditingSalesman(false)}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingSalesman}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Salesman
+              </label>
+              <select
+                value={selectedSalesmanId || ''}
+                onChange={(e) => setSelectedSalesmanId(e.target.value || null)}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isUpdatingSalesman}
+              >
+                <option value="">No Salesman</option>
+                {salesmen.map((salesman) => (
+                  <option key={salesman.id} value={salesman.id}>
+                    {salesman.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingSalesman(false)}
+                disabled={isUpdatingSalesman}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleSalesmanUpdate}
+                disabled={
+                  isUpdatingSalesman ||
+                  selectedSalesmanId === invoiceData.salespersonid
+                }
+              >
+                {isUpdatingSalesman ? "Updating..." : "Update Salesman"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Type Edit Modal */}
+      {isEditingPaymentType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Change Payment Type
+              </h3>
+              <button
+                onClick={() => setIsEditingPaymentType(false)}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingPaymentType}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Type
+              </label>
+              <select
+                value={selectedPaymentType}
+                onChange={(e) => setSelectedPaymentType(e.target.value as any)}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isUpdatingPaymentType}
+              >
+                <option value="CASH">Cash</option>
+                <option value="INVOICE">Invoice</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingPaymentType(false)}
+                disabled={isUpdatingPaymentType}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handlePaymentTypeUpdate}
+                disabled={
+                  isUpdatingPaymentType ||
+                  selectedPaymentType === invoiceData.paymenttype
+                }
+              >
+                {isUpdatingPaymentType ? "Updating..." : "Update Payment Type"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Date/Time Edit Modal */}
+      {isEditingDateTime && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Edit Date & Time
+              </h3>
+              <button
+                onClick={() => setIsEditingDateTime(false)}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingDateTime}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={isUpdatingDateTime}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time
+                </label>
+                <input
+                  type="time"
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={isUpdatingDateTime}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingDateTime(false)}
+                disabled={isUpdatingDateTime}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleDateTimeUpdate}
+                disabled={isUpdatingDateTime}
+              >
+                {isUpdatingDateTime ? "Updating..." : "Update Date & Time"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UUID Edit Modal */}
+      {isEditingUUID && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Set Manual UUID
+              </h3>
+              <button
+                onClick={() => setIsEditingUUID(false)}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingUUID}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                UUID
+              </label>
+              <input
+                type="text"
+                value={selectedUUID}
+                onChange={(e) => setSelectedUUID(e.target.value)}
+                placeholder="Enter UUID manually"
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isUpdatingUUID}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Use this only if the e-invoice UUID needs to be set manually
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingUUID(false)}
+                disabled={isUpdatingUUID}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="amber"
+                onClick={handleUUIDUpdate}
+                disabled={isUpdatingUUID || selectedUUID.trim() === (invoiceData.uuid || '')}
+              >
+                {isUpdatingUUID ? "Updating..." : "Update UUID"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* E-Invoice Cancel Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showEInvoiceCancelConfirm}
+        onClose={() => setShowEInvoiceCancelConfirm(false)}
+        onConfirm={handleConfirmEInvoiceCancellation}
+        title="Cancel E-Invoice"
+        message={`Changing the ${eInvoiceCancelField} will require cancelling the e-invoice. This action cannot be undone. Do you want to proceed?`}
+        confirmButtonText="Proceed with Cancellation"
+        variant="danger"
+      />
+
       {/* Solo Print PDF Overlay */}
       {showSoloPrintOverlay && invoiceData && (
         <InvoiceSoloPrintOverlay
