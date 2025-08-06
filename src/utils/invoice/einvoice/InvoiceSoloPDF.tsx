@@ -259,8 +259,8 @@ const InvoiceSoloPDF: React.FC<Props> = ({
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Currency</Text>
-          <Text style={styles.detailValue}>MYR</Text>
+          <Text style={styles.detailLabel}>Invoice Type</Text>
+          <Text style={styles.detailValue}>{data.invoice.type}</Text>
         </View>
       </View>
 
