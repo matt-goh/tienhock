@@ -1072,5 +1072,911 @@ export default function (pool, config) {
     }
   });
 
+  // PUT /jellypolly/api/invoices/:id/uuid - Update invoice UUID manually
+  router.put("/:id/uuid", async (req, res) => {
+    const { id } = req.params;
+    const { uuid } = req.body;
+
+    if (!uuid || !uuid.trim()) {
+      return res.status(400).json({ message: "UUID is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT invoice_status, einvoice_status FROM jellypolly.invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      const currentInvoice = invoiceCheck.rows[0];
+
+      // Only allow UUID setting for invoices with null einvoice_status
+      if (currentInvoice.einvoice_status !== null) {
+        throw new Error(
+          "Can only set UUID for invoices with null e-invoice status"
+        );
+      }
+
+      // Prevent changes for cancelled invoices
+      if (currentInvoice.invoice_status === "cancelled") {
+        throw new Error("Cannot set UUID for cancelled invoices");
+      }
+
+      // Check if UUID already exists in system
+      const uuidCheck = await client.query(
+        "SELECT id FROM jellypolly.invoices WHERE uuid = $1 AND id != $2",
+        [uuid.trim(), id]
+      );
+
+      if (uuidCheck.rows.length > 0) {
+        throw new Error("This UUID is already assigned to another invoice");
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE jellypolly.invoices 
+      SET uuid = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [uuid.trim(), id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "UUID updated successfully",
+        invoiceId: id,
+        uuid: uuid.trim(),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating UUID:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating UUID" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /jellypolly/api/invoices/:id/order-details - Update invoice order details
+  router.put("/:id/order-details", async (req, res) => {
+    const { id } = req.params;
+    const { products, confirmEInvoiceCancellation } = req.body;
+
+    // Validation
+    if (!products || !Array.isArray(products)) {
+      return res.status(400).json({
+        message: "Products array is required",
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. Get the current invoice to check status
+      const invoiceCheckQuery = `
+      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable
+      FROM jellypolly.invoices 
+      WHERE id = $1
+    `;
+      const invoiceResult = await client.query(invoiceCheckQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          message: "Invoice not found",
+        });
+      }
+
+      const invoice = invoiceResult.rows[0];
+      const oldTotal = parseFloat(invoice.totalamountpayable || 0);
+
+      // 2. Check if this requires e-Invoice cancellation confirmation
+      const requiresConfirmation =
+        invoice.einvoice_status !== null &&
+        invoice.einvoice_status !== "cancelled";
+
+      if (requiresConfirmation && !confirmEInvoiceCancellation) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Order details change requires e-Invoice cancellation confirmation",
+          requiresConfirmation: true,
+          currentEInvoiceStatus: invoice.einvoice_status,
+        });
+      }
+
+      // 3. If confirmation provided, attempt to cancel e-invoice and clear fields
+      if (requiresConfirmation && confirmEInvoiceCancellation) {
+        // Try to cancel via MyInvois API if UUID exists
+        if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+          try {
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${invoice.uuid}/state`,
+              { status: "cancelled", reason: "Order details updated" }
+            );
+          } catch (cancelError) {
+            console.error(
+              `Error cancelling e-invoice ${invoice.uuid} via API:`,
+              cancelError
+            );
+            // Continue even if API cancellation fails
+          }
+        }
+
+        // Clear e-invoice fields
+        const clearEInvoiceQuery = `
+        UPDATE jellypolly.invoices 
+        SET uuid = NULL, 
+            submission_uid = NULL, 
+            long_id = NULL,
+            datetime_validated = NULL, 
+            einvoice_status = NULL
+        WHERE id = $1
+      `;
+        await client.query(clearEInvoiceQuery, [id]);
+      }
+
+      // 4. Delete existing order details
+      const deleteQuery = `DELETE FROM jellypolly.order_details WHERE invoiceid = $1`;
+      await client.query(deleteQuery, [id]);
+
+      // 5. Calculate new totals
+      let subtotal = 0;
+      let taxTotal = 0;
+
+      // 6. Insert new order details
+      const insertQuery = `
+      INSERT INTO jellypolly.order_details (
+        invoiceid, code, price, quantity, freeproduct,
+        returnproduct, description, tax, total, issubtotal
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `;
+
+      for (const product of products) {
+        if (product.istotal) continue; // Skip total rows
+
+        await client.query(insertQuery, [
+          id,
+          product.code || (product.issubtotal ? "SUBTOTAL" : ""),
+          parseFloat(product.price || 0),
+          parseInt(product.quantity || 0),
+          parseInt(product.freeProduct || 0),
+          parseInt(product.returnProduct || 0),
+          product.description || (product.issubtotal ? "Subtotal" : ""),
+          parseFloat(product.tax || 0),
+          String(product.total || "0.00"),
+          product.issubtotal || false,
+        ]);
+
+        // Calculate totals (exclude subtotal rows)
+        if (!product.issubtotal && !product.istotal) {
+          const quantity = parseInt(product.quantity || 0);
+          const price = parseFloat(product.price || 0);
+          const tax = parseFloat(product.tax || 0);
+          subtotal += quantity * price;
+          taxTotal += tax;
+        }
+      }
+
+      // 7. Calculate new totals
+      const totalPayable = subtotal + taxTotal;
+      const newTotal = parseFloat(totalPayable.toFixed(2));
+
+      // Get current payments breakdown
+      const paymentsBreakdownQuery = `
+      SELECT 
+        COALESCE(SUM(CASE WHEN (status IS NULL OR status = 'active') THEN amount_paid ELSE 0 END), 0) as active_paid,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_paid ELSE 0 END), 0) as pending_amount,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN (status IS NULL OR status = 'active') THEN 1 END) as active_count
+      FROM jellypolly.payments 
+      WHERE invoice_id = $1 AND status != 'cancelled'
+    `;
+      const paymentsBreakdownResult = await client.query(
+        paymentsBreakdownQuery,
+        [id]
+      );
+      const {
+        active_paid: activePaid,
+        pending_amount: pendingAmount,
+        pending_count: pendingCount,
+        active_count: activeCount,
+      } = paymentsBreakdownResult.rows[0];
+
+      const totalActivePaid = parseFloat(activePaid || 0);
+      const totalPendingAmount = parseFloat(pendingAmount || 0);
+
+      // 8. Cancel ALL pending payments when order details change (regardless of payment type)
+      let cancelledPendingCount = 0;
+      if (pendingCount > 0) {
+        const cancelPendingQuery = `
+        UPDATE jellypolly.payments 
+        SET status = 'cancelled', 
+            cancellation_date = NOW(),
+            cancellation_reason = $1
+        WHERE invoice_id = $2 AND status = 'pending'
+        RETURNING payment_id, amount_paid
+      `;
+
+        const cancelledPending = await client.query(cancelPendingQuery, [
+          `Order details updated - pending payments cancelled due to invoice changes`,
+          id,
+        ]);
+
+        cancelledPendingCount = cancelledPending.rows.length;
+        console.log(
+          `Cancelled ${cancelledPendingCount} pending payments for invoice ${id} due to order details update`
+        );
+      }
+
+      // 9. Calculate new balance_due based on payment type
+      let newBalanceDue;
+      if (invoice.paymenttype === "CASH") {
+        // CASH invoices should always have zero balance
+        newBalanceDue = 0;
+      } else {
+        // For INVOICE types, calculate: new_total - active_paid (excluding pending)
+        newBalanceDue = Math.max(0, newTotal - totalActivePaid);
+
+        // Log overpayment situations
+        if (newTotal < totalActivePaid) {
+          console.warn(
+            `Invoice ${id}: New total (${newTotal}) is less than active payments (${totalActivePaid}). ` +
+              `Setting balance to 0 but this may require manual adjustment.`
+          );
+        }
+      }
+
+      // 10. Update invoice totals
+      const updateInvoiceQuery = `
+      UPDATE jellypolly.invoices 
+      SET total_excluding_tax = $1,
+          tax_amount = $2,
+          totalamountpayable = $3,
+          balance_due = $4
+      WHERE id = $5
+      RETURNING *
+    `;
+
+      const updateResult = await client.query(updateInvoiceQuery, [
+        parseFloat(subtotal.toFixed(2)),
+        parseFloat(taxTotal.toFixed(2)),
+        newTotal,
+        parseFloat(newBalanceDue.toFixed(2)),
+        id,
+      ]);
+
+      // 11. Handle CASH invoice payment adjustments
+      let cancelledActiveCount = 0;
+      let newPaymentCreated = false;
+      if (invoice.paymenttype === "CASH") {
+        // For CASH invoices, adjust active payments to match the new total
+        if (Math.abs(newTotal - totalActivePaid) > 0.001) {
+          // Only if there's a meaningful difference
+          // Cancel all existing active payments
+          if (activeCount > 0) {
+            const cancelActiveQuery = `
+            UPDATE jellypolly.payments 
+            SET status = 'cancelled', 
+                cancellation_date = NOW(),
+                cancellation_reason = $1
+            WHERE invoice_id = $2 AND (status IS NULL OR status = 'active')
+            RETURNING payment_id, amount_paid
+          `;
+
+            const cancelledActive = await client.query(cancelActiveQuery, [
+              `Order details updated - amount changed from ${totalActivePaid.toFixed(
+                2
+              )} to ${newTotal.toFixed(2)}`,
+              id,
+            ]);
+
+            cancelledActiveCount = cancelledActive.rows.length;
+          }
+
+          // Create new payment for the updated amount (if amount > 0)
+          if (newTotal > 0) {
+            const insertNewPaymentQuery = `
+            INSERT INTO jellypolly.payments (
+              invoice_id, payment_date, amount_paid, payment_method,
+              payment_reference, notes, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING payment_id
+          `;
+
+            const newPaymentResult = await client.query(insertNewPaymentQuery, [
+              id,
+              new Date().toISOString().split("T")[0], // Today's date
+              newTotal,
+              "cash",
+              null,
+              "Automatic payment - order details updated",
+              "active",
+            ]);
+
+            newPaymentCreated = true;
+            console.log(
+              `Created new payment of ${newTotal.toFixed(
+                2
+              )} for CASH invoice ${id} after order details update`
+            );
+          }
+
+          console.log(
+            `Adjusted payments for CASH invoice ${id}: cancelled ${cancelledActiveCount} active payments, created new payment for ${newTotal.toFixed(
+              2
+            )}`
+          );
+        }
+      }
+
+      // 12. Update customer credit if this is an INVOICE type
+      if (invoice.paymenttype === "INVOICE") {
+        const creditAdjustment = newTotal - oldTotal;
+
+        if (Math.abs(creditAdjustment) > 0.001) {
+          await updateCustomerCredit(
+            client,
+            invoice.customerid,
+            creditAdjustment
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+
+      // 13. Return response with detailed payment information
+      res.json({
+        message: "Order details updated successfully",
+        invoice: {
+          id: updateResult.rows[0].id,
+          total_excluding_tax: parseFloat(
+            updateResult.rows[0].total_excluding_tax
+          ),
+          tax_amount: parseFloat(updateResult.rows[0].tax_amount),
+          totalamountpayable: parseFloat(
+            updateResult.rows[0].totalamountpayable
+          ),
+          balance_due: parseFloat(updateResult.rows[0].balance_due),
+        },
+        einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
+        paymentInfo: {
+          oldTotal: oldTotal,
+          newTotal: newTotal,
+          totalActivePaid: totalActivePaid,
+          newBalance: parseFloat(newBalanceDue.toFixed(2)),
+          overpayment:
+            newTotal < totalActivePaid ? totalActivePaid - newTotal : 0,
+          paymentsAdjusted: {
+            pendingCancelled: cancelledPendingCount,
+            activeCancelled: cancelledActiveCount,
+            newPaymentCreated: newPaymentCreated,
+            cashPaymentAdjusted:
+              invoice.paymenttype === "CASH" &&
+              Math.abs(newTotal - totalActivePaid) > 0.001,
+          },
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating order details:", error);
+      res.status(500).json({
+        message: "Error updating order details",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /jellypolly/api/invoices/:id/customer - Update customer for invoice
+  router.put("/:id/customer", async (req, res) => {
+    const { id } = req.params;
+    const { customerid, confirmEInvoiceCancellation } = req.body;
+
+    // Validation
+    if (!customerid) {
+      return res.status(400).json({
+        message: "Customer ID is required",
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. First, get the current invoice to check status
+      const invoiceCheckQuery = `
+      SELECT id, customerid, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated
+      FROM jellypolly.invoices 
+      WHERE id = $1
+    `;
+      const invoiceResult = await client.query(invoiceCheckQuery, [id]);
+
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          message: "Invoice not found",
+        });
+      }
+
+      const invoice = invoiceResult.rows[0];
+
+      // 2. Check if this is critical e-Invoice data change
+      const requiresConfirmation =
+        invoice.einvoice_status !== null &&
+        invoice.einvoice_status !== "cancelled";
+
+      if (requiresConfirmation && !confirmEInvoiceCancellation) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Customer change requires e-Invoice cancellation confirmation",
+          requiresConfirmation: true,
+          currentEInvoiceStatus: invoice.einvoice_status,
+        });
+      }
+
+      // 3. If confirmation provided, attempt to cancel e-invoice via API and clear fields
+      if (requiresConfirmation && confirmEInvoiceCancellation) {
+        let apiCancellationSuccess = false;
+
+        // Try to cancel via MyInvois API if UUID exists
+        if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+          try {
+            // Using the API client logic you provided
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${invoice.uuid}/state`,
+              { status: "cancelled", reason: "Customer information updated" }
+            );
+            apiCancellationSuccess = true;
+          } catch (cancelError) {
+            console.error(
+              `Error cancelling e-invoice ${invoice.uuid} via API:`,
+              cancelError
+            );
+            if (cancelError.status === 400) {
+              console.warn(
+                `E-invoice ${invoice.uuid} might already be cancelled or in a non-cancellable state.`
+              );
+              apiCancellationSuccess = true;
+            }
+          }
+        }
+
+        // Clear e-invoice fields regardless of API result
+        const clearEInvoiceQuery = `
+        UPDATE jellypolly.invoices 
+        SET uuid = NULL, 
+            submission_uid = NULL, 
+            long_id = NULL,
+            datetime_validated = NULL, 
+            einvoice_status = NULL
+        WHERE id = $1
+      `;
+        await client.query(clearEInvoiceQuery, [id]);
+      }
+
+      // 4. Check if the new customer exists
+      const customerCheckQuery = `
+      SELECT id, name FROM customers WHERE id = $1
+    `;
+      const customerResult = await client.query(customerCheckQuery, [
+        customerid,
+      ]);
+
+      if (customerResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Customer with ID '${customerid}' not found`,
+        });
+      }
+
+      // 5. Update the invoice with the new customer
+      const updateQuery = `
+      UPDATE jellypolly.invoices 
+      SET customerid = $1
+      WHERE id = $2
+      RETURNING *
+    `;
+      const updateResult = await client.query(updateQuery, [customerid, id]);
+
+      await client.query("COMMIT");
+
+      // 6. Return success response
+      res.json({
+        message: "Customer updated successfully",
+        invoice: {
+          id: updateResult.rows[0].id,
+          customerid: updateResult.rows[0].customerid,
+          customerName: customerResult.rows[0].name,
+          oldCustomerId: invoice.customerid,
+        },
+        einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating invoice customer:", error);
+      res.status(500).json({
+        message: "Error updating invoice customer",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /jellypolly/api/invoices/:id/salesman - Update invoice salesman
+  router.put("/:id/salesman", async (req, res) => {
+    const { id } = req.params;
+    const { salespersonid } = req.body;
+
+    if (!salespersonid) {
+      return res.status(400).json({ message: "Salesperson ID is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT invoice_status FROM jellypolly.invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      // Verify salesperson exists
+      const staffCheck = await client.query(
+        "SELECT id FROM staffs WHERE id = $1",
+        [salespersonid]
+      );
+
+      if (staffCheck.rows.length === 0) {
+        throw new Error("Salesperson not found");
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE jellypolly.invoices 
+      SET salespersonid = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [salespersonid, id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Salesman updated successfully",
+        invoiceId: id,
+        salespersonid: salespersonid,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating salesman:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating salesman" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /jellypolly/api/invoices/:id/paymenttype - Update invoice payment type
+  router.put("/:id/paymenttype", async (req, res) => {
+    const { id } = req.params;
+    const { paymenttype } = req.body;
+
+    if (!paymenttype || !["CASH", "INVOICE"].includes(paymenttype)) {
+      return res
+        .status(400)
+        .json({ message: "Valid payment type (CASH or INVOICE) is required" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status (including customerid for credit adjustments)
+      const invoiceCheck = await client.query(
+        "SELECT invoice_status, paymenttype, balance_due, totalamountpayable, createddate, customerid FROM jellypolly.invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      const currentInvoice = invoiceCheck.rows[0];
+      const currentPaymentType = currentInvoice.paymenttype;
+
+      // If no change in payment type, return early
+      if (currentPaymentType === paymenttype) {
+        await client.query("COMMIT");
+        return res.json({
+          message: "Payment type unchanged",
+          invoiceId: id,
+          paymenttype: paymenttype,
+        });
+      }
+
+      // Handle INVOICE to CASH conversion
+      if (currentPaymentType === "INVOICE" && paymenttype === "CASH") {
+        // Create automatic payment for the full amount
+        const paymentAmount = currentInvoice.totalamountpayable;
+        const paymentDate = new Date(Number(currentInvoice.createddate))
+          .toISOString()
+          .split("T")[0]; // YYYY-MM-DD format
+
+        const insertPaymentQuery = `
+        INSERT INTO jellypolly.payments (invoice_id, payment_date, payment_method, amount_paid, notes, status)
+        VALUES ($1, $2, 'cash', $3, 'Automatic payment - converted from INVOICE to CASH', 'active')
+        RETURNING payment_id
+      `;
+
+        await client.query(insertPaymentQuery, [
+          id,
+          paymentDate,
+          paymentAmount,
+        ]);
+
+        // Reduce customer credit usage since invoice is no longer on credit
+        await updateCustomerCredit(
+          client,
+          currentInvoice.customerid,
+          -paymentAmount // Negative amount decreases credit_used
+        );
+
+        // Update invoice to CASH type with zero balance and paid status
+        const updateInvoiceQuery = `
+        UPDATE jellypolly.invoices 
+        SET paymenttype = $1, balance_due = 0, invoice_status = $2
+        WHERE id = $3
+        RETURNING id
+      `;
+
+        await client.query(updateInvoiceQuery, ["CASH", "paid", id]);
+      }
+      // Handle CASH to INVOICE conversion
+      else if (currentPaymentType === "CASH" && paymenttype === "INVOICE") {
+        // Find and cancel the automatic payment if it exists
+        const findPaymentQuery = `
+        SELECT payment_id FROM jellypolly.payments 
+        WHERE invoice_id = $1 AND payment_method = 'cash' 
+        AND notes LIKE '%Automatic payment%' 
+        AND (status IS NULL OR status = 'active')
+        ORDER BY payment_date DESC 
+        LIMIT 1
+      `;
+
+        const paymentResult = await client.query(findPaymentQuery, [id]);
+
+        if (paymentResult.rows.length > 0) {
+          const payment = paymentResult.rows[0];
+
+          // Cancel the automatic payment
+          const cancelPaymentQuery = `
+          UPDATE jellypolly.payments 
+          SET status = 'cancelled', notes = CONCAT(notes, ' - Cancelled due to payment type change')
+          WHERE payment_id = $1
+        `;
+
+          await client.query(cancelPaymentQuery, [payment.payment_id]);
+        }
+
+        // Increase customer credit usage since invoice is now on credit
+        await updateCustomerCredit(
+          client,
+          currentInvoice.customerid,
+          currentInvoice.totalamountpayable // Positive amount increases credit_used
+        );
+
+        // Update invoice to INVOICE type with full balance and unpaid status
+        const updateInvoiceQuery = `
+        UPDATE jellypolly.invoices 
+        SET paymenttype = $1, balance_due = $2, invoice_status = $3
+        WHERE id = $4
+        RETURNING id
+      `;
+
+        await client.query(updateInvoiceQuery, [
+          "INVOICE",
+          currentInvoice.totalamountpayable,
+          "Unpaid",
+          id,
+        ]);
+      }
+
+      await client.query("COMMIT");
+
+      // Get updated invoice data for response
+      const updatedInvoiceQuery = `
+      SELECT paymenttype, balance_due, invoice_status FROM jellypolly.invoices WHERE id = $1
+    `;
+      const updatedResult = await client.query(updatedInvoiceQuery, [id]);
+      const updatedInvoice = updatedResult.rows[0];
+
+      res.json({
+        message: "Payment type updated successfully",
+        invoiceId: id,
+        paymenttype: updatedInvoice.paymenttype,
+        balance_due: parseFloat(updatedInvoice.balance_due),
+        invoice_status: updatedInvoice.invoice_status,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating payment type:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating payment type" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // PUT /jellypolly/api/invoices/:id/datetime - Update invoice date/time
+  router.put("/:id/datetime", async (req, res) => {
+    const { id } = req.params;
+    const { createddate, confirmEInvoiceCancellation } = req.body;
+
+    if (!createddate) {
+      return res.status(400).json({ message: "Created date is required" });
+    }
+
+    // Validate that createddate is a valid epoch timestamp
+    const timestamp = parseInt(createddate);
+    if (isNaN(timestamp) || timestamp <= 0) {
+      return res.status(400).json({ message: "Invalid timestamp format" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and get current status
+      const invoiceCheck = await client.query(
+        "SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated FROM jellypolly.invoices WHERE id = $1",
+        [id]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        throw new Error("Invoice not found");
+      }
+
+      const invoice = invoiceCheck.rows[0];
+
+      // Check if this requires e-Invoice cancellation confirmation
+      const requiresConfirmation =
+        invoice.einvoice_status !== null &&
+        invoice.einvoice_status !== "cancelled";
+
+      if (requiresConfirmation && !confirmEInvoiceCancellation) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Date/time change requires e-Invoice cancellation confirmation",
+          requiresConfirmation: true,
+          currentEInvoiceStatus: invoice.einvoice_status,
+        });
+      }
+
+      // If confirmation provided, attempt to cancel e-invoice and clear fields
+      if (requiresConfirmation && confirmEInvoiceCancellation) {
+        // Try to cancel via MyInvois API if UUID exists
+        if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
+          try {
+            await apiClient.makeApiCall(
+              "PUT",
+              `/api/v1.0/documents/state/${invoice.uuid}/state`,
+              { status: "cancelled", reason: "Invoice date/time updated" }
+            );
+          } catch (cancelError) {
+            console.error(
+              `Error cancelling e-invoice ${invoice.uuid} via API:`,
+              cancelError
+            );
+            // Continue even if API cancellation fails
+          }
+        }
+
+        // Clear e-invoice fields regardless of API result
+        const clearEInvoiceQuery = `
+        UPDATE jellypolly.invoices 
+        SET uuid = NULL, 
+            submission_uid = NULL, 
+            long_id = NULL,
+            datetime_validated = NULL, 
+            einvoice_status = NULL
+        WHERE id = $1
+      `;
+        await client.query(clearEInvoiceQuery, [id]);
+      }
+
+      // Update the invoice
+      const updateQuery = `
+      UPDATE jellypolly.invoices 
+      SET createddate = $1
+      WHERE id = $2
+      RETURNING id
+    `;
+
+      const result = await client.query(updateQuery, [createddate, id]);
+
+      if (result.rows.length === 0) {
+        throw new Error("Failed to update invoice");
+      }
+
+      // Update associated payments' dates to match the new invoice date
+      // Convert epoch timestamp to PostgreSQL timestamp format
+      const updatePaymentsQuery = `
+        UPDATE jellypolly.payments 
+        SET payment_date = TO_TIMESTAMP($1::bigint / 1000)::date
+        WHERE invoice_id = $2 
+          AND (status IS NULL OR status != 'cancelled')
+        RETURNING payment_id, payment_date
+      `;
+
+      const paymentsResult = await client.query(updatePaymentsQuery, [
+        createddate,
+        id,
+      ]);
+
+      // Log the updated payments for debugging
+      if (paymentsResult.rows.length > 0) {
+        console.log(
+          `Updated ${paymentsResult.rows.length} payment(s) for invoice ${id} to new date`
+        );
+      }
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Date/time updated successfully",
+        invoiceId: id,
+        createddate: createddate,
+        einvoiceCleared: requiresConfirmation && confirmEInvoiceCancellation,
+        paymentsUpdated: paymentsResult.rows.length,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating date/time:", error);
+      res
+        .status(error.message === "Invoice not found" ? 404 : 400)
+        .json({ message: error.message || "Error updating date/time" });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }
