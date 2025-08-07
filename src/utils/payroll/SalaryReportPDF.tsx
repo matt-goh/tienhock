@@ -173,7 +173,6 @@ const styles = StyleSheet.create({
 
   // Enhanced Footer Section
   footerSection: {
-    marginTop: 8,
     padding: 12,
     borderWidth: 1,
     borderColor: colors.borderDark,
