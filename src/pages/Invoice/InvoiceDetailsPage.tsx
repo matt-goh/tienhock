@@ -1,11 +1,7 @@
 // src/pages/Invoice/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import {
-  ExtendedInvoiceData,
-  Payment,
-  ProductItem,
-} from "../../types/types";
+import { ExtendedInvoiceData, Payment, ProductItem } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -690,6 +686,22 @@ const InvoiceDetailsPage: React.FC = () => {
     setSelectedPaymentType(invoiceData?.paymenttype || "INVOICE");
   };
 
+  const handleOpenDateTimeEdit = (): void => {
+    setIsEditingDateTime(true);
+
+    // Convert epoch timestamp to datetime-local format
+    if (invoiceData?.createddate) {
+      const date = new Date(parseInt(invoiceData.createddate));
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+
+      setSelectedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    }
+  };
+
   // Date/Time Update Handlers
   const handleDateTimeUpdate = async (): Promise<void> => {
     if (!selectedDateTime || !invoiceData) {
@@ -761,22 +773,6 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error(errorMessage);
     } finally {
       setIsUpdatingDateTime(false);
-    }
-  };
-
-  const handleOpenDateTimeEdit = (): void => {
-    setIsEditingDateTime(true);
-
-    // Convert epoch timestamp to datetime-local format
-    if (invoiceData?.createddate) {
-      const date = new Date(parseInt(invoiceData.createddate));
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-
-      setSelectedDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
     }
   };
 
