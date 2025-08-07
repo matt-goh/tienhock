@@ -203,7 +203,7 @@ const SalaryReportPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-center">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          item.payment_preference === 'BNK' 
+                          item.payment_preference === 'Bank' 
                             ? 'bg-sky-100 text-sky-800'
                             : 'bg-emerald-100 text-emerald-800'
                         }`}>
