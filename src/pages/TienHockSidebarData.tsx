@@ -35,6 +35,7 @@ import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 import IncentivesPage from "./Payroll/IncentivesPage";
 import PinjamListPage from "./Payroll/PinjamListPage";
+import SalaryReportPage from "./Payroll/SalaryReportPage";
 
 // Catalogue related imports
 // Staff
@@ -153,6 +154,12 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Contribution Rates",
     path: "/payroll/contribution-rates",
     component: ContributionRatesPage,
+  });
+
+  payrollSubItems.push({
+    name: "Salary Report",
+    path: "/payroll/salary-report",
+    component: SalaryReportPage,
   });
 
   return payrollSubItems;
