@@ -213,9 +213,6 @@ const styles = StyleSheet.create({
   table: {
     width: "100%",
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.borderDark,
-    borderRadius: 3,
     overflow: "hidden",
   },
   tableTitle: {
