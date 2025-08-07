@@ -1,5 +1,6 @@
 // src/routes/staff.js
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 
 export default function (pool) {
   const router = Router();
@@ -10,6 +11,16 @@ export default function (pool) {
     const result = await pool.query(query, [id]);
     return result.rows.length > 0;
   }
+
+  // Helper function to check if staff has OFFICE job and set password
+  function shouldSetPassword(job) {
+    if (!job) return false;
+    const jobArray = Array.isArray(job) ? job : JSON.parse(job);
+    return jobArray.includes("OFFICE");
+  }
+
+  // Default password hash for OFFICE staff
+  const DEFAULT_PASSWORD_HASH = "$2a$10$LCpAl1V5h9xwjFrRtlIiD.jg.ZgCba4n7tUHFFxqNZTHjXh.9IQYy";
 
   // Get staff members
   router.get("/", async (req, res) => {
@@ -131,14 +142,18 @@ export default function (pool) {
           .json({ message: "A staff member with this ID already exists" });
       }
 
+      // Check if staff has OFFICE job and set password accordingly
+      const hasOfficeJob = shouldSetPassword(job);
+      const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
+
       const query = `
         INSERT INTO staffs (
           id, name, telephone_no, email, gender, nationality, birthdate, address,
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
-          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children
+          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, password
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
         RETURNING *
       `;
 
@@ -168,6 +183,7 @@ export default function (pool) {
         maritalStatus || "Single",
         spouseEmploymentStatus || null,
         numberOfChildren || 0,
+        password,
       ];
 
       const result = await pool.query(query, values);
@@ -343,6 +359,10 @@ export default function (pool) {
           updateId = newId;
         }
 
+        // Check if staff has OFFICE job and set password accordingly
+        const hasOfficeJob = shouldSetPassword(job);
+        const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
+
         const query = `
           UPDATE staffs
           SET id = $1, name = $2, telephone_no = $3, email = $4, gender = $5, nationality = $6, 
@@ -350,8 +370,8 @@ export default function (pool) {
               ic_no = $12, bank_account_number = $13, epf_no = $14, income_tax_no = $15, 
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
               race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
-              spouse_employment_status = $24, number_of_children = $25
-          WHERE id = $26
+              spouse_employment_status = $24, number_of_children = $25, password = $26
+          WHERE id = $27
           RETURNING *
         `;
 
@@ -381,6 +401,7 @@ export default function (pool) {
           maritalStatus || "Single",
           spouseEmploymentStatus || null,
           numberOfChildren || 0,
+          password,
           id,
         ];
 
