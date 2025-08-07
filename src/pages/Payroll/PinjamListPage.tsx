@@ -550,7 +550,10 @@ const PinjamListPage: React.FC = () => {
                         {employee.midMonthPinjam > 0 ? (
                           <>
                             <div className="mb-3">
-                              <p className="text-sm text-default-500 mb-1">
+                              <p
+                                className="text-sm text-default-500 mb-1 truncate"
+                                title="Mid-month Pay (Before Pinjam)"
+                              >
                                 Mid-Month Pay (Before Pinjam)
                               </p>
                               <p className="text-xl font-bold text-default-800">
@@ -591,10 +594,19 @@ const PinjamListPage: React.FC = () => {
                                 </span>
                               </div>
                               <div className="flex justify-between font-semibold">
-                                <span className="text-default-800">
+                                <span
+                                  className="text-default-800 truncate mr-2"
+                                  title="Final Mid-month Pay"
+                                >
                                   Final Mid-month pay:
                                 </span>
-                                <span className="text-lg font-bold text-sky-600">
+                                <span
+                                  className="text-lg font-bold truncate text-sky-600"
+                                  title={formatCurrency(
+                                    employee.midMonthPay -
+                                      employee.midMonthPinjam
+                                  )}
+                                >
                                   {formatCurrency(
                                     employee.midMonthPay -
                                       employee.midMonthPinjam
@@ -623,7 +635,10 @@ const PinjamListPage: React.FC = () => {
                         {employee.monthlyPinjam > 0 ? (
                           <>
                             <div className="mb-3">
-                              <p className="text-sm text-default-500 mb-1">
+                              <p
+                                className="text-sm text-default-500 mb-1 truncate"
+                                title="Gaji Genap (Before Pinjam)"
+                              >
                                 Gaji Genap (Before Pinjam)
                               </p>
                               <p className="text-xl font-bold text-default-800">
@@ -664,9 +679,14 @@ const PinjamListPage: React.FC = () => {
                                 </span>
                               </div>
                               <div className="flex justify-between font-semibold">
-                                <span className="text-default-800 flex items-center">
-                                  <IconBuildingBank className="w-4 h-4 mr-1.5" />
-                                  Jumlah Masuk Bank:
+                                <span
+                                  className="text-default-800 flex items-center truncate mr-2"
+                                  title="Jumlah Masuk Bank"
+                                >
+                                  <IconBuildingBank className="w-4 h-4 mr-1.5 flex-shrink-0" />
+                                  <span className="truncate">
+                                    Jumlah Masuk Bank:
+                                  </span>
                                 </span>
                                 <span className="text-lg font-bold text-sky-600">
                                   {formatCurrency(
