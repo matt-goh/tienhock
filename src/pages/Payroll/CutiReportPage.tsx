@@ -1,5 +1,4 @@
 // src/pages/Payroll/CutiReportPage.tsx
-
 import React, { useState, useMemo, useEffect } from "react";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { FormCombobox } from "../../components/FormComponents";
@@ -13,11 +12,20 @@ import {
   IconId,
   IconWorld,
   IconSearch,
+  IconPrinter,
 } from "@tabler/icons-react";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import Button from "../../components/Button";
 import { getMonthName } from "../../utils/payroll/payrollUtils";
 import { api } from "../../routes/utils/api";
 import { calculateYearsOfService } from "../../utils/payroll/leaveCalculationService";
+import {
+  generateSingleCutiReportPDF,
+  generateBatchCutiReportPDF,
+  CutiReportData,
+  CutiBatchReportData,
+} from "../../utils/payroll/CutiReportPDF";
+import toast from "react-hot-toast";
 
 // --- Types for API Data ---
 interface LeaveBalance {
@@ -88,6 +96,7 @@ const CutiReportPage: React.FC = () => {
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance | null>(null);
   const [leaveTaken, setLeaveTaken] = useState<LeaveTaken>({});
   const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const staffOptions = useMemo(
     () =>
@@ -207,13 +216,128 @@ const CutiReportPage: React.FC = () => {
     }).format(amount);
   };
 
+  // Single employee PDF generation
+  const generateSinglePDF = async (action: "download" | "print") => {
+    if (!selectedStaff || !leaveBalances) {
+      toast.error("No employee data available to generate PDF");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      const pdfData: CutiReportData = {
+        employee: {
+          id: selectedStaff.id,
+          name: selectedStaff.name,
+          job: selectedStaff.job,
+          dateJoined: selectedStaff.dateJoined,
+          icNo: selectedStaff.icNo,
+          nationality: selectedStaff.nationality,
+        },
+        year: currentYear,
+        yearsOfService: yearsOfService,
+        leaveBalance: leaveBalances,
+        leaveTaken: leaveTaken,
+        monthlySummary: monthlySummary,
+      };
+
+      await generateSingleCutiReportPDF(pdfData, action);
+
+      const actionText =
+        action === "download" ? "downloaded" : "generated for printing";
+      toast.success(`Leave report ${actionText} successfully`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  // Batch PDF generation for all employees
+  const generateBatchPDF = async (action: "download" | "print") => {
+    if (filteredEmployees.length === 0) {
+      toast.error("No employees available to generate batch PDF");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      toast.loading("Fetching batch leave report data...");
+      
+      // Get employee IDs for the batch request
+      const employeeIds = filteredEmployees.map(emp => emp.id);
+      
+      // Single API call for batch data
+      const batchResponse = await api.post('/api/leave-management/batch-reports', {
+        employeeIds,
+        year: currentYear
+      });
+
+      if (!batchResponse.employees || batchResponse.employees.length === 0) {
+        toast.error("No leave data found for selected employees");
+        return;
+      }
+
+      // Transform the response data to match our PDF component expectations
+      const validEmployeeData: CutiReportData[] = batchResponse.employees.map((empData: any) => ({
+        employee: {
+          id: empData.employee.id,
+          name: empData.employee.name,
+          job: empData.employee.job,
+          dateJoined: empData.employee.dateJoined,
+          icNo: empData.employee.icNo,
+          nationality: empData.employee.nationality,
+        },
+        year: currentYear,
+        yearsOfService: empData.yearsOfService,
+        leaveBalance: empData.leaveBalance,
+        leaveTaken: empData.leaveTaken,
+        monthlySummary: empData.monthlySummary,
+      }));
+
+      const batchData: CutiBatchReportData = {
+        year: currentYear,
+        employees: validEmployeeData,
+        summary: batchResponse.summary,
+      };
+
+      toast.dismiss();
+      await generateBatchCutiReportPDF(batchData, action);
+
+      toast.success(
+        `Batch leave report generated successfully (${validEmployeeData.length} employees)`
+      );
+    } catch (error) {
+      console.error("Error generating batch PDF:", error);
+      toast.error("Failed to generate batch PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const renderStaffHeader = (staff: Employee) => (
     <div className="bg-white px-6 py-4 rounded-xl border border-default-200">
-      <div className="flex items-center gap-4">
-        <IconUserCircle size={48} className="text-default-400" />
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-4">
+          <IconUserCircle size={48} className="text-default-400" />
+          <div>
+            <h2 className="text-xl font-bold text-default-800">{staff.name}</h2>
+            <p className="text-default-500">{staff.id}</p>
+          </div>
+        </div>
+
+        {/* Single Employee Print Controls */}
         <div>
-          <h2 className="text-xl font-bold text-default-800">{staff.name}</h2>
-          <p className="text-default-500">{staff.id}</p>
+          <Button
+            onClick={() => generateSinglePDF("print")}
+            icon={IconPrinter}
+            color="green"
+            variant="outline"
+            disabled={!leaveBalances || isGeneratingPDF}
+          >
+            Print Report
+          </Button>
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-4 border-t border-default-200 pt-4">
@@ -686,21 +810,34 @@ const CutiReportPage: React.FC = () => {
       {/* --- Conditional Rendering: Show Cards or Detail View --- */}
       {!selectedStaffId && !loadingStaffs && (
         <>
-          <div className="text-center mb-4">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
             {/* Search Input */}
-            <div className="max-w-md mx-auto">
+            <div className="flex-1 max-w-md">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <IconSearch size={20} className="text-default-400" />
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg leading-5 bg-white placeholder-default-500 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                  className="block w-full pl-10 pr-3 py-2 border border-default-300 rounded-full leading-5 bg-white placeholder-default-500 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                   placeholder="Search employees by name, ID, or job..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+            </div>
+
+            {/* Batch Print Controls */}
+            <div className="flex-shrink-0">
+              <Button
+                onClick={() => generateBatchPDF("print")}
+                icon={IconPrinter}
+                color="green"
+                variant="outline"
+                disabled={filteredEmployees.length === 0 || isGeneratingPDF}
+              >
+                Print All ({filteredEmployees.length})
+              </Button>
             </div>
           </div>
 
