@@ -11,7 +11,7 @@ export default function (pool) {
     // Validate required parameters
     if (!year || !month) {
       return res.status(400).json({
-        message: "Year and month parameters are required"
+        message: "Year and month parameters are required",
       });
     }
 
@@ -73,12 +73,12 @@ export default function (pool) {
         no: index + 1,
         staff_id: row.staff_id,
         staff_name: row.staff_name,
-        payment_preference: row.payment_preference === 'Bank' ? 'BNK' : 'CSH',
+        payment_preference: row.payment_preference,
         gaji_genap: parseFloat(row.gaji_genap || 0),
         total_pinjam: parseFloat(row.total_pinjam || 0),
         final_total: parseFloat(row.final_total || 0),
         net_pay: parseFloat(row.net_pay || 0),
-        mid_month_amount: parseFloat(row.mid_month_amount || 0)
+        mid_month_amount: parseFloat(row.mid_month_amount || 0),
       }));
 
       res.json({
@@ -87,12 +87,20 @@ export default function (pool) {
         data: salaryData,
         total_records: salaryData.length,
         summary: {
-          total_gaji_genap: salaryData.reduce((sum, item) => sum + item.gaji_genap, 0),
-          total_pinjam: salaryData.reduce((sum, item) => sum + item.total_pinjam, 0),
-          total_final: salaryData.reduce((sum, item) => sum + item.final_total, 0)
-        }
+          total_gaji_genap: salaryData.reduce(
+            (sum, item) => sum + item.gaji_genap,
+            0
+          ),
+          total_pinjam: salaryData.reduce(
+            (sum, item) => sum + item.total_pinjam,
+            0
+          ),
+          total_final: salaryData.reduce(
+            (sum, item) => sum + item.final_total,
+            0
+          ),
+        },
       });
-
     } catch (error) {
       console.error("Error fetching salary report:", error);
       res.status(500).json({
