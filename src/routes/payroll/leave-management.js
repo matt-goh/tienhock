@@ -58,16 +58,16 @@ export default function (pool) {
     const { employeeIds, year } = req.query;
 
     if (!employeeIds || !year) {
-      return res.status(400).json({ 
-        message: "employeeIds and year query parameters are required" 
+      return res.status(400).json({
+        message: "employeeIds and year query parameters are required",
       });
     }
 
     try {
-      const employeeIdList = employeeIds.split(',').filter(id => id.trim());
+      const employeeIdList = employeeIds.split(",").filter((id) => id.trim());
       if (employeeIdList.length === 0) {
-        return res.status(400).json({ 
-          message: "At least one employee ID is required" 
+        return res.status(400).json({
+          message: "At least one employee ID is required",
         });
       }
 
@@ -314,14 +314,8 @@ export default function (pool) {
    */
   router.put("/records/:id", async (req, res) => {
     const { id } = req.params;
-    const {
-      leave_date,
-      leave_type,
-      days_taken,
-      amount_paid,
-      status,
-      notes,
-    } = req.body;
+    const { leave_date, leave_type, days_taken, amount_paid, status, notes } =
+      req.body;
 
     try {
       const query = `
@@ -407,6 +401,266 @@ export default function (pool) {
       console.error("Error fetching monthly leave summary:", error);
       res.status(500).json({
         message: "Error fetching monthly leave summary",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /api/leave-management/batch-reports
+   * Get batch leave reports for multiple employees
+   */
+  router.post("/batch-reports", async (req, res) => {
+    const { employeeIds, year } = req.body;
+
+    if (
+      !employeeIds ||
+      !Array.isArray(employeeIds) ||
+      employeeIds.length === 0
+    ) {
+      return res.status(400).json({
+        message: "Employee IDs array is required and cannot be empty",
+      });
+    }
+
+    if (!year || typeof year !== "number") {
+      return res.status(400).json({
+        message: "Year is required and must be a number",
+      });
+    }
+
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        // Fetch employee basic info, leave balances, and records in a single optimized query
+        const query = `
+          WITH employee_info AS (
+            SELECT 
+              s.id,
+              s.name,
+              s.job,
+              s.date_joined as "dateJoined",
+              s.ic_no as "icNo",
+              s.nationality,
+              EXTRACT(YEAR FROM AGE(CURRENT_DATE, s.date_joined)) as years_of_service
+            FROM staffs s
+            WHERE s.id = ANY($1::text[])
+          ),
+          leave_balances AS (
+            SELECT 
+              lb.employee_id,
+              lb.cuti_umum_total,
+              lb.cuti_tahunan_total,
+              lb.cuti_sakit_total
+            FROM employee_leave_balances lb
+            WHERE lb.employee_id = ANY($1::text[]) AND lb.year = $2
+          ),
+          leave_records AS (
+            SELECT 
+              lr.employee_id,
+              lr.leave_date,
+              lr.leave_type,
+              lr.days_taken,
+              lr.amount_paid
+            FROM leave_records lr
+            WHERE lr.employee_id = ANY($1::text[]) 
+              AND EXTRACT(YEAR FROM lr.leave_date) = $2
+              AND lr.status = 'approved'
+          ),
+          leave_taken AS (
+            SELECT 
+              employee_id,
+              SUM(CASE WHEN leave_type = 'cuti_umum' THEN days_taken ELSE 0 END) as cuti_umum,
+              SUM(CASE WHEN leave_type = 'cuti_sakit' THEN days_taken ELSE 0 END) as cuti_sakit,
+              SUM(CASE WHEN leave_type = 'cuti_tahunan' THEN days_taken ELSE 0 END) as cuti_tahunan
+            FROM leave_records
+            GROUP BY employee_id
+          )
+          SELECT 
+            ei.*,
+            COALESCE(lb.cuti_umum_total, 14) as cuti_umum_total,
+            COALESCE(lb.cuti_tahunan_total, 
+              CASE 
+                WHEN ei.years_of_service < 2 THEN 8
+                WHEN ei.years_of_service < 5 THEN 12
+                ELSE 16
+              END
+            ) as cuti_tahunan_total,
+            COALESCE(lb.cuti_sakit_total,
+              CASE 
+                WHEN ei.years_of_service < 2 THEN 14
+                WHEN ei.years_of_service < 5 THEN 18
+                ELSE 22
+              END
+            ) as cuti_sakit_total,
+            COALESCE(lt.cuti_umum, 0) as cuti_umum_taken,
+            COALESCE(lt.cuti_sakit, 0) as cuti_sakit_taken,
+            COALESCE(lt.cuti_tahunan, 0) as cuti_tahunan_taken,
+            COALESCE(
+              JSON_AGG(
+                CASE WHEN lr.employee_id IS NOT NULL THEN
+                  JSON_BUILD_OBJECT(
+                    'leave_date', lr.leave_date,
+                    'leave_type', lr.leave_type,
+                    'days_taken', lr.days_taken,
+                    'amount_paid', lr.amount_paid
+                  )
+                END
+              ) FILTER (WHERE lr.employee_id IS NOT NULL), 
+              '[]'::json
+            ) as leave_records
+          FROM employee_info ei
+          LEFT JOIN leave_balances lb ON ei.id = lb.employee_id
+          LEFT JOIN leave_taken lt ON ei.id = lt.employee_id
+          LEFT JOIN leave_records lr ON ei.id = lr.employee_id
+          GROUP BY 
+            ei.id, ei.name, ei.job, ei."dateJoined", ei."icNo", ei.nationality, ei.years_of_service,
+            lb.cuti_umum_total, lb.cuti_tahunan_total, lb.cuti_sakit_total,
+            lt.cuti_umum, lt.cuti_sakit, lt.cuti_tahunan
+          ORDER BY ei.name
+        `;
+
+        const result = await client.query(query, [employeeIds, year]);
+
+        // Process the results to match the expected frontend format
+        const employees = result.rows.map((row) => {
+          // Initialize monthly summary
+          const monthlySummary = {};
+          for (let i = 1; i <= 12; i++) {
+            monthlySummary[i] = {
+              cuti_umum: { days: 0, amount: 0 },
+              cuti_sakit: { days: 0, amount: 0 },
+              cuti_tahunan: { days: 0, amount: 0 },
+            };
+          }
+
+          // Process leave records to build monthly summary
+          const leaveRecords = Array.isArray(row.leave_records)
+            ? row.leave_records
+            : [];
+          leaveRecords.forEach((record) => {
+            if (record && record.leave_date && record.leave_type) {
+              const month = new Date(record.leave_date).getMonth() + 1;
+              if (
+                monthlySummary[month] &&
+                monthlySummary[month][record.leave_type]
+              ) {
+                monthlySummary[month][record.leave_type].days += Number(
+                  record.days_taken || 0
+                );
+                monthlySummary[month][record.leave_type].amount += Number(
+                  record.amount_paid || 0
+                );
+              }
+            }
+          });
+
+          return {
+            employee: {
+              id: row.id,
+              name: row.name,
+              job: Array.isArray(row.job) ? row.job : [row.job || "N/A"],
+              dateJoined: row.dateJoined,
+              icNo: row.icNo,
+              nationality: row.nationality,
+            },
+            year: year,
+            yearsOfService: Number(row.years_of_service || 0),
+            leaveBalance: {
+              cuti_umum_total: Number(row.cuti_umum_total || 14),
+              cuti_tahunan_total: Number(row.cuti_tahunan_total || 8),
+              cuti_sakit_total: Number(row.cuti_sakit_total || 14),
+            },
+            leaveTaken: {
+              cuti_umum: Number(row.cuti_umum_taken || 0),
+              cuti_sakit: Number(row.cuti_sakit_taken || 0),
+              cuti_tahunan: Number(row.cuti_tahunan_taken || 0),
+            },
+            monthlySummary: monthlySummary,
+          };
+        });
+
+        // Calculate batch summary
+        const summary = {
+          totalEmployees: employees.length,
+          totalDaysUsed: {
+            cuti_tahunan: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_tahunan.days,
+                  0
+                ),
+              0
+            ),
+            cuti_sakit: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_sakit.days,
+                  0
+                ),
+              0
+            ),
+            cuti_umum: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_umum.days,
+                  0
+                ),
+              0
+            ),
+          },
+          totalAmountPaid: {
+            cuti_tahunan: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_tahunan.amount,
+                  0
+                ),
+              0
+            ),
+            cuti_sakit: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_sakit.amount,
+                  0
+                ),
+              0
+            ),
+            cuti_umum: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_umum.amount,
+                  0
+                ),
+              0
+            ),
+          },
+        };
+
+        await client.query("COMMIT");
+
+        res.json({
+          employees,
+          summary,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error("Error fetching batch leave reports:", error);
+      res.status(500).json({
+        message: "Failed to fetch batch leave reports",
         error: error.message,
       });
     }
