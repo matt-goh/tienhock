@@ -1,11 +1,21 @@
 // src/pages/Payroll/SalaryReportPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { IconRefresh, IconFileText } from "@tabler/icons-react";
+import {
+  IconRefresh,
+  IconFileText,
+  IconPrinter,
+  IconDownload,
+} from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
+import {
+  generateSalaryReportPDF,
+  SalaryReportPDFData,
+} from "../../utils/payroll/SalaryReportPDF";
+import toast from "react-hot-toast";
 
 interface SalaryReportData {
   no: number;
@@ -33,8 +43,11 @@ interface SalaryReportResponse {
 
 const SalaryReportPage: React.FC = () => {
   // State
-  const [reportData, setReportData] = useState<SalaryReportResponse | null>(null);
+  const [reportData, setReportData] = useState<SalaryReportResponse | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -85,8 +98,38 @@ const SalaryReportPage: React.FC = () => {
     }).format(amount);
   };
 
+  // PDF Generation
+  const generatePDF = async (action: "download" | "print") => {
+    if (!reportData || reportData.data.length === 0) {
+      toast.error("No data available to generate PDF");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      const pdfData: SalaryReportPDFData = {
+        year: reportData.year,
+        month: reportData.month,
+        data: reportData.data,
+        total_records: reportData.total_records,
+        summary: reportData.summary,
+      };
+
+      await generateSalaryReportPDF(pdfData, action);
+
+      const actionText =
+        action === "download" ? "downloaded" : "generated for printing";
+      toast.success(`Salary report ${actionText} successfully`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   return (
-    <div className="relative w-full space-y-4 mx-4 md:mx-6">
+    <div className="relative w-full space-y-4 mx-4 mb-4 md:mx-6">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           Salary Report
@@ -100,6 +143,30 @@ const SalaryReportPage: React.FC = () => {
           >
             Refresh
           </Button>
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => generatePDF("print")}
+              icon={IconPrinter}
+              color="green"
+              variant="outline"
+              disabled={
+                !reportData || reportData.data.length === 0 || isGeneratingPDF
+              }
+            >
+              Print
+            </Button>
+            <Button
+              onClick={() => generatePDF("download")}
+              icon={IconDownload}
+              color="blue"
+              variant="outline"
+              disabled={
+                !reportData || reportData.data.length === 0 || isGeneratingPDF
+              }
+            >
+              Download
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -152,7 +219,8 @@ const SalaryReportPage: React.FC = () => {
             <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No salary data found</p>
             <p>
-              No salary data available for {getMonthName(currentMonth)} {currentYear}
+              No salary data available for {getMonthName(currentMonth)}{" "}
+              {currentYear}
             </p>
           </div>
         ) : (
@@ -177,7 +245,7 @@ const SalaryReportPage: React.FC = () => {
                       TOTAL
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                      PREFERRED PAYMENT
+                      PAYMENT
                     </th>
                   </tr>
                 </thead>
@@ -202,11 +270,13 @@ const SalaryReportPage: React.FC = () => {
                         {formatCurrency(item.final_total)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-center">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          item.payment_preference === 'Bank' 
-                            ? 'bg-sky-100 text-sky-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}>
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            item.payment_preference === "Bank"
+                              ? "bg-sky-100 text-sky-800"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
                           {item.payment_preference}
                         </span>
                       </td>
@@ -220,7 +290,8 @@ const SalaryReportPage: React.FC = () => {
             <div className="bg-default-50 px-6 py-4 border-t border-default-200">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
                 <div className="text-sm text-default-600">
-                  <span className="font-medium">Total Records:</span> {reportData.total_records}
+                  <span className="font-medium">Total Records:</span>{" "}
+                  {reportData.total_records}
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
                   <div className="text-default-700">
