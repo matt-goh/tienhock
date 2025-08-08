@@ -12,7 +12,8 @@ export const authMiddleware = (pool) => async (req, res, next) => {
     req.method === "OPTIONS" ||
     req.path === "/api/sessions/initialize" ||
     req.path === "/api/auth/login" ||
-    req.path === "/api/auth/check-ic"
+    req.path === "/api/auth/check-ic" ||
+    req.path.startsWith("/api/excel/")
   ) {
     return next();
   }
