@@ -775,7 +775,7 @@ const InvoiceFormPage: React.FC = () => {
               : "Create New Invoice"}
           </h1>
           <p className="mt-1 text-sm text-default-500">
-            {isEditMode ? "Update invoice info." : "Fill details."}
+            {isEditMode ? "Update invoice info." : "Fill in the details."}
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6">
