@@ -618,5 +618,74 @@ export default function (pool, defaultConfig) {
     }
   });
 
+  // Delete a cancelled invoice
+  router.delete("/:invoice_id", async (req, res) => {
+    const { invoice_id } = req.params;
+    const numericInvoiceId = parseInt(invoice_id, 10);
+    const client = await pool.connect();
+
+    if (isNaN(numericInvoiceId)) {
+      return res.status(400).json({ message: "Invalid invoice ID format" });
+    }
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists and is cancelled
+      const invoiceCheck = await client.query(
+        "SELECT status, total_amount FROM greentarget.invoices WHERE invoice_id = $1 FOR UPDATE",
+        [numericInvoiceId]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const invoice = invoiceCheck.rows[0];
+      
+      if (invoice.status !== "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ 
+          message: "Only cancelled invoices can be deleted" 
+        });
+      }
+
+      // Check if there are any payments for this invoice
+      const paymentsCheck = await client.query(
+        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1",
+        [numericInvoiceId]
+      );
+
+      if (parseInt(paymentsCheck.rows[0].count) > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Cannot delete invoice: it has associated payments. Delete the payments first."
+        });
+      }
+
+      // Delete the invoice
+      await client.query(
+        "DELETE FROM greentarget.invoices WHERE invoice_id = $1",
+        [numericInvoiceId]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Invoice deleted successfully"
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(`Error deleting Green Target invoice ${invoice_id}:`, error);
+      res.status(500).json({
+        message: "Error deleting invoice",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }
