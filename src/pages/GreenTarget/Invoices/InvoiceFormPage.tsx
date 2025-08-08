@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, useCallback, Fragment } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -112,6 +112,19 @@ const InvoiceFormPage: React.FC = () => {
   const [submissionResults, setSubmissionResults] =
     useState<EInvoiceSubmissionResult | null>(null);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
+
+  // Invoice number validation state
+  const [invoiceNumberValidation, setInvoiceNumberValidation] = useState<{
+    isValidating: boolean;
+    isValid: boolean;
+    isDuplicate: boolean;
+    message: string;
+  }>({
+    isValidating: false,
+    isValid: true,
+    isDuplicate: false,
+    message: "",
+  });
 
   // State to remember rental selection when switching types
   const [previousRental, setPreviousRental] = useState<{
@@ -306,6 +319,68 @@ const InvoiceFormPage: React.FC = () => {
 
   // --- HELPERS ---
 
+  // Debounced invoice number validation
+  const validateInvoiceNumber = useCallback(
+    async (invoiceNumber: string) => {
+      if (!invoiceNumber || !invoiceNumber.trim()) {
+        setInvoiceNumberValidation({
+          isValidating: false,
+          isValid: true,
+          isDuplicate: false,
+          message: "",
+        });
+        return;
+      }
+
+      setInvoiceNumberValidation((prev) => ({
+        ...prev,
+        isValidating: true,
+      }));
+
+      try {
+        const result = await greenTargetApi.checkInvoiceNumber(
+          invoiceNumber.trim(),
+          isEditMode && formData.invoice_id ? formData.invoice_id : undefined
+        );
+
+        setInvoiceNumberValidation({
+          isValidating: false,
+          isValid: result.available,
+          isDuplicate: result.exists,
+          message: result.exists
+            ? `Invoice number already exists${
+                result.existing_id ? ` (ID: ${result.existing_id})` : ""
+              }`
+            : "",
+        });
+      } catch (error) {
+        console.error("Error validating invoice number:", error);
+        setInvoiceNumberValidation({
+          isValidating: false,
+          isValid: false,
+          isDuplicate: false,
+          message: "Error validating invoice number",
+        });
+      }
+    },
+    [isEditMode, formData.invoice_id]
+  );
+
+  // Debounce invoice number validation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.invoice_number !== initialFormData?.invoice_number) {
+        validateInvoiceNumber(formData.invoice_number || "");
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [
+    formData.invoice_number,
+    initialFormData?.invoice_number,
+    validateInvoiceNumber,
+  ]);
+
   const isRentalActive = (datePickedStr: string | null | undefined) => {
     /* ... same logic ... */ if (!datePickedStr) return true;
     try {
@@ -401,10 +476,15 @@ const InvoiceFormPage: React.FC = () => {
   // --- FORM VALIDATION & SUBMIT ---
 
   const validateForm = (): boolean => {
-    /* ... same validation logic ... */ if (
-      !formData.customer_id ||
-      formData.customer_id <= 0
-    ) {
+    // Check invoice number validation
+    if (formData.invoice_number && invoiceNumberValidation.isDuplicate) {
+      toast.error(
+        "Invoice number already exists. Please choose a different number."
+      );
+      return false;
+    }
+
+    if (!formData.customer_id || formData.customer_id <= 0) {
       toast.error("Select customer");
       return false;
     }
@@ -454,7 +534,7 @@ const InvoiceFormPage: React.FC = () => {
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
     try {
-      const invData: Omit<Invoice, "invoice_id" | "invoice_number"> & {
+      const invData: Omit<Invoice, "invoice_id"> & {
         total_amount: number;
         invoice_id?: number;
       } = {
@@ -465,6 +545,7 @@ const InvoiceFormPage: React.FC = () => {
         tax_amount: Number(formData.tax_amount),
         total_amount: Number(totalAmount),
         date_issued: formData.date_issued,
+        invoice_number: formData.invoice_number?.trim() || undefined,
       };
       if (isEditMode && formData.invoice_id)
         invData.invoice_id = formData.invoice_id;
@@ -698,26 +779,64 @@ const InvoiceFormPage: React.FC = () => {
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {/* Customer Combobox */}
+          {/* First row with invoice number and customer */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Invoice Number */}
             <div className="space-y-2">
-              <FormCombobox
-                name="customer_id"
-                label="Customer"
-                value={
-                  formData.customer_id > 0
-                    ? formData.customer_id.toString()
-                    : undefined
-                }
-                onChange={handleCustomerChange}
-                options={customerOptionsForCombobox}
-                query={customerQuery}
-                setQuery={setCustomerQuery}
-                placeholder="Search or Select Customer..."
-                disabled={isEditMode}
-                required={true}
-                mode="single"
-              />
+              <label
+                htmlFor="invoice_number"
+                className="block text-sm font-medium text-default-700"
+              >
+                Invoice Number
+                {!isEditMode && (
+                  <span className="text-sm font-normal text-default-500 ml-1">
+                    (optional - auto-generated if empty)
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  id="invoice_number"
+                  name="invoice_number"
+                  value={formData.invoice_number || ""}
+                  onChange={handleInputChange}
+                  className={clsx(
+                    "block w-full px-3 py-2 border rounded-lg shadow-sm",
+                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                    invoiceNumberValidation.isDuplicate
+                      ? "border-red-500 bg-red-50"
+                      : invoiceNumberValidation.isValid
+                      ? "border-default-300"
+                      : "border-yellow-500 bg-yellow-50"
+                  )}
+                  placeholder="Enter custom invoice number or leave blank"
+                />
+                {invoiceNumberValidation.isValidating && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
+                  </div>
+                )}
+              </div>
+              {invoiceNumberValidation.message && (
+                <p
+                  className={clsx(
+                    "text-sm",
+                    invoiceNumberValidation.isDuplicate
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                  )}
+                >
+                  {invoiceNumberValidation.message}
+                </p>
+              )}
+              {formData.invoice_number &&
+                invoiceNumberValidation.isValid &&
+                !invoiceNumberValidation.isValidating && (
+                  <p className="text-sm text-green-600">
+                    Invoice number is available
+                  </p>
+                )}
             </div>
 
             {/* Invoice Date */}
@@ -739,6 +858,29 @@ const InvoiceFormPage: React.FC = () => {
                   "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
                   "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                 )}
+              />
+            </div>
+          </div>
+
+          {/* Second row with customer */}
+          <div className="mt-6">
+            <div className="space-y-2">
+              <FormCombobox
+                name="customer_id"
+                label="Customer"
+                value={
+                  formData.customer_id > 0
+                    ? formData.customer_id.toString()
+                    : undefined
+                }
+                onChange={handleCustomerChange}
+                options={customerOptionsForCombobox}
+                query={customerQuery}
+                setQuery={setCustomerQuery}
+                placeholder="Search or Select Customer..."
+                disabled={isEditMode}
+                required={true}
+                mode="single"
               />
             </div>
           </div>

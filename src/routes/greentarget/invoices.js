@@ -395,6 +395,7 @@ export default function (pool, defaultConfig) {
       amount_before_tax,
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
+      invoice_number, // Optional custom invoice number
     } = req.body;
 
     const client = await pool.connect();
@@ -424,7 +425,26 @@ export default function (pool, defaultConfig) {
       }
 
       // --- Logic ---
-      const invoice_number = await generateInvoiceNumber(client, type);
+      let finalInvoiceNumber;
+      
+      if (invoice_number && invoice_number.trim()) {
+        // Custom invoice number provided - check for duplicates
+        const trimmedNumber = invoice_number.trim();
+        const duplicateCheck = await client.query(
+          "SELECT invoice_id FROM greentarget.invoices WHERE invoice_number = $1",
+          [trimmedNumber]
+        );
+
+        if (duplicateCheck.rows.length > 0) {
+          throw new Error(`Invoice number '${trimmedNumber}' already exists`);
+        }
+
+        finalInvoiceNumber = trimmedNumber;
+      } else {
+        // Generate automatic invoice number
+        finalInvoiceNumber = await generateInvoiceNumber(client, type);
+      }
+      
       const total_amount = numAmountBeforeTax + numTaxAmount;
 
       const invoiceQuery = `
@@ -438,7 +458,7 @@ export default function (pool, defaultConfig) {
       `;
 
       const invoiceResult = await client.query(invoiceQuery, [
-        invoice_number,
+        finalInvoiceNumber,
         type,
         customer_id,
         type === "regular" ? rental_id : null,
@@ -482,6 +502,180 @@ export default function (pool, defaultConfig) {
           message: "Error creating invoice",
           error: error.message,
         });
+    } finally {
+      client.release();
+    }
+  });
+
+  // Check if invoice number is available
+  router.get("/check-number/:invoice_number", async (req, res) => {
+    const { invoice_number } = req.params;
+    const { exclude_id } = req.query; // Optional: exclude a specific invoice ID when editing
+
+    try {
+      let query = "SELECT invoice_id FROM greentarget.invoices WHERE invoice_number = $1";
+      let params = [invoice_number];
+
+      if (exclude_id) {
+        query += " AND invoice_id != $2";
+        params.push(parseInt(exclude_id, 10));
+      }
+
+      const result = await pool.query(query, params);
+      
+      res.json({
+        available: result.rows.length === 0,
+        exists: result.rows.length > 0,
+        existing_id: result.rows.length > 0 ? result.rows[0].invoice_id : null
+      });
+    } catch (error) {
+      console.error("Error checking invoice number:", error);
+      res.status(500).json({
+        message: "Error checking invoice number",
+        error: error.message,
+      });
+    }
+  });
+
+  // Update an invoice
+  router.put("/:invoice_id", async (req, res) => {
+    const { invoice_id } = req.params;
+    const {
+      invoice_number,
+      type,
+      customer_id,
+      rental_id,
+      amount_before_tax,
+      tax_amount = 0,
+      date_issued,
+    } = req.body;
+
+    const numericInvoiceId = parseInt(invoice_id, 10);
+    const client = await pool.connect();
+
+    if (isNaN(numericInvoiceId)) {
+      return res.status(400).json({ message: "Invalid invoice ID format" });
+    }
+
+    try {
+      await client.query("BEGIN");
+
+      // Check if invoice exists
+      const invoiceCheck = await client.query(
+        "SELECT * FROM greentarget.invoices WHERE invoice_id = $1",
+        [numericInvoiceId]
+      );
+
+      if (invoiceCheck.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Input validation
+      if (!type || !customer_id || !amount_before_tax || !date_issued) {
+        throw new Error(
+          "Missing required fields: type, customer_id, amount_before_tax, date_issued."
+        );
+      }
+
+      if (!["regular"].includes(type)) {
+        throw new Error("Invalid invoice type specified.");
+      }
+
+      if (type === "regular" && !rental_id) {
+        throw new Error("Rental ID is required for regular invoices.");
+      }
+
+      const numAmountBeforeTax = parseFloat(amount_before_tax);
+      const numTaxAmount = parseFloat(tax_amount);
+
+      if (isNaN(numAmountBeforeTax) || numAmountBeforeTax < 0) {
+        throw new Error("Invalid amount_before_tax provided.");
+      }
+
+      if (isNaN(numTaxAmount) || numTaxAmount < 0) {
+        throw new Error("Invalid tax_amount provided.");
+      }
+
+      // If invoice_number is provided, check for duplicates
+      let finalInvoiceNumber = invoiceCheck.rows[0].invoice_number; // Keep existing if not provided
+      
+      if (invoice_number && invoice_number.trim()) {
+        const trimmedNumber = invoice_number.trim();
+        
+        // Check for duplicate invoice numbers (excluding current invoice)
+        const duplicateCheck = await client.query(
+          "SELECT invoice_id FROM greentarget.invoices WHERE invoice_number = $1 AND invoice_id != $2",
+          [trimmedNumber, numericInvoiceId]
+        );
+
+        if (duplicateCheck.rows.length > 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Invoice number '${trimmedNumber}' already exists`,
+            duplicate_id: duplicateCheck.rows[0].invoice_id
+          });
+        }
+
+        finalInvoiceNumber = trimmedNumber;
+      }
+
+      const total_amount = numAmountBeforeTax + numTaxAmount;
+
+      // Update the invoice
+      const updateQuery = `
+        UPDATE greentarget.invoices 
+        SET invoice_number = $1,
+            type = $2,
+            customer_id = $3,
+            rental_id = $4,
+            amount_before_tax = $5,
+            tax_amount = $6,
+            total_amount = $7,
+            date_issued = $8,
+            balance_due = $7 - COALESCE(
+              (SELECT SUM(amount_paid) 
+               FROM greentarget.payments 
+               WHERE invoice_id = $9 AND (status IS NULL OR status = 'active')
+              ), 0
+            )
+        WHERE invoice_id = $9
+        RETURNING *;
+      `;
+
+      const updateResult = await client.query(updateQuery, [
+        finalInvoiceNumber,
+        type,
+        customer_id,
+        type === "regular" ? rental_id : null,
+        numAmountBeforeTax.toFixed(2),
+        numTaxAmount.toFixed(2),
+        total_amount.toFixed(2),
+        date_issued,
+        numericInvoiceId,
+      ]);
+
+      // Update customer last_activity_date
+      await client.query(
+        `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
+        [customer_id]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Invoice updated successfully",
+        invoice: updateResult.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error(`Error updating Green Target invoice ${invoice_id}:`, error);
+      res.status(error.message.includes("Missing required") ||
+        error.message.includes("Invalid") ||
+        error.message.includes("already exists") ? 400 : 500).json({
+        message: error.message || "Error updating invoice",
+        error: error.message,
+      });
     } finally {
       client.release();
     }
