@@ -9,12 +9,18 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
+import Tab from "../../components/Tab";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
   generateSalaryReportPDF,
   SalaryReportPDFData,
 } from "../../utils/payroll/SalaryReportPDF";
+import {
+  generateBankReportPDF,
+  BankReportPDFData,
+} from "../../utils/payroll/BankReportPDF";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import toast from "react-hot-toast";
 
 interface SalaryReportData {
@@ -52,6 +58,28 @@ const SalaryReportPage: React.FC = () => {
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState(0); // 0 = Bank, 1 = Pinjam
+
+  // Staff data
+  const { staffs } = useStaffsCache();
+
+  // Bank table data - combine staff info with salary data
+  const bankTableData = useMemo(() => {
+    if (!reportData || !staffs) return [];
+
+    return reportData.data.map((salaryItem) => {
+      const staff = staffs.find((s) => s.id === salaryItem.staff_id);
+      return {
+        no: salaryItem.no,
+        staff_name: salaryItem.staff_name,
+        icNo: staff?.icNo || "N/A",
+        bankAccountNumber: staff?.bankAccountNumber || "N/A",
+        total: salaryItem.final_total,
+      };
+    });
+  }, [reportData, staffs]);
 
   // Generate year and month options
   const yearOptions = useMemo(() => {
@@ -107,19 +135,37 @@ const SalaryReportPage: React.FC = () => {
 
     setIsGeneratingPDF(true);
     try {
-      const pdfData: SalaryReportPDFData = {
-        year: reportData.year,
-        month: reportData.month,
-        data: reportData.data,
-        total_records: reportData.total_records,
-        summary: reportData.summary,
-      };
+      if (activeTab === 0) {
+        // Generate Bank Report PDF
+        const bankPdfData: BankReportPDFData = {
+          year: reportData.year,
+          month: reportData.month,
+          data: bankTableData,
+          total_records: reportData.total_records,
+          summary: {
+            total_final: reportData.summary.total_final,
+          },
+        };
 
-      await generateSalaryReportPDF(pdfData, action);
+        await generateBankReportPDF(bankPdfData, action);
+        const actionText =
+          action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`Salary report ${actionText} successfully`);
+      } else {
+        // Generate Pinjam (Salary) Report PDF
+        const pdfData: SalaryReportPDFData = {
+          year: reportData.year,
+          month: reportData.month,
+          data: reportData.data,
+          total_records: reportData.total_records,
+          summary: reportData.summary,
+        };
 
-      const actionText =
-        action === "download" ? "downloaded" : "generated for printing";
-      toast.success(`Salary report ${actionText} successfully`);
+        await generateSalaryReportPDF(pdfData, action);
+        const actionText =
+          action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`Bank report ${actionText} successfully`);
+      }
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error("Failed to generate PDF");
@@ -128,46 +174,124 @@ const SalaryReportPage: React.FC = () => {
     }
   };
 
+  // Bank Table Component
+  const BankTable = () => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-default-200">
+        <thead className="bg-default-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+              NO.
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+              STAFF NAME
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+              IC NO.
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+              BANK ACCOUNT NUMBER
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+              TOTAL
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-default-200">
+          {bankTableData.map((item) => (
+            <tr key={item.no} className="hover:bg-default-50">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                {item.no}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                {item.staff_name}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                {item.icNo}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                {item.bankAccountNumber}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 text-right">
+                {formatCurrency(item.total)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // Pinjam Table Component
+  const PinjamTable = () => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-default-200">
+        <thead className="bg-default-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+              NO.
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+              STAFF/ID
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+              GAJI/GENAP
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+              TOTAL PINJAM
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+              TOTAL
+            </th>
+            <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+              PAYMENT
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-default-200">
+          {reportData?.data.map((item) => (
+            <tr key={item.staff_id} className="hover:bg-default-50">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                {item.no}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="text-sm font-medium text-default-900">
+                  {item.staff_id} - {item.staff_name}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-right">
+                {formatCurrency(item.gaji_genap)}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-right">
+                {formatCurrency(item.total_pinjam)}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 text-right">
+                {formatCurrency(item.final_total)}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-center">
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    item.payment_preference === "Bank"
+                      ? "bg-sky-100 text-sky-800"
+                      : "bg-emerald-100 text-emerald-800"
+                  }`}
+                >
+                  {item.payment_preference}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div className="relative w-full space-y-4 mx-4 mb-4 md:mx-6">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           Salary Report
         </h1>
-        <div className="flex space-x-3 mt-4 md:mt-0">
-          <Button
-            onClick={fetchSalaryReport}
-            icon={IconRefresh}
-            variant="outline"
-            disabled={isLoading}
-          >
-            Refresh
-          </Button>
-          <div className="flex space-x-2">
-            <Button
-              onClick={() => generatePDF("print")}
-              icon={IconPrinter}
-              color="green"
-              variant="outline"
-              disabled={
-                !reportData || reportData.data.length === 0 || isGeneratingPDF
-              }
-            >
-              Print
-            </Button>
-            <Button
-              onClick={() => generatePDF("download")}
-              icon={IconDownload}
-              color="blue"
-              variant="outline"
-              disabled={
-                !reportData || reportData.data.length === 0 || isGeneratingPDF
-              }
-            >
-              Download
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* Filters */}
@@ -205,9 +329,52 @@ const SalaryReportPage: React.FC = () => {
       {/* Salary Report Table */}
       <div className="bg-white rounded-lg border border-default-200 shadow-sm">
         <div className="px-6 py-4 border-b border-default-200">
-          <h2 className="text-lg font-medium text-default-800">
-            {getMonthName(currentMonth)} {currentYear} Salary Report
-          </h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-medium text-default-800">
+              {getMonthName(currentMonth)} {currentYear} Salary Report
+            </h2>
+            <div className="flex space-x-3">
+              <Button
+                onClick={fetchSalaryReport}
+                icon={IconRefresh}
+                variant="outline"
+                disabled={isLoading}
+                size="sm"
+              >
+                Refresh
+              </Button>
+              <div className="flex space-x-2">
+                <Button
+                  onClick={() => generatePDF("print")}
+                  icon={IconPrinter}
+                  color="green"
+                  variant="outline"
+                  disabled={
+                    !reportData ||
+                    reportData.data.length === 0 ||
+                    isGeneratingPDF
+                  }
+                  size="sm"
+                >
+                  Print
+                </Button>
+                <Button
+                  onClick={() => generatePDF("download")}
+                  icon={IconDownload}
+                  color="blue"
+                  variant="outline"
+                  disabled={
+                    !reportData ||
+                    reportData.data.length === 0 ||
+                    isGeneratingPDF
+                  }
+                  size="sm"
+                >
+                  Download
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {isLoading ? (
@@ -225,65 +392,19 @@ const SalaryReportPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                      NO.
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                      STAFF/ID
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
-                      GAJI/GENAP
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
-                      TOTAL PINJAM
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
-                      TOTAL
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
-                      PAYMENT
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-default-200">
-                  {reportData.data.map((item) => (
-                    <tr key={item.staff_id} className="hover:bg-default-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
-                        {item.no}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-default-900">
-                          {item.staff_id} - {item.staff_name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-right">
-                        {formatCurrency(item.gaji_genap)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-right">
-                        {formatCurrency(item.total_pinjam)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 text-right">
-                        {formatCurrency(item.final_total)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-center">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            item.payment_preference === "Bank"
-                              ? "bg-sky-100 text-sky-800"
-                              : "bg-emerald-100 text-emerald-800"
-                          }`}
-                        >
-                          {item.payment_preference}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="px-6 py-4">
+              <Tab
+                labels={["Bank", "Pinjam"]}
+                defaultActiveTab={activeTab}
+                onTabChange={setActiveTab}
+              >
+                <div>
+                  <BankTable />
+                </div>
+                <div>
+                  <PinjamTable />
+                </div>
+              </Tab>
             </div>
 
             {/* Summary Footer */}
