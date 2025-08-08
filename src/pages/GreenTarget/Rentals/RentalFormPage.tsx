@@ -728,7 +728,7 @@ const RentalFormPage: React.FC = () => {
               ? `Update details for the rental placed on ${formatDateForInput(
                   initialFormData?.date_placed ?? null
                 )}.`
-              : "Fill details."}
+              : "Fill in the details."}
           </p>
         </div>
         <form onSubmit={handleSubmit} className="p-6">
