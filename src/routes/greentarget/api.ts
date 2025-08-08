@@ -107,6 +107,7 @@ export const greenTargetApi = {
     api.put(`/greentarget/api/invoices/${id}`, data),
   cancelInvoice: (id: number, reason?: string) =>
     api.put(`/greentarget/api/invoices/${id}/cancel`, { reason }),
+  deleteInvoice: (id: number) => api.delete(`/greentarget/api/invoices/${id}`),
 
   // e-Invoice endpoints
   submitEInvoice: async (invoiceId: number) => {
