@@ -47,6 +47,9 @@ const InvoiceSelectionTable: React.FC<InvoiceSelectionTableProps> = ({
       <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
         <h4 className="text-md font-medium text-gray-900">
           Available Unpaid Invoices
+          <span className="text-xs text-gray-500 ml-2 font-normal">
+            (Excluding invoices with pending payments)
+          </span>
         </h4>
         <div className="flex items-center gap-4">
           <div className="relative w-auto">

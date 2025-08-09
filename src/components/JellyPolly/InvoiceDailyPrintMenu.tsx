@@ -177,7 +177,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
       setLoadingStep("Searching for invoices...");
       // Fetch invoices from JellyPolly endpoint
-      const response = await api.get(`/api/jellypolly/invoices?${params.toString()}`);
+      const response = await api.get(`/jellypolly/api/invoices?${params.toString()}`);
 
       if (!response || !response.data || response.data.length === 0) {
         toast.error("No invoices found for the selected criteria");
@@ -198,7 +198,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
               );
             }
             // Fetch full invoice details including products from JellyPolly endpoint
-            const fullInvoice = await api.get(`/api/jellypolly/invoices/${invoice.id}`);
+            const fullInvoice = await api.get(`/jellypolly/api/invoices/${invoice.id}`);
             return fullInvoice || invoice; // Fallback to original if fetch fails
           } catch (error) {
             console.error(

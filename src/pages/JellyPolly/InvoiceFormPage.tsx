@@ -242,7 +242,13 @@ const InvoiceFormPage: React.FC = () => {
     let taxTotal = 0;
     invoiceData.products.forEach((item) => {
       if (!item.issubtotal && !item.istotal) {
-        subtotal += (Number(item.quantity) || 0) * (Number(item.price) || 0);
+        if (item.code === "OTH" || item.code === "LESS") {
+          // For 'OTH' or 'LESS' products, use price directly as the line total, ignoring quantity.
+          subtotal += Number(item.price) || 0;
+        } else {
+          // For all other products, calculate total as quantity * price.
+          subtotal += (Number(item.quantity) || 0) * (Number(item.price) || 0);
+        }
         taxTotal += Number(item.tax) || 0;
       }
     });
@@ -510,8 +516,6 @@ const InvoiceFormPage: React.FC = () => {
           errors.push(
             `Item #${index + 1}: Product code and description required.`
           );
-        if (Number(item.quantity || 0) <= 0)
-          errors.push(`Item #${index + 1}: Quantity must be positive.`);
         if (item.code !== "LESS" && Number(item.price || 0) < 0)
           errors.push(`Item #${index + 1}: Price cannot be negative.`);
       });
@@ -567,7 +571,9 @@ const InvoiceFormPage: React.FC = () => {
         if (invoiceData.paymenttype !== "CASH") {
           const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
             invoice_id: invoiceIdForNavigation, // Use the saved ID
-            payment_date: new Date().toISOString(),
+            payment_date: new Date(
+              Number(invoiceData.createddate)
+            ).toISOString(),
             amount_paid: savedInvoice.totalamountpayable,
             payment_method: paymentMethod,
             payment_reference:
