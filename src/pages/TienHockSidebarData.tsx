@@ -35,6 +35,7 @@ import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 import IncentivesPage from "./Payroll/IncentivesPage";
 import PinjamListPage from "./Payroll/PinjamListPage";
+import SalaryReportPage from "./Payroll/SalaryReportPage";
 
 // Catalogue related imports
 // Staff
@@ -89,9 +90,9 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Cuti Management",
-    path: "/payroll/cuti-management",
-    component: CutiManagementPage,
+    name: "Salary Report",
+    path: "/payroll/salary-report",
+    component: SalaryReportPage,
   });
 
   // Add each production type dynamically
@@ -132,15 +133,21 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Incentives",
-    path: "/payroll/incentives",
-    component: IncentivesPage,
+    name: "Cuti Management",
+    path: "/payroll/cuti-management",
+    component: CutiManagementPage,
   });
 
   payrollSubItems.push({
     name: "Mid-month Pay",
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
+  });
+
+  payrollSubItems.push({
+    name: "Incentives",
+    path: "/payroll/incentives",
+    component: IncentivesPage,
   });
 
   payrollSubItems.push({

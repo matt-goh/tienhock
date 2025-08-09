@@ -29,6 +29,7 @@ import {
   IconX,
   IconCircleCheck,
   IconUser,
+  IconTrash,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -59,6 +60,7 @@ import GTStatementModal from "../../../components/GreenTarget/GTStatementModal";
 interface InvoiceCardProps {
   invoice: InvoiceGT;
   onCancelClick: (invoice: InvoiceGT) => void;
+  onDeleteClick: (invoice: InvoiceGT) => void;
   onSubmitEInvoiceClick: (invoice: InvoiceGT) => void;
   onCheckEInvoiceStatus: (invoice: InvoiceGT) => void;
   onSyncCancellationStatus: (invoice: InvoiceGT) => void;
@@ -79,6 +81,7 @@ const STORAGE_KEY = "greentarget_invoice_filters";
 const InvoiceCard = ({
   invoice,
   onCancelClick,
+  onDeleteClick,
   onSubmitEInvoiceClick,
   onCheckEInvoiceStatus,
   onSyncCancellationStatus,
@@ -104,6 +107,12 @@ const InvoiceCard = ({
     e.preventDefault();
     e.stopPropagation();
     onCancelClick(invoice);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDeleteClick(invoice);
   };
 
   // Format date for display
@@ -594,14 +603,15 @@ const InvoiceCard = ({
             </button>
           )}
 
-          {/* Show cancelled indicator if already cancelled */}
+          {/* Show delete button for cancelled invoices */}
           {isCancelled && (
-            <div
-              className="p-1.5 bg-default-100 text-default-500 rounded-full cursor-not-allowed"
-              title="Invoice is cancelled"
+            <button
+              onClick={handleDeleteClick}
+              className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-full transition-colors"
+              title="Delete Invoice"
             >
-              <IconCancel size={18} stroke={1.5} />
-            </div>
+              <IconTrash size={18} stroke={1.5} />
+            </button>
           )}
         </div>
       </div>
@@ -666,6 +676,10 @@ const InvoiceListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [invoiceToCancel, setInvoiceToCancel] = useState<InvoiceGT | null>(
+    null
+  );
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<InvoiceGT | null>(
     null
   );
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
@@ -930,6 +944,11 @@ const InvoiceListPage: React.FC = () => {
     setIsCancelDialogOpen(true);
   };
 
+  const handleDeleteClick = (invoice: InvoiceGT) => {
+    setInvoiceToDelete(invoice);
+    setIsDeleteDialogOpen(true);
+  };
+
   const handleConfirmCancel = async () => {
     if (invoiceToCancel) {
       try {
@@ -977,6 +996,37 @@ const InvoiceListPage: React.FC = () => {
       } finally {
         setIsCancelDialogOpen(false);
         setInvoiceToCancel(null);
+      }
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (invoiceToDelete) {
+      try {
+        await greenTargetApi.deleteInvoice(invoiceToDelete.invoice_id);
+        toast.success("Invoice deleted successfully");
+
+        // Remove the invoice from the list
+        setInvoices(invoices.filter(i => i.invoice_id !== invoiceToDelete.invoice_id));
+        
+        // Remove from selected invoices if it was selected
+        setSelectedInvoiceIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(invoiceToDelete.invoice_id.toString());
+          return newSet;
+        });
+      } catch (error: any) {
+        if (error.message && error.message.includes("associated payments")) {
+          toast.error(
+            "Cannot delete invoice: it has associated payments. Delete the payments first."
+          );
+        } else {
+          toast.error("Failed to delete invoice");
+          console.error("Error deleting invoice:", error);
+        }
+      } finally {
+        setIsDeleteDialogOpen(false);
+        setInvoiceToDelete(null);
       }
     }
   };
@@ -1961,6 +2011,7 @@ const InvoiceListPage: React.FC = () => {
                 key={invoice.invoice_id}
                 invoice={invoice}
                 onCancelClick={handleCancelClick}
+                onDeleteClick={handleDeleteClick}
                 onSubmitEInvoiceClick={handleSubmitEInvoice}
                 onCheckEInvoiceStatus={handleCheckEInvoiceStatus}
                 onSyncCancellationStatus={handleSyncCancellationStatus}
@@ -2239,6 +2290,15 @@ const InvoiceListPage: React.FC = () => {
         title="Cancel Invoice"
         message={`Are you sure you want to cancel invoice ${invoiceToCancel?.invoice_number}? This action cannot be undone.`}
         confirmButtonText="Cancel Invoice"
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Invoice"
+        message={`Are you sure you want to permanently delete invoice ${invoiceToDelete?.invoice_number}? This action cannot be undone and will remove all invoice data from the system.`}
+        confirmButtonText="Delete Invoice"
         variant="danger"
       />
       {/* Confirmation dialog for e-Invoice submission */}

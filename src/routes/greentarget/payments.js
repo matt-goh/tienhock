@@ -76,6 +76,22 @@ export default function (pool) {
         );
       }
 
+      // Check for duplicate payment reference for the same invoice
+      if (payment_reference && payment_reference.trim()) {
+        const duplicateCheck = await client.query(
+          `SELECT payment_id FROM greentarget.payments 
+           WHERE invoice_id = $1 AND payment_reference = $2 
+           AND (status IS NULL OR status != 'cancelled')`,
+          [invoice_id, payment_reference.trim()]
+        );
+        
+        if (duplicateCheck.rows.length > 0) {
+          throw new Error(
+            `Payment reference "${payment_reference}" already exists for this invoice. Please use a unique reference.`
+          );
+        }
+      }
+
       // Get invoice details
       const invoiceQuery = `
         SELECT i.*, c.customer_id

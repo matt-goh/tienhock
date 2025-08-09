@@ -130,12 +130,40 @@ const StaffAddPage: React.FC = () => {
     navigate("/catalogue/staff");
   };
 
+  // Format IC Number with hyphens
+  const formatICNumber = (value: string): string => {
+    // Remove all non-digits
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // Limit to 12 digits
+    const limited = digitsOnly.slice(0, 12);
+    
+    // Apply formatting: XXXXXX-XX-XXXX
+    if (limited.length <= 6) {
+      return limited;
+    } else if (limited.length <= 8) {
+      return `${limited.slice(0, 6)}-${limited.slice(6)}`;
+    } else {
+      return `${limited.slice(0, 6)}-${limited.slice(6, 8)}-${limited.slice(8)}`;
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    
+    // Special handling for IC Number
+    if (name === 'icNo') {
+      const formattedValue = formatICNumber(value);
+      setFormData((prevData) => ({
+        ...prevData,
+        [name]: formattedValue,
+      }));
+    } else {
+      setFormData((prevData) => ({
+        ...prevData,
+        [name]: value,
+      }));
+    }
   };
 
   const handleListboxChange = (name: keyof Employee, value: string) => {

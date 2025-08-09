@@ -93,6 +93,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isCancelInvoiceDialogOpen, setIsCancelInvoiceDialogOpen] =
     useState(false);
   const [isCancellingInvoice, setIsCancellingInvoice] = useState(false);
+  const [isDeleteInvoiceDialogOpen, setIsDeleteInvoiceDialogOpen] =
+    useState(false);
+  const [isDeletingInvoice, setIsDeletingInvoice] = useState(false);
   const [isSubmittingEInvoice, setIsSubmittingEInvoice] = useState(false);
   const [isCheckingEInvoice, setIsCheckingEInvoice] = useState(false);
   const [showSubmissionResultsModal, setShowSubmissionResultsModal] =
@@ -681,6 +684,34 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteInvoice = async () => {
+    if (!invoice) return;
+
+    // Check if invoice has any payments
+    if (payments.length > 0) {
+      toast.error(
+        "Cannot delete invoice: it has associated payments. Delete the payments first."
+      );
+      setIsDeleteInvoiceDialogOpen(false);
+      return;
+    }
+
+    setIsDeletingInvoice(true);
+    try {
+      await greenTargetApi.deleteInvoice(invoice.invoice_id);
+      toast.success("Invoice deleted successfully");
+
+      // Navigate back to invoice list
+      navigate("/greentarget/invoices");
+    } catch (error: any) {
+      console.error("Error deleting invoice:", error);
+      toast.error(error.message || "Failed to delete invoice");
+    } finally {
+      setIsDeletingInvoice(false);
+      setIsDeleteInvoiceDialogOpen(false);
+    }
+  };
+
   const getGTStatusBadgeStyle = (status?: string) => {
     switch (status?.toLowerCase()) {
       case "paid": // Assuming you derive 'paid' from balance
@@ -940,16 +971,27 @@ const InvoiceDetailsPage: React.FC = () => {
                 {showPaymentForm ? "Cancel" : "Record Payment"}
               </Button>
             )}
-            <Button
-              onClick={() => setIsCancelInvoiceDialogOpen(true)}
-              icon={IconTrash}
-              variant="outline"
-              color="rose"
-              disabled={invoice.status === "cancelled"}
-              className="flex-1 sm:flex-none"
-            >
-              {invoice.status === "cancelled" ? "Cancelled" : "Cancel Invoice"}
-            </Button>
+            {invoice.status !== "cancelled" ? (
+              <Button
+                onClick={() => setIsCancelInvoiceDialogOpen(true)}
+                icon={IconCancel}
+                variant="outline"
+                color="rose"
+                className="flex-1 sm:flex-none"
+              >
+                Cancel Invoice
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setIsDeleteInvoiceDialogOpen(true)}
+                icon={IconTrash}
+                variant="outline"
+                color="rose"
+                className="flex-1 sm:flex-none"
+              >
+                Delete Invoice
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1720,6 +1762,23 @@ const InvoiceDetailsPage: React.FC = () => {
         }`}
         confirmButtonText={
           isCancellingInvoice ? "Cancelling..." : "Cancel Invoice"
+        }
+        variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteInvoiceDialogOpen}
+        onClose={() => setIsDeleteInvoiceDialogOpen(false)}
+        onConfirm={handleDeleteInvoice}
+        title="Delete Invoice"
+        message={`Are you sure you want to permanently delete invoice ${
+          invoice?.invoice_number
+        }? This action cannot be undone and will remove all invoice data from the system.${
+          payments.length > 0
+            ? " Note: You must delete all payments first."
+            : ""
+        }`}
+        confirmButtonText={
+          isDeletingInvoice ? "Deleting..." : "Delete Invoice"
         }
         variant="danger"
       />
