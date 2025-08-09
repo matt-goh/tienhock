@@ -165,7 +165,7 @@ export default function (pool) {
             "Content Line 5" // Column 21
           ];
           
-          return columns.join(',');
+          return columns.join(';');
         });
 
       // Calculate total payment amount
@@ -183,11 +183,11 @@ export default function (pool) {
 
       // Combine all rows
       const allRows = [
-        paymentDateRow.join(','),
-        headerRow1.join(','),
-        headerRow2.join(','),
+        paymentDateRow.join(';'),
+        headerRow1.join(';'),
+        headerRow2.join(';'),
         ...textRows,
-        totalRow.join(',')
+        totalRow.join(';')
       ];
       const textOutput = allRows.join('\r\n');
       
