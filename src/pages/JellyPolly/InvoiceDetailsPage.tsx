@@ -1119,9 +1119,11 @@ const InvoiceDetailsPage: React.FC = () => {
       setShowOverpaymentConfirm(false);
       setOverpaymentDetails(null);
       await fetchDetails(); // Refresh invoice and payment data
-    } catch (error) {
-      // Error toast handled by utility, update main toast
-      toast.error("Failed to record payment.", { id: toastId });
+    } catch (error: any) {
+      console.error("Error recording payment:", error);
+      // Handle both axios-style errors and our custom API utility errors
+      const errorMessage = error.response?.data?.message || error.data?.message || error.message || "Failed to record payment.";
+      toast.error(errorMessage, { id: toastId });
     } finally {
       setIsProcessingPayment(false);
     }

@@ -187,6 +187,22 @@ export default function (pool) {
       });
     }
 
+    // Check for duplicate payment reference for the same invoice
+    if (payment_reference && payment_reference.trim()) {
+      const duplicateCheck = await pool.query(
+        `SELECT payment_id FROM jellypolly.payments 
+         WHERE invoice_id = $1 AND payment_reference = $2 
+         AND (status IS NULL OR status != 'cancelled')`,
+        [invoice_id, payment_reference.trim()]
+      );
+      
+      if (duplicateCheck.rows.length > 0) {
+        return res.status(400).json({
+          message: `Payment reference "${payment_reference}" already exists for this invoice. Please use a unique reference.`,
+        });
+      }
+    }
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
