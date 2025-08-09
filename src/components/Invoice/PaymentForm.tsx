@@ -85,11 +85,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       const endDate = new Date();
       const startDate = new Date();
       startDate.setFullYear(endDate.getFullYear() - 1);
-      
+
       params.append("startDate", startDate.getTime().toString());
       params.append("endDate", endDate.getTime().toString());
 
-      const response = await api.get(`${invoicesEndpoint}?${params.toString()}`);
+      const response = await api.get(
+        `${invoicesEndpoint}?${params.toString()}`
+      );
       // With all=true, the response is directly an array of invoices
       setAvailableInvoices(Array.isArray(response) ? response : []);
     } catch (error) {
@@ -151,18 +153,24 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     try {
       // Create payment for each selected invoice
-      const paymentPromises = selectedInvoices.map(({ invoice, amountToPay }) =>
-        api.post(apiEndpoint, {
-          invoice_id: invoice.id,
-          payment_date: formData.payment_date,
-          amount_paid: amountToPay,
-          payment_method: formData.payment_method,
-          payment_reference: formData.payment_reference || undefined,
-          notes: formData.notes || undefined,
-        })
-      );
+      const results = [];
 
-      const results = await Promise.all(paymentPromises);
+      for (const { invoice, amountToPay } of selectedInvoices) {
+        try {
+          const result = await api.post(apiEndpoint, {
+            invoice_id: invoice.id,
+            payment_date: formData.payment_date,
+            amount_paid: amountToPay,
+            payment_method: formData.payment_method,
+            payment_reference: formData.payment_reference || undefined,
+            notes: formData.notes || undefined,
+          });
+          results.push(result);
+        } catch (error: any) {
+          // If any payment fails, throw with the specific error message
+          throw error;
+        }
+      }
 
       // Count overpayments
       const overpaymentCount = results.filter(
@@ -195,7 +203,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       onSuccess();
     } catch (error: any) {
       console.error("Error creating payment:", error);
-      toast.error(error.response?.data?.message || "Failed to record payment", {
+      // Handle both axios-style errors and our custom API utility errors
+      const errorMessage =
+        error.response?.data?.message ||
+        error.data?.message ||
+        error.message ||
+        "Failed to record payment";
+      toast.error(errorMessage, {
         id: toastId,
       });
     } finally {
