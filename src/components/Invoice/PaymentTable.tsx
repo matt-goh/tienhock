@@ -118,7 +118,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       default:
         return (
           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
-            Active
+            Settled
           </span>
         );
     }
