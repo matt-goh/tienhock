@@ -5,6 +5,7 @@ import {
   IconFileText,
   IconPrinter,
   IconDownload,
+  IconFileExport,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -54,6 +55,7 @@ const SalaryReportPage: React.FC = () => {
   );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
+  const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -171,6 +173,147 @@ const SalaryReportPage: React.FC = () => {
       toast.error("Failed to generate PDF");
     } finally {
       setIsGeneratingPDF(false);
+    }
+  };
+
+  // Text Export Generation
+  const generateTextExport = async () => {
+    if (!reportData || reportData.data.length === 0) {
+      toast.error("No data available to export");
+      return;
+    }
+
+    setIsGeneratingExport(true);
+    try {
+      // Generate payment date (last day of the month)
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const paymentDate = `${lastDayOfMonth.toString().padStart(2, "0")}/${currentMonth.toString().padStart(2, "0")}/${currentYear}`;
+
+      // Define payment date row
+      const paymentDateRow = [
+        "PAYMENT DATE : (DD/MM/YYYY)",
+        paymentDate,
+        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+      ];
+
+      // Define column headers with 2-row format
+      const headerRow1 = [
+        "Payment Type/ Mode : PBB/IBG/REN",
+        "Bene Acct No.",
+        "BIC",
+        "Bene Full Name",
+        "ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "Bene Identification No / Passport",
+        "Payment Amount (with 2 decimal points)",
+        "Recipient Reference (shown in sender and bene statement)",
+        "Other Payment Details (shown in sender and bene statement)",
+        "Bene Email 1",
+        "Bene Email 2",
+        "Bene Mobile No. 1 (charge RM0.20 per number)",
+        "Bene Mobile No. 2 (charge RM0.20 per number)",
+        "Joint Bene Name",
+        "Joint Bene Identification No.",
+        "Joint ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "E-mail Content Line 1 (will be shown in bene email)",
+        "E-mail Content Line 2 (will be shown in bene email)",
+        "E-mail Content Line 3 (will be shown in bene email)",
+        "E-mail Content Line 4 (will be shown in bene email)",
+        "E-mail Content Line 5 (will be shown in bene email)"
+      ];
+
+      const headerRow2 = [
+        "(M) - Char: 3 - A",
+        "(M) - Char: 20 - N",
+        "(M) - Char: 11 - A",
+        "(M) - Char: 120 - A",
+        "(M) - Char: 2 - A",
+        "(O) - Char: 29 - AN",
+        "(M) - Char: 18 - N",
+        "(M) - Char: 20 - AN",
+        "(O) - Char: 20 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 120 - A",
+        "(O) - Char: 29 - AN",
+        "(O) - Char: 2 - A",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN"
+      ];
+
+      // Generate data rows
+      const dataRows = reportData.data
+        .filter((row) => parseFloat(row.final_total.toString()) > 0)
+        .map((row) => {
+          const staff = staffs?.find((s) => s.id === row.staff_id);
+          const paymentAmount = parseFloat(row.final_total.toString()).toFixed(2);
+          
+          const columns = [
+            "PBB", // Column 1
+            (staff?.bankAccountNumber || "").replace(/-/g, ""), // Column 2 - remove hyphens
+            "PBBEMYKL", // Column 3
+            (row.staff_name || "").replace(/,/g, " "), // Column 4 - remove commas
+            staff?.document || "", // Column 5
+            (staff?.icNo || "").replace(/-/g, ""), // Column 6 - remove hyphens
+            paymentAmount, // Column 7 - plain number format
+            "Salary", // Column 8
+            "", "", "", "", "", "", "", "", // Columns 9-16
+            "Content Line 1", // Column 17
+            "Content Line 2", // Column 18
+            "Content Line 3", // Column 19
+            "Content Line 4", // Column 20
+            "Content Line 5" // Column 21
+          ];
+          
+          return columns;
+        });
+
+      // Calculate total payment amount
+      const totalAmount = reportData.data
+        .filter((row) => parseFloat(row.final_total.toString()) > 0)
+        .reduce((sum, row) => sum + parseFloat(row.final_total.toString()), 0);
+
+      // Create total row
+      const totalRow = [
+        "TOTAL:",
+        "", "", "", "", "",
+        totalAmount.toFixed(2),
+        "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+      ];
+
+      // Combine all rows
+      const allRows = [
+        paymentDateRow,
+        headerRow1,
+        headerRow2,
+        ...dataRows,
+        totalRow
+      ];
+
+      // Convert to text format (semicolon separated)
+      const textContent = allRows.map(row => row.join(";")).join("\r\n");
+
+      // Create and download the file
+      const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `payment-export-${currentMonth.toString().padStart(2, "0")}-${currentYear}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Payment export file downloaded successfully");
+    } catch (error) {
+      console.error("Error generating text export:", error);
+      toast.error("Failed to generate text export");
+    } finally {
+      setIsGeneratingExport(false);
     }
   };
 
@@ -371,6 +514,20 @@ const SalaryReportPage: React.FC = () => {
                   size="sm"
                 >
                   Download
+                </Button>
+                <Button
+                  onClick={generateTextExport}
+                  icon={IconFileExport}
+                  color="purple"
+                  variant="outline"
+                  disabled={
+                    !reportData ||
+                    reportData.data.length === 0 ||
+                    isGeneratingExport
+                  }
+                  size="sm"
+                >
+                  Export
                 </Button>
               </div>
             </div>
