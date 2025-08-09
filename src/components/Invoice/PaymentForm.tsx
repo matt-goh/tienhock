@@ -68,11 +68,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     { id: "online", name: "Online" },
   ];
 
-  // Fetch unpaid invoices
-  useEffect(() => {
-    fetchUnpaidInvoices();
-  }, []);
-
   const fetchUnpaidInvoices = useCallback(async () => {
     setLoadingInvoices(true);
     try {
@@ -89,18 +84,38 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       params.append("startDate", startDate.getTime().toString());
       params.append("endDate", endDate.getTime().toString());
 
-      const response = await api.get(
-        `${invoicesEndpoint}?${params.toString()}`
+      const [invoicesResponse, paymentsResponse] = await Promise.all([
+        api.get(`${invoicesEndpoint}?${params.toString()}`),
+        api.get(`${apiEndpoint}?include_cancelled=false`), // Get all active/pending payments
+      ]);
+
+      const invoices = Array.isArray(invoicesResponse) ? invoicesResponse : [];
+      const payments = Array.isArray(paymentsResponse) ? paymentsResponse : [];
+
+      // Filter out invoices that have pending payments
+      const invoicesWithPendingPayments = new Set(
+        payments
+          .filter((payment) => payment.status === "pending")
+          .map((payment) => payment.invoice_id)
       );
-      // With all=true, the response is directly an array of invoices
-      setAvailableInvoices(Array.isArray(response) ? response : []);
+
+      const filteredInvoices = invoices.filter(
+        (invoice) => !invoicesWithPendingPayments.has(invoice.id)
+      );
+
+      setAvailableInvoices(filteredInvoices);
     } catch (error) {
       console.error("Error fetching unpaid invoices:", error);
       toast.error("Failed to fetch unpaid invoices");
     } finally {
       setLoadingInvoices(false);
     }
-  }, []);
+  }, [apiEndpoint, invoicesEndpoint]);
+
+  // Fetch unpaid invoices
+  useEffect(() => {
+    fetchUnpaidInvoices();
+  }, [fetchUnpaidInvoices]);
 
   const totalPaymentAmount = selectedInvoices.reduce(
     (sum, item) => sum + item.amountToPay,
