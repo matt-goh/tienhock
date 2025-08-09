@@ -70,9 +70,6 @@ import jellypollyPaymentRouter from "./jellypolly/payments.js";
 import jellypollyEInvoiceRouter from "./jellypolly/e-invoices.js";
 import jellypollyDebtorsRouter from "./jellypolly/debtors.js";
 
-// Excel routes
-import paymentExportRouter from "./excel/payment-export.js";
-
 import {
   MYINVOIS_API_BASE_URL,
   MYINVOIS_CLIENT_ID,
@@ -119,9 +116,6 @@ export default function setupRoutes(app, pool) {
 
   // Auth routes
   app.use("/api/auth", authRouter(pool));
-
-  // Excel routes (before auth middleware)
-  app.use("/api/excel/payment-export", paymentExportRouter(pool));
 
   // Add auth middleware to protect other routes
   app.use("/api", authMiddleware(pool));
