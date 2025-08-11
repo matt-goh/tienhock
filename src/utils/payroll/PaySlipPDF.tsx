@@ -1,6 +1,6 @@
 // src/utils/payroll/PaySlipPDF.tsx
 import React from "react";
-import { Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Page, Text, View, StyleSheet, Document } from "@react-pdf/renderer";
 import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import { groupItemsByType, getMonthName } from "./payrollUtils";
 
@@ -151,16 +151,721 @@ interface PaySlipPDFProps {
   midMonthPayroll?: MidMonthPayroll | null;
 }
 
+interface IndividualJobPayroll {
+  job_type: string;
+  items: any[];
+  leave_records?: any[];
+  commission_records?: any[];
+  gross_pay_portion: number;
+}
+
+// Helper function to split grouped payroll into individual job payrolls
+const splitGroupedPayroll = (payroll: EmployeePayroll): IndividualJobPayroll[] => {
+  // Check if this is a grouped payroll (contains comma-separated job types)
+  if (!payroll.job_type || !payroll.job_type.includes(", ")) {
+    // Not a grouped payroll, return single job
+    return [{
+      job_type: payroll.job_type,
+      items: payroll.items || [],
+      leave_records: payroll.leave_records || [],
+      commission_records: payroll.commission_records || [],
+      gross_pay_portion: payroll.gross_pay
+    }];
+  }
+
+  // Split the job types
+  const jobTypes = payroll.job_type.split(", ").map(job => job.trim());
+  const individualJobs: IndividualJobPayroll[] = [];
+
+  // Group items by job type based on pay_code patterns or descriptions
+  const allItems = payroll.items || [];
+  const allLeaveRecords = payroll.leave_records || [];
+  const allCommissionRecords = payroll.commission_records || [];
+
+  // For each job type, collect relevant items
+  jobTypes.forEach(jobType => {
+    // Filter items that belong to this specific job
+    // This is a simplified approach - you may need to enhance this based on your pay_code patterns
+    const jobItems = allItems.filter(item => {
+      // Check if the pay_code or description contains job-specific identifiers
+      const description = item.description?.toLowerCase() || '';
+      const payCode = item.pay_code_id?.toLowerCase() || '';
+      const jobLower = jobType.toLowerCase();
+      
+      // Simple heuristic: items that contain the job type in description or pay_code
+      return description.includes(jobLower) || payCode.includes(jobLower) || 
+             // If no specific job identifiers, distribute evenly (fallback)
+             allItems.indexOf(item) % jobTypes.length === jobTypes.indexOf(jobType);
+    });
+
+    // Filter leave records for this job (distribute evenly for now)
+    const jobLeaveRecords = allLeaveRecords.filter((record, index) => 
+      index % jobTypes.length === jobTypes.indexOf(jobType)
+    );
+
+    // Filter commission records for this job
+    const jobCommissionRecords = allCommissionRecords.filter(record => {
+      const description = record.description?.toLowerCase() || '';
+      const jobLower = jobType.toLowerCase();
+      return description.includes(jobLower) || 
+             // Fallback: distribute evenly if no specific identifiers
+             allCommissionRecords.indexOf(record) % jobTypes.length === jobTypes.indexOf(jobType);
+    });
+
+    // Calculate gross pay portion for this job
+    const jobGrossPay = jobItems.reduce((sum, item) => sum + (item.amount || 0), 0) +
+                       jobLeaveRecords.reduce((sum, record) => sum + (record.amount_paid || 0), 0) +
+                       jobCommissionRecords.reduce((sum, record) => sum + (record.amount || 0), 0);
+
+    individualJobs.push({
+      job_type: jobType,
+      items: jobItems,
+      leave_records: jobLeaveRecords,
+      commission_records: jobCommissionRecords,
+      gross_pay_portion: jobGrossPay
+    });
+  });
+
+  return individualJobs;
+};
+
+// Individual Job Page Component (without statutory deductions)
+const IndividualJobPage: React.FC<{
+  individualJob: IndividualJobPayroll;
+  payroll: EmployeePayroll;
+  companyName: string;
+  staffDetails?: any;
+  year: number;
+  month: number;
+  monthName: string;
+  isGrouped: boolean;
+  jobIndex: number;
+  totalJobs: number;
+}> = ({
+  individualJob,
+  payroll,
+  companyName,
+  staffDetails,
+  year,
+  month,
+  monthName,
+  isGrouped,
+  jobIndex,
+  totalJobs,
+}) => {
+  const groupedItems = groupItemsByType(individualJob.items || []) || { Base: [], Tambahan: [], Overtime: [] };
+
+  // Helper function to group items by hours and maintain order
+  const groupItemsByHours = (items: any[]) => {
+    const groupsArray: { hours: number; items: any[] }[] = [];
+    const groupsMap = new Map<number, any[]>();
+
+    items.forEach((item) => {
+      const hours = item.quantity;
+      if (!groupsMap.has(hours)) {
+        groupsMap.set(hours, []);
+      }
+      groupsMap.get(hours)!.push(item);
+    });
+
+    items.forEach((item) => {
+      const hours = item.quantity;
+      if (!groupsArray.some((group) => group.hours === hours)) {
+        groupsArray.push({
+          hours,
+          items: groupsMap.get(hours)!,
+        });
+      }
+    });
+
+    return groupsArray;
+  };
+
+  // Group base items by hours
+  const baseGroupedByHours = groupItemsByHours(groupedItems.Base || []);
+  const baseTotalAmount = (groupedItems.Base || []).reduce(
+    (sum, item) => sum + (item.amount || 0),
+    0
+  );
+  const baseTotalRates = (groupedItems.Base || []).reduce(
+    (sum, item) => sum + (item.rate || 0),
+    0
+  );
+
+  const tambahanTotalAmount = (groupedItems["Tambahan"] || []).reduce(
+    (sum, item) => sum + (item.amount || 0),
+    0
+  );
+
+  // Group leave records by leave type and sum amounts
+  const groupedLeaveRecords = (individualJob.leave_records || []).reduce(
+    (acc, record) => {
+      const leaveType = record.leave_type;
+      if (!acc[leaveType]) {
+        acc[leaveType] = {
+          leave_type: leaveType,
+          total_days: 0,
+          total_amount: 0,
+        };
+      }
+      acc[leaveType].total_days += record.days_taken;
+      acc[leaveType].total_amount += record.amount_paid;
+      return acc;
+    },
+    {} as Record<
+      string,
+      { leave_type: string; total_days: number; total_amount: number }
+    >
+  );
+
+  const leaveRecordsArray: { leave_type: string; total_days: number; total_amount: number }[] = Object.values(groupedLeaveRecords);
+  const leaveTotalAmount = leaveRecordsArray.reduce(
+    (sum, record) => sum + (record.total_amount || 0),
+    0
+  );
+
+  // Commission records data
+  const commissionRecords = individualJob.commission_records || [];
+  const commissionTotalAmount = commissionRecords.reduce(
+    (sum, record) => sum + (record.amount || 0),
+    0
+  );
+
+  const combinedTambahanTotal =
+    tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
+
+  // Group additional items by hours
+  const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime || []);
+  const overtimeTotalAmount = (groupedItems.Overtime || []).reduce(
+    (sum, item) => sum + (item.amount || 0),
+    0
+  );
+
+  // Find the hour group with the maximum hours (latest/most hours)
+  const maxHoursGroup = baseGroupedByHours.length > 0 
+    ? baseGroupedByHours.reduce((maxGroup, currentGroup) => {
+        return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
+      }, baseGroupedByHours[0])
+    : null;
+
+  // Calculate rate using the maximum hours group
+  const averageBaseRate =
+    maxHoursGroup && maxHoursGroup.hours > 0
+      ? baseTotalAmount / maxHoursGroup.hours
+      : 0;
+
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-MY", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  // Helper function to prettify leave type text
+  const prettifyLeaveType = (leaveType: string) => {
+    return leaveType
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Helper function to format description based on rate unit
+  const formatDescription = (item: any) => {
+    switch (item.rate_unit) {
+      case "Hour":
+        return `${item.quantity.toFixed(0)} Hour${
+          item.quantity > 1 ? "s" : ""
+        }`;
+      case "Bag":
+        return `${item.quantity.toFixed(0)} Bag${item.quantity > 1 ? "s" : ""}`;
+      case "Trip":
+        return `${item.quantity.toFixed(0)} Trip${
+          item.quantity > 1 ? "s" : ""
+        }`;
+      case "Day":
+        return `${item.quantity.toFixed(0)} Day${item.quantity > 1 ? "s" : ""}`;
+      case "Percent":
+        return `${item.quantity.toFixed(0)} Unit${
+          item.quantity > 1 ? "s" : ""
+        }`;
+      case "Fixed":
+        return monthName;
+      default:
+        return "";
+    }
+  };
+
+  return (
+    <Page size="A4" style={styles.page}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.companySection}>
+          <Text style={styles.companyName}>{companyName}</Text>
+          {/* Employee Information */}
+          <View style={styles.employeeInfoTable}>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Employee</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.name || payroll.employee_name}
+              </Text>
+            </View>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>IC no</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.icNo || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Kerja</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {individualJob.job_type}
+              </Text>
+            </View>
+            <View style={styles.employeeInfoRow}>
+              <Text style={styles.employeeInfoLabel}>Bahagian</Text>
+              <Text style={styles.employeeInfoColon}>:</Text>
+              <Text style={styles.employeeInfoValue}>
+                {staffDetails?.section || payroll.section}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Pay Slip Title */}
+      <Text style={styles.payslipTitle}>
+        Slip Gaji Pajak ({individualJob.job_type}) Untuk Bulan {monthName} {year}
+        {isGrouped && ` - Kerja ${jobIndex + 1} of ${totalJobs} (Individual Breakdown)`}
+      </Text>
+
+      {/* Main Table */}
+      <View style={styles.table}>
+        {/* Table Header */}
+        <View style={styles.tableHeaderRow}>
+          <View style={[styles.tableColHeader, styles.descriptionCol]}>
+            <Text>Kerja</Text>
+          </View>
+          <View style={[styles.tableColHeader, styles.rateCol]}>
+            <Text>Rate</Text>
+          </View>
+          <View style={[styles.tableColHeader, styles.descriptionNoteCol]}>
+            <Text>Description</Text>
+          </View>
+          <View
+            style={[
+              styles.tableColHeader,
+              styles.amountCol,
+              { borderRightWidth: 0 },
+            ]}
+          >
+            <Text>Amount</Text>
+          </View>
+        </View>
+
+        {/* Base Pay Items - Grouped by hours */}
+        {baseGroupedByHours.map((group, groupIndex) =>
+          group.items.map((item, itemIndex) => (
+            <View
+              key={`base-${group.hours}-${itemIndex}`}
+              style={styles.tableRow}
+            >
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <View style={{ height: 12, overflow: "hidden" }}>
+                  <Text>{item.description}</Text>
+                </View>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text>
+                  {item.rate_unit === "Percent"
+                    ? `${item.rate}%`
+                    : item.rate.toFixed(2)}
+                </Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text>{itemIndex === 0 ? `${group.hours} Jam` : ""}</Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text>{formatCurrency(item.amount)}</Text>
+              </View>
+            </View>
+          ))
+        )}
+
+        {/* Base Pay Subtotal Row */}
+        {(groupedItems.Base && groupedItems.Base.length > 0) && (
+          <View style={[styles.tableRow, styles.subtotalRow]}>
+            <View style={[styles.tableCol, styles.descriptionCol]}>
+              <Text></Text>
+            </View>
+            <View style={[styles.tableCol, styles.rateCol]}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                {baseTotalRates.toFixed(2)}
+              </Text>
+            </View>
+            <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                Rate/Jam : {averageBaseRate.toFixed(2)}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.tableCol,
+                styles.amountCol,
+                { borderRightWidth: 0 },
+              ]}
+            >
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                {formatCurrency(baseTotalAmount)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Tambahan Pay Items */}
+        {((groupedItems["Tambahan"] && groupedItems["Tambahan"].length > 0) ||
+          leaveRecordsArray.length > 0 ||
+          commissionRecords.length > 0) && (
+          <>
+            {/* Tambahan Items */}
+            {(groupedItems["Tambahan"] || []).map((item, index) => (
+              <View key={`tambahan-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{item.description}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text>
+                    {item.rate_unit === "Percent"
+                      ? `${item.rate}%`
+                      : item.rate.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>{formatDescription(item)}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(item.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Commission Records in Tambahan Section */}
+            {commissionRecords.map((commission, index) => (
+              <View
+                key={`tambahan-commission-${index}`}
+                style={styles.tableRow}
+              >
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{commission.description}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>Advance</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(commission.amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Leave Records */}
+            {leaveRecordsArray.map((leaveRecord: any, index) => (
+              <View key={`leave-${index}`} style={styles.tableRow}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <View style={{ height: 12, overflow: "hidden" }}>
+                    <Text>{prettifyLeaveType(leaveRecord.leave_type)}</Text>
+                  </View>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text>{leaveRecord.total_days} Hari</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text>{formatCurrency(leaveRecord.total_amount)}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Tambahan Subtotal Row */}
+            <View style={[styles.tableRow, styles.subtotalRow]}>
+              <View style={[styles.tableCol, styles.descriptionCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.rateCol]}>
+                <Text></Text>
+              </View>
+              <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
+              </View>
+              <View
+                style={[
+                  styles.tableCol,
+                  styles.amountCol,
+                  { borderRightWidth: 0 },
+                ]}
+              >
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                  {formatCurrency(combinedTambahanTotal)}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Overtime Pay Items */}
+        {(groupedItems.Overtime && groupedItems.Overtime.length > 0) && (
+          <>
+            {/* Overtime Items - Grouped by hours */}
+            {overtimeGroupedByHours.map((group, groupIndex) =>
+              group.items.map((item, itemIndex) => (
+                <View
+                  key={`overtime-${group.hours}-${itemIndex}`}
+                  style={styles.tableRow}
+                >
+                  <View style={[styles.tableCol, styles.descriptionCol]}>
+                    <View style={{ height: 12, overflow: "hidden" }}>
+                      <Text>{item.description}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.tableCol, styles.rateCol]}>
+                    <Text>
+                      {item.rate_unit === "Percent"
+                        ? `${item.rate}%`
+                        : item.rate.toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                    <Text>
+                      {itemIndex === 0 ? `${group.hours} Jam OT` : ""}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.tableCol,
+                      styles.amountCol,
+                      { borderRightWidth: 0 },
+                    ]}
+                  >
+                    <Text>{formatCurrency(item.amount)}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* Overtime Subtotal Row */}
+            {(groupedItems.Overtime && groupedItems.Overtime.length > 0) && (
+              <View style={[styles.tableRow, styles.subtotalRow]}>
+                <View style={[styles.tableCol, styles.descriptionCol]}>
+                  <Text></Text>
+                </View>
+                <View style={[styles.tableCol, styles.rateCol]}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {(groupedItems.Overtime || []).reduce(
+                      (sum, item) => sum + (item.rate || 0),
+                      0
+                    ).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>Subtotal</Text>
+                </View>
+                <View
+                  style={[
+                    styles.tableCol,
+                    styles.amountCol,
+                    { borderRightWidth: 0 },
+                  ]}
+                >
+                  <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                    {formatCurrency(overtimeTotalAmount)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Job Gross Pay Row (without deductions for individual job pages) */}
+        <View style={[styles.tableRow, styles.grandTotalRow, { borderTopWidth: 0.5 }]}>
+          <View style={[styles.tableCol, styles.descriptionCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.rateCol]}>
+            <Text></Text>
+          </View>
+          <View style={[styles.tableCol, styles.descriptionNoteCol]}>
+            <Text style={styles.totalText}>
+              {isGrouped ? `${individualJob.job_type} Gross Pay` : "Jumlah Gaji Kasar"}
+            </Text>
+          </View>
+          <View
+            style={[styles.tableCol, styles.amountCol, { borderRightWidth: 0 }]}
+          >
+            <Text style={styles.totalText}>
+              {formatCurrency(individualJob.gross_pay_portion)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Notice Section */}
+      <View style={styles.notesSection}>
+        <Text>
+          *** Individual job breakdown - {isGrouped ? "No deductions applied to individual jobs" : ""}
+        </Text>
+      </View>
+
+      {/* Signature Section */}
+      <View style={styles.signatureSection}>
+        <View style={styles.signatureBlock}></View>
+        <View style={styles.signatureBlock}>
+          <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
+          <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
+        </View>
+      </View>
+    </Page>
+  );
+};
+
 const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   payroll,
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   staffDetails,
   midMonthPayroll,
 }) => {
-  const groupedItems = groupItemsByType(payroll.items || []);
+  // Safety check
+  if (!payroll) {
+    return (
+      <Page size="A4" style={styles.page}>
+        <Text>No payroll data available</Text>
+      </Page>
+    );
+  }
+
   const year = payroll.year ?? new Date().getFullYear();
   const month = payroll.month ?? new Date().getMonth() + 1;
   const monthName = getMonthName(month);
+
+  // Check if this is a grouped payroll
+  const isGrouped = payroll.job_type && payroll.job_type.includes(", ");
+  
+  try {
+    if (isGrouped) {
+      // For grouped payrolls, generate multiple pages: main combined page + individual job pages
+      const individualJobs = splitGroupedPayroll(payroll);
+      
+      return (
+        <>
+          {/* Main combined payroll page (existing functionality) */}
+          <MainPayrollPage
+            payroll={payroll}
+            companyName={companyName}
+            staffDetails={staffDetails}
+            midMonthPayroll={midMonthPayroll}
+            year={year}
+            month={month}
+            monthName={monthName}
+          />
+          
+          {/* Individual job pages (without deductions) */}
+          {individualJobs.map((individualJob, index) => (
+            <IndividualJobPage
+              key={`individual-job-${index}`}
+              individualJob={individualJob}
+              payroll={payroll}
+              companyName={companyName}
+              staffDetails={staffDetails}
+              year={year}
+              month={month}
+              monthName={monthName}
+              isGrouped={true}
+              jobIndex={index}
+              totalJobs={individualJobs.length}
+            />
+          ))}
+        </>
+      );
+    } else {
+      // For single job payrolls, return single page
+      return (
+        <MainPayrollPage
+          payroll={payroll}
+          companyName={companyName}
+          staffDetails={staffDetails}
+          midMonthPayroll={midMonthPayroll}
+          year={year}
+          month={month}
+          monthName={monthName}
+        />
+      );
+    }
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return (
+      <Page size="A4" style={styles.page}>
+        <Text>Error generating PDF: {errorMessage}</Text>
+        <Text>Employee: {payroll.employee_name || "Unknown"}</Text>
+        <Text>Job Type: {payroll.job_type || "Unknown"}</Text>
+      </Page>
+    );
+  }
+};
+
+// Main combined payroll page component (original functionality)
+const MainPayrollPage: React.FC<{
+  payroll: EmployeePayroll;
+  companyName: string;
+  staffDetails?: any;
+  midMonthPayroll?: MidMonthPayroll | null;
+  year: number;
+  month: number;
+  monthName: string;
+}> = ({
+  payroll,
+  companyName,
+  staffDetails,
+  midMonthPayroll,
+  year,
+  month,
+  monthName,
+}) => {
+  const groupedItems = groupItemsByType(payroll.items || []) || { Base: [], Tambahan: [], Overtime: [] };
 
   // Helper function to group items by hours and maintain order
   const groupItemsByHours = (items: any[]) => {
@@ -191,18 +896,18 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   };
 
   // Group base items by hours
-  const baseGroupedByHours = groupItemsByHours(groupedItems.Base);
-  const baseTotalAmount = groupedItems.Base.reduce(
-    (sum, item) => sum + item.amount,
+  const baseGroupedByHours = groupItemsByHours(groupedItems.Base || []);
+  const baseTotalAmount = (groupedItems.Base || []).reduce(
+    (sum, item) => sum + (item.amount || 0),
     0
   );
-  const baseTotalRates = groupedItems.Base.reduce(
-    (sum, item) => sum + item.rate,
+  const baseTotalRates = (groupedItems.Base || []).reduce(
+    (sum, item) => sum + (item.rate || 0),
     0
   );
 
-  const tambahanTotalAmount = groupedItems["Tambahan"].reduce(
-    (sum, item) => sum + item.amount,
+  const tambahanTotalAmount = (groupedItems["Tambahan"] || []).reduce(
+    (sum, item) => sum + (item.amount || 0),
     0
   );
 
@@ -227,10 +932,10 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     >
   );
 
-  const leaveRecordsArray = Object.values(groupedLeaveRecords);
+  const leaveRecordsArray: { leave_type: string; total_days: number; total_amount: number }[] = Object.values(groupedLeaveRecords);
 
   const leaveTotalAmount = leaveRecordsArray.reduce(
-    (sum, record) => sum + record.total_amount,
+    (sum, record) => sum + (record.total_amount || 0),
     0
   );
 
@@ -245,16 +950,18 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
     tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
 
   // Group additional items by hours
-  const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime);
-  const overtimeTotalAmount = groupedItems.Overtime.reduce(
-    (sum, item) => sum + item.amount,
+  const overtimeGroupedByHours = groupItemsByHours(groupedItems.Overtime || []);
+  const overtimeTotalAmount = (groupedItems.Overtime || []).reduce(
+    (sum, item) => sum + (item.amount || 0),
     0
   );
 
   // Find the hour group with the maximum hours (latest/most hours)
-  const maxHoursGroup = baseGroupedByHours.reduce((maxGroup, currentGroup) => {
-    return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
-  }, baseGroupedByHours[0]);
+  const maxHoursGroup = baseGroupedByHours.length > 0 
+    ? baseGroupedByHours.reduce((maxGroup, currentGroup) => {
+        return currentGroup.hours > maxGroup.hours ? currentGroup : maxGroup;
+      }, baseGroupedByHours[0])
+    : null;
 
   // Calculate rate using the maximum hours group
   const averageBaseRate =
@@ -265,7 +972,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
 
   // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
-  const isMainten = payroll.job_type === "MAINTEN";
+  const isMainten = payroll.job_type === "MAINTEN" || payroll.job_type?.includes("MAINTEN");
   const cutiTahunanRecords = leaveRecordsArray.filter(
     (record) => record.leave_type === "cuti_tahunan"
   );
@@ -429,7 +1136,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Base Pay Subtotal Row */}
-        {groupedItems.Base.length > 0 && (
+        {(groupedItems.Base && groupedItems.Base.length > 0) && (
           <View style={[styles.tableRow, styles.subtotalRow]}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <Text></Text>
@@ -459,12 +1166,12 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Tambahan Pay Items */}
-        {(groupedItems["Tambahan"].length > 0 ||
+        {((groupedItems["Tambahan"] && groupedItems["Tambahan"].length > 0) ||
           leaveRecordsArray.length > 0 ||
           commissionRecords.length > 0) && (
           <>
             {/* Tambahan Items */}
-            {groupedItems["Tambahan"].map((item, index) => (
+            {(groupedItems["Tambahan"] || []).map((item, index) => (
               <View key={`tambahan-${index}`} style={styles.tableRow}>
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
@@ -575,7 +1282,7 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
         )}
 
         {/* Overtime Pay Items */}
-        {groupedItems.Overtime.length > 0 && (
+        {(groupedItems.Overtime && groupedItems.Overtime.length > 0) && (
           <>
             {/* Overtime Items - Grouped by hours */}
             {overtimeGroupedByHours.map((group, groupIndex) =>
@@ -615,15 +1322,15 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             )}
 
             {/* Overtime Subtotal Row */}
-            {groupedItems.Overtime.length > 0 && (
+            {(groupedItems.Overtime && groupedItems.Overtime.length > 0) && (
               <View style={[styles.tableRow, styles.subtotalRow]}>
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <Text></Text>
                 </View>
                 <View style={[styles.tableCol, styles.rateCol]}>
                   <Text style={{ fontFamily: "Helvetica-Bold" }}>
-                    {groupedItems.Overtime.reduce(
-                      (sum, item) => sum + item.rate,
+                    {(groupedItems.Overtime || []).reduce(
+                      (sum, item) => sum + (item.rate || 0),
                       0
                     ).toFixed(2)}
                   </Text>
@@ -781,13 +1488,13 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
           style={[
             styles.tableRow,
             styles.jumlahGajiBersihRow,
-            !(
+            (
               midMonthPayroll ||
               commissionRecords.length > 0 ||
               (isMainten && cutiTahunanAmount > 0)
             )
-              ? { borderBottomWidth: 0 }
-              : {},
+              ? {}
+              : { borderBottomWidth: 0 },
           ]}
         >
           <View style={[styles.tableCol, styles.descriptionCol]}>
