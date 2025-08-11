@@ -133,9 +133,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderLight,
     minHeight: 18,
   },
-  tableRowAlt: {
-    backgroundColor: "#f8fafc",
-  },
 
   // Table Column Widths - Compact layout
   colNo: {
@@ -215,7 +212,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 6,
-    backgroundColor: "#f8fafc",
     borderRadius: 4,
     borderWidth: 1,
     borderColor: colors.primary,
@@ -288,12 +284,8 @@ export interface SalaryReportPDFData {
 // PDF Components
 const SalaryRow: React.FC<{
   employee: SalaryReportData;
-  isAlternate: boolean;
-}> = ({ employee, isAlternate }) => (
-  <View
-    style={[styles.tableRow, isAlternate ? styles.tableRowAlt : {}]}
-    wrap={false}
-  >
+}> = ({ employee }) => (
+  <View style={styles.tableRow} wrap={false}>
     <Text style={styles.colNo}>{employee.no}</Text>
     <Text style={styles.colStaffId}>
       {employee.staff_id} - {employee.staff_name}
@@ -347,11 +339,10 @@ const SalaryReportPDF: React.FC<{
             <Text style={styles.colPayment}>PAYMENT</Text>
           </View>
 
-          {data.data.map((employee, index) => (
+          {data.data.map((employee) => (
             <SalaryRow
               key={employee.staff_id}
               employee={employee}
-              isAlternate={index % 2 === 1}
             />
           ))}
         </View>
