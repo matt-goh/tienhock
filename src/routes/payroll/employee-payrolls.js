@@ -551,6 +551,7 @@ export default function (pool) {
       );
 
       // Get all commission records for these payrolls in a single query
+      // Handle grouped payrolls by getting commissions for all employees with the same name
       const commissionsQuery = `
       SELECT 
         ep.id as employee_payroll_id,
@@ -558,7 +559,15 @@ export default function (pool) {
         s.name as employee_name
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-      JOIN commission_records cr ON ep.employee_id = cr.employee_id
+      JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
+      JOIN commission_records cr ON (
+        CASE 
+          WHEN ep.job_type LIKE '%,%' THEN cr.employee_id IN (
+            SELECT s2.id FROM staffs s2 WHERE s2.name = emp_staff.name
+          )
+          ELSE cr.employee_id = ep.employee_id
+        END
+      )
       JOIN staffs s ON cr.employee_id = s.id
       WHERE ep.id = ANY($1)
         AND EXTRACT(YEAR FROM cr.commission_date) = mp.year
