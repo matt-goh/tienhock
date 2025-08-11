@@ -28,6 +28,7 @@ import { Link } from "react-router-dom";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useContributionRatesCache } from "../../utils/payroll/useContributionRatesCache";
+import { api } from "../../routes/utils/api";
 
 interface EligibleEmployeesResponse {
   month: number;
@@ -265,6 +266,23 @@ const PayrollProcessingPage: React.FC = () => {
       });
     });
 
+    // Group employees by name to combine payrolls for same-named employees
+    const employeesByName = new Map<
+      string,
+      Array<{ employeeId: string; jobType: string }>
+    >();
+
+    selectedCombinations.forEach(({ employeeId, jobType }) => {
+      const employee = staffsMap.get(employeeId);
+      if (employee) {
+        const employeeName = employee.name;
+        if (!employeesByName.has(employeeName)) {
+          employeesByName.set(employeeName, []);
+        }
+        employeesByName.get(employeeName)!.push({ employeeId, jobType });
+      }
+    });
+
     // Set initial processing status (batched update)
     const initialStatus: Record<
       string,
@@ -278,52 +296,130 @@ const PayrollProcessingPage: React.FC = () => {
     setProcessingStatus(initialStatus);
 
     try {
-      // Calculate payrolls for all selected employees
+      // Calculate payrolls for all grouped employees
       const employeePayrolls: EmployeePayroll[] = [];
       const calculationErrors: Record<string, "error"> = {};
 
       setProcessingProgress({
         current: 30,
         total: 100,
-        stage: `Calculating payrolls for ${selectedCombinations.length} employees...`,
+        stage: `Calculating payrolls for ${employeesByName.size} grouped employees (${selectedCombinations.length} total jobs)...`,
       });
 
-      selectedCombinations.forEach(({ employeeId, jobType }) => {
+      // Process each group of employees with the same name
+      employeesByName.forEach((employeeJobCombos, employeeName) => {
         try {
-          // Get section from job data (O(1) lookup instead of O(n) find)
-          const job = jobsMap.get(jobType);
-          const section = job?.section?.[0] || "Unknown";
+          // Use the first employee's data as the primary record
+          const primaryEmployee = employeeJobCombos[0];
+          const primaryEmployeeData = staffsMap.get(primaryEmployee.employeeId);
 
-          // Calculate employee payroll
-          const employeePayroll =
-            PayrollCalculationService.processEmployeePayrollWithDeductions(
-              logs,
-              employeeId,
-              jobType,
-              section,
-              payroll.month,
-              payroll.year,
-              staffs, // Pass staffs for age/nationality lookup
-              epfRates,
-              socsoRates,
-              sipRates,
-              incomeTaxRates
+          if (!primaryEmployeeData) {
+            console.error(
+              `Primary employee data not found for ${primaryEmployee.employeeId}`
             );
+            return;
+          }
 
-          employeePayrolls.push(employeePayroll);
+          // Combine all work logs from all employee IDs with the same name
+          const allPayrollItemArrays: any[][] = [];
+          let combinedSection = "";
+
+          employeeJobCombos.forEach(({ employeeId, jobType }) => {
+            // Get section from job data (O(1) lookup instead of O(n) find)
+            const job = jobsMap.get(jobType);
+            const section = job?.section?.[0] || "Unknown";
+            if (!combinedSection) combinedSection = section;
+
+            // Calculate individual employee payroll for this job
+            const individualPayroll =
+              PayrollCalculationService.processEmployeePayroll(
+                logs,
+                employeeId,
+                jobType,
+                section,
+                payroll.month,
+                payroll.year
+              );
+
+            // Add this job's payroll items to the array for merging
+            allPayrollItemArrays.push(individualPayroll.items);
+          });
+
+          // Merge all payroll items, combining duplicates
+          const combinedPayrollItems =
+            PayrollCalculationService.mergePayrollItems(allPayrollItemArrays);
+
+          // Now calculate combined payroll with deductions using the primary employee's data
+          // but with the combined gross pay from all jobs
+          const combinedGrossPay = combinedPayrollItems.reduce(
+            (sum, item) => sum + item.amount,
+            0
+          );
+
+          // Calculate deductions for the combined gross pay
+          const deductions = PayrollCalculationService.calculateContributions(
+            combinedPayrollItems,
+            primaryEmployee.employeeId,
+            staffs,
+            epfRates,
+            socsoRates,
+            sipRates,
+            incomeTaxRates
+          );
+
+          // Calculate total employee deductions
+          const totalEmployeeDeductions = deductions.reduce(
+            (sum, deduction) => sum + deduction.employee_amount,
+            0
+          );
+
+          // Create the grouped payroll record
+          const groupedPayroll: EmployeePayroll & { deductions: any[] } = {
+            employee_id: primaryEmployee.employeeId, // Use primary employee ID
+            employee_name: employeeName, // Use the grouped name
+            job_type: employeeJobCombos
+              .map((combo) => combo.jobType)
+              .join(", "), // Show all job types
+            section: combinedSection,
+            gross_pay: Number(combinedGrossPay.toFixed(2)),
+            net_pay: Number(
+              (combinedGrossPay - totalEmployeeDeductions).toFixed(2)
+            ),
+            items: combinedPayrollItems,
+            deductions,
+          };
+
+          employeePayrolls.push(groupedPayroll);
         } catch (error) {
           console.error(
-            `Error calculating payroll for employee ${employeeId}:`,
+            `Error calculating grouped payroll for ${employeeName}:`,
             error
           );
-          const key = `${employeeId}-${jobType}`;
-          calculationErrors[key] = "error";
+          // Mark all jobs for this employee group as error
+          employeeJobCombos.forEach(({ employeeId, jobType }) => {
+            const key = `${employeeId}-${jobType}`;
+            calculationErrors[key] = "error";
+          });
         }
       });
 
       // Batch update calculation errors
       if (Object.keys(calculationErrors).length > 0) {
         setProcessingStatus((prev) => ({ ...prev, ...calculationErrors }));
+      }
+
+      // First, clear any existing payroll records for this monthly payroll to avoid duplicates
+      setProcessingProgress({
+        current: 60,
+        total: 100,
+        stage: "Clearing existing payroll records...",
+      });
+
+      try {
+        await api.delete(`/api/employee-payrolls/monthly/${payroll.id}`);
+      } catch (error) {
+        console.warn("Could not clear existing payroll records (might be first time processing):", error);
+        // Continue processing even if clear fails - might be first time processing
       }
 
       // Process payrolls in chunks to avoid large database operations
