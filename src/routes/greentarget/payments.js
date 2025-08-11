@@ -369,13 +369,13 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // Get payment details before cancelling
+      // Get payment details and related invoice status, and lock rows for update
       const paymentQuery = `
-        SELECT p.*, i.customer_id, i.balance_due 
-        FROM greentarget.payments p 
+        SELECT p.*, i.customer_id, i.balance_due, i.status as invoice_status
+        FROM greentarget.payments p
         JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
-          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
-        FOR UPDATE OF i
+        WHERE p.payment_id = $1 AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
+        FOR UPDATE OF p, i
       `;
       const paymentResult = await client.query(paymentQuery, [payment_id]);
 
@@ -390,8 +390,8 @@ export default function (pool) {
 
       // Set payment status to cancelled
       const updatePaymentQuery = `
-        UPDATE greentarget.payments 
-        SET status = 'cancelled', 
+        UPDATE greentarget.payments
+        SET status = 'cancelled',
             cancellation_date = CURRENT_TIMESTAMP,
             cancellation_reason = $1
         WHERE payment_id = $2
@@ -402,27 +402,20 @@ export default function (pool) {
         payment_id,
       ]);
 
-      // Get the current invoice balance
-      const invoiceQuery =
-        "SELECT balance_due FROM greentarget.invoices WHERE invoice_id = $1";
-      const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
-
-      if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${invoice_id} not found`);
-      }
-
-      // Get both the balance and status
-      const currentBalance = parseFloat(invoiceResult.rows[0].balance_due);
-      const currentStatus = invoiceResult.rows[0].status;
-      const newBalance = currentBalance + parseFloat(amount_paid);
+      // Use details fetched from the first query to update the invoice
+      const currentBalance = parseFloat(payment.balance_due);
+      const currentInvoiceStatus = payment.invoice_status;
+      const paymentAmount = parseFloat(amount_paid);
+      const newBalance = currentBalance + paymentAmount;
 
       // Determine the new status based on balance and current status
       let newStatus;
-      if (newBalance === 0) {
-        newStatus = "paid";
+      if (newBalance > 0) {
+        // If it was already overdue, keep it that way. Otherwise, 'active'.
+        newStatus = currentInvoiceStatus === "overdue" ? "overdue" : "active";
       } else {
-        // Maintain overdue status if already overdue
-        newStatus = currentStatus === "overdue" ? "overdue" : "active";
+        // If balance is 0 or less, it's paid.
+        newStatus = "paid";
       }
 
       // Update both balance and status
