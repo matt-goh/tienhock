@@ -627,6 +627,9 @@ export default function (pool) {
 
       const payrollData = payrollResult.rows[0];
 
+      // Check if this is a grouped payroll (job_type contains comma)
+      const isGroupedPayroll = payrollData.job_type && payrollData.job_type.includes(", ");
+
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
         // Get payroll items
@@ -676,19 +679,34 @@ export default function (pool) {
         `, [payrollData.employee_id, payrollData.year, payrollData.month]),
 
         // Get commission records for the specific month/year
-        pool.query(`
-          SELECT cr.*, s.name as employee_name
-          FROM commission_records cr
-          JOIN staffs s ON cr.employee_id = s.id
-          WHERE cr.employee_id = $1
-            AND DATE(cr.commission_date) >= $2
-            AND DATE(cr.commission_date) <= $3
-          ORDER BY cr.commission_date DESC
-        `, [
-          payrollData.employee_id,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
-        ])
+        // For grouped payrolls, get commissions for all employees with same name
+        isGroupedPayroll 
+          ? pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
+          : pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE cr.employee_id = $1
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
       ]);
 
       // Format comprehensive response
@@ -756,6 +774,9 @@ export default function (pool) {
 
       const payrollData = payrollResult.rows[0];
 
+      // Check if this is a grouped payroll (job_type contains comma)
+      const isGroupedPayroll = payrollData.job_type && payrollData.job_type.includes(", ");
+
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
         // Get payroll items
@@ -805,19 +826,34 @@ export default function (pool) {
         `, [payrollData.employee_id, payrollData.year, payrollData.month]),
 
         // Get commission records for the specific month/year
-        pool.query(`
-          SELECT cr.*, s.name as employee_name
-          FROM commission_records cr
-          JOIN staffs s ON cr.employee_id = s.id
-          WHERE cr.employee_id = $1
-            AND DATE(cr.commission_date) >= $2
-            AND DATE(cr.commission_date) <= $3
-          ORDER BY cr.commission_date DESC
-        `, [
-          payrollData.employee_id,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
-        ])
+        // For grouped payrolls, get commissions for all employees with same name
+        isGroupedPayroll 
+          ? pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
+          : pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE cr.employee_id = $1
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
       ]);
 
       // Format comprehensive response

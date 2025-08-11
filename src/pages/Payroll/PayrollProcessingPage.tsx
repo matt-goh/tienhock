@@ -374,7 +374,10 @@ const PayrollProcessingPage: React.FC = () => {
           );
 
           // Create the grouped payroll record
-          const groupedPayroll: EmployeePayroll & { deductions: any[] } = {
+          const groupedPayroll: EmployeePayroll & { 
+            deductions: any[];
+            grouped_employee_ids?: string[];
+          } = {
             employee_id: primaryEmployee.employeeId, // Use primary employee ID
             employee_name: employeeName, // Use the grouped name
             job_type: employeeJobCombos
@@ -387,6 +390,8 @@ const PayrollProcessingPage: React.FC = () => {
             ),
             items: combinedPayrollItems,
             deductions,
+            // Store all employee IDs in this group for commission retrieval
+            grouped_employee_ids: employeeJobCombos.map(combo => combo.employeeId),
           };
 
           employeePayrolls.push(groupedPayroll);
