@@ -133,9 +133,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderLight,
     minHeight: 18,
   },
-  tableRowAlt: {
-    backgroundColor: "#f8fafc",
-  },
 
   // Table Column Widths - Bank layout
   colNo: {
@@ -173,7 +170,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderDark,
     borderRadius: 6,
-    backgroundColor: "#fafbfc",
   },
   footerTitle: {
     fontSize: 13,
@@ -196,7 +192,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     padding: 8,
-    backgroundColor: "white",
     borderRadius: 4,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -228,7 +223,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
     paddingVertical: 10,
-    backgroundColor: colors.primary,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: colors.borderDark,
@@ -236,13 +230,13 @@ const styles = StyleSheet.create({
   grandTotalLabel: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    color: "white",
+    color: colors.textPrimary,
     letterSpacing: 1,
   },
   grandTotalAmount: {
     fontSize: 15,
     fontFamily: "Helvetica-Bold",
-    color: "white",
+    color: colors.primary,
   },
 
   // Group Section Styles
@@ -251,19 +245,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
     borderRadius: 6,
-    backgroundColor: "white",
   },
   groupHeader: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.borderLight,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   groupTitle: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    color: "white",
+    color: colors.textPrimary,
     textAlign: "center",
     letterSpacing: 0.5,
   },
@@ -272,7 +267,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "#f8fafc",
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
   },
@@ -312,9 +306,9 @@ const getMonthName = (month: number): string => {
 
 const groupByPaymentPreference = (data: BankReportData[]) => {
   return {
-    Bank: data.filter(item => item.payment_preference === 'Bank'),
-    Cash: data.filter(item => item.payment_preference === 'Cash'),
-    Cheque: data.filter(item => item.payment_preference === 'Cheque'),
+    Bank: data.filter((item) => item.payment_preference === "Bank"),
+    Cash: data.filter((item) => item.payment_preference === "Cash"),
+    Cheque: data.filter((item) => item.payment_preference === "Cheque"),
   };
 };
 
@@ -347,10 +341,7 @@ const BankRow: React.FC<{
   employee: BankReportData;
   isAlternate: boolean;
 }> = ({ employee, isAlternate }) => (
-  <View
-    style={[styles.tableRow, isAlternate ? styles.tableRowAlt : {}]}
-    wrap={false}
-  >
+  <View style={styles.tableRow} wrap={false}>
     <Text style={styles.colNo}>{employee.no}</Text>
     <Text style={styles.colStaffName}>{employee.staff_name}</Text>
     <Text style={styles.colIcNo}>{employee.icNo}</Text>
@@ -367,16 +358,16 @@ const PaymentGroup: React.FC<{
   total: number;
 }> = ({ title, data, total }) => {
   if (data.length === 0) return null;
-  
+
   return (
     <View style={styles.groupSection} wrap={false}>
       <View style={styles.groupHeader}>
         <Text style={styles.groupTitle}>{title} Payment</Text>
       </View>
-      
+
       <View style={styles.groupSummary}>
         <Text style={styles.groupSummaryText}>
-          {data.length} employee{data.length !== 1 ? 's' : ''}
+          {data.length} employee{data.length !== 1 ? "s" : ""}
         </Text>
         <Text style={styles.groupSummaryText}>
           Total: RM {formatCurrency(total)}
@@ -395,8 +386,8 @@ const PaymentGroup: React.FC<{
         {data.map((employee, index) => (
           <BankRow
             key={index}
-            employee={{...employee, no: index + 1}}
-            isAlternate={index % 2 === 1}
+            employee={{ ...employee, no: index + 1 }}
+            isAlternate={false}
           />
         ))}
       </View>
@@ -409,7 +400,7 @@ const BankReportPDF: React.FC<{
   companyName?: string;
 }> = ({ data, companyName = TIENHOCK_INFO.name }) => {
   const reportTitle = `${getMonthName(data.month)} ${data.year} Bank Report`;
-  
+
   const groupedData = groupByPaymentPreference(data.data);
   const bankTotal = calculateGroupTotal(groupedData.Bank);
   const cashTotal = calculateGroupTotal(groupedData.Cash);
@@ -430,14 +421,20 @@ const BankReportPDF: React.FC<{
         {/* Payment Groups */}
         <PaymentGroup title="Bank" data={groupedData.Bank} total={bankTotal} />
         <PaymentGroup title="Cash" data={groupedData.Cash} total={cashTotal} />
-        <PaymentGroup title="Cheque" data={groupedData.Cheque} total={chequeTotal} />
+        <PaymentGroup
+          title="Cheque"
+          data={groupedData.Cheque}
+          total={chequeTotal}
+        />
 
         {/* Separator */}
-        <View style={{
-          height: 1,
-          backgroundColor: colors.borderDark,
-          marginVertical: 15,
-        }} />
+        <View
+          style={{
+            height: 1,
+            backgroundColor: colors.borderDark,
+            marginVertical: 15,
+          }}
+        />
 
         {/* Enhanced Footer Summary */}
         <View style={styles.footerSection}>
@@ -448,7 +445,8 @@ const BankReportPDF: React.FC<{
             <View style={styles.footerColumn}>
               <Text style={styles.footerMainLabel}>Bank Payments</Text>
               <Text style={styles.footerMainValue}>
-                {groupedData.Bank.length} employee{groupedData.Bank.length !== 1 ? 's' : ''}
+                {groupedData.Bank.length} employee
+                {groupedData.Bank.length !== 1 ? "s" : ""}
               </Text>
               <Text style={styles.footerMainAmount}>
                 RM {formatCurrency(bankTotal)}
@@ -457,7 +455,8 @@ const BankReportPDF: React.FC<{
             <View style={styles.footerColumn}>
               <Text style={styles.footerMainLabel}>Cash Payments</Text>
               <Text style={styles.footerMainValue}>
-                {groupedData.Cash.length} employee{groupedData.Cash.length !== 1 ? 's' : ''}
+                {groupedData.Cash.length} employee
+                {groupedData.Cash.length !== 1 ? "s" : ""}
               </Text>
               <Text style={styles.footerMainAmount}>
                 RM {formatCurrency(cashTotal)}
@@ -466,7 +465,8 @@ const BankReportPDF: React.FC<{
             <View style={styles.footerColumn}>
               <Text style={styles.footerMainLabel}>Cheque Payments</Text>
               <Text style={styles.footerMainValue}>
-                {groupedData.Cheque.length} employee{groupedData.Cheque.length !== 1 ? 's' : ''}
+                {groupedData.Cheque.length} employee
+                {groupedData.Cheque.length !== 1 ? "s" : ""}
               </Text>
               <Text style={styles.footerMainAmount}>
                 RM {formatCurrency(chequeTotal)}
@@ -504,9 +504,7 @@ export const generateBankReportPDF = async (
     const doc = <BankReportPDF data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
 
-    const fileName = `Bank_Report_${getMonthName(data.month)}_${
-      data.year
-    }.pdf`;
+    const fileName = `Bank_Report_${getMonthName(data.month)}_${data.year}.pdf`;
 
     if (action === "download") {
       const url = URL.createObjectURL(pdfBlob);
