@@ -91,8 +91,11 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
-  const [showConfirmPaymentDialog, setShowConfirmPaymentDialog] = useState(false);
-  const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(null);
+  const [showConfirmPaymentDialog, setShowConfirmPaymentDialog] =
+    useState(false);
+  const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(
+    null
+  );
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [isCancelInvoiceDialogOpen, setIsCancelInvoiceDialogOpen] =
     useState(false);
@@ -1856,7 +1859,9 @@ const InvoiceDetailsPage: React.FC = () => {
           paymentToConfirm?.payment_method === "cheque" ? "cheque" : ""
         } payment of ${
           paymentToConfirm
-            ? formatCurrency(parseFloat(paymentToConfirm.amount_paid.toString()))
+            ? formatCurrency(
+                parseFloat(paymentToConfirm.amount_paid.toString())
+              )
             : ""
         }? This will update the invoice balance and mark the payment as active.`}
         confirmButtonText={
@@ -1876,9 +1881,7 @@ const InvoiceDetailsPage: React.FC = () => {
             ? " Note: You must delete all payments first."
             : ""
         }`}
-        confirmButtonText={
-          isDeletingInvoice ? "Deleting..." : "Delete Invoice"
-        }
+        confirmButtonText={isDeletingInvoice ? "Deleting..." : "Delete Invoice"}
         variant="danger"
       />
       {/* e-Invoice Confirmation Dialog */}
