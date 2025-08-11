@@ -1,4 +1,4 @@
-// Create this file: src/utils/greenTarget/api.ts
+// src/utils/greenTarget/api.ts
 import { api } from "../utils/api";
 import {
   getCachedData,
@@ -108,8 +108,12 @@ export const greenTargetApi = {
   cancelInvoice: (id: number, reason?: string) =>
     api.put(`/greentarget/api/invoices/${id}/cancel`, { reason }),
   deleteInvoice: (id: number) => api.delete(`/greentarget/api/invoices/${id}`),
-  checkInvoiceNumber: (invoiceNumber: string, excludeId?: number) => 
-    api.get(`/greentarget/api/invoices/check-number/${encodeURIComponent(invoiceNumber)}${excludeId ? `?exclude_id=${excludeId}` : ''}`),
+  checkInvoiceNumber: (invoiceNumber: string, excludeId?: number) =>
+    api.get(
+      `/greentarget/api/invoices/check-number/${encodeURIComponent(
+        invoiceNumber
+      )}${excludeId ? `?exclude_id=${excludeId}` : ""}`
+    ),
 
   // e-Invoice endpoints
   submitEInvoice: async (invoiceId: number) => {
@@ -160,6 +164,12 @@ export const greenTargetApi = {
       `/greentarget/api/invoices/${invoiceId}/payments${
         includeCancelled ? "?include_cancelled=true" : ""
       }`
+    ),
+  checkInternalPaymentRef: (ref: string, excludePaymentId: number) =>
+    api.get(
+      `/greentarget/api/payments/check-internal-ref/${encodeURIComponent(
+        ref
+      )}?exclude_payment_id=${excludePaymentId}`
     ),
   cancelPayment: (paymentId: number, reason?: string) =>
     api.put(`/greentarget/api/payments/${paymentId}/cancel`, { reason }),

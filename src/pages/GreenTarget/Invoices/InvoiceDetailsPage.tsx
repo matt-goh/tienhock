@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx
-import React, { useState, useEffect, Fragment } from "react"; // Added Fragment
+import React, { useState, useEffect, Fragment, useCallback } from "react"; // Added Fragment, useCallback
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   IconFileInvoice,
@@ -16,6 +16,9 @@ import {
   IconFileDownload,
   IconFiles,
   IconCircleCheck,
+  IconPencil,
+  IconX,
+  IconDeviceFloppy,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -117,6 +120,16 @@ const InvoiceDetailsPage: React.FC = () => {
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [consolidatedInfo, setConsolidatedInfo] = useState<any>(null);
 
+  // --- NEW State for inline editing ---
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [editedRefValue, setEditedRefValue] = useState("");
+  const [refValidation, setRefValidation] = useState({
+    isValidating: false,
+    isDuplicate: false,
+    message: "",
+  });
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchInvoiceDetails(parseInt(id));
@@ -149,6 +162,103 @@ const InvoiceDetailsPage: React.FC = () => {
 
     generateQR();
   }, [invoice]);
+
+  // Debounced validation for internal reference
+  const validateInternalRef = useCallback(
+    async (ref: string, paymentId: number) => {
+      if (!ref) {
+        setRefValidation({
+          isValidating: false,
+          isDuplicate: false,
+          message: "",
+        });
+        return;
+      }
+      setRefValidation((prev) => ({ ...prev, isValidating: true }));
+      try {
+        const result = await greenTargetApi.checkInternalPaymentRef(
+          ref,
+          paymentId
+        );
+        setRefValidation({
+          isValidating: false,
+          isDuplicate: result.exists,
+          message: result.exists ? "This reference is already in use." : "",
+        });
+      } catch (error) {
+        setRefValidation({
+          isValidating: false,
+          isDuplicate: true, // Assume invalid on error
+          message: "Could not validate reference.",
+        });
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (editingPaymentId && editedRefValue) {
+      const handler = setTimeout(() => {
+        const originalPayment = payments.find(
+          (p) => p.payment_id === editingPaymentId
+        );
+        // Only validate if the value has changed
+        if (
+          originalPayment &&
+          originalPayment.internal_reference !== editedRefValue
+        ) {
+          validateInternalRef(editedRefValue, editingPaymentId);
+        } else {
+          // If value is same as original, it's not a duplicate of itself
+          setRefValidation({
+            isValidating: false,
+            isDuplicate: false,
+            message: "",
+          });
+        }
+      }, 500);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    }
+  }, [editedRefValue, editingPaymentId, payments, validateInternalRef]);
+
+  const handleEditInternalRef = (payment: Payment) => {
+    setEditingPaymentId(payment.payment_id);
+    setEditedRefValue(payment.internal_reference || "");
+    setRefValidation({ isValidating: false, isDuplicate: false, message: "" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPaymentId(null);
+    setEditedRefValue("");
+    setRefValidation({ isValidating: false, isDuplicate: false, message: "" });
+  };
+
+  const handleSaveInternalRef = async (paymentId: number) => {
+    if (refValidation.isDuplicate) {
+      toast.error("This reference number is already in use.");
+      return;
+    }
+
+    setIsUpdatingPayment(true);
+    try {
+      await greenTargetApi.updatePayment(paymentId, {
+        internal_reference: editedRefValue,
+      });
+      toast.success("Internal reference updated.");
+      handleCancelEdit(); // Exit edit mode
+      if (id) fetchInvoiceDetails(parseInt(id)); // Refresh data
+    } catch (error: any) {
+      console.error("Failed to update payment:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update reference.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingPayment(false);
+    }
+  };
 
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
@@ -1599,7 +1709,66 @@ const InvoiceDetailsPage: React.FC = () => {
                         {payment.payment_reference || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
-                        {payment.internal_reference || "-"}
+                        {editingPaymentId === payment.payment_id ? (
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="text"
+                                value={editedRefValue}
+                                onChange={(e) =>
+                                  setEditedRefValue(e.target.value)
+                                }
+                                className={clsx(
+                                  "block w-full px-2 py-1 border rounded-md shadow-sm sm:text-sm",
+                                  refValidation.isDuplicate
+                                    ? "border-red-500 bg-red-50"
+                                    : "border-default-300",
+                                  "focus:ring-sky-500 focus:border-sky-500"
+                                )}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() =>
+                                  handleSaveInternalRef(payment.payment_id)
+                                }
+                                disabled={
+                                  isUpdatingPayment ||
+                                  refValidation.isValidating ||
+                                  refValidation.isDuplicate
+                                }
+                                className="p-1 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                                title="Save"
+                              >
+                                <IconDeviceFloppy size={18} />
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="p-1 rounded-md text-red-600 hover:bg-red-100"
+                                title="Cancel"
+                              >
+                                <IconX size={18} />
+                              </button>
+                            </div>
+                            {refValidation.message && (
+                              <p className="text-xs text-red-600 mt-1">
+                                {refValidation.message}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <span>{payment.internal_reference || "-"}</span>
+                            {payment.status !== "cancelled" && (
+                              <button
+                                onClick={() => handleEditInternalRef(payment)}
+                                className="p-1 rounded-md text-default-500 hover:bg-default-100 hover:text-sky-600"
+                                title="Edit Internal Reference"
+                              >
+                                <IconPencil size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         {payment.status === "pending" && (
