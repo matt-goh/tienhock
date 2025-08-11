@@ -108,6 +108,9 @@ export default function (pool) {
 
       const invoice = invoiceResult.rows[0];
 
+      // Determine initial status based on payment method
+      const initialStatus = payment_method === "cheque" ? "pending" : "active";
+
       // Create the payment
       const paymentQuery = `
         INSERT INTO greentarget.payments (
@@ -116,9 +119,10 @@ export default function (pool) {
           amount_paid,
           payment_method,
           payment_reference,
-          internal_reference
+          internal_reference,
+          status
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `;
 
@@ -129,41 +133,46 @@ export default function (pool) {
         payment_method,
         payment_reference || null,
         internal_reference || null,
+        initialStatus,
       ]);
 
-      // Update invoice balance_due
-      const newBalanceDue = Math.max(
-        0,
-        parseFloat(invoice.balance_due) - parseFloat(amount_paid)
-      );
-      const currentStatus = invoice.status;
-
-      if (newBalanceDue === 0) {
-        // If fully paid, always set to paid
-        await client.query(
-          `UPDATE greentarget.invoices SET balance_due = $1, status = 'paid' WHERE invoice_id = $2`,
-          [newBalanceDue, invoice_id]
+      // Only update invoice balance if payment is active (not pending)
+      if (initialStatus === "active") {
+        const newBalanceDue = Math.max(
+          0,
+          parseFloat(invoice.balance_due) - parseFloat(amount_paid)
         );
-      } else {
-        // If partially paid, maintain overdue status if already overdue
-        const newStatus = currentStatus === "overdue" ? "overdue" : "active";
+        const currentStatus = invoice.status;
 
+        if (newBalanceDue === 0) {
+          // If fully paid, always set to paid
+          await client.query(
+            `UPDATE greentarget.invoices SET balance_due = $1, status = 'paid' WHERE invoice_id = $2`,
+            [newBalanceDue, invoice_id]
+          );
+        } else {
+          // If partially paid, maintain overdue status if already overdue
+          const newStatus = currentStatus === "overdue" ? "overdue" : "active";
+
+          await client.query(
+            `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
+            [newBalanceDue, newStatus, invoice_id]
+          );
+        }
+
+        // Update customer last_activity_date only for active payments
         await client.query(
-          `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
-          [newBalanceDue, newStatus, invoice_id]
+          `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
+          [invoice.customer_id]
         );
       }
-
-      // Update customer last_activity_date
-      await client.query(
-        `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
-        [invoice.customer_id]
-      );
 
       await client.query("COMMIT");
 
       res.status(201).json({
-        message: "Payment created successfully",
+        message: initialStatus === "pending" 
+          ? "Payment created successfully (pending confirmation)" 
+          : "Payment created successfully",
         payment: paymentResult.rows[0],
       });
     } catch (error) {
@@ -267,6 +276,84 @@ export default function (pool) {
         message: "Error fetching debtors report",
         error: error.message,
       });
+    }
+  });
+
+  // Confirm pending payment
+  router.put("/:payment_id/confirm", async (req, res) => {
+    const { payment_id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Get the payment details and lock the payment row
+      const paymentQuery = `
+        SELECT p.*, i.customer_id, i.balance_due, i.status as invoice_status
+        FROM greentarget.payments p
+        JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
+        WHERE p.payment_id = $1 AND p.status = 'pending'
+        FOR UPDATE OF p, i
+      `;
+      const paymentResult = await client.query(paymentQuery, [payment_id]);
+
+      if (paymentResult.rows.length === 0) {
+        return res.status(404).json({ 
+          message: "Payment not found or not in pending status" 
+        });
+      }
+
+      const payment = paymentResult.rows[0];
+      const { invoice_id, amount_paid, customer_id } = payment;
+      const currentBalance = parseFloat(payment.balance_due);
+      const paymentAmount = parseFloat(amount_paid);
+
+      // Update payment status to active
+      const updatePaymentQuery = `
+        UPDATE greentarget.payments 
+        SET status = 'active' 
+        WHERE payment_id = $1
+        RETURNING *
+      `;
+      const updatedPayment = await client.query(updatePaymentQuery, [payment_id]);
+
+      // Update invoice balance and status
+      const newBalanceDue = Math.max(0, currentBalance - paymentAmount);
+      const currentInvoiceStatus = payment.invoice_status;
+
+      let newInvoiceStatus;
+      if (newBalanceDue === 0) {
+        newInvoiceStatus = "paid";
+      } else {
+        newInvoiceStatus = currentInvoiceStatus === "overdue" ? "overdue" : "active";
+      }
+
+      await client.query(
+        `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
+        [newBalanceDue, newInvoiceStatus, invoice_id]
+      );
+
+      // Update customer last_activity_date
+      await client.query(
+        `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
+        [customer_id]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Payment confirmed successfully",
+        payment: updatedPayment.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error confirming Green Target payment:", error);
+      res.status(500).json({
+        message: "Error confirming payment",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 

@@ -163,6 +163,8 @@ export const greenTargetApi = {
     ),
   cancelPayment: (paymentId: number, reason?: string) =>
     api.put(`/greentarget/api/payments/${paymentId}/cancel`, { reason }),
+  confirmPayment: (paymentId: number) =>
+    api.put(`/greentarget/api/payments/${paymentId}/confirm`),
   createPayment: (data: any) => api.post("/greentarget/api/payments", data),
   updatePayment: (id: any, data: any) =>
     api.put(`/greentarget/api/payments/${id}`, data),

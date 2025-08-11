@@ -15,6 +15,7 @@ import {
   IconRefresh,
   IconFileDownload,
   IconFiles,
+  IconCircleCheck,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -46,7 +47,7 @@ interface Payment {
   payment_method: string;
   payment_reference?: string;
   internal_reference?: string;
-  status?: "active" | "cancelled";
+  status?: "active" | "cancelled" | "pending";
   cancellation_date?: string;
   cancellation_reason?: string;
 }
@@ -90,6 +91,9 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
+  const [showConfirmPaymentDialog, setShowConfirmPaymentDialog] = useState(false);
+  const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(null);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [isCancelInvoiceDialogOpen, setIsCancelInvoiceDialogOpen] =
     useState(false);
   const [isCancellingInvoice, setIsCancellingInvoice] = useState(false);
@@ -342,6 +346,37 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsCancellingPayment(false);
       setIsCancelPaymentDialogOpen(false);
       setPaymentToCancel(null);
+    }
+  };
+
+  const handleConfirmPaymentClick = (payment: Payment) => {
+    if (payment.status !== "pending") {
+      toast.error("Only pending payments can be confirmed");
+      return;
+    }
+
+    setPaymentToConfirm(payment);
+    setShowConfirmPaymentDialog(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentToConfirm || !invoice) return;
+
+    setIsConfirmingPayment(true);
+    try {
+      await greenTargetApi.confirmPayment(paymentToConfirm.payment_id);
+
+      toast.success("Payment confirmed successfully");
+
+      // Refresh the invoice details to update balances
+      fetchInvoiceDetails(invoice.invoice_id);
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      toast.error("Failed to confirm payment");
+    } finally {
+      setIsConfirmingPayment(false);
+      setShowConfirmPaymentDialog(false);
+      setPaymentToConfirm(null);
     }
   };
 
@@ -1140,7 +1175,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
               {/* Conditional Reference Input */}
               {(paymentFormData.payment_method === "cheque" ||
-                paymentFormData.payment_method === "bank_transfer") && (
+                paymentFormData.payment_method === "bank_transfer" ||
+                paymentFormData.payment_method === "online") && (
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
@@ -1148,6 +1184,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   >
                     {paymentFormData.payment_method === "cheque"
                       ? "Cheque Number"
+                      : paymentFormData.payment_method === "online"
+                      ? "Transaction ID"
                       : "Transaction Reference"}
                   </label>
                   <input
@@ -1503,6 +1541,9 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                       Internal Ref
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Status
+                    </th>
                     {/* Add the new Actions column header */}
                     <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
                       Actions
@@ -1516,6 +1557,8 @@ const InvoiceDetailsPage: React.FC = () => {
                       className={`hover:bg-default-50 transition-colors ${
                         payment.status === "cancelled"
                           ? "bg-default-50 text-default-400"
+                          : payment.status === "pending"
+                          ? "bg-amber-50"
                           : ""
                       }`}
                       title={
@@ -1525,6 +1568,8 @@ const InvoiceDetailsPage: React.FC = () => {
                                 ? formatDate(payment.cancellation_date)
                                 : "unknown date"
                             }`
+                          : payment.status === "pending"
+                          ? "Payment pending confirmation"
                           : "Paid"
                       }
                     >
@@ -1554,36 +1599,73 @@ const InvoiceDetailsPage: React.FC = () => {
                         {payment.internal_reference || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <Button
-                          variant="outline"
-                          color="rose"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCancelPaymentClick(payment);
-                          }}
-                          disabled={payment.status === "cancelled"}
-                          title={
-                            payment.status === "cancelled"
-                              ? `Payment cancelled on ${
-                                  payment.cancellation_date
-                                    ? formatDate(payment.cancellation_date)
-                                    : "unknown date"
-                                }`
-                              : "Cancel Payment"
-                          }
-                          className="px-2"
-                        >
-                          {payment.status === "cancelled" ? (
-                            <span className="italic cursor-not-allowed">
+                        {payment.status === "pending" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            <IconClock size={14} className="mr-1" />
+                            Pending
+                          </span>
+                        )}
+                        {payment.status === "active" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <IconCircleCheck size={14} className="mr-1" />
+                            Active
+                          </span>
+                        )}
+                        {payment.status === "cancelled" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">
+                            <IconCancel size={14} className="mr-1" />
+                            Cancelled
+                          </span>
+                        )}
+                        {!payment.status && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <IconCircleCheck size={14} className="mr-1" />
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex gap-2 justify-center">
+                          {payment.status === "pending" && (
+                            <Button
+                              variant="outline"
+                              color="sky"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleConfirmPaymentClick(payment);
+                              }}
+                              title="Confirm Payment"
+                              className="px-2"
+                            >
+                              <span className="flex items-center gap-1">
+                                <IconCircleCheck size={16} /> Confirm
+                              </span>
+                            </Button>
+                          )}
+                          {payment.status !== "cancelled" && (
+                            <Button
+                              variant="outline"
+                              color="rose"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelPaymentClick(payment);
+                              }}
+                              title="Cancel Payment"
+                              className="px-2"
+                            >
+                              <span className="flex items-center gap-1">
+                                <IconTrash size={16} /> Cancel
+                              </span>
+                            </Button>
+                          )}
+                          {payment.status === "cancelled" && (
+                            <span className="text-xs italic text-default-500">
                               Cancelled
                             </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <IconTrash size={16} /> Cancel
-                            </span>
                           )}
-                        </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1764,6 +1846,23 @@ const InvoiceDetailsPage: React.FC = () => {
           isCancellingInvoice ? "Cancelling..." : "Cancel Invoice"
         }
         variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={showConfirmPaymentDialog}
+        onClose={() => setShowConfirmPaymentDialog(false)}
+        onConfirm={handleConfirmPayment}
+        title="Confirm Payment"
+        message={`Are you sure you want to confirm this ${
+          paymentToConfirm?.payment_method === "cheque" ? "cheque" : ""
+        } payment of ${
+          paymentToConfirm
+            ? formatCurrency(parseFloat(paymentToConfirm.amount_paid.toString()))
+            : ""
+        }? This will update the invoice balance and mark the payment as active.`}
+        confirmButtonText={
+          isConfirmingPayment ? "Confirming..." : "Confirm Payment"
+        }
+        variant="default"
       />
       <ConfirmationDialog
         isOpen={isDeleteInvoiceDialogOpen}
