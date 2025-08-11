@@ -91,7 +91,13 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
         );
         const initialExpanded: Record<string, boolean> = {};
         jobTypes.forEach((jobType) => {
-          initialExpanded[jobType as string] = true;
+          // Create the group key that will be used in groupEmployeesByJobType
+          const groupKey = (jobType as string).includes(", ") 
+            ? `Grouped: ${jobType}`
+            : jobType as string;
+          
+          // Expand all sections by default
+          initialExpanded[groupKey] = true;
         });
         setExpandedJobs(initialExpanded);
       }
@@ -171,10 +177,16 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
 
     employeePayrolls.forEach((employeePayroll) => {
       const { job_type } = employeePayroll;
-      if (!grouped[job_type]) {
-        grouped[job_type] = [];
+
+      // For grouped employees (job_type contains comma), create a special group key
+      const groupKey = job_type.includes(", ")
+        ? `Grouped: ${job_type}`
+        : job_type;
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = [];
       }
-      grouped[job_type].push(employeePayroll);
+      grouped[groupKey].push(employeePayroll);
     });
 
     return grouped;
@@ -288,7 +300,12 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     const jobTypes = new Set(payroll.employeePayrolls.map((ep) => ep.job_type));
     const newExpanded: Record<string, boolean> = {};
     jobTypes.forEach((jobType) => {
-      newExpanded[jobType] = expanded;
+      // Create the group key that matches what's used in groupEmployeesByJobType
+      const groupKey = jobType.includes(", ") 
+        ? `Grouped: ${jobType}`
+        : jobType;
+      
+      newExpanded[groupKey] = expanded;
     });
     setExpandedJobs(newExpanded);
   };
@@ -735,12 +752,20 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                             className="text-default-500 mr-2"
                           />
                         )}
-                        <h3 className="font-medium">{jobType}</h3>
+                        <h3 className="font-medium">
+                          {jobType.startsWith("Grouped: ") 
+                            ? jobType.replace("Grouped: ", "")
+                            : jobType
+                          }
+                        </h3>
                         <span className="ml-2 text-sm text-default-500">
                           ({filteredEmployees.length}{" "}
                           {filteredEmployees.length === 1
                             ? "employee"
                             : "employees"}
+                          {jobType.startsWith("Grouped: ") 
+                            ? " - combined payrolls"
+                            : ""}
                           )
                         </span>
                       </div>
@@ -872,15 +897,45 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-default-900">
                                     {employeePayroll.employee_name || "Unknown"}
+                                    {/* Show grouped indicator if multiple job types */}
+                                    {employeePayroll.job_type &&
+                                      employeePayroll.job_type.includes(
+                                        ", "
+                                      ) && (
+                                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                                          Grouped
+                                        </span>
+                                      )}
                                   </div>
                                   <div className="text-xs text-default-500">
                                     {employeePayroll.employee_id}
+                                    {/* Show all job types if grouped */}
+                                    {employeePayroll.job_type &&
+                                      employeePayroll.job_type.includes(
+                                        ", "
+                                      ) && (
+                                        <div className="text-xs text-sky-600 mt-0.5">
+                                          Jobs: {employeePayroll.job_type}
+                                        </div>
+                                      )}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-default-600">
                                     {employeePayroll.section}
                                   </div>
+                                  {/* Show combined gross pay info for grouped employees */}
+                                  {employeePayroll.job_type &&
+                                    employeePayroll.job_type.includes(", ") && (
+                                      <div className="text-xs text-emerald-600 mt-1">
+                                        Combined from{" "}
+                                        {
+                                          employeePayroll.job_type.split(", ")
+                                            .length
+                                        }{" "}
+                                        jobs
+                                      </div>
+                                    )}
                                   {payroll.status === "Finalized" && (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 mt-1">
                                       <IconLock size={12} className="mr-1" />
@@ -895,6 +950,15 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                         employeePayroll.gross_pay.toString()
                                       )
                                     )}
+                                    {/* Show combined indicator for grouped employees */}
+                                    {employeePayroll.job_type &&
+                                      employeePayroll.job_type.includes(
+                                        ", "
+                                      ) && (
+                                        <div className="text-xs text-emerald-600 mt-0.5">
+                                          ∑ Combined
+                                        </div>
+                                      )}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -904,6 +968,15 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                         employeePayroll.net_pay.toString()
                                       )
                                     )}
+                                    {/* Show single deduction indicator for grouped employees */}
+                                    {employeePayroll.job_type &&
+                                      employeePayroll.job_type.includes(
+                                        ", "
+                                      ) && (
+                                        <div className="text-xs text-emerald-600 mt-0.5">
+                                          Single deduction
+                                        </div>
+                                      )}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right">

@@ -1348,5 +1348,71 @@ export default function (pool) {
     }
   });
 
+  // Clear all employee payrolls for a specific monthly payroll (used when reprocessing with grouped payrolls)
+  router.delete("/monthly/:monthlyPayrollId", async (req, res) => {
+    const { monthlyPayrollId } = req.params;
+
+    const client = await pool.connect();
+    
+    try {
+      await client.query("BEGIN");
+
+      // Get all employee payroll IDs for this monthly payroll
+      const employeePayrollsResult = await client.query(
+        "SELECT id FROM employee_payrolls WHERE monthly_payroll_id = $1",
+        [monthlyPayrollId]
+      );
+
+      const employeePayrollIds = employeePayrollsResult.rows.map(row => row.id);
+
+      if (employeePayrollIds.length > 0) {
+        // Delete related data in correct order (foreign key dependencies)
+        
+        // Delete payroll deductions
+        await client.query(
+          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+          [employeePayrollIds]
+        );
+
+        // Delete payroll items
+        await client.query(
+          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
+          [employeePayrollIds]
+        );
+
+        // Delete employee payrolls
+        const deleteResult = await client.query(
+          "DELETE FROM employee_payrolls WHERE monthly_payroll_id = $1",
+          [monthlyPayrollId]
+        );
+
+        await client.query("COMMIT");
+
+        res.json({
+          message: "Employee payrolls cleared successfully",
+          deleted_count: deleteResult.rowCount,
+          cleared_employee_payrolls: employeePayrollIds.length
+        });
+      } else {
+        await client.query("COMMIT");
+        res.json({
+          message: "No employee payrolls found for this monthly payroll",
+          deleted_count: 0,
+          cleared_employee_payrolls: 0
+        });
+      }
+
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error clearing employee payrolls:", error);
+      res.status(500).json({
+        message: "Error clearing employee payrolls",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   return router;
 }
