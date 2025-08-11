@@ -399,7 +399,7 @@ const BankReportPDF: React.FC<{
   data: BankReportPDFData;
   companyName?: string;
 }> = ({ data, companyName = TIENHOCK_INFO.name }) => {
-  const reportTitle = `${getMonthName(data.month)} ${data.year} Bank Report`;
+  const reportTitle = `${getMonthName(data.month)} ${data.year} Gaji Report`;
 
   const groupedData = groupByPaymentPreference(data.data);
   const bankTotal = calculateGroupTotal(groupedData.Bank);
