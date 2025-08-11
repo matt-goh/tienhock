@@ -539,7 +539,7 @@ const PayCodePage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="relative w-full px-4 md:mx-6 -mt-8">
+    <div className="relative w-full px-4 md:mx-6">
       {/* Header */}
       <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800">Pay Code</h1>

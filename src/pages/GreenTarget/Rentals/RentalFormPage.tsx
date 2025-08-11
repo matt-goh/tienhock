@@ -712,7 +712,7 @@ const RentalFormPage: React.FC = () => {
   ].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div className="container mx-auto px-4 -mt-8 pb-10">
+    <div className="container mx-auto px-4 pb-4">
       <BackButton onClick={handleBackClick} className="mb-2" />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">

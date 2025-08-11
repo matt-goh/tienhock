@@ -277,7 +277,7 @@ const CustomerPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-20 -mt-8 mb-6">
+    <div className="relative w-full mx-20 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-6">
           <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">

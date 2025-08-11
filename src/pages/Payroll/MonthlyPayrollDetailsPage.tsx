@@ -407,7 +407,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const totals = calculateTotals(payroll.employeePayrolls || []);
 
   return (
-    <div className="relative w-full mx-4 md:mx-6 -mt-6">
+    <div className="relative w-full mx-4 md:mx-6">
       <BackButton onClick={handleBack} />
 
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">

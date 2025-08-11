@@ -371,7 +371,7 @@ const StaffPage = () => {
 
   return (
     <div className="w-full max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
           <IconBriefcase size={28} stroke={2.5} className="text-default-700" />
           Staff Directory ({filteredEmployees.length})
@@ -457,7 +457,7 @@ const StaffPage = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
             {paginatedEmployees.map((employee) => (
               <EmployeeCard
                 key={employee.id}

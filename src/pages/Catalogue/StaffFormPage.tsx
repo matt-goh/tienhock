@@ -623,7 +623,7 @@ const StaffFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-10 -mt-8">
+    <div className="container mx-auto px-4 pb-10">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
