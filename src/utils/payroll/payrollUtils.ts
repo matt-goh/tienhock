@@ -287,6 +287,7 @@ export const saveEmployeePayrollsBatch = async (
         status: payroll.status || "Processing",
         items: payroll.items,
         deductions: payroll.deductions,
+        grouped_employee_ids: (payroll as any).grouped_employee_ids || null,
       }))
     });
     return response;
