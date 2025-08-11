@@ -138,6 +138,11 @@ export const greenTargetApi = {
       invoice_id?: string | number;
       includeCancelled?: boolean;
       customer_id?: string | number;
+      startDate?: string;
+      endDate?: string;
+      paymentMethod?: string;
+      status?: string;
+      search?: string;
     } = {}
   ) => {
     const queryParams = new URLSearchParams();
@@ -152,6 +157,26 @@ export const greenTargetApi = {
 
     if (options.customer_id) {
       queryParams.append("customer_id", options.customer_id.toString());
+    }
+
+    if (options.startDate) {
+      queryParams.append("startDate", options.startDate);
+    }
+
+    if (options.endDate) {
+      queryParams.append("endDate", options.endDate);
+    }
+
+    if (options.paymentMethod) {
+      queryParams.append("paymentMethod", options.paymentMethod);
+    }
+
+    if (options.status) {
+      queryParams.append("status", options.status);
+    }
+
+    if (options.search) {
+      queryParams.append("search", options.search);
     }
 
     const queryString = queryParams.toString();
