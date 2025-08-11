@@ -113,6 +113,7 @@ const HomePage: React.FC = () => {
       Dashboard: "Overview and analytics",
       Rentals: "Manage dumpster rentals",
       Invoices: "Billing and invoicing",
+      Payments: "Track payments and transactions",
       Debtors: "Track outstanding payments",
       Customers: "Customer management",
       Dumpsters: "Dumpster management",
@@ -135,7 +136,7 @@ const HomePage: React.FC = () => {
       Accounting: "Financial reports and debtors management",
       Sales: "Sales and invoice management",
       Invoice: "Create and manage invoices",
-      "Sales Summary": "Sales analytics and reporting", 
+      "Sales Summary": "Sales analytics and reporting",
       Payments: "Track and manage payments",
       Debtors: "Monitor outstanding receivables",
     };
@@ -149,7 +150,12 @@ const HomePage: React.FC = () => {
     JellyPollySidebarData.forEach((category) => {
       if (category.subItems) {
         category.subItems.forEach((subItem) => {
-          if (subItem.path && !subItem.path.includes(":") && !subItem.name.includes("New") && !subItem.name.includes("Details")) {
+          if (
+            subItem.path &&
+            !subItem.path.includes(":") &&
+            !subItem.name.includes("New") &&
+            !subItem.name.includes("Details")
+          ) {
             items.push({
               name: subItem.name,
               path: `/jellypolly${subItem.path}`,

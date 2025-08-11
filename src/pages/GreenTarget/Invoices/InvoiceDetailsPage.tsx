@@ -1780,7 +1780,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         {payment.status === "active" && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <IconCircleCheck size={14} className="mr-1" />
-                            Active
+                            Settled
                           </span>
                         )}
                         {payment.status === "cancelled" && (
@@ -1792,7 +1792,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         {!payment.status && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <IconCircleCheck size={14} className="mr-1" />
-                            Active
+                            No Status
                           </span>
                         )}
                       </td>

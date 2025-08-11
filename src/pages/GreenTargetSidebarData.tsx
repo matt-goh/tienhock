@@ -5,6 +5,7 @@ import {
   IconTrash,
   IconTruck,
   IconUsers,
+  IconCash,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -20,6 +21,7 @@ import GreenTargetInvoiceFormPage from "./GreenTarget/Invoices/InvoiceFormPage";
 import GreenTargetInvoiceDetailsPage from "./GreenTarget/Invoices/InvoiceDetailsPage";
 import GreenTargetDebtorsReportPage from "./GreenTarget/DebtorsReportPage";
 import GreenTargetDashboardPage from "./GreenTarget/GreenTargetDashboardPage";
+import GreenTargetPaymentPage from "./GreenTarget/Payments/GreenTargetPaymentPage";
 
 export const GreenTargetSidebarData: SidebarItem[] = [
   {
@@ -75,6 +77,12 @@ export const GreenTargetSidebarData: SidebarItem[] = [
         component: GreenTargetInvoiceDetailsPage,
       },
     ],
+  },
+  {
+    name: "Payments",
+    icon: IconCash,
+    path: "/payments",
+    component: GreenTargetPaymentPage,
   },
   {
     name: "Debtors",
