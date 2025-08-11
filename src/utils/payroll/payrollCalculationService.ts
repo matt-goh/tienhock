@@ -460,6 +460,36 @@ export class PayrollCalculationService {
   }
 
   /**
+   * Merges multiple payroll item arrays and removes duplicates by pay_code_id
+   * @param itemArrays Array of payroll item arrays to merge
+   * @returns Merged array with combined quantities and amounts for duplicate pay codes
+   */
+  static mergePayrollItems(itemArrays: PayrollItem[][]): PayrollItem[] {
+    const mergedItems: Record<string, PayrollItem> = {};
+
+    itemArrays.forEach(items => {
+      items.forEach(item => {
+        const key = item.pay_code_id;
+        
+        if (!mergedItems[key]) {
+          // First occurrence of this pay code
+          mergedItems[key] = { ...item };
+        } else {
+          // Merge with existing item
+          mergedItems[key].quantity += item.quantity;
+          mergedItems[key].amount += item.amount;
+        }
+      });
+    });
+
+    // Convert back to array and ensure proper rounding
+    return Object.values(mergedItems).map(item => ({
+      ...item,
+      amount: Number(item.amount.toFixed(2))
+    }));
+  }
+
+  /**
    * Enhanced employee payroll processing that includes deductions
    * @param workLogs Array of work logs for the month
    * @param employee_id Employee ID

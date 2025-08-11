@@ -79,6 +79,7 @@ const SalaryReportPage: React.FC = () => {
         icNo: staff?.icNo || "N/A",
         bankAccountNumber: staff?.bankAccountNumber || "N/A",
         total: salaryItem.final_total,
+        payment_preference: salaryItem.payment_preference,
       };
     });
   }, [reportData, staffs]);
