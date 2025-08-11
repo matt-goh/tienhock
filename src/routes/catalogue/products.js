@@ -40,7 +40,25 @@ export default function (pool) {
             ? Number(product.price_per_unit)
             : null,
       }));
-      res.status(200).json(productsWithNumberValues);
+
+      // Custom sort order: "1-", "2-", "WE-", "S-", "MEQ-"
+      const prefixOrder = ["1-", "2-", "WE-", "S-", "MEQ-"];
+      const sortedProducts = productsWithNumberValues.sort((a, b) => {
+        const aPrefix = prefixOrder.find((prefix) => a.id.startsWith(prefix));
+        const bPrefix = prefixOrder.find((prefix) => b.id.startsWith(prefix));
+
+        const aIndex = aPrefix ? prefixOrder.indexOf(aPrefix) : 999;
+        const bIndex = bPrefix ? prefixOrder.indexOf(bPrefix) : 999;
+
+        if (aIndex !== bIndex) {
+          return aIndex - bIndex;
+        }
+
+        // If same prefix or both don't match any prefix, sort alphabetically
+        return a.id.localeCompare(b.id);
+      });
+
+      res.status(200).json(sortedProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
       res
