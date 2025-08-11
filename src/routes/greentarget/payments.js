@@ -280,6 +280,117 @@ export default function (pool) {
     }
   });
 
+  // Check if internal reference is available
+  router.get("/check-internal-ref/:ref(*)", async (req, res) => {
+    const internal_reference = decodeURIComponent(req.params.ref);
+    const { exclude_payment_id } = req.query;
+
+    try {
+      let query = `
+        SELECT payment_id 
+        FROM greentarget.payments 
+        WHERE internal_reference = $1 
+        AND (status IS NULL OR status != 'cancelled')
+      `;
+      const params = [internal_reference];
+
+      if (exclude_payment_id) {
+        query += " AND payment_id != $2";
+        params.push(parseInt(exclude_payment_id, 10));
+      }
+
+      const result = await pool.query(query, params);
+
+      res.json({
+        available: result.rows.length === 0,
+        exists: result.rows.length > 0,
+        existing_id: result.rows.length > 0 ? result.rows[0].payment_id : null,
+      });
+    } catch (error) {
+      console.error("Error checking internal reference:", error);
+      res.status(500).json({
+        message: "Error checking internal reference",
+        error: error.message,
+      });
+    }
+  });
+
+  // Update a payment (currently for reference fields only to avoid balance complexity)
+  router.put("/:payment_id", async (req, res) => {
+    const { payment_id } = req.params;
+    const { internal_reference, payment_reference } = req.body;
+
+    // Check if there is anything to update
+    if (internal_reference === undefined && payment_reference === undefined) {
+      return res.status(400).json({ message: "No updatable fields provided." });
+    }
+
+    try {
+      // If internal_reference is being updated, check for duplicates on non-cancelled payments
+      if (internal_reference !== undefined && internal_reference !== null) {
+        const checkQuery = `
+          SELECT payment_id 
+          FROM greentarget.payments 
+          WHERE internal_reference = $1 
+            AND payment_id != $2 
+            AND (status IS NULL OR status != 'cancelled')
+        `;
+        const checkResult = await pool.query(checkQuery, [
+          internal_reference,
+          payment_id,
+        ]);
+        if (checkResult.rows.length > 0) {
+          return res.status(409).json({
+            // 409 Conflict
+            message: `Internal reference "${internal_reference}" is already in use on an active payment.`,
+            error: "duplicate_reference",
+          });
+        }
+      }
+
+      // Build the update query dynamically
+      const fieldsToUpdate = [];
+      const queryParams = [];
+      let paramIndex = 1;
+
+      if (internal_reference !== undefined) {
+        fieldsToUpdate.push(`internal_reference = $${paramIndex++}`);
+        queryParams.push(internal_reference);
+      }
+
+      if (payment_reference !== undefined) {
+        fieldsToUpdate.push(`payment_reference = $${paramIndex++}`);
+        queryParams.push(payment_reference);
+      }
+
+      queryParams.push(payment_id);
+
+      const query = `
+        UPDATE greentarget.payments
+        SET ${fieldsToUpdate.join(", ")}
+        WHERE payment_id = $${paramIndex}
+        RETURNING *
+      `;
+
+      const result = await pool.query(query, queryParams);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      res.json({
+        message: "Payment updated successfully",
+        payment: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      res.status(500).json({
+        message: "Error updating payment",
+        error: error.message,
+      });
+    }
+  });
+
   // Confirm pending payment
   router.put("/:payment_id/confirm", async (req, res) => {
     const { payment_id } = req.params;
