@@ -551,6 +551,7 @@ export default function (pool) {
       );
 
       // Get all commission records for these payrolls in a single query
+      // Handle grouped payrolls by getting commissions for all employees with the same name
       const commissionsQuery = `
       SELECT 
         ep.id as employee_payroll_id,
@@ -558,7 +559,15 @@ export default function (pool) {
         s.name as employee_name
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-      JOIN commission_records cr ON ep.employee_id = cr.employee_id
+      JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
+      JOIN commission_records cr ON (
+        CASE 
+          WHEN ep.job_type LIKE '%,%' THEN cr.employee_id IN (
+            SELECT s2.id FROM staffs s2 WHERE s2.name = emp_staff.name
+          )
+          ELSE cr.employee_id = ep.employee_id
+        END
+      )
       JOIN staffs s ON cr.employee_id = s.id
       WHERE ep.id = ANY($1)
         AND EXTRACT(YEAR FROM cr.commission_date) = mp.year
@@ -627,6 +636,9 @@ export default function (pool) {
 
       const payrollData = payrollResult.rows[0];
 
+      // Check if this is a grouped payroll (job_type contains comma)
+      const isGroupedPayroll = payrollData.job_type && payrollData.job_type.includes(", ");
+
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
         // Get payroll items
@@ -676,19 +688,34 @@ export default function (pool) {
         `, [payrollData.employee_id, payrollData.year, payrollData.month]),
 
         // Get commission records for the specific month/year
-        pool.query(`
-          SELECT cr.*, s.name as employee_name
-          FROM commission_records cr
-          JOIN staffs s ON cr.employee_id = s.id
-          WHERE cr.employee_id = $1
-            AND DATE(cr.commission_date) >= $2
-            AND DATE(cr.commission_date) <= $3
-          ORDER BY cr.commission_date DESC
-        `, [
-          payrollData.employee_id,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
-        ])
+        // For grouped payrolls, get commissions for all employees with same name
+        isGroupedPayroll 
+          ? pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
+          : pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE cr.employee_id = $1
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
       ]);
 
       // Format comprehensive response
@@ -756,6 +783,9 @@ export default function (pool) {
 
       const payrollData = payrollResult.rows[0];
 
+      // Check if this is a grouped payroll (job_type contains comma)
+      const isGroupedPayroll = payrollData.job_type && payrollData.job_type.includes(", ");
+
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
         // Get payroll items
@@ -805,19 +835,34 @@ export default function (pool) {
         `, [payrollData.employee_id, payrollData.year, payrollData.month]),
 
         // Get commission records for the specific month/year
-        pool.query(`
-          SELECT cr.*, s.name as employee_name
-          FROM commission_records cr
-          JOIN staffs s ON cr.employee_id = s.id
-          WHERE cr.employee_id = $1
-            AND DATE(cr.commission_date) >= $2
-            AND DATE(cr.commission_date) <= $3
-          ORDER BY cr.commission_date DESC
-        `, [
-          payrollData.employee_id,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
-          `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
-        ])
+        // For grouped payrolls, get commissions for all employees with same name
+        isGroupedPayroll 
+          ? pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
+          : pool.query(`
+              SELECT cr.*, s.name as employee_name
+              FROM commission_records cr
+              JOIN staffs s ON cr.employee_id = s.id
+              WHERE cr.employee_id = $1
+                AND DATE(cr.commission_date) >= $2
+                AND DATE(cr.commission_date) <= $3
+              ORDER BY cr.commission_date DESC
+            `, [
+              payrollData.employee_id,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-01`,
+              `${payrollData.year}-${payrollData.month.toString().padStart(2, "0")}-${new Date(payrollData.year, payrollData.month, 0).getDate().toString().padStart(2, "0")}`
+            ])
       ]);
 
       // Format comprehensive response
@@ -1345,6 +1390,72 @@ export default function (pool) {
         message: "Error deleting payroll item",
         error: error.message,
       });
+    }
+  });
+
+  // Clear all employee payrolls for a specific monthly payroll (used when reprocessing with grouped payrolls)
+  router.delete("/monthly/:monthlyPayrollId", async (req, res) => {
+    const { monthlyPayrollId } = req.params;
+
+    const client = await pool.connect();
+    
+    try {
+      await client.query("BEGIN");
+
+      // Get all employee payroll IDs for this monthly payroll
+      const employeePayrollsResult = await client.query(
+        "SELECT id FROM employee_payrolls WHERE monthly_payroll_id = $1",
+        [monthlyPayrollId]
+      );
+
+      const employeePayrollIds = employeePayrollsResult.rows.map(row => row.id);
+
+      if (employeePayrollIds.length > 0) {
+        // Delete related data in correct order (foreign key dependencies)
+        
+        // Delete payroll deductions
+        await client.query(
+          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+          [employeePayrollIds]
+        );
+
+        // Delete payroll items
+        await client.query(
+          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
+          [employeePayrollIds]
+        );
+
+        // Delete employee payrolls
+        const deleteResult = await client.query(
+          "DELETE FROM employee_payrolls WHERE monthly_payroll_id = $1",
+          [monthlyPayrollId]
+        );
+
+        await client.query("COMMIT");
+
+        res.json({
+          message: "Employee payrolls cleared successfully",
+          deleted_count: deleteResult.rowCount,
+          cleared_employee_payrolls: employeePayrollIds.length
+        });
+      } else {
+        await client.query("COMMIT");
+        res.json({
+          message: "No employee payrolls found for this monthly payroll",
+          deleted_count: 0,
+          cleared_employee_payrolls: 0
+        });
+      }
+
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error clearing employee payrolls:", error);
+      res.status(500).json({
+        message: "Error clearing employee payrolls",
+        error: error.message,
+      });
+    } finally {
+      client.release();
     }
   });
 

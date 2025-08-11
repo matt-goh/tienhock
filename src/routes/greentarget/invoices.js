@@ -508,8 +508,8 @@ export default function (pool, defaultConfig) {
   });
 
   // Check if invoice number is available
-  router.get("/check-number/:invoice_number", async (req, res) => {
-    const { invoice_number } = req.params;
+  router.get("/check-number/:invoice_number(*)", async (req, res) => {
+    const invoice_number = decodeURIComponent(req.params.invoice_number);
     const { exclude_id } = req.query; // Optional: exclude a specific invoice ID when editing
 
     try {
