@@ -84,7 +84,7 @@ export default function (pool) {
            AND (status IS NULL OR status != 'cancelled')`,
           [invoice_id, payment_reference.trim()]
         );
-        
+
         if (duplicateCheck.rows.length > 0) {
           throw new Error(
             `Payment reference "${payment_reference}" already exists for this invoice. Please use a unique reference.`
@@ -170,9 +170,10 @@ export default function (pool) {
       await client.query("COMMIT");
 
       res.status(201).json({
-        message: initialStatus === "pending" 
-          ? "Payment created successfully (pending confirmation)" 
-          : "Payment created successfully",
+        message:
+          initialStatus === "pending"
+            ? "Payment created successfully (pending confirmation)"
+            : "Payment created successfully",
         payment: paymentResult.rows[0],
       });
     } catch (error) {
@@ -298,8 +299,8 @@ export default function (pool) {
       const paymentResult = await client.query(paymentQuery, [payment_id]);
 
       if (paymentResult.rows.length === 0) {
-        return res.status(404).json({ 
-          message: "Payment not found or not in pending status" 
+        return res.status(404).json({
+          message: "Payment not found or not in pending status",
         });
       }
 
@@ -315,7 +316,9 @@ export default function (pool) {
         WHERE payment_id = $1
         RETURNING *
       `;
-      const updatedPayment = await client.query(updatePaymentQuery, [payment_id]);
+      const updatedPayment = await client.query(updatePaymentQuery, [
+        payment_id,
+      ]);
 
       // Update invoice balance and status
       const newBalanceDue = Math.max(0, currentBalance - paymentAmount);
@@ -325,7 +328,8 @@ export default function (pool) {
       if (newBalanceDue === 0) {
         newInvoiceStatus = "paid";
       } else {
-        newInvoiceStatus = currentInvoiceStatus === "overdue" ? "overdue" : "active";
+        newInvoiceStatus =
+          currentInvoiceStatus === "overdue" ? "overdue" : "active";
       }
 
       await client.query(
