@@ -68,7 +68,7 @@ const PayCodePage: React.FC = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(15);
+  const [itemsPerPage] = useState(100);
 
   // Pay type options
   const payTypeOptions: string[] = ["All", "Base", "Tambahan", "Overtime"]; // Add more if needed

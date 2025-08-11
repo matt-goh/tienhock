@@ -101,7 +101,7 @@ const JobPage: React.FC = () => {
 
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(15); // Can increase this now
+  const [itemsPerPage] = useState<number>(100); // Can increase this now
 
   // --- Data Fetching ---
   useEffect(() => {
