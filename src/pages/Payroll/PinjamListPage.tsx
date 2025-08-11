@@ -506,12 +506,12 @@ const PinjamListPage: React.FC = () => {
                     isSelected
                       ? "shadow-md ring-2 ring-blue-500 ring-offset-1"
                       : "shadow-sm hover:shadow-md"
-                  } border-default-200 p-4 space-y-3`}
+                  } border-default-200 px-4 pb-4 space-y-3`}
                   onClick={handleCardClick}
                 >
                   {/* Employee header - Now clickable for selection */}
                   <div
-                    className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 -mt-4 px-4 py-3 rounded-t-lg cursor-pointer"
+                    className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 px-4 py-3 rounded-t-lg cursor-pointer"
                     onClick={handleHeaderClick}
                   >
                     <div className="flex-1">

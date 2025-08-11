@@ -961,7 +961,7 @@ const InvoiceDetailsPage: React.FC = () => {
     : "Select Payment Method";
 
   return (
-    <div className="container mx-auto px-8 pb-8 -mt-6">
+    <div className="container mx-auto px-8 pb-8">
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
         <div>
