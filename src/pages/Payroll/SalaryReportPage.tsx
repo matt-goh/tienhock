@@ -6,7 +6,15 @@ import {
   IconPrinter,
   IconDownload,
   IconFileExport,
+  IconLink,
 } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
@@ -56,6 +64,9 @@ const SalaryReportPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
+  const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [exportYear, setExportYear] = useState<number>(new Date().getFullYear());
+  const [exportMonth, setExportMonth] = useState<number>(new Date().getMonth() + 1);
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -87,11 +98,13 @@ const SalaryReportPage: React.FC = () => {
   // Generate year and month options
   const yearOptions = useMemo(() => {
     const years = [];
-    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
+    const startYear = new Date().getFullYear() - 5; // Go back 5 years
+    const endYear = new Date().getFullYear(); // Current year
+    for (let year = endYear; year >= startYear; year--) {
       years.push({ id: year, name: year.toString() });
     }
     return years;
-  }, [currentYear]);
+  }, []);
 
   const monthOptions = useMemo(
     () =>
@@ -178,6 +191,20 @@ const SalaryReportPage: React.FC = () => {
   };
 
   // Text Export Generation
+  const generateExportURL = () => {
+    // Determine server URL based on environment
+    const isProduction = window.location.hostname === 'tienhock.com';
+    const baseURL = isProduction ? 'https://api.tienhock.com' : 'http://localhost:5001';
+    const url = `${baseURL}/api/excel/payment-export?year=${exportYear}&month=${exportMonth}&api_key=foodmaker`;
+    
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Export URL copied to clipboard!");
+      setShowExportDialog(false);
+    }).catch(() => {
+      toast.error("Failed to copy URL to clipboard");
+    });
+  };
+
   const generateTextExport = async () => {
     if (!reportData || reportData.data.length === 0) {
       toast.error("No data available to export");
@@ -317,6 +344,95 @@ const SalaryReportPage: React.FC = () => {
       setIsGeneratingExport(false);
     }
   };
+
+  // Export Dialog Component
+  const ExportDialog = () => (
+    <Transition appear show={showExportDialog} as={React.Fragment}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-50"
+        onClose={() => setShowExportDialog(false)}
+      >
+        <div className="min-h-screen px-4 text-center">
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogPanel 
+              className="fixed inset-0 bg-black opacity-30" 
+              onClick={() => setShowExportDialog(false)}
+            />
+          </TransitionChild>
+
+          <span
+            className="inline-block h-screen align-middle"
+            aria-hidden="true"
+          >
+            &#8203;
+          </span>
+
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <DialogPanel
+              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DialogTitle
+                as="h3"
+                className="text-lg font-medium leading-6 text-default-900"
+              >
+                Export Link Generator
+              </DialogTitle>
+              <div className="mt-4 space-y-4">
+                <FormListbox
+                  name="exportYear"
+                  label="Year"
+                  value={exportYear.toString()}
+                  onChange={(value) => setExportYear(Number(value))}
+                  options={yearOptions}
+                />
+                <FormListbox
+                  name="exportMonth"
+                  label="Month"
+                  value={exportMonth.toString()}
+                  onChange={(value) => setExportMonth(Number(value))}
+                  options={monthOptions}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  onClick={() => setShowExportDialog(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={generateExportURL}
+                  color="blue"
+                  size="sm"
+                >
+                  Copy URL
+                </Button>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+  );
 
   // Bank Table Component
   const BankTable = () => (
@@ -530,6 +646,15 @@ const SalaryReportPage: React.FC = () => {
                 >
                   Export
                 </Button>
+                <Button
+                  onClick={() => setShowExportDialog(true)}
+                  icon={IconLink}
+                  color="orange"
+                  variant="outline"
+                  size="sm"
+                >
+                  Export Link
+                </Button>
               </div>
             </div>
           </div>
@@ -597,6 +722,9 @@ const SalaryReportPage: React.FC = () => {
           </>
         )}
       </div>
+      
+      {/* Export Dialog */}
+      <ExportDialog />
     </div>
   );
 };
