@@ -48,11 +48,6 @@ interface DumpsterStatus {
   rental?: Rental;
 }
 
-interface TooltipPosition {
-  top: number;
-  left: number;
-}
-
 const DumpsterListPage: React.FC = () => {
   const navigate = useNavigate();
   const [dumpsters, setDumpsters] = useState<Dumpster[]>([]);
