@@ -67,7 +67,7 @@ const DumpsterListPage: React.FC = () => {
     null
   );
 
-  const ITEMS_PER_PAGE = 15;
+  const ITEMS_PER_PAGE = 100;
 
   // Fetch dumpsters and rentals on component mount
   useEffect(() => {
