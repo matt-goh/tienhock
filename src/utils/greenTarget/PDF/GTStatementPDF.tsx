@@ -277,6 +277,47 @@ const formatCurrency = (amount: number | string | null | undefined) => {
 
 const isDebit = (amount: number) => amount >= 0;
 
+// Generate description based on rental details for statements
+const generateStatementDescription = (invoice: InvoiceGT): string[] => {
+  // For invoices with rental details (both regular and statement types)
+  if (invoice.rental_details && invoice.rental_details.length > 0) {
+    // Group rentals by dumpster type (A or B)
+    const groupedByType: { [key: string]: number } = {};
+    
+    invoice.rental_details.forEach(rental => {
+      if (rental.tong_no) {
+        const dumpsterNumber = rental.tong_no.trim();
+        const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+        groupedByType[type] = (groupedByType[type] || 0) + 1;
+      }
+    });
+
+    // Create descriptions for each type
+    const descriptions: string[] = [];
+    Object.entries(groupedByType).forEach(([type, quantity]) => {
+      const desc = quantity === 1 
+        ? `1x Rental Tong (${type})`
+        : `${quantity}x Rental Tong (${type})`;
+      descriptions.push(desc);
+    });
+
+    return descriptions;
+  }
+  
+  // Fallback to legacy single rental fields for backward compatibility (only for regular invoices)
+  if (invoice.type === "regular" && invoice.rental_id && invoice.tong_no) {
+    const dumpsterNumber = invoice.tong_no.trim();
+    const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+    return [`Rental Tong (${type})`];
+  }
+
+  // Default fallback for statement type or invoices without rental details
+  if (invoice.type === "statement") {
+    return ["Statement of Account"];
+  }
+  return ["Waste Management Service"];
+};
+
 interface GTStatementPDFProps {
   invoice: InvoiceGT;
   qrCodeData?: string | null;
@@ -293,6 +334,9 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
   invoice,
   statementDetails = [],
 }) => {
+  // Generate dynamic descriptions based on rental details
+  const descriptions = generateStatementDescription(invoice);
+  
   const finalStatementDetails =
     statementDetails.length > 0
       ? statementDetails
@@ -306,11 +350,13 @@ const GTStatementPDF: React.FC<GTStatementPDFProps> = ({
           },
           {
             date: invoice.date_issued,
-            description: `Trip: Waste Management Service`,
+            description: descriptions.length === 1 
+              ? `${descriptions[0]}` 
+              : `${descriptions.join(", ")}`,
             invoiceNo: invoice.invoice_number,
             amount: invoice.total_amount,
             balance: invoice.total_amount,
-          },
+          }
         ];
 
   const currentBalance =
