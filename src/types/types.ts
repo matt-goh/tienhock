@@ -512,7 +512,7 @@ export interface JobCategory {
 
 export interface RentalDetail {
   rental_id: number;
-  tong_no: string;
+  tong_no?: string;
   date_placed: string;
   date_picked?: string | null;
   driver?: string;
