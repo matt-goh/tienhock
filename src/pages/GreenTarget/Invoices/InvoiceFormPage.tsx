@@ -971,14 +971,18 @@ const InvoiceFormPage: React.FC = () => {
                             !isEditMode && handleRentalToggle(rental)
                           }
                           className={clsx(
-                            "p-4 cursor-pointer transition-colors",
+                            "p-4 cursor-pointer transition-colors relative",
                             isEditMode
                               ? "cursor-not-allowed"
-                              : "hover:bg-gray-50",
-                            isSelected
-                              ? "bg-sky-50 border-l-4 border-l-sky-500"
-                              : ""
+                              : "hover:bg-gray-50"
                           )}
+                          style={isSelected ? {
+                            backgroundColor: '#f0f9ff',
+                            borderLeft: '4px solid #0ea5e9',
+                            borderRight: 'none',
+                            borderTop: 'none',
+                            borderBottom: 'none'
+                          } : {}}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
