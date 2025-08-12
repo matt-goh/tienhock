@@ -81,6 +81,8 @@ const StaffFormPage: React.FC = () => {
     maritalStatus: "Single",
     spouseEmploymentStatus: "",
     numberOfChildren: 0,
+    department: "",
+    kwspNumber: "",
   });
   const [initialFormData, setInitialFormData] = useState<Employee>({
     ...formData,
@@ -136,6 +138,22 @@ const StaffFormPage: React.FC = () => {
     { id: "Bank", name: "Bank" },
     { id: "Cash", name: "Cash" },
     { id: "Cheque", name: "Cheque" },
+  ];
+
+  const departmentOptions = [
+    { id: "GENERAL WORKER", name: "GENERAL WORKER" },
+    { id: "MAINTENANCE", name: "MAINTENANCE" },
+    { id: "MACHINE OPERATOR", name: "MACHINE OPERATOR" },
+    { id: "SALESMAN", name: "SALESMAN" },
+    { id: "MARKETING", name: "MARKETING" },
+    { id: "DIRECTOR", name: "DIRECTOR" },
+    { id: "LOGISTIC JUNIOR (STOCK)", name: "LOGISTIC JUNIOR (STOCK)" },
+    { id: "STOCK & DATA ENTRY CLERK", name: "STOCK & DATA ENTRY CLERK" },
+    { id: "BOILERMAN", name: "BOILERMAN" },
+    { id: "OPERATION EXECUTIVE", name: "OPERATION EXECUTIVE" },
+    { id: "GENERAL CLERK", name: "GENERAL CLERK" },
+    { id: "ADMIN", name: "ADMIN" },
+    { id: "EXECUTIVE DIRECTOR", name: "EXECUTIVE DIRECTOR" },
   ];
 
   const getAllPayCodesForEmployee = useCallback(() => {
@@ -295,6 +313,8 @@ const StaffFormPage: React.FC = () => {
         maritalStatus: data.maritalStatus || "Single",
         spouseEmploymentStatus: data.spouseEmploymentStatus || "",
         numberOfChildren: data.numberOfChildren || 0,
+        department: data.department || "",
+        kwspNumber: data.kwspNumber || "",
       };
 
       // Preserve modified fields from current formData
@@ -1215,6 +1235,8 @@ const StaffFormPage: React.FC = () => {
                   {renderInput("incomeTaxNo", "Income Tax Number")}
                   {renderInput("socsoNo", "SOCSO Number")}
                   {renderListbox("document", "Document", documentOptions)}
+                  {renderListbox("department", "Department", departmentOptions)}
+                  {renderInput("kwspNumber", "KWSP Number")}
                 </div>
                 <div className="border-t border-default-200 pt-6 mt-6">
                   <h3 className="text-base font-medium text-default-800 mb-4">

@@ -437,6 +437,8 @@ export interface Employee {
   maritalStatus: string;
   spouseEmploymentStatus: string;
   numberOfChildren: number;
+  department: string;
+  kwspNumber: string;
   updatedAt?: string;
 }
 

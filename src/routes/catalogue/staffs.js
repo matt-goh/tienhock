@@ -1,6 +1,5 @@
 // src/routes/staff.js
 import { Router } from "express";
-import bcrypt from "bcryptjs";
 
 export default function (pool) {
   const router = Router();
@@ -56,7 +55,9 @@ export default function (pool) {
            s.updated_at as "updatedAt",
            s.marital_status as "maritalStatus",
            s.spouse_employment_status as "spouseEmploymentStatus",
-           s.number_of_children as "numberOfChildren"`;
+           s.number_of_children as "numberOfChildren",
+           s.department,
+           s.kwsp_number as "kwspNumber"`;
 
       let query = `
       SELECT ${columns}
@@ -131,6 +132,8 @@ export default function (pool) {
       maritalStatus,
       spouseEmploymentStatus,
       numberOfChildren,
+      department,
+      kwspNumber,
     } = req.body;
 
     try {
@@ -151,9 +154,9 @@ export default function (pool) {
           id, name, telephone_no, email, gender, nationality, birthdate, address,
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
-          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, password
+          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
         RETURNING *
       `;
 
@@ -183,6 +186,8 @@ export default function (pool) {
         maritalStatus || "Single",
         spouseEmploymentStatus || null,
         numberOfChildren || 0,
+        department || null,
+        kwspNumber || null,
         password,
       ];
 
@@ -265,7 +270,9 @@ export default function (pool) {
           s.location,
           s.marital_status as "maritalStatus",
           s.spouse_employment_status as "spouseEmploymentStatus",
-          s.number_of_children as "numberOfChildren"
+          s.number_of_children as "numberOfChildren",
+          s.department,
+          s.kwsp_number as "kwspNumber"
         FROM 
           staffs s
         WHERE
@@ -341,6 +348,8 @@ export default function (pool) {
       maritalStatus,
       spouseEmploymentStatus,
       numberOfChildren,
+      department,
+      kwspNumber,
     } = req.body;
 
     try {
@@ -370,8 +379,8 @@ export default function (pool) {
               ic_no = $12, bank_account_number = $13, epf_no = $14, income_tax_no = $15, 
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
               race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
-              spouse_employment_status = $24, number_of_children = $25, password = $26
-          WHERE id = $27
+              spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27, password = $28
+          WHERE id = $29
           RETURNING *
         `;
 
@@ -401,6 +410,8 @@ export default function (pool) {
           maritalStatus || "Single",
           spouseEmploymentStatus || null,
           numberOfChildren || 0,
+          department || null,
+          kwspNumber || null,
           password,
           id,
         ];
