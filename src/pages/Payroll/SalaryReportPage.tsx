@@ -554,61 +554,61 @@ const SalaryReportPage: React.FC = () => {
         <table className="w-full border border-default-200 rounded-lg overflow-hidden">
           <thead className="bg-default-50 border-b border-default-200">
             <tr>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 BIL
               </th>
-              <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
                 BAHAGIAN KERJA
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 GAJI
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 OT
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 COMM
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 GAJI KASAR
               </th>
               <th
-                className="px-1 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
                 colSpan={2}
               >
                 EPF
               </th>
               <th
-                className="px-1 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
                 colSpan={2}
               >
                 SOCSO
               </th>
               <th
-                className="px-1 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
                 colSpan={2}
               >
                 SIP
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider border-l border-default-300">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300">
                 PCB
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 GAJI BERSIH
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 1/2 BULAN
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 JUMLAH DIGENAPKAN
               </th>
-              <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
                 SETELAH DIGENAPKAN
               </th>
             </tr>
@@ -620,22 +620,22 @@ const SalaryReportPage: React.FC = () => {
               <th></th>
               <th></th>
               <th></th>
-              <th className="px-1 py-2 text-center text-sm font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-sm font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
                 PKJ
               </th>
-              <th className="px-1 py-2 text-center text-sm font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-sm font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
                 PKJ
               </th>
-              <th className="px-1 py-2 text-center text-sm font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-sm font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
                 PKJ
               </th>
               <th></th>
@@ -653,7 +653,7 @@ const SalaryReportPage: React.FC = () => {
                   <tr key={`header-${index}`} className="bg-default-100">
                     <td
                       colSpan={19}
-                      className="px-2 py-2 text-center text-sm font-medium text-default-600 border-t border-default-300"
+                      className="px-2 py-2 text-center text-xs font-medium text-default-600 border-t border-default-300"
                     >
                       {item.text}
                     </td>
@@ -669,63 +669,63 @@ const SalaryReportPage: React.FC = () => {
 
               return (
                 <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
-                  <td className="px-2 py-2 text-sm text-default-900 text-center">
+                  <td className="px-2 py-2 text-xs text-default-900 text-center">
                     {locationNumber}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-left">
+                  <td className="px-2 py-2 text-xs text-default-600 text-left">
                     {locationName}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.gaji || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.ot || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.bonus || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.comm || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.gaji_kasar || 0)}
                   </td>
-                  <td className="px-1 py-2 text-sm text-default-600 text-center border-l border-default-300">
+                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
                     {formatCurrency(locationData?.totals.epf_majikan || 0)}
                   </td>
-                  <td className="px-1 py-2 text-sm text-default-600 text-center">
+                  <td className="px-1 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.epf_pekerja || 0)}
                   </td>
-                  <td className="px-1 py-2 text-sm text-default-600 text-center border-l border-default-300">
+                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
                     {formatCurrency(locationData?.totals.socso_majikan || 0)}
                   </td>
-                  <td className="px-1 py-2 text-sm text-default-600 text-center">
+                  <td className="px-1 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.socso_pekerja || 0)}
                   </td>
-                  <td className="px-1 py-2 text-sm text-default-600 text-center border-l border-default-300">
+                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
                     {formatCurrency(locationData?.totals.sip_majikan || 0)}
                   </td>
-                  <td className="px-1 py-2 text-sm text-default-600 text-center">
+                  <td className="px-1 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.sip_pekerja || 0)}
                   </td>
                   <td className="px-2 py-2 text-sm text-default-600 text-center border-l border-default-300">
                     {formatCurrency(locationData?.totals.pcb || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.gaji_bersih || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.setengah_bulan || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(locationData?.totals.jumlah || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(
                       locationData?.totals.jumlah_digenapkan || 0
                     )}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
                     {formatCurrency(
                       locationData?.totals.setelah_digenapkan || 0
                     )}
@@ -738,53 +738,53 @@ const SalaryReportPage: React.FC = () => {
             <tr>
               <td
                 colSpan={2}
-                className="px-2 py-2 text-sm font-bold text-default-700 text-center"
+                className="px-2 py-2 text-xs font-bold text-default-700 text-center"
               >
                 GRAND TOTAL
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_kasar
                 )}
               </td>
-              <td className="px-1 py-2 text-sm font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-sm font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-sm font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_pekerja
                 )}
@@ -792,25 +792,25 @@ const SalaryReportPage: React.FC = () => {
               <td className="px-2 py-2 text-sm font-bold text-default-900 text-center border-l border-default-300">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_bersih
                 )}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setengah_bulan
                 )}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.jumlah_digenapkan
                 )}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setelah_digenapkan
                 )}
