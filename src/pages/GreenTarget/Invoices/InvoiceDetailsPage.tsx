@@ -1552,96 +1552,110 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
 
         {/* Rental details for regular invoices */}
-        {invoice.type === "regular" && invoice.rental_id && (
+        {invoice.type === "regular" && invoice.rental_details && Array.isArray(invoice.rental_details) && invoice.rental_details.length > 0 && (
           <div className="px-6 py-4 border-t border-default-200">
-            <h2 className="text-lg font-medium mb-3">Rental Details</h2>
-            <div
-              className="rounded-lg border border-default-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" // Added hover effect
-              onClick={() =>
-                navigate(`/greentarget/rentals/${invoice.rental_id}`)
-              }
-              title="View Rental"
-            >
-              {/* Status Banner */}
-              <div
-                className={`px-4 py-2 ${
-                  isRentalActive(invoice.date_picked)
-                    ? "bg-green-500 text-white"
-                    : "bg-default-100 text-default-700"
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <h3 className="font-medium">Rental #{invoice.rental_id}</h3>
-                  <span
-                    className={`text-sm font-medium px-2 py-0.5 rounded-full ${
-                      isRentalActive(invoice.date_picked)
-                        ? "bg-green-400/30 text-white"
-                        : "bg-default-200 text-default-600"
-                    }`}
-                  >
-                    {isRentalActive(invoice.date_picked)
-                      ? "Ongoing"
-                      : "Completed"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Rental Information */}
-              <div className="p-4">
-                {/* Rental Dates */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                    <div className="text-xs text-default-500 mb-1">
-                      Placement Date
-                    </div>
-                    <div className="font-medium">
-                      {formatDate(invoice.date_placed || "")}
-                    </div>
-                  </div>
+            <h2 className="text-lg font-medium mb-3">
+              Rental Details ({invoice.rental_details.length} rental{invoice.rental_details.length > 1 ? 's' : ''})
+            </h2>
+            <div className="space-y-4">
+              {invoice.rental_details.map((rental: any, index: number) => (
+                <div
+                  key={rental.rental_id || index}
+                  className="rounded-lg border border-default-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() =>
+                    rental.rental_id && navigate(`/greentarget/rentals/${rental.rental_id}`)
+                  }
+                  title="View Rental"
+                >
+                  {/* Status Banner */}
                   <div
-                    className={`p-3 rounded-lg ${
-                      invoice.date_picked
-                        ? "bg-default-50 border border-default-100"
-                        : "bg-green-50 border border-green-100"
+                    className={`px-4 py-2 ${
+                      isRentalActive(rental.date_picked)
+                        ? "bg-green-500 text-white"
+                        : "bg-default-100 text-default-700"
                     }`}
                   >
-                    <div className="text-xs text-default-500 mb-1">
-                      Pickup Date
-                    </div>
-                    <div
-                      className={`font-medium ${
-                        !invoice.date_picked ? "text-green-600" : ""
-                      }`}
-                    >
-                      {invoice.date_picked
-                        ? formatDate(invoice.date_picked)
-                        : "Not picked up yet"}
-                    </div>
-                  </div>
-                </div>
-                {/* Dumpster, Driver & Location Info */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                    <div className="text-xs text-default-500 mb-1">
-                      Dumpster
-                    </div>
-                    <div className="font-medium">
-                      {invoice.tong_no || "N/A"}
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium">
+                        Rental #{rental.rental_id || 'N/A'}
+                        {invoice.rental_details && invoice.rental_details.length > 1 && (
+                          <span className="ml-2 text-sm opacity-75">
+                            ({index + 1} of {invoice.rental_details.length})
+                          </span>
+                        )}
+                      </h3>
+                      <span
+                        className={`text-sm font-medium px-2 py-0.5 rounded-full ${
+                          isRentalActive(rental.date_picked)
+                            ? "bg-green-400/30 text-white"
+                            : "bg-default-200 text-default-600"
+                        }`}
+                      >
+                        {isRentalActive(rental.date_picked)
+                          ? "Ongoing"
+                          : "Completed"}
+                      </span>
                     </div>
                   </div>
-                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                    <div className="text-xs text-default-500 mb-1">Driver</div>
-                    <div className="font-medium">{invoice.driver || "N/A"}</div>
-                  </div>
-                </div>
 
-                <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                  <div className="text-xs text-default-500 mb-1">Location</div>
-                  <div className="font-medium">
-                    {invoice.location_address || "No specific location"}
+                  {/* Rental Information */}
+                  <div className="p-4">
+                    {/* Rental Dates */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Placement Date
+                        </div>
+                        <div className="font-medium">
+                          {formatDate(rental.date_placed || "")}
+                        </div>
+                      </div>
+                      <div
+                        className={`p-3 rounded-lg ${
+                          rental.date_picked
+                            ? "bg-default-50 border border-default-100"
+                            : "bg-green-50 border border-green-100"
+                        }`}
+                      >
+                        <div className="text-xs text-default-500 mb-1">
+                          Pickup Date
+                        </div>
+                        <div
+                          className={`font-medium ${
+                            !rental.date_picked ? "text-green-600" : ""
+                          }`}
+                        >
+                          {rental.date_picked
+                            ? formatDate(rental.date_picked)
+                            : "Not picked up yet"}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Dumpster, Driver & Location Info */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Dumpster
+                        </div>
+                        <div className="font-medium">
+                          {rental.tong_no || "N/A"}
+                        </div>
+                      </div>
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">Driver</div>
+                        <div className="font-medium">{rental.driver || "N/A"}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                      <div className="text-xs text-default-500 mb-1">Location</div>
+                      <div className="font-medium">
+                        {rental.location_address || "No specific location"}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         )}
