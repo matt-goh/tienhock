@@ -85,14 +85,17 @@ const RentalCard = ({
 
     const differenceInTime = endDate.getTime() - startDate.getTime();
     const differenceInDays = Math.ceil(differenceInTime / (1000 * 3600 * 24));
+    
+    // Ensure minimum of 1 day (same day placement and pickup should count as 1 day)
+    const displayDays = Math.max(1, differenceInDays);
 
     // Return different text for rentals with and without pickup dates
     if (!rental.date_picked) {
-      return `${differenceInDays} day${
-        differenceInDays !== 1 ? "s" : ""
+      return `${displayDays} day${
+        displayDays !== 1 ? "s" : ""
       } (ongoing)`;
     } else {
-      return `${differenceInDays} day${differenceInDays !== 1 ? "s" : ""}`;
+      return `${displayDays} day${displayDays !== 1 ? "s" : ""}`;
     }
   };
 
