@@ -141,6 +141,46 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
     const taxAmount = formatAmount(invoiceData.tax_amount);
     const totalAmount = formatAmount(invoiceData.total_amount);
 
+    // Generate description based on rental details
+    const generateInvoiceDescription = (invoice) => {
+      // Check if invoice has rental details for dynamic description
+      if (invoice.rental_details && invoice.rental_details.length > 0) {
+        const groupedByType = {};
+        
+        invoice.rental_details.forEach(rental => {
+          if (rental.tong_no) {
+            const dumpsterNumber = rental.tong_no.trim();
+            const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+            groupedByType[type] = (groupedByType[type] || 0) + 1;
+          }
+        });
+
+        const descriptions = [];
+        Object.entries(groupedByType).forEach(([type, quantity]) => {
+          const desc = quantity === 1 
+            ? `1x Rental Tong (${type})`
+            : `${quantity}x Rental Tong (${type})`;
+          descriptions.push(desc);
+        });
+
+        return descriptions.length > 0 
+          ? descriptions.join(", ")
+          : "Rental Tong Service";
+      }
+      
+      // Fallback to legacy single rental fields
+      if (invoice.type === "regular" && invoice.rental_id && invoice.tong_no) {
+        const dumpsterNumber = invoice.tong_no.trim();
+        const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+        return `Rental Tong (${type})`;
+      }
+
+      // Default fallback
+      return "Waste Management Service";
+    };
+
+    const itemDescription = generateInvoiceDescription(invoiceData);
+
     // Start XML document using optimized string concatenation
     let xml = TEMPLATE_HEADER;
 
@@ -320,9 +360,7 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
       </cac:TaxSubtotal>
     </cac:TaxTotal>
     <cac:Item>
-      <cbc:Description>${escapeXml(
-        "Trip(s): Waste Management Service"
-      )}</cbc:Description>
+      <cbc:Description>${escapeXml(itemDescription)}</cbc:Description>
       <cac:OriginCountry>
         <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
       </cac:OriginCountry>
