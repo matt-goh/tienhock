@@ -1,4 +1,3 @@
-// src/pages/JellyPolly/PaymentPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,15 +14,16 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import DateRangePicker from "../../components/DateRangePicker";
-import { api } from "../../routes/utils/api";
+import Button from "../../../components/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import DateRangePicker from "../../../components/DateRangePicker";
+import { greenTargetApi } from "../../../routes/greentarget/api";
 import toast from "react-hot-toast";
-import { Payment } from "../../types/types";
-import PaymentTable from "../../components/Invoice/PaymentTable";
-import PaymentForm from "../../components/Invoice/PaymentForm";
-import StyledListbox from "../../components/StyledListbox";
+import { Payment } from "../../../types/types";
+import { GreenTargetPayment } from "../../../types/greenTargetTypes";
+import GreenTargetPaymentTable from "../../../components/GreenTarget/GreenTargetPaymentTable";
+import GreenTargetPaymentForm from "../../../components/GreenTarget/GreenTargetPaymentForm";
+import StyledListbox from "../../../components/StyledListbox";
 
 interface PaymentFilters {
   dateRange: {
@@ -55,10 +55,12 @@ const monthOptions: MonthOption[] = [
   { id: 11, name: "December" },
 ];
 
-const PaymentPage: React.FC = () => {
+const GreenTargetPaymentPage: React.FC = () => {
   const navigate = useNavigate();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [sortedPayments, setSortedPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<GreenTargetPayment[]>([]);
+  const [sortedPayments, setSortedPayments] = useState<GreenTargetPayment[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -91,124 +93,125 @@ const PaymentPage: React.FC = () => {
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-
-      if (filters.dateRange.start) {
-        params.append(
-          "startDate",
-          filters.dateRange.start.getTime().toString()
-        );
-      }
-
-      if (filters.dateRange.end) {
-        params.append("endDate", filters.dateRange.end.getTime().toString());
-      }
-
-      if (filters.paymentMethod) {
-        params.append("paymentMethod", filters.paymentMethod);
-      }
-
-      if (filters.status) {
-        params.append("status", filters.status);
-      }
-
-      if (filters.searchTerm.trim()) {
-        params.append("search", filters.searchTerm.trim());
-      }
-
-      params.append("include_cancelled", "true"); // Include cancelled payments
-
-      // Use JellyPolly-specific API endpoint
-      const response = await api.get(
-        `/jellypolly/api/payments/all?${params.toString()}`
-      );
+      // For now, fetch all payments and filter client-side
+      // Backend doesn't support all filter parameters yet
+      const response = await greenTargetApi.getPayments({
+        includeCancelled: true,
+      });
       setPayments(response);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching payments:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch payments"
-      );
-      setPayments([]);
+      toast.error("Failed to fetch payments");
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []);
 
-  // Sort payments effect - match main company logic
-  useEffect(() => {
-    const sorted = [...payments].sort((a, b) => {
+  // Client-side filtering and sorting
+  const filteredAndSortedPayments = useMemo(() => {
+    let filtered = [...payments];
+
+    // Filter by date range
+    if (filters.dateRange.start && filters.dateRange.end) {
+      const startTime = filters.dateRange.start.getTime();
+      const endTime = filters.dateRange.end.getTime() + 24 * 60 * 60 * 1000 - 1; // End of day
+
+      filtered = filtered.filter((payment) => {
+        const paymentTime = new Date(payment.payment_date).getTime();
+        return paymentTime >= startTime && paymentTime <= endTime;
+      });
+    }
+
+    // Filter by payment method
+    if (filters.paymentMethod) {
+      filtered = filtered.filter(
+        (payment) => payment.payment_method === filters.paymentMethod
+      );
+    }
+
+    // Filter by status
+    if (filters.status) {
+      if (filters.status === "active") {
+        // Include both active (null, undefined, or 'active') and pending payments when 'active' is selected
+        filtered = filtered.filter(
+          (payment) =>
+            !payment.status ||
+            payment.status === "active" ||
+            payment.status === "pending" ||
+            payment.status === "overpaid"
+        );
+      } else {
+        filtered = filtered.filter(
+          (payment) => payment.status === filters.status
+        );
+      }
+    }
+
+    // Filter by search term
+    if (filters.searchTerm) {
+      const searchLower = filters.searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (payment) =>
+          payment.invoice_id?.toString().toLowerCase().includes(searchLower) ||
+          payment.payment_reference?.toLowerCase().includes(searchLower) ||
+          payment.internal_reference?.toLowerCase().includes(searchLower) ||
+          payment.amount_paid?.toString().includes(searchLower) ||
+          payment.customer_name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Sort payments with pending status at the top, then by date
+    return filtered.sort((a, b) => {
       // First priority: pending status
-      if (a.status === 'pending' && b.status !== 'pending') return -1;
-      if (a.status !== 'pending' && b.status === 'pending') return 1;
-      
+      if (a.status === "pending" && b.status !== "pending") return -1;
+      if (a.status !== "pending" && b.status === "pending") return 1;
+
       // Second priority: sort by payment date (newest first)
       const dateA = new Date(a.payment_date).getTime();
       const dateB = new Date(b.payment_date).getTime();
       return dateB - dateA;
     });
-    setSortedPayments(sorted);
-  }, [payments]);
+  }, [payments, filters]);
 
-  // Initial fetch
+  // Update sorted payments when filters change
+  useEffect(() => {
+    setSortedPayments(filteredAndSortedPayments);
+  }, [filteredAndSortedPayments]);
+
   useEffect(() => {
     fetchPayments();
-  }, [fetchPayments]);
+  }, []); // Only fetch once on mount
 
-  // Month change handler
-  const handleMonthChange = (month: MonthOption) => {
+  const handleDateChange = useCallback(
+    (newDateRange: { start: Date; end: Date }) => {
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: newDateRange,
+      }));
+    },
+    []
+  );
+
+  const handleMonthChange = useCallback((month: MonthOption) => {
     setSelectedMonth(month);
-    
+
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonthIndex = now.getMonth();
-    
-    const targetYear = month.id > currentMonthIndex ? currentYear - 1 : currentYear;
-    
+
+    const targetYear =
+      month.id > currentMonthIndex ? currentYear - 1 : currentYear;
+
     const startDate = new Date(targetYear, month.id, 1);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(targetYear, month.id + 1, 0);
     endDate.setHours(23, 59, 59, 999);
-    
-    setFilters(prev => ({
+
+    setFilters((prev) => ({
       ...prev,
-      dateRange: { start: startDate, end: endDate }
+      dateRange: { start: startDate, end: endDate },
     }));
-  };
-
-  // Date range change handler
-  const handleDateRangeChange = (range: { start: Date | null; end: Date | null }) => {
-    setFilters(prev => ({
-      ...prev,
-      dateRange: range
-    }));
-  };
-
-  // Search handler
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters(prev => ({
-      ...prev,
-      searchTerm: e.target.value
-    }));
-  };
-
-  // Payment method filter options
-  const paymentMethodOptions = [
-    { id: "", name: "All Methods" },
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
-  ];
-
-  // Status filter options
-  const statusOptions = [
-    { id: "", name: "All Status" },
-    { id: "active", name: "Active" },
-    { id: "pending", name: "Pending" },
-    { id: "overpaid", name: "Overpaid" },
-    { id: "cancelled", name: "Cancelled" },
-  ];
-
+  }, []);
 
   const handleNewPayment = () => {
     setSelectedPayment(null);
@@ -220,19 +223,19 @@ const PaymentPage: React.FC = () => {
     fetchPayments();
   };
 
-  const handleViewPayment = (payment: Payment) => {
-    navigate(`/jellypolly/sales/invoice/${payment.invoice_id}`, {
+  const handleViewPayment = (payment: GreenTargetPayment) => {
+    navigate(`/greentarget/invoices/${payment.invoice_id}`, {
       state: { scrollToPayments: true },
     });
   };
 
   return (
-    <div className="pb-4 max-w-full mx-auto px-8">
+    <div className="pb-4 max-w-full mx-auto px-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <IconCash size={28} className="text-gray-700" />
-          JellyPolly Payment Management
+          Payment Management
         </h1>
         <Button onClick={handleNewPayment} icon={IconPlus} size="md">
           New Payment
@@ -255,7 +258,12 @@ const PaymentPage: React.FC = () => {
                 title="Search payments by invoice, reference, or amount"
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 value={filters.searchTerm}
-                onChange={handleSearchChange}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    searchTerm: e.target.value,
+                  }))
+                }
               />
             </div>
 
@@ -266,7 +274,7 @@ const PaymentPage: React.FC = () => {
                   start: filters.dateRange.start || new Date(),
                   end: filters.dateRange.end || new Date(),
                 }}
-                onDateChange={handleDateRangeChange}
+                onDateChange={handleDateChange}
               />
             </div>
 
@@ -334,13 +342,19 @@ const PaymentPage: React.FC = () => {
             {/* Payment Method Filter */}
             <StyledListbox
               value={filters.paymentMethod || ""}
-              onChange={(value) =>
+              onChange={(value) => {
                 setFilters((prev) => ({
                   ...prev,
                   paymentMethod: value === "" ? null : String(value),
-                }))
-              }
-              options={paymentMethodOptions}
+                }));
+              }}
+              options={[
+                { id: "", name: "All Methods" },
+                { id: "cash", name: "Cash" },
+                { id: "cheque", name: "Cheque" },
+                { id: "bank_transfer", name: "Bank Transfer" },
+                { id: "online", name: "Online" },
+              ]}
               className="w-full sm:w-40"
               placeholder="All Methods"
             />
@@ -348,13 +362,19 @@ const PaymentPage: React.FC = () => {
             {/* Status Filter */}
             <StyledListbox
               value={filters.status || ""}
-              onChange={(value) =>
+              onChange={(value) => {
                 setFilters((prev) => ({
                   ...prev,
                   status: value === "" ? null : String(value),
-                }))
-              }
-              options={statusOptions}
+                }));
+              }}
+              options={[
+                { id: "", name: "All Status" },
+                { id: "active", name: "Active" },
+                { id: "pending", name: "Pending" },
+                { id: "overpaid", name: "Overpaid" },
+                { id: "cancelled", name: "Cancelled" },
+              ]}
               className="w-full sm:w-40"
               placeholder="All Status"
             />
@@ -368,7 +388,7 @@ const PaymentPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <PaymentTable
+        <GreenTargetPaymentTable
           payments={sortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
@@ -377,17 +397,15 @@ const PaymentPage: React.FC = () => {
 
       {/* Payment Form Modal */}
       {showPaymentForm && (
-        <PaymentForm
+        <GreenTargetPaymentForm
           payment={selectedPayment}
           onClose={() => setShowPaymentForm(false)}
           onSuccess={handlePaymentCreated}
           dateRange={filters.dateRange}
-          apiEndpoint="/jellypolly/api/payments"
-          invoicesEndpoint="/jellypolly/api/invoices"
         />
       )}
     </div>
   );
 };
 
-export default PaymentPage;
+export default GreenTargetPaymentPage;

@@ -299,20 +299,42 @@ const InvoiceCard = ({
               )}
             </div>
             <div>
-              {/* Add rental ID and driver info in the right side */}
-              {invoice.rental_id && (
+              {/* Add rental ID and driver info in the right side - Multi-rental support */}
+              {invoice.rental_details &&
+              Array.isArray(invoice.rental_details) &&
+              invoice.rental_details.length > 0 ? (
                 <div className="text-right truncate">
-                  <h3
-                    className="font-medium text-default-700 cursor-pointer hover:underline truncate"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/greentarget/rentals/${invoice.rental_id}`);
-                    }}
-                    title="View Rental"
-                  >
-                    Rental #{invoice.rental_id}
+                  <h3 className="font-medium text-default-700 text-sm">
+                    {invoice.rental_details.length} Rental
+                    {invoice.rental_details.length > 1 ? "s" : ""}
                   </h3>
+                  <div className="text-xs text-default-500">
+                    {invoice.rental_details.map((rental, index) => (
+                      <span key={rental.rental_id || index}>
+                        #{rental.rental_id || "N/A"}
+                        {invoice.rental_details &&
+                        index < invoice.rental_details.length - 1
+                          ? ", "
+                          : ""}
+                      </span>
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                invoice.rental_id && (
+                  <div className="text-right truncate">
+                    <h3
+                      className="font-medium text-default-700 cursor-pointer hover:underline truncate"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/greentarget/rentals/${invoice.rental_id}`);
+                      }}
+                      title="View Rental"
+                    >
+                      Rental #{invoice.rental_id}
+                    </h3>
+                  </div>
+                )
               )}
               {/* e-Invoice Status Badge (if applicable) */}
               {invoice.einvoice_status && (
@@ -339,7 +361,7 @@ const InvoiceCard = ({
                       }}
                     >
                       <IconCheck size={14} className="mr-1" />
-                      e-Invoice Valid
+                      e-Invoice
                     </a>
                   ) : invoice.einvoice_status === "pending" ? (
                     <a
@@ -449,6 +471,61 @@ const InvoiceCard = ({
               {invoice.driver}, {invoice.tong_no}
             </p>
           )}
+
+          {/* Multi-rental details section */}
+          {invoice.rental_details &&
+            Array.isArray(invoice.rental_details) &&
+            invoice.rental_details.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-default-200">
+                <div className="text-xs text-default-500 mb-1 font-medium">
+                  Rental Details ({invoice.rental_details.length} rental
+                  {invoice.rental_details.length > 1 ? "s" : ""})
+                </div>
+                <div className="grid grid-cols-1 gap-1">
+                  {invoice.rental_details.slice(0, 3).map((rental, index) => (
+                    <div
+                      key={rental.rental_id || index}
+                      className="flex items-center justify-between text-xs text-default-600 py-1 px-2 bg-default-50 rounded cursor-pointer hover:bg-default-100 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (rental.rental_id) {
+                          navigate(`/greentarget/rentals/${rental.rental_id}`);
+                        }
+                      }}
+                      title="Click to view rental details"
+                    >
+                      <div className="flex items-center">
+                        <IconTruck size={12} className="mr-1 flex-shrink-0" />
+                        <span className="font-medium">
+                          #{rental.rental_id || "N/A"}
+                        </span>
+                        {rental.tong_no && (
+                          <span className="ml-1 text-default-500">
+                            • {rental.tong_no}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center text-default-500">
+                        {rental.driver && (
+                          <span
+                            className="truncate max-w-40"
+                            title={rental.driver}
+                          >
+                            {rental.driver}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {invoice.rental_details.length > 3 && (
+                    <div className="text-xs text-default-500 text-center py-1">
+                      +{invoice.rental_details.length - 3} more rental
+                      {invoice.rental_details.length - 3 > 1 ? "s" : ""}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Details grid */}
@@ -957,40 +1034,31 @@ const InvoiceListPage: React.FC = () => {
           invoiceToCancel.invoice_id
         );
 
-        // Check if the response contains an error message
-        if (
-          response.error ||
-          (response.message && response.message.includes("Cannot cancel"))
-        ) {
-          // Show error toast with the server's message
-          toast.error(
-            response.message || "Cannot cancel invoice: unknown error occurred"
-          );
-        } else {
-          // Only show success and update state if there's no error
-          toast.success("Invoice cancelled successfully");
+        // If we get here, the request was successful
+        toast.success("Invoice cancelled successfully");
 
-          // Update the invoice status in the list
-          setInvoices(
-            invoices.map((i) =>
-              i.invoice_id === invoiceToCancel.invoice_id
-                ? { 
-                    ...i, 
-                    status: "cancelled", 
-                    einvoice_status: i.einvoice_status ? "cancelled" : null 
-                  }
-                : i
-            )
-          );
-        }
+        // Update the invoice status in the list
+        setInvoices(
+          invoices.map((i) =>
+            i.invoice_id === invoiceToCancel.invoice_id
+              ? {
+                  ...i,
+                  status: "cancelled",
+                  einvoice_status: i.einvoice_status ? "cancelled" : null,
+                }
+              : i
+          )
+        );
       } catch (error: any) {
-        // This will catch network errors or other exceptions
-        if (error.message && error.message.includes("associated payments")) {
+        // This will catch all errors including server errors
+        const errorMessage = error?.response?.data?.message || error?.message;
+
+        if (errorMessage && errorMessage.includes("active payments")) {
           toast.error(
-            "Cannot cancel invoice: it has associated payments. Cancel the payments first."
+            "Cannot cancel invoice: it has active payments. Cancel the payments first."
           );
         } else {
-          toast.error("Failed to cancel invoice");
+          toast.error(errorMessage || "Failed to cancel invoice");
           console.error("Error cancelling invoice:", error);
         }
       } finally {
@@ -1000,28 +1068,56 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (forceDelete = false) => {
     if (invoiceToDelete) {
       try {
-        await greenTargetApi.deleteInvoice(invoiceToDelete.invoice_id);
+        const url = forceDelete
+          ? `/greentarget/api/invoices/${invoiceToDelete.invoice_id}?force=true`
+          : `/greentarget/api/invoices/${invoiceToDelete.invoice_id}`;
+
+        await api.delete(url);
         toast.success("Invoice deleted successfully");
 
         // Remove the invoice from the list
-        setInvoices(invoices.filter(i => i.invoice_id !== invoiceToDelete.invoice_id));
-        
+        setInvoices(
+          invoices.filter((i) => i.invoice_id !== invoiceToDelete.invoice_id)
+        );
+
         // Remove from selected invoices if it was selected
-        setSelectedInvoiceIds(prev => {
+        setSelectedInvoiceIds((prev) => {
           const newSet = new Set(prev);
           newSet.delete(invoiceToDelete.invoice_id.toString());
           return newSet;
         });
       } catch (error: any) {
-        if (error.message && error.message.includes("associated payments")) {
-          toast.error(
-            "Cannot delete invoice: it has associated payments. Delete the payments first."
+        const errorData = error?.response?.data;
+
+        if (errorData?.canForceDelete && errorData?.payments) {
+          // Show detailed confirmation with payment information
+          const paymentList = errorData.payments
+            .map(
+              (p: any) =>
+                `- ${new Intl.NumberFormat("en-MY", {
+                  style: "currency",
+                  currency: "MYR",
+                }).format(p.amount_paid)} (${p.payment_method}, ${new Date(
+                  p.payment_date
+                ).toLocaleDateString()})`
+            )
+            .join("\n");
+
+          const confirmed = window.confirm(
+            `This invoice has the following payments:\n\n${paymentList}\n\nDeleting the invoice will also delete all associated payments. This action cannot be undone.\n\nDo you want to proceed?`
           );
+
+          if (confirmed) {
+            handleConfirmDelete(true); // Retry with force delete
+            return;
+          }
         } else {
-          toast.error("Failed to delete invoice");
+          const errorMessage =
+            errorData?.message || error?.message || "Failed to delete invoice";
+          toast.error(errorMessage);
           console.error("Error deleting invoice:", error);
         }
       } finally {
@@ -1664,7 +1760,7 @@ const InvoiceListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-auto max-w-[95rem] px-4 sm:px-6 lg:px-8 -mt-4">
+    <div className="relative w-full mx-auto max-w-[95rem] pb-4 px-4 sm:px-6 lg:px-8">
       {/* Revised Header Layout - 2 rows total on desktop */}
       <div className="space-y-4">
         {/* Row 1: Header with title, filters, search and action buttons */}

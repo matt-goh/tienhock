@@ -8,6 +8,7 @@ import {
   IconBriefcase,
   IconPhone,
   IconId,
+  IconUsers,
 } from "@tabler/icons-react";
 import { Employee, FilterOptions } from "../../types/types";
 import { useNavigate } from "react-router-dom";
@@ -371,12 +372,19 @@ const StaffPage = () => {
 
   return (
     <div className="w-full max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
           <IconBriefcase size={28} stroke={2.5} className="text-default-700" />
           Staff Directory ({filteredEmployees.length})
         </h1>
         <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            onClick={() => navigate("/catalogue/staff/records")}
+            icon={IconUsers}
+            variant="outline"
+          >
+            Records
+          </Button>
           <div className="relative flex items-center sm:max-w-xs">
             <IconSearch
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
@@ -385,7 +393,7 @@ const StaffPage = () => {
             <input
               type="text"
               placeholder="Search name, ID or phone..."
-              className="w-full pl-10 pr-10 py-2 border border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm"
+              className="w-full pl-10 pr-10 py-2.5 border border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm"
               value={searchTerm}
               onChange={handleSearchChange}
             />
@@ -457,7 +465,7 @@ const StaffPage = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
             {paginatedEmployees.map((employee) => (
               <EmployeeCard
                 key={employee.id}

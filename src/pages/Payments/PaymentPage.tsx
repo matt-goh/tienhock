@@ -117,13 +117,13 @@ const PaymentPage: React.FC = () => {
 
       const response = await api.get(`/api/payments/all?${params.toString()}`);
       setPayments(response);
-      
+
       // Sort payments with pending status at the top, then by date
       const sorted = [...response].sort((a, b) => {
         // First priority: pending status
-        if (a.status === 'pending' && b.status !== 'pending') return -1;
-        if (a.status !== 'pending' && b.status === 'pending') return 1;
-        
+        if (a.status === "pending" && b.status !== "pending") return -1;
+        if (a.status !== "pending" && b.status === "pending") return 1;
+
         // Second priority: sort by payment date (newest first)
         const dateA = new Date(a.payment_date).getTime();
         const dateB = new Date(b.payment_date).getTime();
@@ -190,7 +190,7 @@ const PaymentPage: React.FC = () => {
   };
 
   return (
-    <div className="-mt-12 p-6 max-w-full mx-auto px-8">
+    <div className="pb-4 max-w-full mx-auto px-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">

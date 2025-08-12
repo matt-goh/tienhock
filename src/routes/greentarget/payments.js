@@ -84,7 +84,7 @@ export default function (pool) {
            AND (status IS NULL OR status != 'cancelled')`,
           [invoice_id, payment_reference.trim()]
         );
-        
+
         if (duplicateCheck.rows.length > 0) {
           throw new Error(
             `Payment reference "${payment_reference}" already exists for this invoice. Please use a unique reference.`
@@ -108,6 +108,9 @@ export default function (pool) {
 
       const invoice = invoiceResult.rows[0];
 
+      // Determine initial status based on payment method
+      const initialStatus = payment_method === "cheque" ? "pending" : "active";
+
       // Create the payment
       const paymentQuery = `
         INSERT INTO greentarget.payments (
@@ -116,9 +119,10 @@ export default function (pool) {
           amount_paid,
           payment_method,
           payment_reference,
-          internal_reference
+          internal_reference,
+          status
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
       `;
 
@@ -129,41 +133,47 @@ export default function (pool) {
         payment_method,
         payment_reference || null,
         internal_reference || null,
+        initialStatus,
       ]);
 
-      // Update invoice balance_due
-      const newBalanceDue = Math.max(
-        0,
-        parseFloat(invoice.balance_due) - parseFloat(amount_paid)
-      );
-      const currentStatus = invoice.status;
-
-      if (newBalanceDue === 0) {
-        // If fully paid, always set to paid
-        await client.query(
-          `UPDATE greentarget.invoices SET balance_due = $1, status = 'paid' WHERE invoice_id = $2`,
-          [newBalanceDue, invoice_id]
+      // Only update invoice balance if payment is active (not pending)
+      if (initialStatus === "active") {
+        const newBalanceDue = Math.max(
+          0,
+          parseFloat(invoice.balance_due) - parseFloat(amount_paid)
         );
-      } else {
-        // If partially paid, maintain overdue status if already overdue
-        const newStatus = currentStatus === "overdue" ? "overdue" : "active";
+        const currentStatus = invoice.status;
 
+        if (newBalanceDue === 0) {
+          // If fully paid, always set to paid
+          await client.query(
+            `UPDATE greentarget.invoices SET balance_due = $1, status = 'paid' WHERE invoice_id = $2`,
+            [newBalanceDue, invoice_id]
+          );
+        } else {
+          // If partially paid, maintain overdue status if already overdue
+          const newStatus = currentStatus === "overdue" ? "overdue" : "active";
+
+          await client.query(
+            `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
+            [newBalanceDue, newStatus, invoice_id]
+          );
+        }
+
+        // Update customer last_activity_date only for active payments
         await client.query(
-          `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
-          [newBalanceDue, newStatus, invoice_id]
+          `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
+          [invoice.customer_id]
         );
       }
-
-      // Update customer last_activity_date
-      await client.query(
-        `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
-        [invoice.customer_id]
-      );
 
       await client.query("COMMIT");
 
       res.status(201).json({
-        message: "Payment created successfully",
+        message:
+          initialStatus === "pending"
+            ? "Payment created successfully (pending confirmation)"
+            : "Payment created successfully",
         payment: paymentResult.rows[0],
       });
     } catch (error) {
@@ -270,6 +280,198 @@ export default function (pool) {
     }
   });
 
+  // Check if internal reference is available
+  router.get("/check-internal-ref/:ref(*)", async (req, res) => {
+    const internal_reference = decodeURIComponent(req.params.ref);
+    const { exclude_payment_id } = req.query;
+
+    try {
+      let query = `
+        SELECT payment_id 
+        FROM greentarget.payments 
+        WHERE internal_reference = $1 
+        AND (status IS NULL OR status != 'cancelled')
+      `;
+      const params = [internal_reference];
+
+      if (exclude_payment_id) {
+        query += " AND payment_id != $2";
+        params.push(parseInt(exclude_payment_id, 10));
+      }
+
+      const result = await pool.query(query, params);
+
+      res.json({
+        available: result.rows.length === 0,
+        exists: result.rows.length > 0,
+        existing_id: result.rows.length > 0 ? result.rows[0].payment_id : null,
+      });
+    } catch (error) {
+      console.error("Error checking internal reference:", error);
+      res.status(500).json({
+        message: "Error checking internal reference",
+        error: error.message,
+      });
+    }
+  });
+
+  // Update a payment (currently for reference fields only to avoid balance complexity)
+  router.put("/:payment_id", async (req, res) => {
+    const { payment_id } = req.params;
+    const { internal_reference, payment_reference } = req.body;
+
+    // Check if there is anything to update
+    if (internal_reference === undefined && payment_reference === undefined) {
+      return res.status(400).json({ message: "No updatable fields provided." });
+    }
+
+    try {
+      // If internal_reference is being updated, check for duplicates on non-cancelled payments
+      if (internal_reference !== undefined && internal_reference !== null) {
+        const checkQuery = `
+          SELECT payment_id 
+          FROM greentarget.payments 
+          WHERE internal_reference = $1 
+            AND payment_id != $2 
+            AND (status IS NULL OR status != 'cancelled')
+        `;
+        const checkResult = await pool.query(checkQuery, [
+          internal_reference,
+          payment_id,
+        ]);
+        if (checkResult.rows.length > 0) {
+          return res.status(409).json({
+            // 409 Conflict
+            message: `Internal reference "${internal_reference}" is already in use on an active payment.`,
+            error: "duplicate_reference",
+          });
+        }
+      }
+
+      // Build the update query dynamically
+      const fieldsToUpdate = [];
+      const queryParams = [];
+      let paramIndex = 1;
+
+      if (internal_reference !== undefined) {
+        fieldsToUpdate.push(`internal_reference = $${paramIndex++}`);
+        queryParams.push(internal_reference);
+      }
+
+      if (payment_reference !== undefined) {
+        fieldsToUpdate.push(`payment_reference = $${paramIndex++}`);
+        queryParams.push(payment_reference);
+      }
+
+      queryParams.push(payment_id);
+
+      const query = `
+        UPDATE greentarget.payments
+        SET ${fieldsToUpdate.join(", ")}
+        WHERE payment_id = $${paramIndex}
+        RETURNING *
+      `;
+
+      const result = await pool.query(query, queryParams);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      res.json({
+        message: "Payment updated successfully",
+        payment: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      res.status(500).json({
+        message: "Error updating payment",
+        error: error.message,
+      });
+    }
+  });
+
+  // Confirm pending payment
+  router.put("/:payment_id/confirm", async (req, res) => {
+    const { payment_id } = req.params;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Get the payment details and lock the payment row
+      const paymentQuery = `
+        SELECT p.*, i.customer_id, i.balance_due, i.status as invoice_status
+        FROM greentarget.payments p
+        JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
+        WHERE p.payment_id = $1 AND p.status = 'pending'
+        FOR UPDATE OF p, i
+      `;
+      const paymentResult = await client.query(paymentQuery, [payment_id]);
+
+      if (paymentResult.rows.length === 0) {
+        return res.status(404).json({
+          message: "Payment not found or not in pending status",
+        });
+      }
+
+      const payment = paymentResult.rows[0];
+      const { invoice_id, amount_paid, customer_id } = payment;
+      const currentBalance = parseFloat(payment.balance_due);
+      const paymentAmount = parseFloat(amount_paid);
+
+      // Update payment status to active
+      const updatePaymentQuery = `
+        UPDATE greentarget.payments 
+        SET status = 'active' 
+        WHERE payment_id = $1
+        RETURNING *
+      `;
+      const updatedPayment = await client.query(updatePaymentQuery, [
+        payment_id,
+      ]);
+
+      // Update invoice balance and status
+      const newBalanceDue = Math.max(0, currentBalance - paymentAmount);
+      const currentInvoiceStatus = payment.invoice_status;
+
+      let newInvoiceStatus;
+      if (newBalanceDue === 0) {
+        newInvoiceStatus = "paid";
+      } else {
+        newInvoiceStatus =
+          currentInvoiceStatus === "overdue" ? "overdue" : "active";
+      }
+
+      await client.query(
+        `UPDATE greentarget.invoices SET balance_due = $1, status = $2 WHERE invoice_id = $3`,
+        [newBalanceDue, newInvoiceStatus, invoice_id]
+      );
+
+      // Update customer last_activity_date
+      await client.query(
+        `UPDATE greentarget.customers SET last_activity_date = CURRENT_DATE WHERE customer_id = $1`,
+        [customer_id]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({
+        message: "Payment confirmed successfully",
+        payment: updatedPayment.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error confirming Green Target payment:", error);
+      res.status(500).json({
+        message: "Error confirming payment",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   router.put("/:payment_id/cancel", async (req, res) => {
     const { payment_id } = req.params;
     const { reason } = req.body; // Optional cancellation reason
@@ -278,13 +480,13 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // Get payment details before cancelling
+      // Get payment details and related invoice status, and lock rows for update
       const paymentQuery = `
-        SELECT p.*, i.customer_id, i.balance_due 
-        FROM greentarget.payments p 
+        SELECT p.*, i.customer_id, i.balance_due, i.status as invoice_status
+        FROM greentarget.payments p
         JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id
-          AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
-        FOR UPDATE OF i
+        WHERE p.payment_id = $1 AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending')
+        FOR UPDATE OF p, i
       `;
       const paymentResult = await client.query(paymentQuery, [payment_id]);
 
@@ -299,8 +501,8 @@ export default function (pool) {
 
       // Set payment status to cancelled
       const updatePaymentQuery = `
-        UPDATE greentarget.payments 
-        SET status = 'cancelled', 
+        UPDATE greentarget.payments
+        SET status = 'cancelled',
             cancellation_date = CURRENT_TIMESTAMP,
             cancellation_reason = $1
         WHERE payment_id = $2
@@ -311,27 +513,20 @@ export default function (pool) {
         payment_id,
       ]);
 
-      // Get the current invoice balance
-      const invoiceQuery =
-        "SELECT balance_due FROM greentarget.invoices WHERE invoice_id = $1";
-      const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
-
-      if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice with ID ${invoice_id} not found`);
-      }
-
-      // Get both the balance and status
-      const currentBalance = parseFloat(invoiceResult.rows[0].balance_due);
-      const currentStatus = invoiceResult.rows[0].status;
-      const newBalance = currentBalance + parseFloat(amount_paid);
+      // Use details fetched from the first query to update the invoice
+      const currentBalance = parseFloat(payment.balance_due);
+      const currentInvoiceStatus = payment.invoice_status;
+      const paymentAmount = parseFloat(amount_paid);
+      const newBalance = currentBalance + paymentAmount;
 
       // Determine the new status based on balance and current status
       let newStatus;
-      if (newBalance === 0) {
-        newStatus = "paid";
+      if (newBalance > 0) {
+        // If it was already overdue, keep it that way. Otherwise, 'active'.
+        newStatus = currentInvoiceStatus === "overdue" ? "overdue" : "active";
       } else {
-        // Maintain overdue status if already overdue
-        newStatus = currentStatus === "overdue" ? "overdue" : "active";
+        // If balance is 0 or less, it's paid.
+        newStatus = "paid";
       }
 
       // Update both balance and status

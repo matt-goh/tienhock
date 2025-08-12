@@ -6,7 +6,15 @@ import {
   IconPrinter,
   IconDownload,
   IconFileExport,
+  IconLink,
 } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
@@ -23,6 +31,70 @@ import {
 } from "../../utils/payroll/BankReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import toast from "react-hot-toast";
+
+// Location mapping with proper order
+const LOCATION_MAP: { [key: string]: string } = {
+  "01": "DIRECTOR'S REMUNERATION",
+  "02": "OFFICE",
+  "03": "SALESMAN",
+  "04": "IKUT LORI",
+  "05": "PENGANGKUTAN HABUK",
+  "06": "JAGA BOILER",
+  "07": "MESIN & SANGKUT MEE",
+  "08": "PACKING MEE",
+  "09": "MESIN BIHUN",
+  "10": "SANGKUT BIHUN",
+  "11": "PACKING BIHUN",
+  "12": "PEKEBUN",
+  "13": "TUKANG SAPU",
+  "14": "KILANG KERJA LUAR",
+  "15": "OTHER SABARINA",
+  "16": "COMM-MESIN MEE",
+  "17": "COMM-MESIN BIHUN",
+  "18": "COMM-KILANG",
+  "19": "COMM-LORI",
+  "20": "COMM-BOILER",
+  "21": "COMM-FORKLIFT/CASE",
+  "22": "KILANG HABUK",
+  "23": "CUTI TAHUNAN",
+  "24": "SPECIAL OT",
+};
+
+// Location order with headers
+interface LocationOrderItem {
+  type: "location" | "header";
+  id?: string;
+  text?: string;
+}
+
+const LOCATION_ORDER: LocationOrderItem[] = [
+  { type: "location", id: "01" },
+  { type: "location", id: "02" },
+  { type: "location", id: "03" },
+  { type: "location", id: "04" },
+  { type: "location", id: "05" },
+  { type: "location", id: "06" },
+  { type: "location", id: "07" },
+  { type: "location", id: "08" },
+  { type: "location", id: "09" },
+  { type: "location", id: "10" },
+  { type: "location", id: "11" },
+  { type: "location", id: "12" },
+  { type: "location", id: "13" },
+  { type: "header", text: "KERJA LUAR MAINTENANCE" },
+  { type: "location", id: "14" },
+  { type: "location", id: "15" },
+  { type: "header", text: "COMMISSION" },
+  { type: "location", id: "16" },
+  { type: "location", id: "17" },
+  { type: "location", id: "18" },
+  { type: "location", id: "19" },
+  { type: "location", id: "20" },
+  { type: "location", id: "21" },
+  { type: "location", id: "22" },
+  { type: "location", id: "23" },
+  { type: "location", id: "24" },
+];
 
 interface SalaryReportData {
   no: number;
@@ -46,6 +118,85 @@ interface SalaryReportResponse {
     total_pinjam: number;
     total_final: number;
   };
+  comprehensive?: ComprehensiveSalaryData;
+  bank_data?: {
+    no: number;
+    staff_name: string;
+    icNo: string;
+    bankAccountNumber: string;
+    total: number;
+    payment_preference: string;
+  }[];
+}
+
+// Comprehensive salary data for location-based reporting
+interface LocationSalaryData {
+  location: string;
+  employees: {
+    staff_id: string;
+    staff_name: string;
+    gaji: number; // Base Pay + Tambahan
+    ot: number; // Overtime total
+    bonus: number; // Bonus amount
+    comm: number; // Commission amount
+    gaji_kasar: number; // Gross pay
+    epf_majikan: number;
+    epf_pekerja: number;
+    socso_majikan: number;
+    socso_pekerja: number;
+    sip_majikan: number;
+    sip_pekerja: number;
+    pcb: number; // Income tax
+    gaji_bersih: number; // Net pay + commission
+    setengah_bulan: number; // Mid month pay
+    jumlah: number; // GAJI BERSIH - 1/2 BULAN
+    jumlah_digenapkan: number; // Rounding (empty in new system)
+    setelah_digenapkan: number; // Same as JUMLAH
+  }[];
+  totals: {
+    gaji: number;
+    ot: number;
+    bonus: number;
+    comm: number;
+    gaji_kasar: number;
+    epf_majikan: number;
+    epf_pekerja: number;
+    socso_majikan: number;
+    socso_pekerja: number;
+    sip_majikan: number;
+    sip_pekerja: number;
+    pcb: number;
+    gaji_bersih: number;
+    setengah_bulan: number;
+    jumlah: number;
+    jumlah_digenapkan: number;
+    setelah_digenapkan: number;
+  };
+}
+
+interface ComprehensiveSalaryData {
+  year: number;
+  month: number;
+  locations: LocationSalaryData[];
+  grand_totals: {
+    gaji: number;
+    ot: number;
+    bonus: number;
+    comm: number;
+    gaji_kasar: number;
+    epf_majikan: number;
+    epf_pekerja: number;
+    socso_majikan: number;
+    socso_pekerja: number;
+    sip_majikan: number;
+    sip_pekerja: number;
+    pcb: number;
+    gaji_bersih: number;
+    setengah_bulan: number;
+    jumlah: number;
+    jumlah_digenapkan: number;
+    setelah_digenapkan: number;
+  };
 }
 
 const SalaryReportPage: React.FC = () => {
@@ -53,45 +204,45 @@ const SalaryReportPage: React.FC = () => {
   const [reportData, setReportData] = useState<SalaryReportResponse | null>(
     null
   );
+  const [comprehensiveSalaryData, setComprehensiveSalaryData] =
+    useState<ComprehensiveSalaryData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
+  const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [exportYear, setExportYear] = useState<number>(
+    new Date().getFullYear()
+  );
+  const [exportMonth, setExportMonth] = useState<number>(
+    new Date().getMonth() + 1
+  );
 
   // Filters
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState(0); // 0 = Bank, 1 = Pinjam
+  const [activeTab, setActiveTab] = useState(0); // 0 = Salary, 1 = Bank, 2 = Pinjam
 
   // Staff data
   const { staffs } = useStaffsCache();
 
-  // Bank table data - combine staff info with salary data
+  // Bank table data - now comes directly from API
   const bankTableData = useMemo(() => {
-    if (!reportData || !staffs) return [];
-
-    return reportData.data.map((salaryItem) => {
-      const staff = staffs.find((s) => s.id === salaryItem.staff_id);
-      return {
-        no: salaryItem.no,
-        staff_name: salaryItem.staff_name,
-        icNo: staff?.icNo || "N/A",
-        bankAccountNumber: staff?.bankAccountNumber || "N/A",
-        total: salaryItem.final_total,
-        payment_preference: salaryItem.payment_preference,
-      };
-    });
-  }, [reportData, staffs]);
+    if (!reportData?.bank_data) return [];
+    return reportData.bank_data;
+  }, [reportData]);
 
   // Generate year and month options
   const yearOptions = useMemo(() => {
     const years = [];
-    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
+    const startYear = new Date().getFullYear() - 5; // Go back 5 years
+    const endYear = new Date().getFullYear(); // Current year
+    for (let year = endYear; year >= startYear; year--) {
       years.push({ id: year, name: year.toString() });
     }
     return years;
-  }, [currentYear]);
+  }, []);
 
   const monthOptions = useMemo(
     () =>
@@ -114,9 +265,11 @@ const SalaryReportPage: React.FC = () => {
         `/api/salary-report?year=${currentYear}&month=${currentMonth}`
       );
       setReportData(response);
+      setComprehensiveSalaryData(response.comprehensive);
     } catch (error) {
       console.error("Error fetching salary report:", error);
       setReportData(null);
+      setComprehensiveSalaryData(null);
     } finally {
       setIsLoading(false);
     }
@@ -139,6 +292,9 @@ const SalaryReportPage: React.FC = () => {
     setIsGeneratingPDF(true);
     try {
       if (activeTab === 0) {
+        // Salary tab - comprehensive report (will need new PDF generator)
+        toast("Comprehensive salary report PDF will be implemented soon");
+      } else if (activeTab === 1) {
         // Generate Bank Report PDF
         const bankPdfData: BankReportPDFData = {
           year: reportData.year,
@@ -153,7 +309,7 @@ const SalaryReportPage: React.FC = () => {
         await generateBankReportPDF(bankPdfData, action);
         const actionText =
           action === "download" ? "downloaded" : "generated for printing";
-        toast.success(`Salary report ${actionText} successfully`);
+        toast.success(`Bank report ${actionText} successfully`);
       } else {
         // Generate Pinjam (Salary) Report PDF
         const pdfData: SalaryReportPDFData = {
@@ -167,7 +323,7 @@ const SalaryReportPage: React.FC = () => {
         await generateSalaryReportPDF(pdfData, action);
         const actionText =
           action === "download" ? "downloaded" : "generated for printing";
-        toast.success(`Bank report ${actionText} successfully`);
+        toast.success(`Pinjam report ${actionText} successfully`);
       }
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -178,6 +334,25 @@ const SalaryReportPage: React.FC = () => {
   };
 
   // Text Export Generation
+  const generateExportURL = () => {
+    // Determine server URL based on environment
+    const isProduction = window.location.hostname === "tienhock.com";
+    const baseURL = isProduction
+      ? "https://api.tienhock.com"
+      : "http://localhost:5001";
+    const url = `${baseURL}/api/excel/payment-export?year=${exportYear}&month=${exportMonth}&api_key=foodmaker`;
+
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        toast.success("Export URL copied to clipboard!");
+        setShowExportDialog(false);
+      })
+      .catch(() => {
+        toast.error("Failed to copy URL to clipboard");
+      });
+  };
+
   const generateTextExport = async () => {
     if (!reportData || reportData.data.length === 0) {
       toast.error("No data available to export");
@@ -188,13 +363,35 @@ const SalaryReportPage: React.FC = () => {
     try {
       // Generate payment date (last day of the month)
       const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
-      const paymentDate = `${lastDayOfMonth.toString().padStart(2, "0")}/${currentMonth.toString().padStart(2, "0")}/${currentYear}`;
+      const paymentDate = `${lastDayOfMonth
+        .toString()
+        .padStart(2, "0")}/${currentMonth
+        .toString()
+        .padStart(2, "0")}/${currentYear}`;
 
       // Define payment date row
       const paymentDateRow = [
         "PAYMENT DATE : (DD/MM/YYYY)",
         paymentDate,
-        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
       ];
 
       // Define column headers with 2-row format
@@ -219,7 +416,7 @@ const SalaryReportPage: React.FC = () => {
         "E-mail Content Line 2 (will be shown in bene email)",
         "E-mail Content Line 3 (will be shown in bene email)",
         "E-mail Content Line 4 (will be shown in bene email)",
-        "E-mail Content Line 5 (will be shown in bene email)"
+        "E-mail Content Line 5 (will be shown in bene email)",
       ];
 
       const headerRow2 = [
@@ -243,7 +440,7 @@ const SalaryReportPage: React.FC = () => {
         "(O) - Char: 40 - AN",
         "(O) - Char: 40 - AN",
         "(O) - Char: 40 - AN",
-        "(O) - Char: 40 - AN"
+        "(O) - Char: 40 - AN",
       ];
 
       // Generate data rows
@@ -251,8 +448,10 @@ const SalaryReportPage: React.FC = () => {
         .filter((row) => parseFloat(row.final_total.toString()) > 0)
         .map((row) => {
           const staff = staffs?.find((s) => s.id === row.staff_id);
-          const paymentAmount = parseFloat(row.final_total.toString()).toFixed(2);
-          
+          const paymentAmount = parseFloat(row.final_total.toString()).toFixed(
+            2
+          );
+
           const columns = [
             "PBB", // Column 1
             (staff?.bankAccountNumber || "").replace(/-/g, ""), // Column 2 - remove hyphens
@@ -262,14 +461,21 @@ const SalaryReportPage: React.FC = () => {
             (staff?.icNo || "").replace(/-/g, ""), // Column 6 - remove hyphens
             paymentAmount, // Column 7 - plain number format
             "Salary", // Column 8
-            "", "", "", "", "", "", "", "", // Columns 9-16
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "", // Columns 9-16
             "Content Line 1", // Column 17
             "Content Line 2", // Column 18
             "Content Line 3", // Column 19
             "Content Line 4", // Column 20
-            "Content Line 5" // Column 21
+            "Content Line 5", // Column 21
           ];
-          
+
           return columns;
         });
 
@@ -281,9 +487,26 @@ const SalaryReportPage: React.FC = () => {
       // Create total row
       const totalRow = [
         "TOTAL:",
-        "", "", "", "", "",
+        "",
+        "",
+        "",
+        "",
+        "",
         totalAmount.toFixed(2),
-        "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
       ];
 
       // Combine all rows
@@ -292,18 +515,22 @@ const SalaryReportPage: React.FC = () => {
         headerRow1,
         headerRow2,
         ...dataRows,
-        totalRow
+        totalRow,
       ];
 
       // Convert to text format (semicolon separated)
-      const textContent = allRows.map(row => row.join(";")).join("\r\n");
+      const textContent = allRows.map((row) => row.join(";")).join("\r\n");
 
       // Create and download the file
-      const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
+      const blob = new Blob([textContent], {
+        type: "text/plain;charset=utf-8",
+      });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `payment-export-${currentMonth.toString().padStart(2, "0")}-${currentYear}.txt`;
+      link.download = `payment-export-${currentMonth
+        .toString()
+        .padStart(2, "0")}-${currentYear}.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -318,45 +545,407 @@ const SalaryReportPage: React.FC = () => {
     }
   };
 
+  // Comprehensive Salary Table Component
+  const ComprehensiveSalaryTable = () => {
+    if (!comprehensiveSalaryData) return null;
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full border border-default-200 rounded-lg overflow-hidden">
+          <thead className="bg-default-50 border-b border-default-200">
+            <tr>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                BIL
+              </th>
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                BAHAGIAN KERJA
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                GAJI
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                OT
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                BONUS
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                COMM
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                GAJI KASAR
+              </th>
+              <th
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                colSpan={2}
+              >
+                EPF
+              </th>
+              <th
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                colSpan={2}
+              >
+                SOCSO
+              </th>
+              <th
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                colSpan={2}
+              >
+                SIP
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300">
+                PCB
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                GAJI BERSIH
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                1/2 BULAN
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                JUMLAH
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                JUMLAH DIGENAPKAN
+              </th>
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                SETELAH DIGENAPKAN
+              </th>
+            </tr>
+            <tr className="bg-default-50 border-t border-default-200">
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+                MAJ
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+                PKJ
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+                MAJ
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+                PKJ
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+                MAJ
+              </th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+                PKJ
+              </th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-default-200">
+            {LOCATION_ORDER.map((item, index) => {
+              if (item.type === "header") {
+                return (
+                  <tr key={`header-${index}`} className="bg-default-100">
+                    <td
+                      colSpan={19}
+                      className="px-2 py-2 text-center text-xs font-medium text-default-600 border-t border-default-300"
+                    >
+                      {item.text}
+                    </td>
+                  </tr>
+                );
+              }
+
+              const locationData = comprehensiveSalaryData.locations.find(
+                (loc) => loc.location === item.id
+              );
+              const locationNumber = item.id!;
+              const locationName = LOCATION_MAP[item.id!];
+
+              return (
+                <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
+                  <td className="px-2 py-2 text-xs text-default-900 text-center">
+                    {locationNumber}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-left">
+                    {locationName}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.gaji || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.ot || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.bonus || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.comm || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.gaji_kasar || 0)}
+                  </td>
+                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
+                    {formatCurrency(locationData?.totals.epf_majikan || 0)}
+                  </td>
+                  <td className="px-1 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.epf_pekerja || 0)}
+                  </td>
+                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
+                    {formatCurrency(locationData?.totals.socso_majikan || 0)}
+                  </td>
+                  <td className="px-1 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.socso_pekerja || 0)}
+                  </td>
+                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
+                    {formatCurrency(locationData?.totals.sip_majikan || 0)}
+                  </td>
+                  <td className="px-1 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.sip_pekerja || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-sm text-default-600 text-center border-l border-default-300">
+                    {formatCurrency(locationData?.totals.pcb || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.gaji_bersih || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.setengah_bulan || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(locationData?.totals.jumlah || 0)}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(
+                      locationData?.totals.jumlah_digenapkan || 0
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                    {formatCurrency(
+                      locationData?.totals.setelah_digenapkan || 0
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-default-100 border-t-2 border-default-300">
+            <tr>
+              <td
+                colSpan={2}
+                className="px-2 py-2 text-xs font-bold text-default-700 text-center"
+              >
+                GRAND TOTAL
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.gaji_kasar
+                )}
+              </td>
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.epf_majikan
+                )}
+              </td>
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.epf_pekerja
+                )}
+              </td>
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.socso_majikan
+                )}
+              </td>
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.socso_pekerja
+                )}
+              </td>
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.sip_majikan
+                )}
+              </td>
+              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.sip_pekerja
+                )}
+              </td>
+              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center border-l border-default-300">
+                {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.gaji_bersih
+                )}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.setengah_bulan
+                )}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.jumlah_digenapkan
+                )}
+              </td>
+              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+                {formatCurrency(
+                  comprehensiveSalaryData.grand_totals.setelah_digenapkan
+                )}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  };
+
+  // Export Dialog Component
+  const ExportDialog = () => (
+    <Transition appear show={showExportDialog} as={React.Fragment}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 z-50"
+        onClose={() => setShowExportDialog(false)}
+      >
+        <div className="min-h-screen px-4 text-center">
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogPanel
+              className="fixed inset-0 bg-black opacity-30"
+              onClick={() => setShowExportDialog(false)}
+            />
+          </TransitionChild>
+
+          <span
+            className="inline-block h-screen align-middle"
+            aria-hidden="true"
+          >
+            &#8203;
+          </span>
+
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <DialogPanel
+              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DialogTitle
+                as="h3"
+                className="text-lg font-medium leading-6 text-default-900"
+              >
+                Export Link Generator
+              </DialogTitle>
+              <div className="mt-4 space-y-4">
+                <FormListbox
+                  name="exportYear"
+                  label="Year"
+                  value={exportYear.toString()}
+                  onChange={(value) => setExportYear(Number(value))}
+                  options={yearOptions}
+                />
+                <FormListbox
+                  name="exportMonth"
+                  label="Month"
+                  value={exportMonth.toString()}
+                  onChange={(value) => setExportMonth(Number(value))}
+                  options={monthOptions}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  onClick={() => setShowExportDialog(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={generateExportURL} color="blue" size="sm">
+                  Copy URL
+                </Button>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+
   // Bank Table Component
   const BankTable = () => (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-default-200">
-        <thead className="bg-default-50">
+      <table className="w-full border border-default-200 rounded-lg overflow-hidden">
+        <thead className="bg-default-50 border-b border-default-200">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
               NO.
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
               STAFF NAME
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
               IC NO.
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
               BANK ACCOUNT NUMBER
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
               TOTAL
             </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-default-200">
-          {bankTableData.map((item) => (
-            <tr key={item.no} className="hover:bg-default-50">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+          {bankTableData.map((item, index) => (
+            <tr key={item.no} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
+              <td className="px-2 py-2 text-sm text-default-900">
                 {item.no}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+              <td className="px-2 py-2 text-sm text-default-900 font-medium">
                 {item.staff_name}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+              <td className="px-2 py-2 text-sm text-default-600">
                 {item.icNo}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+              <td className="px-2 py-2 text-sm text-default-600">
                 {item.bankAccountNumber}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 text-right">
+              <td className="px-2 py-2 text-sm text-default-900 font-medium text-right">
                 {formatCurrency(item.total)}
               </td>
             </tr>
@@ -369,52 +958,52 @@ const SalaryReportPage: React.FC = () => {
   // Pinjam Table Component
   const PinjamTable = () => (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-default-200">
-        <thead className="bg-default-50">
+      <table className="w-full border border-default-200 rounded-lg overflow-hidden">
+        <thead className="bg-default-50 border-b border-default-200">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
               NO.
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
               STAFF/ID
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
               GAJI/GENAP
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
               TOTAL PINJAM
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
               TOTAL
             </th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+            <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
               PAYMENT
             </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-default-200">
-          {reportData?.data.map((item) => (
-            <tr key={item.staff_id} className="hover:bg-default-50">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+          {reportData?.data.map((item, index) => (
+            <tr key={item.staff_id} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
+              <td className="px-2 py-2 text-sm text-default-900">
                 {item.no}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm font-medium text-default-900">
+              <td className="px-2 py-2">
+                <div className="text-sm text-default-900 font-medium">
                   {item.staff_id} - {item.staff_name}
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-right">
+              <td className="px-2 py-2 text-sm text-default-600 text-right">
                 {formatCurrency(item.gaji_genap)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-right">
+              <td className="px-2 py-2 text-sm text-default-600 text-right">
                 {formatCurrency(item.total_pinjam)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 text-right">
+              <td className="px-2 py-2 text-sm text-default-900 font-medium text-right">
                 {formatCurrency(item.final_total)}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 text-center">
+              <td className="px-2 py-2 text-sm text-default-900 text-center">
                 <span
-                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  className={`inline-flex px-2 py-1 text-sm font-semibold rounded-full ${
                     item.payment_preference === "Bank"
                       ? "bg-sky-100 text-sky-800"
                       : "bg-emerald-100 text-emerald-800"
@@ -516,20 +1105,33 @@ const SalaryReportPage: React.FC = () => {
                 >
                   Download
                 </Button>
-                <Button
-                  onClick={generateTextExport}
-                  icon={IconFileExport}
-                  color="purple"
-                  variant="outline"
-                  disabled={
-                    !reportData ||
-                    reportData.data.length === 0 ||
-                    isGeneratingExport
-                  }
-                  size="sm"
-                >
-                  Export
-                </Button>
+                {activeTab === 1 && (
+                  <>
+                    <Button
+                      onClick={generateTextExport}
+                      icon={IconFileExport}
+                      color="purple"
+                      variant="outline"
+                      disabled={
+                        !reportData ||
+                        reportData.data.length === 0 ||
+                        isGeneratingExport
+                      }
+                      size="sm"
+                    >
+                      Export
+                    </Button>
+                    <Button
+                      onClick={() => setShowExportDialog(true)}
+                      icon={IconLink}
+                      color="orange"
+                      variant="outline"
+                      size="sm"
+                    >
+                      Export Link
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -552,10 +1154,13 @@ const SalaryReportPage: React.FC = () => {
           <>
             <div className="px-6 py-4">
               <Tab
-                labels={["Bank", "Pinjam"]}
+                labels={["Salary", "Bank", "Pinjam"]}
                 defaultActiveTab={activeTab}
                 onTabChange={setActiveTab}
               >
+                <div>
+                  <ComprehensiveSalaryTable />
+                </div>
                 <div>
                   <BankTable />
                 </div>
@@ -597,6 +1202,9 @@ const SalaryReportPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Export Dialog */}
+      <ExportDialog />
     </div>
   );
 };
