@@ -101,7 +101,7 @@ const JobPage: React.FC = () => {
 
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(15); // Can increase this now
+  const [itemsPerPage] = useState<number>(100); // Can increase this now
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -472,7 +472,7 @@ const JobPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className={`relative w-full px-4 mb-2 md:mx-6 -mt-8`}>
+    <div className={`relative w-full px-4 mb-2 md:mx-6`}>
       <h1 className="mb-4 text-center text-xl font-semibold text-default-800">
         Job & Pay Codes
       </h1>
@@ -518,7 +518,7 @@ const JobPage: React.FC = () => {
       {selectedJob && (
         <>
           {/* --- Job Selection Combobox and Info (Only shows after selection) --- */}
-          <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
             <div className="md:flex-shrink-0">
               {/* Existing Job Combobox */}
               <label className="block text-sm font-medium text-default-700 mb-1">
@@ -659,7 +659,7 @@ const JobPage: React.FC = () => {
 
           {/* --- Staff Section --- */}
           {selectedJob && (
-            <div className="mt-2 mb-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-medium text-default-700">
                 Staff Associated with this Job:
               </h3>
@@ -688,7 +688,7 @@ const JobPage: React.FC = () => {
           )}
 
           {/* --- Pay Codes Section (Only shows after selection) --- */}
-          <div className="mt-6 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm">
             {/* Header + Add Button + Search */}
             <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
               <h2 className="text-lg font-semibold text-default-800">

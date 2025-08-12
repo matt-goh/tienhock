@@ -2624,7 +2624,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   return (
-    <div className="relative w-full mx-4 mb-4 md:mx-6 -mt-8">
+    <div className="relative w-full mx-4 mb-4 md:mx-6">
       <BackButton onClick={handleBack} />
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <h1 className="text-xl font-semibold text-default-800 mb-4">

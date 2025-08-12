@@ -47,11 +47,13 @@ export const useStaffsCache = () => {
       const response = await api.get("/api/staffs");
 
       if (response) {
-        // Ensure job and location arrays are always arrays
+        // Ensure job and location arrays are always arrays and new fields have defaults
         const normalizedStaffs = response.map((staff: Employee) => ({
           ...staff,
           job: Array.isArray(staff.job) ? staff.job : [],
           location: Array.isArray(staff.location) ? staff.location : [],
+          department: staff.department || "",
+          kwspNumber: staff.kwspNumber || "",
         }));
 
         setAllStaffs(normalizedStaffs);

@@ -326,7 +326,8 @@ export default function (pool) {
       // Check for associated invoices (through rentals)
       const invoiceCheck = await pool.query(
         `SELECT COUNT(*) FROM greentarget.invoices i 
-       JOIN greentarget.rentals r ON i.rental_id = r.rental_id 
+       JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+       JOIN greentarget.rentals r ON ir.rental_id = r.rental_id 
        WHERE r.tong_no = $1`,
         [tong_no]
       );
@@ -343,7 +344,8 @@ export default function (pool) {
       const paymentCheck = await pool.query(
         `SELECT COUNT(*) FROM greentarget.payments p 
        JOIN greentarget.invoices i ON p.invoice_id = i.invoice_id 
-       JOIN greentarget.rentals r ON i.rental_id = r.rental_id 
+       JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+       JOIN greentarget.rentals r ON ir.rental_id = r.rental_id 
        WHERE r.tong_no = $1`,
         [tong_no]
       );

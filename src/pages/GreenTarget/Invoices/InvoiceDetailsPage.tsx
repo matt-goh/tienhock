@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx
-import React, { useState, useEffect, Fragment } from "react"; // Added Fragment
+import React, { useState, useEffect, Fragment, useCallback } from "react"; // Added Fragment, useCallback
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   IconFileInvoice,
@@ -15,10 +15,15 @@ import {
   IconRefresh,
   IconFileDownload,
   IconFiles,
+  IconCircleCheck,
+  IconPencil,
+  IconX,
+  IconDeviceFloppy,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
+import { api } from "../../../routes/utils/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   Listbox,
@@ -46,7 +51,7 @@ interface Payment {
   payment_method: string;
   payment_reference?: string;
   internal_reference?: string;
-  status?: "active" | "cancelled";
+  status?: "active" | "cancelled" | "pending";
   cancellation_date?: string;
   cancellation_reason?: string;
 }
@@ -90,6 +95,12 @@ const InvoiceDetailsPage: React.FC = () => {
     useState(false);
   const [paymentToCancel, setPaymentToCancel] = useState<Payment | null>(null);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
+  const [showConfirmPaymentDialog, setShowConfirmPaymentDialog] =
+    useState(false);
+  const [paymentToConfirm, setPaymentToConfirm] = useState<Payment | null>(
+    null
+  );
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [isCancelInvoiceDialogOpen, setIsCancelInvoiceDialogOpen] =
     useState(false);
   const [isCancellingInvoice, setIsCancellingInvoice] = useState(false);
@@ -109,6 +120,16 @@ const InvoiceDetailsPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false); // To disable buttons
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [consolidatedInfo, setConsolidatedInfo] = useState<any>(null);
+
+  // --- NEW State for inline editing ---
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [editedRefValue, setEditedRefValue] = useState("");
+  const [refValidation, setRefValidation] = useState({
+    isValidating: false,
+    isDuplicate: false,
+    message: "",
+  });
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -142,6 +163,103 @@ const InvoiceDetailsPage: React.FC = () => {
 
     generateQR();
   }, [invoice]);
+
+  // Debounced validation for internal reference
+  const validateInternalRef = useCallback(
+    async (ref: string, paymentId: number) => {
+      if (!ref) {
+        setRefValidation({
+          isValidating: false,
+          isDuplicate: false,
+          message: "",
+        });
+        return;
+      }
+      setRefValidation((prev) => ({ ...prev, isValidating: true }));
+      try {
+        const result = await greenTargetApi.checkInternalPaymentRef(
+          ref,
+          paymentId
+        );
+        setRefValidation({
+          isValidating: false,
+          isDuplicate: result.exists,
+          message: result.exists ? "This reference is already in use." : "",
+        });
+      } catch (error) {
+        setRefValidation({
+          isValidating: false,
+          isDuplicate: true, // Assume invalid on error
+          message: "Could not validate reference.",
+        });
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (editingPaymentId && editedRefValue) {
+      const handler = setTimeout(() => {
+        const originalPayment = payments.find(
+          (p) => p.payment_id === editingPaymentId
+        );
+        // Only validate if the value has changed
+        if (
+          originalPayment &&
+          originalPayment.internal_reference !== editedRefValue
+        ) {
+          validateInternalRef(editedRefValue, editingPaymentId);
+        } else {
+          // If value is same as original, it's not a duplicate of itself
+          setRefValidation({
+            isValidating: false,
+            isDuplicate: false,
+            message: "",
+          });
+        }
+      }, 500);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    }
+  }, [editedRefValue, editingPaymentId, payments, validateInternalRef]);
+
+  const handleEditInternalRef = (payment: Payment) => {
+    setEditingPaymentId(payment.payment_id);
+    setEditedRefValue(payment.internal_reference || "");
+    setRefValidation({ isValidating: false, isDuplicate: false, message: "" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPaymentId(null);
+    setEditedRefValue("");
+    setRefValidation({ isValidating: false, isDuplicate: false, message: "" });
+  };
+
+  const handleSaveInternalRef = async (paymentId: number) => {
+    if (refValidation.isDuplicate) {
+      toast.error("This reference number is already in use.");
+      return;
+    }
+
+    setIsUpdatingPayment(true);
+    try {
+      await greenTargetApi.updatePayment(paymentId, {
+        internal_reference: editedRefValue,
+      });
+      toast.success("Internal reference updated.");
+      handleCancelEdit(); // Exit edit mode
+      if (id) fetchInvoiceDetails(parseInt(id)); // Refresh data
+    } catch (error: any) {
+      console.error("Failed to update payment:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update reference.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingPayment(false);
+    }
+  };
 
   const fetchInvoiceDetails = async (invoiceId: number) => {
     try {
@@ -342,6 +460,37 @@ const InvoiceDetailsPage: React.FC = () => {
       setIsCancellingPayment(false);
       setIsCancelPaymentDialogOpen(false);
       setPaymentToCancel(null);
+    }
+  };
+
+  const handleConfirmPaymentClick = (payment: Payment) => {
+    if (payment.status !== "pending") {
+      toast.error("Only pending payments can be confirmed");
+      return;
+    }
+
+    setPaymentToConfirm(payment);
+    setShowConfirmPaymentDialog(true);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!paymentToConfirm || !invoice) return;
+
+    setIsConfirmingPayment(true);
+    try {
+      await greenTargetApi.confirmPayment(paymentToConfirm.payment_id);
+
+      toast.success("Payment confirmed successfully");
+
+      // Refresh the invoice details to update balances
+      fetchInvoiceDetails(invoice.invoice_id);
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      toast.error("Failed to confirm payment");
+    } finally {
+      setIsConfirmingPayment(false);
+      setShowConfirmPaymentDialog(false);
+      setPaymentToConfirm(null);
     }
   };
 
@@ -658,16 +807,6 @@ const InvoiceDetailsPage: React.FC = () => {
   const handleCancelInvoice = async () => {
     if (!invoice) return;
 
-    // Check if invoice has payments
-    const activePayments = payments.filter((p) => p.status === "active");
-    if (activePayments.length > 0) {
-      toast.error(
-        "Cannot cancel invoice: it has associated payments. Cancel the payments first."
-      );
-      setIsCancelInvoiceDialogOpen(false);
-      return;
-    }
-
     setIsCancellingInvoice(true);
     try {
       await greenTargetApi.cancelInvoice(invoice.invoice_id);
@@ -677,35 +816,66 @@ const InvoiceDetailsPage: React.FC = () => {
       fetchInvoiceDetails(parseInt(id as string));
     } catch (error: any) {
       console.error("Error cancelling invoice:", error);
-      toast.error(error.message || "Failed to cancel invoice");
+      const errorMessage = error?.response?.data?.message || error?.message;
+
+      if (errorMessage && errorMessage.includes("active payments")) {
+        toast.error(
+          "Cannot cancel invoice: it has active payments. Cancel the payments first."
+        );
+      } else {
+        toast.error(errorMessage || "Failed to cancel invoice");
+      }
     } finally {
       setIsCancellingInvoice(false);
       setIsCancelInvoiceDialogOpen(false);
     }
   };
 
-  const handleDeleteInvoice = async () => {
+  const handleDeleteInvoice = async (forceDelete = false) => {
     if (!invoice) return;
-
-    // Check if invoice has any payments
-    if (payments.length > 0) {
-      toast.error(
-        "Cannot delete invoice: it has associated payments. Delete the payments first."
-      );
-      setIsDeleteInvoiceDialogOpen(false);
-      return;
-    }
 
     setIsDeletingInvoice(true);
     try {
-      await greenTargetApi.deleteInvoice(invoice.invoice_id);
+      const url = forceDelete
+        ? `/greentarget/api/invoices/${invoice.invoice_id}?force=true`
+        : `/greentarget/api/invoices/${invoice.invoice_id}`;
+
+      await api.delete(url);
       toast.success("Invoice deleted successfully");
 
       // Navigate back to invoice list
       navigate("/greentarget/invoices");
     } catch (error: any) {
       console.error("Error deleting invoice:", error);
-      toast.error(error.message || "Failed to delete invoice");
+      const errorData = error?.response?.data;
+
+      if (errorData?.canForceDelete && errorData?.payments) {
+        // Show detailed confirmation with payment information
+        const paymentList = errorData.payments
+          .map(
+            (p: any) =>
+              `- ${new Intl.NumberFormat("en-MY", {
+                style: "currency",
+                currency: "MYR",
+              }).format(p.amount_paid)} (${p.payment_method}, ${new Date(
+                p.payment_date
+              ).toLocaleDateString()})`
+          )
+          .join("\n");
+
+        const confirmed = window.confirm(
+          `This invoice has the following payments:\n\n${paymentList}\n\nDeleting the invoice will also delete all associated payments. This action cannot be undone.\n\nDo you want to proceed?`
+        );
+
+        if (confirmed) {
+          handleDeleteInvoice(true); // Retry with force delete
+          return;
+        }
+      } else {
+        const errorMessage =
+          errorData?.message || error?.message || "Failed to delete invoice";
+        toast.error(errorMessage);
+      }
     } finally {
       setIsDeletingInvoice(false);
       setIsDeleteInvoiceDialogOpen(false);
@@ -813,7 +983,7 @@ const InvoiceDetailsPage: React.FC = () => {
     : "Select Payment Method";
 
   return (
-    <div className="container mx-auto px-8 pb-8 -mt-6">
+    <div className="container mx-auto px-8 pb-8">
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
         <div>
@@ -840,7 +1010,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 title="e-Invoice Valid"
               >
                 <IconCheck size={18} stroke={1.5} />
-                <span className="truncate">e-Invoice Valid</span>
+                <span className="truncate">e-Invoice</span>
               </button>
             )}
             {invoice.einvoice_status === "pending" && (
@@ -1140,7 +1310,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
               {/* Conditional Reference Input */}
               {(paymentFormData.payment_method === "cheque" ||
-                paymentFormData.payment_method === "bank_transfer") && (
+                paymentFormData.payment_method === "bank_transfer" ||
+                paymentFormData.payment_method === "online") && (
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
@@ -1148,6 +1319,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   >
                     {paymentFormData.payment_method === "cheque"
                       ? "Cheque Number"
+                      : paymentFormData.payment_method === "online"
+                      ? "Transaction ID"
                       : "Transaction Reference"}
                   </label>
                   <input
@@ -1379,96 +1552,110 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
 
         {/* Rental details for regular invoices */}
-        {invoice.type === "regular" && invoice.rental_id && (
+        {invoice.type === "regular" && invoice.rental_details && Array.isArray(invoice.rental_details) && invoice.rental_details.length > 0 && (
           <div className="px-6 py-4 border-t border-default-200">
-            <h2 className="text-lg font-medium mb-3">Rental Details</h2>
-            <div
-              className="rounded-lg border border-default-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow" // Added hover effect
-              onClick={() =>
-                navigate(`/greentarget/rentals/${invoice.rental_id}`)
-              }
-              title="View Rental"
-            >
-              {/* Status Banner */}
-              <div
-                className={`px-4 py-2 ${
-                  isRentalActive(invoice.date_picked)
-                    ? "bg-green-500 text-white"
-                    : "bg-default-100 text-default-700"
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <h3 className="font-medium">Rental #{invoice.rental_id}</h3>
-                  <span
-                    className={`text-sm font-medium px-2 py-0.5 rounded-full ${
-                      isRentalActive(invoice.date_picked)
-                        ? "bg-green-400/30 text-white"
-                        : "bg-default-200 text-default-600"
-                    }`}
-                  >
-                    {isRentalActive(invoice.date_picked)
-                      ? "Ongoing"
-                      : "Completed"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Rental Information */}
-              <div className="p-4">
-                {/* Rental Dates */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                    <div className="text-xs text-default-500 mb-1">
-                      Placement Date
-                    </div>
-                    <div className="font-medium">
-                      {formatDate(invoice.date_placed || "")}
-                    </div>
-                  </div>
+            <h2 className="text-lg font-medium mb-3">
+              Rental Details ({invoice.rental_details.length} rental{invoice.rental_details.length > 1 ? 's' : ''})
+            </h2>
+            <div className="space-y-4">
+              {invoice.rental_details.map((rental: any, index: number) => (
+                <div
+                  key={rental.rental_id || index}
+                  className="rounded-lg border border-default-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() =>
+                    rental.rental_id && navigate(`/greentarget/rentals/${rental.rental_id}`)
+                  }
+                  title="View Rental"
+                >
+                  {/* Status Banner */}
                   <div
-                    className={`p-3 rounded-lg ${
-                      invoice.date_picked
-                        ? "bg-default-50 border border-default-100"
-                        : "bg-green-50 border border-green-100"
+                    className={`px-4 py-2 ${
+                      isRentalActive(rental.date_picked)
+                        ? "bg-green-500 text-white"
+                        : "bg-default-100 text-default-700"
                     }`}
                   >
-                    <div className="text-xs text-default-500 mb-1">
-                      Pickup Date
-                    </div>
-                    <div
-                      className={`font-medium ${
-                        !invoice.date_picked ? "text-green-600" : ""
-                      }`}
-                    >
-                      {invoice.date_picked
-                        ? formatDate(invoice.date_picked)
-                        : "Not picked up yet"}
-                    </div>
-                  </div>
-                </div>
-                {/* Dumpster, Driver & Location Info */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                    <div className="text-xs text-default-500 mb-1">
-                      Dumpster
-                    </div>
-                    <div className="font-medium">
-                      {invoice.tong_no || "N/A"}
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium">
+                        Rental #{rental.rental_id || 'N/A'}
+                        {invoice.rental_details && invoice.rental_details.length > 1 && (
+                          <span className="ml-2 text-sm opacity-75">
+                            ({index + 1} of {invoice.rental_details.length})
+                          </span>
+                        )}
+                      </h3>
+                      <span
+                        className={`text-sm font-medium px-2 py-0.5 rounded-full ${
+                          isRentalActive(rental.date_picked)
+                            ? "bg-green-400/30 text-white"
+                            : "bg-default-200 text-default-600"
+                        }`}
+                      >
+                        {isRentalActive(rental.date_picked)
+                          ? "Ongoing"
+                          : "Completed"}
+                      </span>
                     </div>
                   </div>
-                  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                    <div className="text-xs text-default-500 mb-1">Driver</div>
-                    <div className="font-medium">{invoice.driver || "N/A"}</div>
-                  </div>
-                </div>
 
-                <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                  <div className="text-xs text-default-500 mb-1">Location</div>
-                  <div className="font-medium">
-                    {invoice.location_address || "No specific location"}
+                  {/* Rental Information */}
+                  <div className="p-4">
+                    {/* Rental Dates */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Placement Date
+                        </div>
+                        <div className="font-medium">
+                          {formatDate(rental.date_placed || "")}
+                        </div>
+                      </div>
+                      <div
+                        className={`p-3 rounded-lg ${
+                          rental.date_picked
+                            ? "bg-default-50 border border-default-100"
+                            : "bg-green-50 border border-green-100"
+                        }`}
+                      >
+                        <div className="text-xs text-default-500 mb-1">
+                          Pickup Date
+                        </div>
+                        <div
+                          className={`font-medium ${
+                            !rental.date_picked ? "text-green-600" : ""
+                          }`}
+                        >
+                          {rental.date_picked
+                            ? formatDate(rental.date_picked)
+                            : "Not picked up yet"}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Dumpster, Driver & Location Info */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">
+                          Dumpster
+                        </div>
+                        <div className="font-medium">
+                          {rental.tong_no || "N/A"}
+                        </div>
+                      </div>
+                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 mb-1">Driver</div>
+                        <div className="font-medium">{rental.driver || "N/A"}</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-default-50 p-3 rounded-lg border border-default-100">
+                      <div className="text-xs text-default-500 mb-1">Location</div>
+                      <div className="font-medium">
+                        {rental.location_address || "No specific location"}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         )}
@@ -1503,6 +1690,9 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                       Internal Ref
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      Status
+                    </th>
                     {/* Add the new Actions column header */}
                     <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
                       Actions
@@ -1516,6 +1706,8 @@ const InvoiceDetailsPage: React.FC = () => {
                       className={`hover:bg-default-50 transition-colors ${
                         payment.status === "cancelled"
                           ? "bg-default-50 text-default-400"
+                          : payment.status === "pending"
+                          ? "bg-amber-50"
                           : ""
                       }`}
                       title={
@@ -1525,6 +1717,8 @@ const InvoiceDetailsPage: React.FC = () => {
                                 ? formatDate(payment.cancellation_date)
                                 : "unknown date"
                             }`
+                          : payment.status === "pending"
+                          ? "Payment pending confirmation"
                           : "Paid"
                       }
                     >
@@ -1551,39 +1745,135 @@ const InvoiceDetailsPage: React.FC = () => {
                         {payment.payment_reference || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
-                        {payment.internal_reference || "-"}
+                        {editingPaymentId === payment.payment_id ? (
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="text"
+                                value={editedRefValue}
+                                onChange={(e) =>
+                                  setEditedRefValue(e.target.value)
+                                }
+                                className={clsx(
+                                  "block w-full px-2 py-1 border rounded-md shadow-sm sm:text-sm",
+                                  refValidation.isDuplicate
+                                    ? "border-red-500 bg-red-50"
+                                    : "border-default-300",
+                                  "focus:ring-sky-500 focus:border-sky-500"
+                                )}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() =>
+                                  handleSaveInternalRef(payment.payment_id)
+                                }
+                                disabled={
+                                  isUpdatingPayment ||
+                                  refValidation.isValidating ||
+                                  refValidation.isDuplicate
+                                }
+                                className="p-1 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                                title="Save"
+                              >
+                                <IconDeviceFloppy size={18} />
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="p-1 rounded-md text-red-600 hover:bg-red-100"
+                                title="Cancel"
+                              >
+                                <IconX size={18} />
+                              </button>
+                            </div>
+                            {refValidation.message && (
+                              <p className="text-xs text-red-600 mt-1">
+                                {refValidation.message}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <span>{payment.internal_reference || "-"}</span>
+                            {payment.status !== "cancelled" && (
+                              <button
+                                onClick={() => handleEditInternalRef(payment)}
+                                className="p-1 rounded-md text-default-500 hover:bg-default-100 hover:text-sky-600"
+                                title="Edit Internal Reference"
+                              >
+                                <IconPencil size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <Button
-                          variant="outline"
-                          color="rose"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCancelPaymentClick(payment);
-                          }}
-                          disabled={payment.status === "cancelled"}
-                          title={
-                            payment.status === "cancelled"
-                              ? `Payment cancelled on ${
-                                  payment.cancellation_date
-                                    ? formatDate(payment.cancellation_date)
-                                    : "unknown date"
-                                }`
-                              : "Cancel Payment"
-                          }
-                          className="px-2"
-                        >
-                          {payment.status === "cancelled" ? (
-                            <span className="italic cursor-not-allowed">
+                        {payment.status === "pending" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            <IconClock size={14} className="mr-1" />
+                            Pending
+                          </span>
+                        )}
+                        {payment.status === "active" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <IconCircleCheck size={14} className="mr-1" />
+                            Settled
+                          </span>
+                        )}
+                        {payment.status === "cancelled" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">
+                            <IconCancel size={14} className="mr-1" />
+                            Cancelled
+                          </span>
+                        )}
+                        {!payment.status && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <IconCircleCheck size={14} className="mr-1" />
+                            No Status
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex gap-2 justify-center">
+                          {payment.status === "pending" && (
+                            <Button
+                              variant="outline"
+                              color="sky"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleConfirmPaymentClick(payment);
+                              }}
+                              title="Confirm Payment"
+                              className="px-2"
+                            >
+                              <span className="flex items-center gap-1">
+                                <IconCircleCheck size={16} /> Confirm
+                              </span>
+                            </Button>
+                          )}
+                          {payment.status !== "cancelled" && (
+                            <Button
+                              variant="outline"
+                              color="rose"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelPaymentClick(payment);
+                              }}
+                              title="Cancel Payment"
+                              className="px-2"
+                            >
+                              <span className="flex items-center gap-1">
+                                <IconTrash size={16} /> Cancel
+                              </span>
+                            </Button>
+                          )}
+                          {payment.status === "cancelled" && (
+                            <span className="text-xs italic text-default-500">
                               Cancelled
                             </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <IconTrash size={16} /> Cancel
-                            </span>
                           )}
-                        </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1766,20 +2056,31 @@ const InvoiceDetailsPage: React.FC = () => {
         variant="danger"
       />
       <ConfirmationDialog
+        isOpen={showConfirmPaymentDialog}
+        onClose={() => setShowConfirmPaymentDialog(false)}
+        onConfirm={handleConfirmPayment}
+        title="Confirm Payment"
+        message={`Are you sure you want to confirm this ${
+          paymentToConfirm?.payment_method === "cheque" ? "cheque" : ""
+        } payment of ${
+          paymentToConfirm
+            ? formatCurrency(
+                parseFloat(paymentToConfirm.amount_paid.toString())
+              )
+            : ""
+        }? This will update the invoice balance and mark the payment as active.`}
+        confirmButtonText={
+          isConfirmingPayment ? "Confirming..." : "Confirm Payment"
+        }
+        variant="default"
+      />
+      <ConfirmationDialog
         isOpen={isDeleteInvoiceDialogOpen}
         onClose={() => setIsDeleteInvoiceDialogOpen(false)}
         onConfirm={handleDeleteInvoice}
         title="Delete Invoice"
-        message={`Are you sure you want to permanently delete invoice ${
-          invoice?.invoice_number
-        }? This action cannot be undone and will remove all invoice data from the system.${
-          payments.length > 0
-            ? " Note: You must delete all payments first."
-            : ""
-        }`}
-        confirmButtonText={
-          isDeletingInvoice ? "Deleting..." : "Delete Invoice"
-        }
+        message={`Are you sure you want to permanently delete invoice ${invoice?.invoice_number}? This action cannot be undone and will remove all invoice data from the system.`}
+        confirmButtonText={isDeletingInvoice ? "Deleting..." : "Delete Invoice"}
         variant="danger"
       />
       {/* e-Invoice Confirmation Dialog */}

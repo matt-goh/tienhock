@@ -863,7 +863,7 @@ const DebtorsReportPage: React.FC = () => {
                                                   "-"}
                                               </td>
                                               <td className="px-3 py-2">
-                                                {formatDate(payment.date)}
+                                                {payment.date}
                                               </td>
                                               <td className="px-3 py-2 text-right text-green-600">
                                                 RM{" "}

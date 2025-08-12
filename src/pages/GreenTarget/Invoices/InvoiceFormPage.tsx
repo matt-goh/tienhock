@@ -56,7 +56,7 @@ interface Invoice {
   invoice_number?: string;
   type: "regular";
   customer_id: number; // Store as number
-  rental_id?: number | null; // Store as number or null
+  rental_ids?: number[]; // Changed to array for multiple rentals
   amount_before_tax: number;
   tax_amount: number;
   total_amount?: number; // Calculated
@@ -85,14 +85,14 @@ const InvoiceFormPage: React.FC = () => {
     amount_before_tax: 200, // Default value?
     tax_amount: 0,
     date_issued: new Date().toISOString().split("T")[0],
-    rental_id: null,
+    rental_ids: [], // Changed to array
   });
   const [initialFormData, setInitialFormData] = useState<Invoice | null>(null); // For change detection
 
   // Reference Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [availableRentals, setAvailableRentals] = useState<Rental[]>([]);
-  const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
+  const [selectedRentals, setSelectedRentals] = useState<Rental[]>([]); // Changed to array
 
   // UI State
   const [customerQuery, setCustomerQuery] = useState(""); // For customer combobox search
@@ -126,12 +126,6 @@ const InvoiceFormPage: React.FC = () => {
     message: "",
   });
 
-  // State to remember rental selection when switching types
-  const [previousRental, setPreviousRental] = useState<{
-    rental_id: number | null;
-    rental: Rental | null;
-  }>({ rental_id: null, rental: null });
-
   // --- EFFECTS ---
 
   // Set initial form data (only once after customers load or if editing)
@@ -143,21 +137,22 @@ const InvoiceFormPage: React.FC = () => {
         amount_before_tax: 200,
         tax_amount: 0,
         date_issued: new Date().toISOString().split("T")[0],
-        rental_id: null,
+        rental_ids: [], // Changed to array
       };
       setInitialFormData(defaultInitialState);
       // Apply rentalData if it exists
       if (rentalData?.customer_id) {
+        const rentalIds = rentalData.rental_id ? [rentalData.rental_id] : [];
         setFormData((prev) => ({
           ...prev,
           ...defaultInitialState,
           customer_id: rentalData.customer_id,
-          rental_id: rentalData.rental_id,
+          rental_ids: rentalIds,
         }));
         setInitialFormData((prev) => ({
           ...(prev ?? defaultInitialState),
           customer_id: rentalData.customer_id,
-          rental_id: rentalData.rental_id,
+          rental_ids: rentalIds,
         }));
       } else {
         setFormData(defaultInitialState); // Set form state too
@@ -212,23 +207,63 @@ const InvoiceFormPage: React.FC = () => {
       fetchAvailableRentals(formData.customer_id);
     } else {
       setAvailableRentals([]);
-      setSelectedRental(null);
+      setSelectedRentals([]);
     }
   }, [formData.customer_id, formData.type]);
 
-  // Select rental when availableRentals or formData.rental_id changes
+  // Select rentals when availableRentals or formData.rental_ids changes
   useEffect(() => {
     if (
       formData.type === "regular" &&
-      formData.rental_id &&
+      formData.rental_ids &&
+      formData.rental_ids.length > 0 &&
       availableRentals.length > 0
     ) {
-      const currentSelectedRental = availableRentals.find(
-        (r) => r.rental_id === formData.rental_id
+      const currentSelectedRentals = availableRentals.filter((r) =>
+        formData.rental_ids!.includes(r.rental_id)
       );
-      setSelectedRental(currentSelectedRental || null);
+      setSelectedRentals(currentSelectedRentals);
+    } else {
+      setSelectedRentals([]);
     }
-  }, [formData.rental_id, formData.type, availableRentals]);
+  }, [formData.rental_ids, formData.type, availableRentals]);
+
+  // Auto-calculate invoice amount based on selected rentals (RM 200 per rental)
+  useEffect(() => {
+    // Only auto-calculate if we're in create mode for regular invoices
+    if (
+      !isEditMode &&
+      formData.type === "regular" &&
+      selectedRentals.length > 0
+    ) {
+      const calculatedAmount = selectedRentals.length * 200;
+
+      // Only update if the amount is different to prevent infinite loops
+      if (formData.amount_before_tax !== calculatedAmount) {
+        setFormData((prev) => ({
+          ...prev,
+          amount_before_tax: calculatedAmount,
+        }));
+      }
+    } else if (
+      !isEditMode &&
+      formData.type === "regular" &&
+      selectedRentals.length === 0
+    ) {
+      // Reset to default amount when no rentals selected
+      if (formData.amount_before_tax !== 200) {
+        setFormData((prev) => ({
+          ...prev,
+          amount_before_tax: 200,
+        }));
+      }
+    }
+  }, [
+    selectedRentals.length,
+    isEditMode,
+    formData.type,
+    formData.amount_before_tax,
+  ]);
 
   // --- DATA FETCHING ---
 
@@ -245,7 +280,7 @@ const InvoiceFormPage: React.FC = () => {
   const fetchAvailableRentals = async (customerId: number) => {
     if (!customerId || customerId <= 0) {
       setAvailableRentals([]);
-      setSelectedRental(null);
+      setSelectedRentals([]);
       return;
     }
     try {
@@ -259,32 +294,32 @@ const InvoiceFormPage: React.FC = () => {
         (r) =>
           // Include rentals with no invoice info
           !r.invoice_info ||
-          // OR include the rental being edited in edit mode
-          (isEditMode && r.rental_id === initialFormData?.rental_id) ||
+          // OR include rentals being edited in edit mode
+          (isEditMode && initialFormData?.rental_ids?.includes(r.rental_id)) ||
           // OR include rentals with cancelled invoices (not active)
           (r.invoice_info && r.invoice_info.status === "cancelled")
       );
       setAvailableRentals(available);
-      // Reset selection if current is no longer valid
-      if (
-        selectedRental &&
-        !available.some((r) => r.rental_id === selectedRental.rental_id)
-      ) {
-        if (
-          !(
-            isEditMode &&
-            selectedRental.rental_id === initialFormData?.rental_id
-          )
-        ) {
-          setSelectedRental(null);
-          setFormData((prev) => ({ ...prev, rental_id: null }));
-        }
+      // Reset selections if current ones are no longer valid
+      const validSelectedRentals = selectedRentals.filter(
+        (selectedRental) =>
+          available.some((r) => r.rental_id === selectedRental.rental_id) ||
+          (isEditMode &&
+            initialFormData?.rental_ids?.includes(selectedRental.rental_id))
+      );
+
+      if (validSelectedRentals.length !== selectedRentals.length) {
+        setSelectedRentals(validSelectedRentals);
+        setFormData((prev) => ({
+          ...prev,
+          rental_ids: validSelectedRentals.map((r) => r.rental_id),
+        }));
       }
     } catch (err) {
       console.error("Error fetching rentals:", err);
       toast.error("Failed load rentals.");
       setAvailableRentals([]);
-      setSelectedRental(null);
+      setSelectedRentals([]);
     }
   };
 
@@ -299,7 +334,9 @@ const InvoiceFormPage: React.FC = () => {
         invoice_number: inv.invoice_number,
         type: inv.type,
         customer_id: inv.customer_id,
-        rental_id: inv.rental_id ?? null,
+        rental_ids: inv.rental_details
+          ? inv.rental_details.map((r: any) => r.rental_id)
+          : [],
         amount_before_tax: parseFloat(inv.amount_before_tax.toString()),
         tax_amount: parseFloat(inv.tax_amount.toString()),
         date_issued: inv.date_issued
@@ -382,12 +419,17 @@ const InvoiceFormPage: React.FC = () => {
   ]);
 
   const isRentalActive = (datePickedStr: string | null | undefined) => {
-    /* ... same logic ... */ if (!datePickedStr) return true;
+    if (!datePickedStr) return true;
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const pickup = new Date(datePickedStr);
+      // Extract just the date part to avoid timezone conversion issues
+      const dateOnly = datePickedStr.split("T")[0]; // Get '2025-08-12' from '2025-08-12T00:00:00.000Z'
+      const pickup = new Date(dateOnly + "T00:00:00"); // Parse as local date
       pickup.setHours(0, 0, 0, 0);
+
+      // A rental is active if the pickup date is today or in the future
+      // A rental is completed if the pickup date is in the past
       return !isNaN(pickup.getTime()) && pickup >= today;
     } catch {
       return false;
@@ -442,17 +484,36 @@ const InvoiceFormPage: React.FC = () => {
     const newCustId =
       selectedId && typeof selectedId === "string" ? Number(selectedId) : 0;
     if (newCustId !== formData.customer_id) {
-      setFormData((p) => ({ ...p, customer_id: newCustId, rental_id: null }));
-      setSelectedRental(null);
-      setPreviousRental({ rental_id: null, rental: null });
+      setFormData((p) => ({ ...p, customer_id: newCustId, rental_ids: [] }));
+      setSelectedRentals([]);
       setCustomerQuery("");
     }
   };
-  const handleRentalChange = (rentalIdString: string) => {
-    const rid = rentalIdString === "" ? null : Number(rentalIdString);
-    const selR = availableRentals.find((r) => r.rental_id === rid) || null;
-    setSelectedRental(selR);
-    setFormData((p) => ({ ...p, rental_id: rid }));
+  // Handle multiple rental selection
+  const handleRentalToggle = (rental: Rental) => {
+    const isSelected = selectedRentals.some(
+      (r) => r.rental_id === rental.rental_id
+    );
+
+    if (isSelected) {
+      // Remove rental from selection
+      const newSelectedRentals = selectedRentals.filter(
+        (r) => r.rental_id !== rental.rental_id
+      );
+      setSelectedRentals(newSelectedRentals);
+      setFormData((p) => ({
+        ...p,
+        rental_ids: newSelectedRentals.map((r) => r.rental_id),
+      }));
+    } else {
+      // Add rental to selection
+      const newSelectedRentals = [...selectedRentals, rental];
+      setSelectedRentals(newSelectedRentals);
+      setFormData((p) => ({
+        ...p,
+        rental_ids: newSelectedRentals.map((r) => r.rental_id),
+      }));
+    }
   };
   const handlePaymentMethodChange = (methodIdString: string) => {
     setPaymentMethod(methodIdString);
@@ -493,9 +554,9 @@ const InvoiceFormPage: React.FC = () => {
     );
     if (
       formData.type === "regular" &&
-      (!formData.rental_id || formData.rental_id <= 0)
+      (!formData.rental_ids || formData.rental_ids.length === 0)
     ) {
-      toast.error("Select rental");
+      toast.error("Select at least one rental");
       return false;
     }
     if (!formData.date_issued) {
@@ -540,7 +601,7 @@ const InvoiceFormPage: React.FC = () => {
       } = {
         type: formData.type,
         customer_id: Number(formData.customer_id),
-        rental_id: formData.rental_id ? Number(formData.rental_id) : null,
+        rental_ids: formData.rental_ids || [],
         amount_before_tax: Number(formData.amount_before_tax),
         tax_amount: Number(formData.tax_amount),
         total_amount: Number(totalAmount),
@@ -743,14 +804,6 @@ const InvoiceFormPage: React.FC = () => {
     name: c.name,
     phone_number: c.phone_number,
   }));
-  const rentalOptions: SelectOption[] = availableRentals.map((r) => ({
-    id: r.rental_id,
-    name: `Rental #${r.rental_id} - ${r.tong_no} (${new Date(
-      r.date_placed
-    ).toLocaleDateString()})${
-      r.location_address ? ` - ${r.location_address}` : ""
-    }`,
-  }));
   const selectedCustomerForEinvoice = customers.find(
     (c) => c.customer_id === formData.customer_id
   );
@@ -765,7 +818,6 @@ const InvoiceFormPage: React.FC = () => {
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
-          {" "}
           {/* Header */}
           <h1 className="text-xl font-semibold text-default-900">
             {isEditMode
@@ -885,170 +937,166 @@ const InvoiceFormPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Conditional Fields (Regular Invoice - Rental Selection) */}
-          {formData.type ===
-            "regular" /* ... Rental Listbox and Details ... */ && (
+          {/* Conditional Fields (Regular Invoice - Multiple Rental Selection) */}
+          {formData.type === "regular" && (
             <div className="mt-6">
               <div className="space-y-2">
-                <label
-                  htmlFor="rental_id-button"
-                  className="block text-sm font-medium text-default-700"
-                >
-                  Select Rental <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-default-700">
+                  Select Rentals <span className="text-red-500">*</span>
+                  <span className="text-sm font-normal text-default-500 ml-1">
+                    (Click to select multiple rentals)
+                  </span>
                 </label>
-                <Listbox
-                  value={formData.rental_id?.toString() ?? ""}
-                  onChange={handleRentalChange}
-                  disabled={!formData.customer_id || isEditMode}
-                  name="rental_id"
-                >
-                  <div className="relative">
-                    <HeadlessListboxButton
-                      id="rental_id-button"
-                      className={clsx(
-                        "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
-                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                        !formData.customer_id || isEditMode
-                          ? "bg-gray-50 text-gray-500 cursor-not-allowed"
-                          : ""
-                      )}
-                    >
-                      <span className="block truncate">
-                        {getOptionName(rentalOptions, formData.rental_id) ||
-                          (!formData.customer_id
-                            ? "Select customer first"
-                            : "Select Rental")}
-                      </span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <IconChevronDown
-                          size={20}
-                          className="text-gray-400"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    </HeadlessListboxButton>
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions
-                        className={clsx(
-                          "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
-                          "mt-1"
-                        )}
-                      >
-                        <ListboxOption
-                          value=""
-                          disabled
-                          className="text-gray-400 italic py-2 pl-3 pr-10 select-none"
+
+                {!formData.customer_id ? (
+                  <div className="p-4 border border-default-300 rounded-lg bg-gray-50 text-gray-500 text-center">
+                    Select customer first
+                  </div>
+                ) : availableRentals.length === 0 ? (
+                  <div className="p-4 border border-default-300 rounded-lg bg-gray-50 text-gray-500 text-center">
+                    No available rentals found for this customer
+                  </div>
+                ) : (
+                  <div className="border border-default-300 rounded-lg divide-y divide-default-200 max-h-80 overflow-y-auto">
+                    {availableRentals.map((rental) => {
+                      const isSelected = selectedRentals.some(
+                        (r) => r.rental_id === rental.rental_id
+                      );
+                      const isActive = isRentalActive(rental.date_picked);
+
+                      return (
+                        <div
+                          key={rental.rental_id}
+                          onClick={() =>
+                            !isEditMode && handleRentalToggle(rental)
+                          }
+                          className={clsx(
+                            "p-4 cursor-pointer transition-colors relative",
+                            isEditMode
+                              ? "cursor-not-allowed"
+                              : "hover:bg-gray-50"
+                          )}
+                          style={isSelected ? {
+                            backgroundColor: '#f0f9ff',
+                            borderLeft: '4px solid #0ea5e9',
+                            borderRight: 'none',
+                            borderTop: 'none',
+                            borderBottom: 'none'
+                          } : {}}
                         >
-                          Select Rental
-                        </ListboxOption>
-                        {rentalOptions.length === 0 && formData.customer_id ? (
-                          <div className="relative cursor-default select-none py-2 px-4 text-gray-500">
-                            No available rentals found.
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center">
+                                {isSelected ? (
+                                  <IconSquareCheckFilled
+                                    className="text-sky-600"
+                                    size={20}
+                                  />
+                                ) : (
+                                  <IconSquare
+                                    className="text-gray-400"
+                                    size={20}
+                                  />
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  Rental #{rental.rental_id} - Dumpster{" "}
+                                  {rental.tong_no}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Placed:{" "}
+                                  {new Date(
+                                    rental.date_placed
+                                  ).toLocaleDateString()}
+                                  {rental.location_address &&
+                                    ` • ${rental.location_address}`}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span
+                                className={clsx(
+                                  "text-xs font-medium px-2 py-1 rounded-full",
+                                  isActive
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-600"
+                                )}
+                              >
+                                {isActive ? "Ongoing" : "Completed"}
+                              </span>
+                            </div>
                           </div>
-                        ) : (
-                          rentalOptions.map((option) => (
-                            <ListboxOption
-                              key={option.id}
-                              className={({ active }) =>
-                                clsx(
-                                  "relative cursor-default select-none py-2 pl-3 pr-10",
-                                  active
-                                    ? "bg-sky-100 text-sky-900"
-                                    : "text-gray-900"
-                                )
-                              }
-                              value={option.id.toString()}
-                            >
-                              {({ selected }) => (
-                                <>
-                                  <span
-                                    className={clsx(
-                                      "block truncate",
-                                      selected ? "font-medium" : "font-normal"
-                                    )}
-                                  >
-                                    {option.name}
-                                  </span>
-                                  {selected ? (
-                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                      <IconCheck size={20} aria-hidden="true" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {selectedRentals.length > 0 && (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-default-700 mb-2">
+                      Selected Rentals ({selectedRentals.length})
+                    </div>
+                    <div className="space-y-2">
+                      {selectedRentals.map((rental) => (
+                        <div
+                          key={rental.rental_id}
+                          className="bg-sky-50 border border-sky-200 rounded-lg p-3"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                Rental #{rental.rental_id} - Dumpster{" "}
+                                {rental.tong_no}
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                <span>Driver: {rental.driver}</span>
+                                <span className="mx-2">•</span>
+                                <span>
+                                  Placed:{" "}
+                                  {new Date(
+                                    rental.date_placed
+                                  ).toLocaleDateString()}
+                                </span>
+                                {rental.date_picked && (
+                                  <>
+                                    <span className="mx-2">•</span>
+                                    <span>
+                                      Picked:{" "}
+                                      {new Date(
+                                        rental.date_picked
+                                      ).toLocaleDateString()}
                                     </span>
-                                  ) : null}
-                                </>
+                                  </>
+                                )}
+                              </div>
+                              {rental.location_address && (
+                                <div className="text-sm text-gray-500 mt-1">
+                                  Location: {rental.location_address}
+                                </div>
                               )}
-                            </ListboxOption>
-                          ))
-                        )}
-                      </ListboxOptions>
-                    </Transition>
+                            </div>
+                            {!isEditMode && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRentalToggle(rental);
+                                }}
+                                className="text-red-600 hover:text-red-700 p-1"
+                                title="Remove rental"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </Listbox>
+                )}
               </div>
-              {selectedRental && (
-                <div className="mt-3 rounded-lg border border-default-200 overflow-hidden">
-                  <div
-                    className={clsx(
-                      "px-4 py-2",
-                      isRentalActive(selectedRental.date_picked)
-                        ? "bg-green-500 text-white"
-                        : "bg-default-100 text-default-700"
-                    )}
-                  >
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium">Selected Rental Details</h3>
-                      <span
-                        className={clsx(
-                          "text-sm font-medium px-2 py-0.5 rounded-full",
-                          isRentalActive(selectedRental.date_picked)
-                            ? "bg-green-400/30 text-white"
-                            : "bg-default-200 text-default-600"
-                        )}
-                      >
-                        {isRentalActive(selectedRental.date_picked)
-                          ? "Ongoing"
-                          : "Completed"}{" "}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-4 text-sm">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                      <InfoItem
-                        label="Placement Date"
-                        value={new Date(
-                          selectedRental.date_placed
-                        ).toLocaleDateString()}
-                      />
-                      <InfoItem
-                        label="Pickup Date"
-                        value={
-                          selectedRental.date_picked
-                            ? new Date(
-                                selectedRental.date_picked
-                              ).toLocaleDateString()
-                            : "Not picked up yet"
-                        }
-                        highlight={!selectedRental.date_picked}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <InfoItem label="Driver" value={selectedRental.driver} />
-                      <InfoItem
-                        label="Dumpster"
-                        value={selectedRental.tong_no}
-                      />
-                      <InfoItem
-                        label="Location"
-                        value={selectedRental.location_address || "N/A"}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -1078,7 +1126,11 @@ const InvoiceFormPage: React.FC = () => {
                     required
                     className={clsx(
                       "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                      !isEditMode &&
+                        formData.type === "regular" &&
+                        selectedRentals.length > 0 &&
+                        "bg-sky-50"
                     )}
                   />
                 </div>

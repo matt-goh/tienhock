@@ -34,7 +34,8 @@ export default function (pool, defaultConfig) {
               l.address as location_address
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+        LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+        LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         WHERE i.invoice_id = $1
       `;

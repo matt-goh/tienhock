@@ -448,6 +448,46 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           balance: openingBalance,
         });
 
+        // Helper function to generate description for an invoice
+        const generateInvoiceDescription = (invoice: any): string => {
+          // Check if invoice has rental details for dynamic description
+          if (invoice.rental_details && invoice.rental_details.length > 0) {
+            const groupedByType: { [key: string]: number } = {};
+            
+            invoice.rental_details.forEach((rental: any) => {
+              if (rental.tong_no) {
+                const dumpsterNumber = rental.tong_no.trim();
+                const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+                groupedByType[type] = (groupedByType[type] || 0) + 1;
+              }
+            });
+
+            const descriptions: string[] = [];
+            Object.entries(groupedByType).forEach(([type, quantity]) => {
+              const desc = quantity === 1 
+                ? `1x Rental Tong (${type})`
+                : `${quantity}x Rental Tong (${type})`;
+              descriptions.push(desc);
+            });
+
+            return descriptions.length > 0 
+              ? `${descriptions.join(", ")}`
+              : `Rental Tong Service`;
+          }
+          
+          // Fallback to legacy single rental fields
+          if (invoice.type === "regular" && invoice.rental_id && invoice.tong_no) {
+            const dumpsterNumber = invoice.tong_no.trim();
+            const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+            return `Rental Tong (${type})`;
+          }
+
+          // Default fallback
+          return invoice.location_address 
+            ? `Rental Tong Service (${invoice.location_address})`
+            : `Rental Tong Service`;
+        };
+
         // Sort all transactions (invoices and payments) by date
         const allTransactions = [
           ...periodInvoices.map(
@@ -459,7 +499,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               location_address: any;
             }) => ({
               date: invoice.date_issued,
-              description: `Trip: Waste Management Service (${invoice.location_address})`,
+              description: generateInvoiceDescription(invoice),
               invoiceNo: invoice.invoice_number,
               amount: parseFloat(invoice.total_amount.toString()), // Debit (positive)
               isInvoice: true,

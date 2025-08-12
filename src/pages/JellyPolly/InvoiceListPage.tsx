@@ -1537,7 +1537,7 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="flex flex-col w-full h-full px-4 md:px-12 -mt-6">
+    <div className="flex flex-col w-full h-full px-4 md:px-12">
       <div className="space-y-3">
         {/* --- Combined Header and Filters --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">

@@ -1,4 +1,4 @@
-// Create this file: src/utils/greenTarget/api.ts
+// src/utils/greenTarget/api.ts
 import { api } from "../utils/api";
 import {
   getCachedData,
@@ -108,8 +108,12 @@ export const greenTargetApi = {
   cancelInvoice: (id: number, reason?: string) =>
     api.put(`/greentarget/api/invoices/${id}/cancel`, { reason }),
   deleteInvoice: (id: number) => api.delete(`/greentarget/api/invoices/${id}`),
-  checkInvoiceNumber: (invoiceNumber: string, excludeId?: number) => 
-    api.get(`/greentarget/api/invoices/check-number/${encodeURIComponent(invoiceNumber)}${excludeId ? `?exclude_id=${excludeId}` : ''}`),
+  checkInvoiceNumber: (invoiceNumber: string, excludeId?: number) =>
+    api.get(
+      `/greentarget/api/invoices/check-number/${encodeURIComponent(
+        invoiceNumber
+      )}${excludeId ? `?exclude_id=${excludeId}` : ""}`
+    ),
 
   // e-Invoice endpoints
   submitEInvoice: async (invoiceId: number) => {
@@ -134,6 +138,11 @@ export const greenTargetApi = {
       invoice_id?: string | number;
       includeCancelled?: boolean;
       customer_id?: string | number;
+      startDate?: string;
+      endDate?: string;
+      paymentMethod?: string;
+      status?: string;
+      search?: string;
     } = {}
   ) => {
     const queryParams = new URLSearchParams();
@@ -150,6 +159,26 @@ export const greenTargetApi = {
       queryParams.append("customer_id", options.customer_id.toString());
     }
 
+    if (options.startDate) {
+      queryParams.append("startDate", options.startDate);
+    }
+
+    if (options.endDate) {
+      queryParams.append("endDate", options.endDate);
+    }
+
+    if (options.paymentMethod) {
+      queryParams.append("paymentMethod", options.paymentMethod);
+    }
+
+    if (options.status) {
+      queryParams.append("status", options.status);
+    }
+
+    if (options.search) {
+      queryParams.append("search", options.search);
+    }
+
     const queryString = queryParams.toString();
     return api.get(
       `/greentarget/api/payments${queryString ? `?${queryString}` : ""}`
@@ -161,8 +190,16 @@ export const greenTargetApi = {
         includeCancelled ? "?include_cancelled=true" : ""
       }`
     ),
+  checkInternalPaymentRef: (ref: string, excludePaymentId: number) =>
+    api.get(
+      `/greentarget/api/payments/check-internal-ref/${encodeURIComponent(
+        ref
+      )}?exclude_payment_id=${excludePaymentId}`
+    ),
   cancelPayment: (paymentId: number, reason?: string) =>
     api.put(`/greentarget/api/payments/${paymentId}/cancel`, { reason }),
+  confirmPayment: (paymentId: number) =>
+    api.put(`/greentarget/api/payments/${paymentId}/confirm`),
   createPayment: (data: any) => api.post("/greentarget/api/payments", data),
   updatePayment: (id: any, data: any) =>
     api.put(`/greentarget/api/payments/${id}`, data),

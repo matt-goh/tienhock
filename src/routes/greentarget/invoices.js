@@ -53,10 +53,21 @@ export default function (pool, defaultConfig) {
               c.id_number,
               c.id_type,
               c.additional_info,
-              l.address as location_address,
-              l.phone_number as location_phone_number,
-              r.driver,
-              r.tong_no,
+              -- Aggregate rental information for multi-rental invoices
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'rental_id', r.rental_id,
+                    'tong_no', r.tong_no,
+                    'driver', r.driver,
+                    'date_placed', r.date_placed,
+                    'date_picked', r.date_picked,
+                    'location_address', l.address,
+                    'location_phone_number', l.phone_number
+                  ) ORDER BY r.rental_id
+                ) FILTER (WHERE r.rental_id IS NOT NULL),
+                '[]'::json
+              ) as rental_details,
               -- Calculate paid amount correctly using non-cancelled payments
               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
               -- Add subquery to check if invoice is part of a consolidated invoice
@@ -76,7 +87,8 @@ export default function (pool, defaultConfig) {
               ) as consolidated_part_of
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+        LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+        LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         -- LEFT JOIN ensures invoices without payments are included
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
@@ -141,9 +153,10 @@ export default function (pool, defaultConfig) {
       }
       // *** END Added Status Filter ***
 
-      // Group by all non-aggregated columns from invoices, customers, rentals, locations
+      // Group by all non-aggregated columns from invoices and customers only
+      // Rental information is aggregated, so don't group by rental/location columns
       query += `
-        GROUP BY i.invoice_id, c.customer_id, l.location_id, r.rental_id
+        GROUP BY i.invoice_id, c.customer_id
       `;
 
       // Add ordering - consider making this dynamic based on query params
@@ -223,13 +236,21 @@ export default function (pool, defaultConfig) {
             c.tin_number,
             c.id_number,
             c.id_type,
-            r.rental_id,
-            r.tong_no,
-            r.date_placed,
-            r.date_picked,
-            r.driver,
-            l.address as location_address,
-            l.phone_number as location_phone_number,
+            -- Aggregate rental information for multi-rental invoices
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'rental_id', r.rental_id,
+                  'tong_no', r.tong_no,
+                  'date_placed', r.date_placed,
+                  'date_picked', r.date_picked,
+                  'driver', r.driver,
+                  'location_address', l.address,
+                  'location_phone_number', l.phone_number
+                ) ORDER BY r.rental_id
+              ) FILTER (WHERE r.rental_id IS NOT NULL),
+              '[]'::json
+            ) as rental_details,
             -- Calculate paid amount correctly using non-cancelled payments
             COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
             -- Add subquery for consolidated part info
@@ -249,11 +270,12 @@ export default function (pool, defaultConfig) {
             ) as consolidated_part_of
       FROM greentarget.invoices i
       JOIN greentarget.customers c ON i.customer_id = c.customer_id
-      LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+      LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+      LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
       LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
       LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
       WHERE i.invoice_id IN (${placeholders})
-      GROUP BY i.invoice_id, c.customer_id, r.rental_id, l.location_id
+      GROUP BY i.invoice_id, c.customer_id
     `;
 
       const result = await pool.query(invoiceQuery, validIds);
@@ -306,13 +328,21 @@ export default function (pool, defaultConfig) {
               c.phone_number as customer_phone_number,
               c.tin_number,
               c.id_number,
-              r.rental_id,
-              r.tong_no,
-              r.date_placed,
-              r.date_picked,
-              r.driver,
-              l.address as location_address,
-              l.phone_number as location_phone_number,
+              -- Aggregate rental information for multi-rental invoices
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'rental_id', r.rental_id,
+                    'tong_no', r.tong_no,
+                    'date_placed', r.date_placed,
+                    'date_picked', r.date_picked,
+                    'driver', r.driver,
+                    'location_address', l.address,
+                    'location_phone_number', l.phone_number
+                  ) ORDER BY r.rental_id
+                ) FILTER (WHERE r.rental_id IS NOT NULL),
+                '[]'::json
+              ) as rental_details,
               -- Calculate paid amount correctly using non-cancelled payments
               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
               -- Add subquery for consolidated part info
@@ -332,11 +362,12 @@ export default function (pool, defaultConfig) {
               ) as consolidated_part_of
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.rentals r ON i.rental_id = r.rental_id
+        LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
+        LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
         WHERE i.invoice_id = $1
-        GROUP BY i.invoice_id, c.customer_id, l.location_id, r.rental_id
+        GROUP BY i.invoice_id, c.customer_id
       `;
 
       const invoiceResult = await pool.query(invoiceQuery, [numericInvoiceId]);
@@ -391,12 +422,14 @@ export default function (pool, defaultConfig) {
     const {
       type,
       customer_id,
-      rental_id,
+      rental_ids,
       amount_before_tax,
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
       invoice_number, // Optional custom invoice number
     } = req.body;
+
+    console.log('Invoice creation request:', { type, customer_id, rental_ids, amount_before_tax, tax_amount, date_issued, invoice_number });
 
     const client = await pool.connect();
 
@@ -412,8 +445,8 @@ export default function (pool, defaultConfig) {
       if (!["regular"].includes(type)) {
         throw new Error("Invalid invoice type specified.");
       }
-      if (type === "regular" && !rental_id) {
-        throw new Error("Rental ID is required for regular invoices.");
+      if (type === "regular" && (!rental_ids || !Array.isArray(rental_ids) || rental_ids.length === 0)) {
+        throw new Error("At least one rental ID is required for regular invoices.");
       }
       const numAmountBeforeTax = parseFloat(amount_before_tax);
       const numTaxAmount = parseFloat(tax_amount);
@@ -449,11 +482,11 @@ export default function (pool, defaultConfig) {
 
       const invoiceQuery = `
         INSERT INTO greentarget.invoices (
-          invoice_number, type, customer_id, rental_id,
+          invoice_number, type, customer_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
           balance_due
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *;
       `;
 
@@ -461,13 +494,25 @@ export default function (pool, defaultConfig) {
         finalInvoiceNumber,
         type,
         customer_id,
-        type === "regular" ? rental_id : null,
         numAmountBeforeTax.toFixed(2),
         numTaxAmount.toFixed(2),
         total_amount.toFixed(2),
         date_issued,
         total_amount.toFixed(2), // Initial balance_due
       ]);
+
+      const createdInvoice = invoiceResult.rows[0];
+      const invoiceId = createdInvoice.invoice_id;
+
+      // Insert rental associations in junction table
+      if (type === "regular" && rental_ids && Array.isArray(rental_ids) && rental_ids.length > 0) {
+        for (const rentalId of rental_ids) {
+          await client.query(
+            `INSERT INTO greentarget.invoice_rentals (invoice_id, rental_id) VALUES ($1, $2)`,
+            [invoiceId, rentalId]
+          );
+        }
+      }
 
       // Update customer last_activity_date
       await client.query(
@@ -477,8 +522,9 @@ export default function (pool, defaultConfig) {
 
       await client.query("COMMIT");
 
+      console.log('Invoice created successfully:', createdInvoice.invoice_id, createdInvoice.invoice_number);
+
       // Recalculate balance for the response object, just in case
-      const createdInvoice = invoiceResult.rows[0];
       createdInvoice.current_balance = parseFloat(createdInvoice.total_amount); // Or use balance_due
       createdInvoice.balance_due = parseFloat(createdInvoice.balance_due);
       createdInvoice.amount_paid = 0; // No payments yet
@@ -544,7 +590,7 @@ export default function (pool, defaultConfig) {
       invoice_number,
       type,
       customer_id,
-      rental_id,
+      rental_ids,
       amount_before_tax,
       tax_amount = 0,
       date_issued,
@@ -582,8 +628,8 @@ export default function (pool, defaultConfig) {
         throw new Error("Invalid invoice type specified.");
       }
 
-      if (type === "regular" && !rental_id) {
-        throw new Error("Rental ID is required for regular invoices.");
+      if (type === "regular" && (!rental_ids || !Array.isArray(rental_ids) || rental_ids.length === 0)) {
+        throw new Error("At least one rental ID is required for regular invoices.");
       }
 
       const numAmountBeforeTax = parseFloat(amount_before_tax);
@@ -628,18 +674,17 @@ export default function (pool, defaultConfig) {
         SET invoice_number = $1,
             type = $2,
             customer_id = $3,
-            rental_id = $4,
-            amount_before_tax = $5,
-            tax_amount = $6,
-            total_amount = $7,
-            date_issued = $8,
-            balance_due = $7 - COALESCE(
+            amount_before_tax = $4,
+            tax_amount = $5,
+            total_amount = $6,
+            date_issued = $7,
+            balance_due = $6 - COALESCE(
               (SELECT SUM(amount_paid) 
                FROM greentarget.payments 
-               WHERE invoice_id = $9 AND (status IS NULL OR status = 'active')
+               WHERE invoice_id = $8 AND (status IS NULL OR status = 'active')
               ), 0
             )
-        WHERE invoice_id = $9
+        WHERE invoice_id = $8
         RETURNING *;
       `;
 
@@ -647,13 +692,29 @@ export default function (pool, defaultConfig) {
         finalInvoiceNumber,
         type,
         customer_id,
-        type === "regular" ? rental_id : null,
         numAmountBeforeTax.toFixed(2),
         numTaxAmount.toFixed(2),
         total_amount.toFixed(2),
         date_issued,
         numericInvoiceId,
       ]);
+
+      // Update rental associations in junction table
+      if (type === "regular" && rental_ids && Array.isArray(rental_ids)) {
+        // First, delete existing associations
+        await client.query(
+          `DELETE FROM greentarget.invoice_rentals WHERE invoice_id = $1`,
+          [numericInvoiceId]
+        );
+        
+        // Then insert new associations
+        for (const rentalId of rental_ids) {
+          await client.query(
+            `INSERT INTO greentarget.invoice_rentals (invoice_id, rental_id) VALUES ($1, $2)`,
+            [numericInvoiceId, rentalId]
+          );
+        }
+      }
 
       // Update customer last_activity_date
       await client.query(
@@ -845,16 +906,28 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Check if there are any payments for this invoice
+      // Check if there are any payments for this invoice and get payment details
       const paymentsCheck = await client.query(
-        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1",
+        `SELECT payment_id, amount_paid, payment_date, payment_method, status 
+         FROM greentarget.payments 
+         WHERE invoice_id = $1 
+         ORDER BY payment_date DESC`,
         [numericInvoiceId]
       );
 
-      if (parseInt(paymentsCheck.rows[0].count) > 0) {
+      // If force delete is requested, delete payments first
+      if (paymentsCheck.rows.length > 0 && req.query.force === 'true') {
+        // Delete all payments for this invoice
+        await client.query(
+          "DELETE FROM greentarget.payments WHERE invoice_id = $1",
+          [numericInvoiceId]
+        );
+      } else if (paymentsCheck.rows.length > 0) {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: "Cannot delete invoice: it has associated payments. Delete the payments first."
+          message: "Cannot delete invoice: it has associated payments.",
+          payments: paymentsCheck.rows,
+          canForceDelete: true
         });
       }
 

@@ -48,11 +48,6 @@ interface DumpsterStatus {
   rental?: Rental;
 }
 
-interface TooltipPosition {
-  top: number;
-  left: number;
-}
-
 const DumpsterListPage: React.FC = () => {
   const navigate = useNavigate();
   const [dumpsters, setDumpsters] = useState<Dumpster[]>([]);
@@ -67,7 +62,7 @@ const DumpsterListPage: React.FC = () => {
     null
   );
 
-  const ITEMS_PER_PAGE = 15;
+  const ITEMS_PER_PAGE = 100;
 
   // Fetch dumpsters and rentals on component mount
   useEffect(() => {
@@ -294,7 +289,7 @@ const DumpsterListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-20 mb-4 -mt-8">
+    <div className="relative w-full mx-20 mb-4">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl text-default-700 font-bold">
           Dumpsters ({filteredDumpsters.length})

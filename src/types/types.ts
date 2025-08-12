@@ -437,6 +437,8 @@ export interface Employee {
   maritalStatus: string;
   spouseEmploymentStatus: string;
   numberOfChildren: number;
+  department: string;
+  kwspNumber: string;
   updatedAt?: string;
 }
 
@@ -508,6 +510,16 @@ export interface JobCategory {
   [key: string]: string | undefined;
 }
 
+export interface RentalDetail {
+  rental_id: number;
+  tong_no?: string;
+  date_placed: string;
+  date_picked?: string | null;
+  driver?: string;
+  location_address?: string;
+  location_phone_number?: string;
+}
+
 export interface InvoiceGT {
   invoice_id: number;
   invoice_number: string;
@@ -525,6 +537,8 @@ export interface InvoiceGT {
   rental_id?: number;
   driver?: string;
   tong_no?: string;
+  // New multi-rental support
+  rental_details?: RentalDetail[];
   amount_before_tax: number;
   tax_amount: number;
   total_amount: number;

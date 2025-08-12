@@ -221,7 +221,7 @@ const ProductPage: React.FC = () => {
   }
 
   return (
-    <div className="relative -mt-6 mb-4 w-full mx-6">
+    <div className="relative mb-4 w-full mx-6">
       <div className="flex flex-col items-center justify-center w-full">
         <div className="relative w-full text-center text-lg text-default-700 font-medium mb-2">
           Product Catalogue
@@ -280,7 +280,7 @@ const ProductPage: React.FC = () => {
           </div>
 
           {/* Scrollable Body */}
-          <div className="max-h-[70vh] overflow-y-auto">
+          <div className="max-h-[72vh] overflow-y-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProducts.map((product: Product) => (
