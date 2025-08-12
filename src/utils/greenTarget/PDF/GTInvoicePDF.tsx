@@ -269,7 +269,16 @@ const generateDescription = (invoice: InvoiceGT): string => {
     )} to ${formatDate(invoice.statement_period_end)}.`;
   }
   if (invoice.type === "regular" && invoice.rental_id) {
-    return `Trip(s): Waste Management Service`;
+    // Determine description based on dumpster type
+    if (invoice.tong_no) {
+      const dumpsterNumber = invoice.tong_no.trim();
+      if (dumpsterNumber.startsWith('B')) {
+        return `Rental Tong (B)`;
+      } else {
+        return `Rental Tong (A)`;
+      }
+    }
+    return `Waste Management Service`;
   }
   return "Invoice for services rendered.";
 };
@@ -310,7 +319,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
       ];
 
   return (
-    <Page size={hasValidEInvoice ? "A4" : "LETTER"} style={styles.page}>
+    <Page size={"A4"} style={styles.page}>
       {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.companySection}>
@@ -593,7 +602,7 @@ const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
         <View style={styles.signatureColumn}>
           <View style={styles.signatureLine} />
           <Text style={styles.signatureText}>
-            For GREEN TARGET WASTE TREATMENT IND. S/B
+            GREEN TARGET WASTE TREATMENT IND. S/B
           </Text>
         </View>
       </View>
