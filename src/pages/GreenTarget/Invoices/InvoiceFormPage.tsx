@@ -228,6 +228,43 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [formData.rental_ids, formData.type, availableRentals]);
 
+  // Auto-calculate invoice amount based on selected rentals (RM 200 per rental)
+  useEffect(() => {
+    // Only auto-calculate if we're in create mode for regular invoices
+    if (
+      !isEditMode &&
+      formData.type === "regular" &&
+      selectedRentals.length > 0
+    ) {
+      const calculatedAmount = selectedRentals.length * 200;
+
+      // Only update if the amount is different to prevent infinite loops
+      if (formData.amount_before_tax !== calculatedAmount) {
+        setFormData((prev) => ({
+          ...prev,
+          amount_before_tax: calculatedAmount,
+        }));
+      }
+    } else if (
+      !isEditMode &&
+      formData.type === "regular" &&
+      selectedRentals.length === 0
+    ) {
+      // Reset to default amount when no rentals selected
+      if (formData.amount_before_tax !== 200) {
+        setFormData((prev) => ({
+          ...prev,
+          amount_before_tax: 200,
+        }));
+      }
+    }
+  }, [
+    selectedRentals.length,
+    isEditMode,
+    formData.type,
+    formData.amount_before_tax,
+  ]);
+
   // --- DATA FETCHING ---
 
   const fetchCustomers = async () => {
@@ -1085,7 +1122,11 @@ const InvoiceFormPage: React.FC = () => {
                     required
                     className={clsx(
                       "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                      !isEditMode &&
+                        formData.type === "regular" &&
+                        selectedRentals.length > 0 &&
+                        "bg-sky-50"
                     )}
                   />
                 </div>
