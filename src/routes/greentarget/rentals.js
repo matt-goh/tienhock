@@ -79,7 +79,10 @@ export default function (pool) {
               ORDER BY 
                 CASE 
                   WHEN i.status IS NULL OR i.status = 'active' THEN 0
-                  ELSE 1
+                  WHEN i.status = 'paid' THEN 1
+                  WHEN i.status = 'overdue' THEN 2
+                  WHEN i.status = 'cancelled' THEN 9
+                  ELSE 3
                 END
               LIMIT 1) as invoice_info
       FROM greentarget.rentals r
@@ -565,7 +568,16 @@ export default function (pool) {
                   'status', i.status,
                   'amount', i.total_amount,
                   'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id)
-                ) FROM greentarget.invoices i WHERE i.rental_id = r.rental_id LIMIT 1) as invoice_info
+                ) FROM greentarget.invoices i WHERE i.rental_id = r.rental_id 
+                ORDER BY 
+                  CASE 
+                    WHEN i.status IS NULL OR i.status = 'active' THEN 0
+                    WHEN i.status = 'paid' THEN 1
+                    WHEN i.status = 'overdue' THEN 2
+                    WHEN i.status = 'cancelled' THEN 9
+                    ELSE 3
+                  END
+                LIMIT 1) as invoice_info
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
