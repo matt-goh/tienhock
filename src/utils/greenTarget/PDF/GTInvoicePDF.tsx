@@ -270,9 +270,13 @@ const generateDescription = (invoice: InvoiceGT): string => {
   }
   if (invoice.type === "regular" && invoice.rental_id) {
     // Determine description based on dumpster type
-    if (invoice.tong_no) {
-      const dumpsterNumber = invoice.tong_no.trim();
-      if (dumpsterNumber.startsWith('B')) {
+    if (
+      invoice.rental_details &&
+      invoice.rental_details.length > 0 &&
+      invoice.rental_details[0].tong_no
+    ) {
+      const dumpsterNumber = invoice.rental_details[0].tong_no.trim();
+      if (dumpsterNumber.startsWith("B")) {
         return `Rental Tong (B)`;
       } else {
         return `Rental Tong (A)`;

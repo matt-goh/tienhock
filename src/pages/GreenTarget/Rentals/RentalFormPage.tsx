@@ -28,6 +28,7 @@ import LocationFormModal from "../../../components/GreenTarget/LocationFormModal
 import { api } from "../../../routes/utils/api";
 import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import AssociatedInvoiceDisplay from "../../../components/GreenTarget/AssociatedInvoiceDisplay";
 
 // Interfaces (Customer, Location, Dumpster, Rental - unchanged)
 interface Customer {
@@ -54,6 +55,14 @@ interface Dumpster {
   has_future_rental?: boolean;
   next_rental?: { date: string; customer: string; rental_id: number };
 }
+interface InvoiceInfo {
+  invoice_id: number;
+  invoice_number: string;
+  status: string;
+  amount?: number;
+  has_payments?: boolean;
+}
+
 interface Rental {
   rental_id?: number;
   customer_id: number;
@@ -65,6 +74,7 @@ interface Rental {
   date_placed: string;
   date_picked: string | null;
   remarks: string | null;
+  invoice_info?: InvoiceInfo | null;
 }
 
 // Helper to format date
@@ -255,7 +265,6 @@ const RentalFormPage: React.FC = () => {
 
   // Fetch rental details function
   const fetchRentalDetails = async (rentalId: number, isMounted: boolean) => {
-    /* ... same as before ... */
     try {
       const rental = await greenTargetApi.getRental(rentalId);
       if (!isMounted || !rental) {
@@ -275,6 +284,7 @@ const RentalFormPage: React.FC = () => {
         date_placed: formatDateForInput(rental.date_placed),
         date_picked: formatDateForInput(rental.date_picked),
         remarks: rental.remarks ?? null,
+        invoice_info: rental.invoice_info || null,
       };
       setFormData(fetchedFormData);
       setInitialFormData(fetchedFormData);
@@ -1289,6 +1299,20 @@ const RentalFormPage: React.FC = () => {
                 />
               </div>
             </div>
+            {/* --- Associated Invoice Section --- */}
+            {isEditMode && formData.invoice_info && (
+              <div className="border-b border-default-200 pb-6">
+                <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
+                  Invoice Information
+                </h2>
+                <AssociatedInvoiceDisplay 
+                  invoiceInfo={formData.invoice_info}
+                  onViewInvoice={(invoiceId) => {
+                    window.open(`/greentarget/invoices/${invoiceId}`, '_blank');
+                  }}
+                />
+              </div>
+            )}
           </div>
           {/* --- Action Buttons --- */}
           <div className="mt-6 flex items-center justify-end gap-x-4">
