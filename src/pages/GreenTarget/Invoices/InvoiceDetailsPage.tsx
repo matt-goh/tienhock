@@ -806,16 +806,6 @@ const InvoiceDetailsPage: React.FC = () => {
   const handleCancelInvoice = async () => {
     if (!invoice) return;
 
-    // Check if invoice has payments
-    const activePayments = payments.filter((p) => p.status === "active");
-    if (activePayments.length > 0) {
-      toast.error(
-        "Cannot cancel invoice: it has associated payments. Cancel the payments first."
-      );
-      setIsCancelInvoiceDialogOpen(false);
-      return;
-    }
-
     setIsCancellingInvoice(true);
     try {
       await greenTargetApi.cancelInvoice(invoice.invoice_id);
@@ -825,7 +815,15 @@ const InvoiceDetailsPage: React.FC = () => {
       fetchInvoiceDetails(parseInt(id as string));
     } catch (error: any) {
       console.error("Error cancelling invoice:", error);
-      toast.error(error.message || "Failed to cancel invoice");
+      const errorMessage = error?.response?.data?.message || error?.message;
+      
+      if (errorMessage && errorMessage.includes("active payments")) {
+        toast.error(
+          "Cannot cancel invoice: it has active payments. Cancel the payments first."
+        );
+      } else {
+        toast.error(errorMessage || "Failed to cancel invoice");
+      }
     } finally {
       setIsCancellingInvoice(false);
       setIsCancelInvoiceDialogOpen(false);

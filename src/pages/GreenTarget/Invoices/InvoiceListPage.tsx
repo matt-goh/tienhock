@@ -957,40 +957,31 @@ const InvoiceListPage: React.FC = () => {
           invoiceToCancel.invoice_id
         );
 
-        // Check if the response contains an error message
-        if (
-          response.error ||
-          (response.message && response.message.includes("Cannot cancel"))
-        ) {
-          // Show error toast with the server's message
-          toast.error(
-            response.message || "Cannot cancel invoice: unknown error occurred"
-          );
-        } else {
-          // Only show success and update state if there's no error
-          toast.success("Invoice cancelled successfully");
+        // If we get here, the request was successful
+        toast.success("Invoice cancelled successfully");
 
-          // Update the invoice status in the list
-          setInvoices(
-            invoices.map((i) =>
-              i.invoice_id === invoiceToCancel.invoice_id
-                ? { 
-                    ...i, 
-                    status: "cancelled", 
-                    einvoice_status: i.einvoice_status ? "cancelled" : null 
-                  }
-                : i
-            )
-          );
-        }
+        // Update the invoice status in the list
+        setInvoices(
+          invoices.map((i) =>
+            i.invoice_id === invoiceToCancel.invoice_id
+              ? { 
+                  ...i, 
+                  status: "cancelled", 
+                  einvoice_status: i.einvoice_status ? "cancelled" : null 
+                }
+              : i
+          )
+        );
       } catch (error: any) {
-        // This will catch network errors or other exceptions
-        if (error.message && error.message.includes("associated payments")) {
+        // This will catch all errors including server errors
+        const errorMessage = error?.response?.data?.message || error?.message;
+        
+        if (errorMessage && errorMessage.includes("active payments")) {
           toast.error(
-            "Cannot cancel invoice: it has associated payments. Cancel the payments first."
+            "Cannot cancel invoice: it has active payments. Cancel the payments first."
           );
         } else {
-          toast.error("Failed to cancel invoice");
+          toast.error(errorMessage || "Failed to cancel invoice");
           console.error("Error cancelling invoice:", error);
         }
       } finally {
