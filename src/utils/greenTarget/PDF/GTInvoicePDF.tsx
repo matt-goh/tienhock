@@ -244,10 +244,11 @@ const formatCurrency = (amount: number | string | null | undefined) => {
   return num.toFixed(2);
 };
 
-// Generate a basic description based on invoice type and details
-const generateDescription = (invoice: InvoiceGT): string => {
+// Generate description for consolidated/statement invoices
+const generateSingleDescription = (invoice: InvoiceGT): string => {
   // Check both conditions for consolidated invoices
   const isConsolidated =
+    invoice.is_consolidated ||
     (Array.isArray(invoice.consolidated_invoices) &&
       invoice.consolidated_invoices.length > 0) || // Check consolidated_invoices array
     (invoice.invoice_number && invoice.invoice_number.startsWith("CON-")); // Check invoice number format
@@ -268,23 +269,96 @@ const generateDescription = (invoice: InvoiceGT): string => {
       invoice.statement_period_start
     )} to ${formatDate(invoice.statement_period_end)}.`;
   }
-  if (invoice.type === "regular" && invoice.rental_id) {
-    // Determine description based on dumpster type
-    if (
-      invoice.rental_details &&
-      invoice.rental_details.length > 0 &&
-      invoice.rental_details[0].tong_no
-    ) {
-      const dumpsterNumber = invoice.rental_details[0].tong_no.trim();
-      if (dumpsterNumber.startsWith("B")) {
-        return `Rental Tong (B)`;
-      } else {
-        return `Rental Tong (A)`;
-      }
-    }
-    return `Waste Management Service`;
-  }
+  
   return "Invoice for services rendered.";
+};
+
+// Generate line items based on rental details
+interface LineItem {
+  description: string;
+  qty: number;
+  price: number;
+  total: number;
+  tax: number;
+}
+
+const generateLineItems = (invoice: InvoiceGT): LineItem[] => {
+  const isConsolidated =
+    invoice.is_consolidated ||
+    (Array.isArray(invoice.consolidated_invoices) &&
+      invoice.consolidated_invoices.length > 0) ||
+    (invoice.invoice_number && invoice.invoice_number.startsWith("CON-"));
+
+  // For consolidated invoices and statements, show as single line item
+  if (isConsolidated || invoice.type === "statement") {
+    return [{
+      description: generateSingleDescription(invoice),
+      qty: 1,
+      price: invoice.amount_before_tax,
+      total: invoice.amount_before_tax,
+      tax: invoice.tax_amount,
+    }];
+  }
+
+  // For regular invoices with rental details
+  if (invoice.type === "regular" && invoice.rental_details && invoice.rental_details.length > 0) {
+    // Group rentals by dumpster type (A or B)
+    const groupedByType: { [key: string]: number } = {};
+    
+    invoice.rental_details.forEach(rental => {
+      if (rental.tong_no) {
+        const dumpsterNumber = rental.tong_no.trim();
+        const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+        groupedByType[type] = (groupedByType[type] || 0) + 1;
+      }
+    });
+
+    // Create line items for each type
+    const lineItems: LineItem[] = [];
+    const totalTypes = Object.keys(groupedByType).length;
+    
+    Object.entries(groupedByType).forEach(([type, quantity]) => {
+      const itemPrice = totalTypes > 1 
+        ? (invoice.amount_before_tax * quantity) / invoice.rental_details!.length
+        : invoice.amount_before_tax;
+      const itemTax = totalTypes > 1 
+        ? (invoice.tax_amount * quantity) / invoice.rental_details!.length
+        : invoice.tax_amount;
+
+      lineItems.push({
+        description: `Rental Tong (${type})`,
+        qty: quantity,
+        price: itemPrice / quantity, // Unit price
+        total: itemPrice,
+        tax: itemTax,
+      });
+    });
+
+    return lineItems;
+  }
+  
+  // Fallback to legacy single rental fields for backward compatibility
+  if (invoice.type === "regular" && invoice.rental_id && invoice.tong_no) {
+    const dumpsterNumber = invoice.tong_no.trim();
+    const type = dumpsterNumber.startsWith("B") ? "B" : "A";
+    
+    return [{
+      description: `Rental Tong (${type})`,
+      qty: 1,
+      price: invoice.amount_before_tax,
+      total: invoice.amount_before_tax,
+      tax: invoice.tax_amount,
+    }];
+  }
+
+  // Default fallback
+  return [{
+    description: "Waste Management Service",
+    qty: 1,
+    price: invoice.amount_before_tax,
+    total: invoice.amount_before_tax,
+    tax: invoice.tax_amount,
+  }];
 };
 
 interface GTInvoicePDFProps {
@@ -293,34 +367,16 @@ interface GTInvoicePDFProps {
 }
 
 const GTInvoicePDF: React.FC<GTInvoicePDFProps> = ({ invoice, qrCodeData }) => {
-  const description = generateDescription(invoice);
   const hasValidEInvoice =
     invoice.uuid && invoice.long_id && invoice.einvoice_status === "valid";
   const isConsolidated =
+    invoice.is_consolidated ||
     (Array.isArray(invoice.consolidated_invoices) &&
       invoice.consolidated_invoices.length > 0) ||
     (invoice.invoice_number && invoice.invoice_number.startsWith("CON-"));
 
-  // Create order details for the table
-  const orderDetails = isConsolidated
-    ? [
-        {
-          description: description,
-          qty: 1,
-          price: invoice.amount_before_tax,
-          total: invoice.total_amount,
-          tax: invoice.tax_amount,
-        },
-      ]
-    : [
-        {
-          description: description,
-          qty: 1,
-          price: invoice.amount_before_tax,
-          total: invoice.amount_before_tax,
-          tax: invoice.tax_amount,
-        },
-      ];
+  // Create order details for the table using the new line items logic
+  const orderDetails = generateLineItems(invoice);
 
   return (
     <Page size={"A4"} style={styles.page}>

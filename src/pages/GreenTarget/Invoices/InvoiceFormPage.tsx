@@ -387,8 +387,8 @@ const InvoiceFormPage: React.FC = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       // Extract just the date part to avoid timezone conversion issues
-      const dateOnly = datePickedStr.split('T')[0]; // Get '2025-08-12' from '2025-08-12T00:00:00.000Z'
-      const pickup = new Date(dateOnly + 'T00:00:00'); // Parse as local date
+      const dateOnly = datePickedStr.split("T")[0]; // Get '2025-08-12' from '2025-08-12T00:00:00.000Z'
+      const pickup = new Date(dateOnly + "T00:00:00"); // Parse as local date
       pickup.setHours(0, 0, 0, 0);
 
       // A rental is active if the pickup date is today or in the future
@@ -781,7 +781,6 @@ const InvoiceFormPage: React.FC = () => {
       <BackButton onClick={handleBackClick} className="ml-5" />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
-          {" "}
           {/* Header */}
           <h1 className="text-xl font-semibold text-default-900">
             {isEditMode
