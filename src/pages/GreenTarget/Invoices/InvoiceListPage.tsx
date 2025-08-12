@@ -339,7 +339,7 @@ const InvoiceCard = ({
                       }}
                     >
                       <IconCheck size={14} className="mr-1" />
-                      e-Invoice Valid
+                      e-Invoice
                     </a>
                   ) : invoice.einvoice_status === "pending" ? (
                     <a
@@ -991,10 +991,14 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (forceDelete = false) => {
     if (invoiceToDelete) {
       try {
-        await greenTargetApi.deleteInvoice(invoiceToDelete.invoice_id);
+        const url = forceDelete 
+          ? `/greentarget/api/invoices/${invoiceToDelete.invoice_id}?force=true`
+          : `/greentarget/api/invoices/${invoiceToDelete.invoice_id}`;
+        
+        await api.delete(url);
         toast.success("Invoice deleted successfully");
 
         // Remove the invoice from the list
@@ -1007,12 +1011,28 @@ const InvoiceListPage: React.FC = () => {
           return newSet;
         });
       } catch (error: any) {
-        if (error.message && error.message.includes("associated payments")) {
-          toast.error(
-            "Cannot delete invoice: it has associated payments. Delete the payments first."
+        const errorData = error?.response?.data;
+        
+        if (errorData?.canForceDelete && errorData?.payments) {
+          // Show detailed confirmation with payment information
+          const paymentList = errorData.payments
+            .map((p: any) => `- ${new Intl.NumberFormat("en-MY", {
+              style: "currency",
+              currency: "MYR",
+            }).format(p.amount_paid)} (${p.payment_method}, ${new Date(p.payment_date).toLocaleDateString()})`)
+            .join('\n');
+          
+          const confirmed = window.confirm(
+            `This invoice has the following payments:\n\n${paymentList}\n\nDeleting the invoice will also delete all associated payments. This action cannot be undone.\n\nDo you want to proceed?`
           );
+          
+          if (confirmed) {
+            handleConfirmDelete(true); // Retry with force delete
+            return;
+          }
         } else {
-          toast.error("Failed to delete invoice");
+          const errorMessage = errorData?.message || error?.message || "Failed to delete invoice";
+          toast.error(errorMessage);
           console.error("Error deleting invoice:", error);
         }
       } finally {

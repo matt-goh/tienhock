@@ -23,6 +23,7 @@ import {
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
+import { api } from "../../../routes/utils/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   Listbox,
@@ -816,7 +817,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } catch (error: any) {
       console.error("Error cancelling invoice:", error);
       const errorMessage = error?.response?.data?.message || error?.message;
-      
+
       if (errorMessage && errorMessage.includes("active payments")) {
         toast.error(
           "Cannot cancel invoice: it has active payments. Cancel the payments first."
@@ -830,28 +831,51 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   };
 
-  const handleDeleteInvoice = async () => {
+  const handleDeleteInvoice = async (forceDelete = false) => {
     if (!invoice) return;
-
-    // Check if invoice has any payments
-    if (payments.length > 0) {
-      toast.error(
-        "Cannot delete invoice: it has associated payments. Delete the payments first."
-      );
-      setIsDeleteInvoiceDialogOpen(false);
-      return;
-    }
 
     setIsDeletingInvoice(true);
     try {
-      await greenTargetApi.deleteInvoice(invoice.invoice_id);
+      const url = forceDelete
+        ? `/greentarget/api/invoices/${invoice.invoice_id}?force=true`
+        : `/greentarget/api/invoices/${invoice.invoice_id}`;
+
+      await api.delete(url);
       toast.success("Invoice deleted successfully");
 
       // Navigate back to invoice list
       navigate("/greentarget/invoices");
     } catch (error: any) {
       console.error("Error deleting invoice:", error);
-      toast.error(error.message || "Failed to delete invoice");
+      const errorData = error?.response?.data;
+
+      if (errorData?.canForceDelete && errorData?.payments) {
+        // Show detailed confirmation with payment information
+        const paymentList = errorData.payments
+          .map(
+            (p: any) =>
+              `- ${new Intl.NumberFormat("en-MY", {
+                style: "currency",
+                currency: "MYR",
+              }).format(p.amount_paid)} (${p.payment_method}, ${new Date(
+                p.payment_date
+              ).toLocaleDateString()})`
+          )
+          .join("\n");
+
+        const confirmed = window.confirm(
+          `This invoice has the following payments:\n\n${paymentList}\n\nDeleting the invoice will also delete all associated payments. This action cannot be undone.\n\nDo you want to proceed?`
+        );
+
+        if (confirmed) {
+          handleDeleteInvoice(true); // Retry with force delete
+          return;
+        }
+      } else {
+        const errorMessage =
+          errorData?.message || error?.message || "Failed to delete invoice";
+        toast.error(errorMessage);
+      }
     } finally {
       setIsDeletingInvoice(false);
       setIsDeleteInvoiceDialogOpen(false);
@@ -986,7 +1010,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 title="e-Invoice Valid"
               >
                 <IconCheck size={18} stroke={1.5} />
-                <span className="truncate">e-Invoice Valid</span>
+                <span className="truncate">e-Invoice</span>
               </button>
             )}
             {invoice.einvoice_status === "pending" && (
@@ -2041,13 +2065,7 @@ const InvoiceDetailsPage: React.FC = () => {
         onClose={() => setIsDeleteInvoiceDialogOpen(false)}
         onConfirm={handleDeleteInvoice}
         title="Delete Invoice"
-        message={`Are you sure you want to permanently delete invoice ${
-          invoice?.invoice_number
-        }? This action cannot be undone and will remove all invoice data from the system.${
-          payments.length > 0
-            ? " Note: You must delete all payments first."
-            : ""
-        }`}
+        message={`Are you sure you want to permanently delete invoice ${invoice?.invoice_number}? This action cannot be undone and will remove all invoice data from the system.`}
         confirmButtonText={isDeletingInvoice ? "Deleting..." : "Delete Invoice"}
         variant="danger"
       />

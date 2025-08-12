@@ -845,16 +845,28 @@ export default function (pool, defaultConfig) {
         });
       }
 
-      // Check if there are any payments for this invoice
+      // Check if there are any payments for this invoice and get payment details
       const paymentsCheck = await client.query(
-        "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1",
+        `SELECT payment_id, amount_paid, payment_date, payment_method, status 
+         FROM greentarget.payments 
+         WHERE invoice_id = $1 
+         ORDER BY payment_date DESC`,
         [numericInvoiceId]
       );
 
-      if (parseInt(paymentsCheck.rows[0].count) > 0) {
+      // If force delete is requested, delete payments first
+      if (paymentsCheck.rows.length > 0 && req.query.force === 'true') {
+        // Delete all payments for this invoice
+        await client.query(
+          "DELETE FROM greentarget.payments WHERE invoice_id = $1",
+          [numericInvoiceId]
+        );
+      } else if (paymentsCheck.rows.length > 0) {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: "Cannot delete invoice: it has associated payments. Delete the payments first."
+          message: "Cannot delete invoice: it has associated payments.",
+          payments: paymentsCheck.rows,
+          canForceDelete: true
         });
       }
 
