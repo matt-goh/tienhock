@@ -1,14 +1,18 @@
-import React, { useMemo } from "react";
-import { IconUsers, IconArrowLeft } from "@tabler/icons-react";
+import React, { useMemo, useState } from "react";
+import { IconUsers, IconArrowLeft, IconFileExport, IconLink } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { Employee } from "../../types/types";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
+import toast from "react-hot-toast";
 
 const StaffRecords = () => {
   const { allStaffs: employees, loading, error } = useStaffsCache();
   const navigate = useNavigate();
+  
+  // Export state
+  const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
 
   const calculateAge = (birthdate: string): number => {
     if (!birthdate) return 0;
@@ -61,9 +65,133 @@ const StaffRecords = () => {
     return { day, month, year };
   };
 
+  const formatPhoneNumber = (phoneNumber: string): string => {
+    if (!phoneNumber) return "-";
+    
+    // Remove all non-digit characters
+    const digits = phoneNumber.replace(/\D/g, "");
+    
+    if (digits.length === 10) {
+      // Format as XXX-XXX-XXXX
+      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11) {
+      // Format as XXX-XXXX-XXXX
+      return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+    } else {
+      // Return original if not 10 or 11 digits
+      return phoneNumber;
+    }
+  };
+
+  const formatRace = (race: string): string => {
+    if (!race) return "-";
+    const upperRace = race.toUpperCase();
+    if (upperRace === "CINA") return "CHINESE";
+    return upperRace;
+  };
+
   const activeEmployees = useMemo(() => {
     return employees.filter((employee) => !employee.dateResigned);
   }, [employees]);
+
+  // Export URL Generation
+  const generateExportURL = () => {
+    // Determine server URL based on environment
+    const isProduction = window.location.hostname === 'tienhock.com';
+    const baseURL = isProduction ? 'https://api.tienhock.com' : 'http://localhost:5001';
+    const url = `${baseURL}/api/excel/staff-records-export?api_key=foodmaker`;
+    
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success("Export URL copied to clipboard!");
+    }).catch(() => {
+      toast.error("Failed to copy URL to clipboard");
+    });
+  };
+
+  // Text Export Generation
+  const generateTextExport = async () => {
+    if (!activeEmployees || activeEmployees.length === 0) {
+      toast.error("No staff records available to export");
+      return;
+    }
+
+    setIsGeneratingExport(true);
+    try {
+      // Define column headers
+      const headers = [
+        "Employee Name",
+        "M/F",
+        "Age",
+        "Married",
+        "Tel No.",
+        "Date Join",
+        "Department",
+        "No IC / Passport",
+        "KWSP No",
+        "Income Tax No",
+        "Bank Acc. No",
+        "Date/Birth (DD.MM)",
+        "Date/Birth (YYYY)",
+        "Religion",
+        "Race",
+        "Citizenship"
+      ];
+
+      // Generate data rows
+      const dataRows = activeEmployees.map((employee: Employee) => {
+        const birthDateParts = formatDate(employee.birthdate);
+        const dayMonth = `${birthDateParts.day}.${birthDateParts.month}`;
+        const year = birthDateParts.year;
+        
+        return [
+          employee.name || "",
+          formatGender(employee.gender),
+          calculateAge(employee.birthdate).toString(),
+          formatMaritalStatus(employee.maritalStatus),
+          formatPhoneNumber(employee.telephoneNo || ""),
+          formatDateJoined(employee.dateJoined),
+          employee.department || "",
+          employee.icNo || "",
+          employee.kwspNumber || "",
+          employee.incomeTaxNo || "",
+          employee.bankAccountNumber || "",
+          dayMonth,
+          year,
+          (employee.agama || "").toUpperCase(),
+          formatRace(employee.race || ""),
+          (employee.nationality || "").toUpperCase()
+        ];
+      });
+
+      // Combine headers and data
+      const allRows = [
+        headers,
+        ...dataRows
+      ];
+
+      // Convert to text format (semicolon separated)
+      const textContent = allRows.map(row => row.join(";")).join("\r\n");
+
+      // Create and download the file
+      const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `staff-records-export-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Staff records export file downloaded successfully");
+    } catch (error) {
+      console.error("Error generating text export:", error);
+      toast.error("Failed to generate text export");
+    } finally {
+      setIsGeneratingExport(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -93,6 +221,27 @@ const StaffRecords = () => {
             <IconUsers size={28} stroke={2.5} className="text-default-700" />
             Staff Records ({activeEmployees.length})
           </h1>
+        </div>
+        <div className="flex space-x-2">
+          <Button
+            onClick={generateTextExport}
+            icon={IconFileExport}
+            color="purple"
+            variant="outline"
+            disabled={activeEmployees.length === 0 || isGeneratingExport}
+            size="sm"
+          >
+            Export
+          </Button>
+          <Button
+            onClick={generateExportURL}
+            icon={IconLink}
+            color="orange"
+            variant="outline"
+            size="sm"
+          >
+            Export Link
+          </Button>
         </div>
       </div>
 
