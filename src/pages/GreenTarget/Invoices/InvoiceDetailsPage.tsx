@@ -141,6 +141,50 @@ const InvoiceDetailsPage: React.FC = () => {
   });
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
+  // Invoice details editing states
+  const [isEditingInvoiceNumber, setIsEditingInvoiceNumber] = useState(false);
+  const [editedInvoiceNumber, setEditedInvoiceNumber] = useState("");
+  const [invoiceNumberValidation, setInvoiceNumberValidation] = useState({
+    isValidating: false,
+    isValid: true,
+    isDuplicate: false,
+    message: "",
+  });
+  const [isUpdatingInvoiceNumber, setIsUpdatingInvoiceNumber] = useState(false);
+
+  const [isEditingDateIssued, setIsEditingDateIssued] = useState(false);
+  const [editedDateIssued, setEditedDateIssued] = useState("");
+  const [isUpdatingDateIssued, setIsUpdatingDateIssued] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [isUpdatingCustomer, setIsUpdatingCustomer] = useState(false);
+
+  const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [editedAmount, setEditedAmount] = useState("");
+  const [isUpdatingAmount, setIsUpdatingAmount] = useState(false);
+
+  // E-invoice cancellation confirmation states
+  const [showEInvoiceCancelConfirm, setShowEInvoiceCancelConfirm] =
+    useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<{
+    type: "invoice_number" | "date_issued" | "customer" | "amount";
+    value: any;
+    requiresEInvoiceCancel: boolean;
+  } | null>(null);
+
+  // Customer change warning states
+  const [showCustomerChangeWarning, setShowCustomerChangeWarning] =
+    useState(false);
+  const [pendingCustomerChange, setPendingCustomerChange] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+
   useEffect(() => {
     if (id) {
       fetchInvoiceDetails(parseInt(id));
@@ -235,6 +279,77 @@ const InvoiceDetailsPage: React.FC = () => {
     }
   }, [editedRefValue, editingPaymentId, payments, validateInternalRef]);
 
+  // Debounced invoice number validation
+  const validateInvoiceNumber = useCallback(
+    async (invoiceNumber: string) => {
+      if (!invoiceNumber || !invoiceNumber.trim()) {
+        setInvoiceNumberValidation({
+          isValidating: false,
+          isValid: true,
+          isDuplicate: false,
+          message: "",
+        });
+        return;
+      }
+
+      setInvoiceNumberValidation((prev) => ({
+        ...prev,
+        isValidating: true,
+      }));
+
+      try {
+        const result = await greenTargetApi.checkInvoiceNumber(
+          invoiceNumber,
+          invoice?.invoice_id
+        );
+
+        setInvoiceNumberValidation({
+          isValidating: false,
+          isValid: !result.exists,
+          isDuplicate: result.exists,
+          message: result.exists
+            ? "This invoice number is already in use."
+            : "",
+        });
+      } catch (error) {
+        console.error("Error validating invoice number:", error);
+        setInvoiceNumberValidation({
+          isValidating: false,
+          isValid: false,
+          isDuplicate: false,
+          message: "Error validating invoice number",
+        });
+      }
+    },
+    [invoice?.invoice_id]
+  );
+
+  // Debounce invoice number validation
+  useEffect(() => {
+    if (isEditingInvoiceNumber && editedInvoiceNumber) {
+      const timer = setTimeout(() => {
+        if (editedInvoiceNumber !== invoice?.invoice_number) {
+          validateInvoiceNumber(editedInvoiceNumber);
+        } else {
+          // If value is same as original, reset validation
+          setInvoiceNumberValidation({
+            isValidating: false,
+            isValid: true,
+            isDuplicate: false,
+            message: "",
+          });
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [
+    editedInvoiceNumber,
+    isEditingInvoiceNumber,
+    invoice?.invoice_number,
+    validateInvoiceNumber,
+  ]);
+
   const handleEditInternalRef = (payment: Payment) => {
     setEditingPaymentId(payment.payment_id);
     setEditedRefValue(payment.internal_reference || "");
@@ -268,6 +383,379 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error(errorMessage);
     } finally {
       setIsUpdatingPayment(false);
+    }
+  };
+
+  // Invoice details editing handlers
+  const handleEditInvoiceNumber = () => {
+    setIsEditingInvoiceNumber(true);
+    setEditedInvoiceNumber(invoice?.invoice_number || "");
+    setInvoiceNumberValidation({
+      isValidating: false,
+      isValid: true,
+      isDuplicate: false,
+      message: "",
+    });
+  };
+
+  const handleCancelInvoiceNumberEdit = () => {
+    setIsEditingInvoiceNumber(false);
+    setEditedInvoiceNumber("");
+    setInvoiceNumberValidation({
+      isValidating: false,
+      isValid: true,
+      isDuplicate: false,
+      message: "",
+    });
+  };
+
+  const handleSaveInvoiceNumber = async () => {
+    if (
+      invoiceNumberValidation.isDuplicate ||
+      !invoiceNumberValidation.isValid
+    ) {
+      toast.error("Please fix validation errors before saving.");
+      return;
+    }
+
+    if (editedInvoiceNumber === invoice?.invoice_number) {
+      handleCancelInvoiceNumberEdit();
+      return;
+    }
+
+    // Check if e-invoice cancellation is required
+    const requiresEInvoiceCancel = invoice?.einvoice_status === "valid";
+
+    if (requiresEInvoiceCancel) {
+      setPendingUpdate({
+        type: "invoice_number",
+        value: editedInvoiceNumber,
+        requiresEInvoiceCancel: true,
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    // Proceed with update
+    await updateInvoiceNumber(editedInvoiceNumber);
+  };
+
+  const updateInvoiceNumber = async (newInvoiceNumber: string) => {
+    setIsUpdatingInvoiceNumber(true);
+    try {
+      const updateData: any = {
+        invoice_number: newInvoiceNumber,
+        type: invoice?.type,
+        customer_id: invoice?.customer_id,
+        amount_before_tax: invoice?.amount_before_tax || invoice?.total_amount,
+        date_issued: invoice?.date_issued,
+      };
+
+      // Include rental_ids for regular invoices
+      if (invoice?.type === "regular" && invoice?.rental_details) {
+        updateData.rental_ids = invoice.rental_details.map(
+          (rental: any) => rental.rental_id
+        );
+      }
+
+      await greenTargetApi.updateInvoice(invoice?.invoice_id!, updateData);
+      toast.success("Invoice number updated successfully.");
+      handleCancelInvoiceNumberEdit();
+      if (id) fetchInvoiceDetails(parseInt(id));
+    } catch (error: any) {
+      console.error("Failed to update invoice number:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update invoice number.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingInvoiceNumber(false);
+    }
+  };
+
+  const handleEditDateIssued = () => {
+    setIsEditingDateIssued(true);
+    // Convert the date to YYYY-MM-DD format for input
+    const dateOnly = invoice?.date_issued?.split("T")[0] || "";
+    setEditedDateIssued(dateOnly);
+  };
+
+  const handleCancelDateIssuedEdit = () => {
+    setIsEditingDateIssued(false);
+    setEditedDateIssued("");
+  };
+
+  const handleSaveDateIssued = async () => {
+    if (editedDateIssued === invoice?.date_issued?.split("T")[0]) {
+      handleCancelDateIssuedEdit();
+      return;
+    }
+
+    // Check if e-invoice cancellation is required
+    const requiresEInvoiceCancel = invoice?.einvoice_status === "valid";
+
+    if (requiresEInvoiceCancel) {
+      setPendingUpdate({
+        type: "date_issued",
+        value: editedDateIssued,
+        requiresEInvoiceCancel: true,
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    // Proceed with update
+    await updateDateIssued(editedDateIssued);
+  };
+
+  const updateDateIssued = async (newDate: string) => {
+    setIsUpdatingDateIssued(true);
+    try {
+      const updateData: any = {
+        date_issued: newDate,
+        type: invoice?.type,
+        customer_id: invoice?.customer_id,
+        amount_before_tax: invoice?.amount_before_tax || invoice?.total_amount,
+        invoice_number: invoice?.invoice_number,
+      };
+
+      // Include rental_ids for regular invoices
+      if (invoice?.type === "regular" && invoice?.rental_details) {
+        updateData.rental_ids = invoice.rental_details.map(
+          (rental: any) => rental.rental_id
+        );
+      }
+
+      await greenTargetApi.updateInvoice(invoice?.invoice_id!, updateData);
+      toast.success("Date issued updated successfully.");
+      handleCancelDateIssuedEdit();
+      if (id) fetchInvoiceDetails(parseInt(id));
+    } catch (error: any) {
+      console.error("Failed to update date issued:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update date issued.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingDateIssued(false);
+    }
+  };
+
+  const handleEditAmount = () => {
+    setIsEditingAmount(true);
+    setEditedAmount(invoice?.total_amount?.toString() || "");
+  };
+
+  const handleCancelAmountEdit = () => {
+    setIsEditingAmount(false);
+    setEditedAmount("");
+  };
+
+  const handleSaveAmount = async () => {
+    const newAmount = parseFloat(editedAmount);
+    if (isNaN(newAmount) || newAmount < 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+
+    if (newAmount === parseFloat(invoice?.total_amount?.toString() || "0")) {
+      handleCancelAmountEdit();
+      return;
+    }
+
+    // Check if e-invoice cancellation is required
+    const requiresEInvoiceCancel = invoice?.einvoice_status === "valid";
+
+    if (requiresEInvoiceCancel) {
+      setPendingUpdate({
+        type: "amount",
+        value: newAmount,
+        requiresEInvoiceCancel: true,
+      });
+      setShowEInvoiceCancelConfirm(true);
+      return;
+    }
+
+    // Proceed with update
+    await updateAmount(newAmount);
+  };
+
+  const updateAmount = async (newAmount: number) => {
+    setIsUpdatingAmount(true);
+    try {
+      const updateData: any = {
+        total_amount: newAmount,
+        amount_before_tax: newAmount, // Assuming the amount is before tax
+        type: invoice?.type,
+        customer_id: invoice?.customer_id,
+        date_issued: invoice?.date_issued,
+        invoice_number: invoice?.invoice_number,
+      };
+
+      // Include rental_ids for regular invoices
+      if (invoice?.type === "regular" && invoice?.rental_details) {
+        updateData.rental_ids = invoice.rental_details.map(
+          (rental: any) => rental.rental_id
+        );
+      }
+
+      await greenTargetApi.updateInvoice(invoice?.invoice_id!, updateData);
+      toast.success("Invoice amount updated successfully.");
+      handleCancelAmountEdit();
+      if (id) fetchInvoiceDetails(parseInt(id));
+    } catch (error: any) {
+      console.error("Failed to update invoice amount:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update invoice amount.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingAmount(false);
+    }
+  };
+
+  // E-invoice cancellation and warning handlers
+  const handleConfirmEInvoiceCancel = async () => {
+    if (!pendingUpdate) return;
+
+    try {
+      setIsSyncingCancellation(true);
+
+      // Proceed with the update with e-invoice cancellation confirmation
+      switch (pendingUpdate.type) {
+        case "invoice_number":
+          await updateInvoiceNumberWithConfirmation(pendingUpdate.value);
+          break;
+        case "date_issued":
+          await updateDateIssuedWithConfirmation(pendingUpdate.value);
+          break;
+        case "amount":
+          await updateAmountWithConfirmation(pendingUpdate.value);
+          break;
+      }
+
+      toast.success("E-invoice cancelled and invoice updated successfully.");
+    } catch (error: any) {
+      console.error("Failed to cancel e-invoice or update invoice:", error);
+      const errorMessage =
+        error?.response?.data?.message ||
+        "Failed to cancel e-invoice or update invoice.";
+      toast.error(errorMessage);
+    } finally {
+      setIsSyncingCancellation(false);
+      setShowEInvoiceCancelConfirm(false);
+      setPendingUpdate(null);
+    }
+  };
+
+  const handleCancelEInvoiceCancel = () => {
+    setShowEInvoiceCancelConfirm(false);
+    setPendingUpdate(null);
+
+    // Reset editing states based on pending update type
+    if (pendingUpdate?.type === "invoice_number") {
+      handleCancelInvoiceNumberEdit();
+    } else if (pendingUpdate?.type === "date_issued") {
+      handleCancelDateIssuedEdit();
+    } else if (pendingUpdate?.type === "amount") {
+      handleCancelAmountEdit();
+    }
+  };
+
+  // Update methods with e-invoice cancellation confirmation
+  const updateInvoiceNumberWithConfirmation = async (
+    newInvoiceNumber: string
+  ) => {
+    setIsUpdatingInvoiceNumber(true);
+    try {
+      const updateData: any = {
+        invoice_number: newInvoiceNumber,
+        type: invoice?.type,
+        customer_id: invoice?.customer_id,
+        amount_before_tax: invoice?.amount_before_tax || invoice?.total_amount,
+        date_issued: invoice?.date_issued,
+        confirmEInvoiceCancellation: true,
+      };
+
+      // Include rental_ids for regular invoices
+      if (invoice?.type === "regular" && invoice?.rental_details) {
+        updateData.rental_ids = invoice.rental_details.map(
+          (rental: any) => rental.rental_id
+        );
+      }
+
+      await greenTargetApi.updateInvoice(invoice?.invoice_id!, updateData);
+      handleCancelInvoiceNumberEdit();
+      if (id) fetchInvoiceDetails(parseInt(id));
+    } catch (error: any) {
+      console.error("Failed to update invoice number:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update invoice number.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingInvoiceNumber(false);
+    }
+  };
+
+  const updateDateIssuedWithConfirmation = async (newDate: string) => {
+    setIsUpdatingDateIssued(true);
+    try {
+      const updateData: any = {
+        date_issued: newDate,
+        type: invoice?.type,
+        customer_id: invoice?.customer_id,
+        amount_before_tax: invoice?.amount_before_tax || invoice?.total_amount,
+        invoice_number: invoice?.invoice_number,
+        confirmEInvoiceCancellation: true,
+      };
+
+      // Include rental_ids for regular invoices
+      if (invoice?.type === "regular" && invoice?.rental_details) {
+        updateData.rental_ids = invoice.rental_details.map(
+          (rental: any) => rental.rental_id
+        );
+      }
+
+      await greenTargetApi.updateInvoice(invoice?.invoice_id!, updateData);
+      handleCancelDateIssuedEdit();
+      if (id) fetchInvoiceDetails(parseInt(id));
+    } catch (error: any) {
+      console.error("Failed to update date issued:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update date issued.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingDateIssued(false);
+    }
+  };
+
+  const updateAmountWithConfirmation = async (newAmount: number) => {
+    setIsUpdatingAmount(true);
+    try {
+      const updateData: any = {
+        total_amount: newAmount,
+        amount_before_tax: newAmount, // Assuming the amount is before tax
+        type: invoice?.type,
+        customer_id: invoice?.customer_id,
+        date_issued: invoice?.date_issued,
+        invoice_number: invoice?.invoice_number,
+        confirmEInvoiceCancellation: true,
+      };
+
+      // Include rental_ids for regular invoices
+      if (invoice?.type === "regular" && invoice?.rental_details) {
+        updateData.rental_ids = invoice.rental_details.map(
+          (rental: any) => rental.rental_id
+        );
+      }
+
+      await greenTargetApi.updateInvoice(invoice?.invoice_id!, updateData);
+      handleCancelAmountEdit();
+      if (id) fetchInvoiceDetails(parseInt(id));
+    } catch (error: any) {
+      console.error("Failed to update invoice amount:", error);
+      const errorMessage =
+        error?.response?.data?.message || "Failed to update invoice amount.";
+      toast.error(errorMessage);
+    } finally {
+      setIsUpdatingAmount(false);
     }
   };
 
@@ -1499,30 +1987,130 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
 
       {/* Invoice details */}
-      <div className="bg-white rounded-lg shadow border border-default-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow border border-default-200 overflow-hidden mt-8">
         {/* Invoice info */}
         <section className="px-6 py-4 border-b border-default-200">
           <h2 className="text-lg font-medium mb-4 border-b pb-2">
             Invoice Details
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Invoice Number
               </span>
-              <span className="text-gray-900 font-medium">
-                {invoice.invoice_number}
-              </span>
+              {isEditingInvoiceNumber ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={editedInvoiceNumber}
+                      onChange={(e) => setEditedInvoiceNumber(e.target.value)}
+                      className={clsx(
+                        "flex-1 px-2 py-1.5 border rounded-lg text-sm",
+                        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
+                        invoiceNumberValidation.isDuplicate
+                          ? "border-red-300 bg-red-50"
+                          : "border-default-300"
+                      )}
+                      placeholder="Enter invoice number"
+                      disabled={isUpdatingInvoiceNumber}
+                    />
+                    <button
+                      onClick={handleSaveInvoiceNumber}
+                      disabled={
+                        isUpdatingInvoiceNumber ||
+                        invoiceNumberValidation.isValidating ||
+                        invoiceNumberValidation.isDuplicate ||
+                        !editedInvoiceNumber.trim()
+                      }
+                      className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                      title="Save"
+                    >
+                      <IconDeviceFloppy size={18} />
+                    </button>
+                    <button
+                      onClick={handleCancelInvoiceNumberEdit}
+                      disabled={isUpdatingInvoiceNumber}
+                      className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                      title="Cancel"
+                    >
+                      <IconX size={18} />
+                    </button>
+                  </div>
+                  {invoiceNumberValidation.isValidating && (
+                    <p className="text-xs text-blue-600">Validating...</p>
+                  )}
+                  {invoiceNumberValidation.message && (
+                    <p className="text-xs text-red-600">
+                      {invoiceNumberValidation.message}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span className="text-gray-900 font-medium">
+                    {invoice.invoice_number}
+                  </span>
+                  {invoice.status !== "cancelled" && (
+                    <button
+                      onClick={handleEditInvoiceNumber}
+                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                      title="Edit Invoice Number"
+                    >
+                      <IconPencil size={14} className="text-sky-600" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Date Issued
               </span>
-              <span className="text-gray-900 font-medium">
-                {formatDate(invoice.date_issued)}
-              </span>
+              {isEditingDateIssued ? (
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="date"
+                    value={editedDateIssued}
+                    onChange={(e) => setEditedDateIssued(e.target.value)}
+                    className="flex-1 px-2 py-1.5 border border-default-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                    disabled={isUpdatingDateIssued}
+                  />
+                  <button
+                    onClick={handleSaveDateIssued}
+                    disabled={isUpdatingDateIssued || !editedDateIssued}
+                    className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                    title="Save"
+                  >
+                    <IconDeviceFloppy size={18} />
+                  </button>
+                  <button
+                    onClick={handleCancelDateIssuedEdit}
+                    disabled={isUpdatingDateIssued}
+                    className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                    title="Cancel"
+                  >
+                    <IconX size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span className="text-gray-900 font-medium">
+                    {formatDate(invoice.date_issued)}
+                  </span>
+                  {invoice.status !== "cancelled" && (
+                    <button
+                      onClick={handleEditDateIssued}
+                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                      title="Edit Date Issued"
+                    >
+                      <IconPencil size={14} className="text-sky-600" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Customer
               </span>
@@ -1544,21 +2132,66 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
-                Invoice Type
-              </span>
-              <span className="text-gray-900 font-medium capitalize">
-                {invoice.type}
-              </span>
-            </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col group">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
                 Total Amount
               </span>
-              <span className="text-gray-900 font-semibold text-base">
-                {formatCurrency(parseFloat(invoice.total_amount.toString()))}
-              </span>
+              {isEditingAmount ? (
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-default-500 text-sm">
+                      RM
+                    </span>
+                    <input
+                      type="number"
+                      value={editedAmount}
+                      onChange={(e) => setEditedAmount(e.target.value)}
+                      className="w-full pl-10 pr-3 py-1.5 border border-default-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      disabled={isUpdatingAmount}
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveAmount}
+                    disabled={
+                      isUpdatingAmount ||
+                      !editedAmount ||
+                      parseFloat(editedAmount) < 0
+                    }
+                    className="p-1.5 rounded-md text-green-600 hover:bg-green-100 disabled:text-default-400 disabled:bg-transparent"
+                    title="Save"
+                  >
+                    <IconDeviceFloppy size={18} />
+                  </button>
+                  <button
+                    onClick={handleCancelAmountEdit}
+                    disabled={isUpdatingAmount}
+                    className="p-1.5 rounded-md text-red-600 hover:bg-red-100 disabled:text-default-400"
+                    title="Cancel"
+                  >
+                    <IconX size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span className="text-gray-900 font-semibold">
+                    {formatCurrency(
+                      parseFloat(invoice.total_amount.toString())
+                    )}
+                  </span>
+                  {invoice.status !== "cancelled" && (
+                    <button
+                      onClick={handleEditAmount}
+                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                      title="Edit Amount"
+                    >
+                      <IconPencil size={14} className="text-sky-600" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex flex-col">
               <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
@@ -1566,7 +2199,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </span>
               <div className="flex items-center">
                 <span
-                  className={`font-semibold text-base ${
+                  className={`font-semibold ${
                     invoice.current_balance <= 0 ||
                     invoice.status === "cancelled"
                       ? "text-green-600"
@@ -1579,12 +2212,12 @@ const InvoiceDetailsPage: React.FC = () => {
                 </span>
                 {invoice.current_balance <= 0 &&
                   invoice.status !== "cancelled" && (
-                    <span className="ml-2 text-green-600 text-sm font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                    <span className="ml-2 text-green-600 text-xs font-medium px-2 py-0.5 bg-green-50 rounded-full">
                       Paid in Full
                     </span>
                   )}
                 {invoice.status === "cancelled" && (
-                  <span className="ml-2 text-rose-600 text-sm font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                  <span className="ml-2 text-rose-600 text-xs font-medium px-2 py-0.5 bg-rose-50 rounded-full">
                     Cancelled
                   </span>
                 )}
@@ -2284,6 +2917,23 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText="Submit"
         variant="default"
       />
+
+      {/* E-Invoice Cancellation Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showEInvoiceCancelConfirm}
+        onClose={handleCancelEInvoiceCancel}
+        onConfirm={handleConfirmEInvoiceCancel}
+        title="Cancel e-Invoice"
+        message={`This change requires cancelling the e-Invoice first. Are you sure you want to proceed? This will cancel the e-Invoice in MyInvois and then update the ${pendingUpdate?.type?.replace(
+          "_",
+          " "
+        )}.`}
+        confirmButtonText={
+          isSyncingCancellation ? "Processing..." : "Cancel e-Invoice & Update"
+        }
+        variant="danger"
+      />
+
       {/* PDF Handlers (Rendered conditionally) */}
       {showPrintOverlay && invoice && (
         <GTPrintPDFOverlay
