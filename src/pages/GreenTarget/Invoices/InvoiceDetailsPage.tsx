@@ -312,7 +312,7 @@ const InvoiceDetailsPage: React.FC = () => {
       setAvailableRentals([]);
       return;
     }
-    
+
     try {
       setIsLoadingRentals(true);
       const params = new URLSearchParams({
@@ -321,7 +321,7 @@ const InvoiceDetailsPage: React.FC = () => {
       const data: any[] = await api.get(
         `/greentarget/api/rentals?${params.toString()}`
       );
-      
+
       // Filter rentals that are available (not in other invoices or in cancelled invoices)
       const available = data.filter(
         (r) =>
@@ -332,7 +332,7 @@ const InvoiceDetailsPage: React.FC = () => {
           // OR include rentals with cancelled invoices
           (r.invoice_info && r.invoice_info.status === "cancelled")
       );
-      
+
       setAvailableRentals(available);
     } catch (err) {
       console.error("Error fetching available rentals:", err);
@@ -362,7 +362,7 @@ const InvoiceDetailsPage: React.FC = () => {
       toast.error("Customer information missing");
       return;
     }
-    
+
     setIsEditingRentals(true);
     fetchAvailableRentals(invoice.customer_id);
   };
@@ -399,7 +399,7 @@ const InvoiceDetailsPage: React.FC = () => {
     setIsSavingRentals(true);
     try {
       const rentalIds = selectedRentals.map((r) => r.rental_id);
-      
+
       const updateData = {
         type: invoice.type,
         customer_id: invoice.customer_id,
@@ -412,11 +412,11 @@ const InvoiceDetailsPage: React.FC = () => {
       };
 
       await greenTargetApi.updateInvoice(invoice.invoice_id, updateData);
-      
+
       toast.success("Rental selection updated successfully");
       setIsEditingRentals(false);
       setAvailableRentals([]);
-      
+
       // Refresh invoice details
       fetchInvoiceDetails(invoice.invoice_id);
     } catch (error: any) {
@@ -1667,134 +1667,141 @@ const InvoiceDetailsPage: React.FC = () => {
 
         {/* Rental details for regular invoices */}
         {invoice.type === "regular" && (
-            <div className="px-6 py-4 border-t border-default-200">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-lg font-medium">
-                  Rental Details ({invoice.rental_details?.length || 0} rental
-                  {(invoice.rental_details?.length || 0) > 1 ? "s" : ""})
-                </h2>
-                {invoice.status !== "cancelled" && !isEditingRentals && (
+          <div className="px-6 py-4 border-t border-default-200">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-medium">
+                Rental Details ({invoice.rental_details?.length || 0} rental
+                {(invoice.rental_details?.length || 0) > 1 ? "s" : ""})
+              </h2>
+              {invoice.status !== "cancelled" && !isEditingRentals && (
+                <Button
+                  onClick={handleEditRentals}
+                  icon={IconPencil}
+                  variant="outline"
+                  color="sky"
+                  size="sm"
+                  className="ml-4"
+                >
+                  Edit Rentals
+                </Button>
+              )}
+              {isEditingRentals && (
+                <div className="flex gap-2">
                   <Button
-                    onClick={handleEditRentals}
-                    icon={IconPencil}
-                    variant="outline"
+                    onClick={handleSaveRentals}
+                    icon={IconDeviceFloppy}
+                    variant="filled"
                     color="sky"
                     size="sm"
-                    className="ml-4"
+                    disabled={isSavingRentals}
                   >
-                    Edit Rentals
+                    {isSavingRentals ? "Saving..." : "Save Changes"}
                   </Button>
+                  <Button
+                    onClick={handleCancelEditRentals}
+                    icon={IconX}
+                    variant="outline"
+                    color="default"
+                    size="sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {isEditingRentals && (
+              <div className="mb-6 p-4 bg-sky-50 border border-sky-200 rounded-lg">
+                <h3 className="text-sm font-medium text-sky-800 mb-3">
+                  Select Rentals for Invoice
+                </h3>
+                {isLoadingRentals ? (
+                  <div className="text-center py-4">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></div>
+                    <p className="mt-2 text-sm text-sky-600">
+                      Loading available rentals...
+                    </p>
+                  </div>
+                ) : availableRentals.length === 0 ? (
+                  <p className="text-sm text-default-500">
+                    No available rentals found for this customer.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {availableRentals.map((rental) => {
+                      const isSelected = selectedRentals.some(
+                        (r) => r.rental_id === rental.rental_id
+                      );
+                      const isActive = isRentalActive(rental.date_picked);
+
+                      return (
+                        <div
+                          key={rental.rental_id}
+                          onClick={() => handleRentalToggle(rental)}
+                          className={clsx(
+                            "p-3 border rounded-lg cursor-pointer transition-colors",
+                            isSelected
+                              ? "bg-sky-100 border-sky-300"
+                              : "bg-white border-default-200 hover:bg-gray-50"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center">
+                                {isSelected ? (
+                                  <IconSquareCheckFilled
+                                    className="text-sky-600"
+                                    size={20}
+                                  />
+                                ) : (
+                                  <IconSquare
+                                    className="text-gray-400"
+                                    size={20}
+                                  />
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  Rental #{rental.rental_id} - Dumpster{" "}
+                                  {rental.tong_no}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Placed: {formatDate(rental.date_placed)}
+                                  {rental.location_address &&
+                                    ` • ${rental.location_address}`}
+                                </div>
+                              </div>
+                            </div>
+                            <span
+                              className={clsx(
+                                "text-xs font-medium px-2 py-1 rounded-full",
+                                isActive
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-600"
+                              )}
+                            >
+                              {isActive ? "Ongoing" : "Completed"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-                {isEditingRentals && (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleSaveRentals}
-                      icon={IconDeviceFloppy}
-                      variant="filled"
-                      color="sky"
-                      size="sm"
-                      disabled={isSavingRentals}
-                    >
-                      {isSavingRentals ? "Saving..." : "Save Changes"}
-                    </Button>
-                    <Button
-                      onClick={handleCancelEditRentals}
-                      icon={IconX}
-                      variant="outline"
-                      color="default"
-                      size="sm"
-                    >
-                      Cancel
-                    </Button>
+                {selectedRentals.length > 0 && (
+                  <div className="mt-4 p-3 bg-white border border-sky-200 rounded-lg">
+                    <p className="text-sm font-medium text-sky-800">
+                      Selected: {selectedRentals.length} rental
+                      {selectedRentals.length > 1 ? "s" : ""}
+                    </p>
                   </div>
                 )}
               </div>
+            )}
 
-              {isEditingRentals && (
-                <div className="mb-6 p-4 bg-sky-50 border border-sky-200 rounded-lg">
-                  <h3 className="text-sm font-medium text-sky-800 mb-3">
-                    Select Rentals for Invoice
-                  </h3>
-                  {isLoadingRentals ? (
-                    <div className="text-center py-4">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></div>
-                      <p className="mt-2 text-sm text-sky-600">Loading available rentals...</p>
-                    </div>
-                  ) : availableRentals.length === 0 ? (
-                    <p className="text-sm text-default-500">No available rentals found for this customer.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {availableRentals.map((rental) => {
-                        const isSelected = selectedRentals.some(
-                          (r) => r.rental_id === rental.rental_id
-                        );
-                        const isActive = isRentalActive(rental.date_picked);
-
-                        return (
-                          <div
-                            key={rental.rental_id}
-                            onClick={() => handleRentalToggle(rental)}
-                            className={clsx(
-                              "p-3 border rounded-lg cursor-pointer transition-colors",
-                              isSelected
-                                ? "bg-sky-100 border-sky-300"
-                                : "bg-white border-default-200 hover:bg-gray-50"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center">
-                                  {isSelected ? (
-                                    <IconSquareCheckFilled
-                                      className="text-sky-600"
-                                      size={20}
-                                    />
-                                  ) : (
-                                    <IconSquare
-                                      className="text-gray-400"
-                                      size={20}
-                                    />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-medium text-gray-900">
-                                    Rental #{rental.rental_id} - Dumpster {rental.tong_no}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    Placed: {formatDate(rental.date_placed)}
-                                    {rental.location_address && ` • ${rental.location_address}`}
-                                  </div>
-                                </div>
-                              </div>
-                              <span
-                                className={clsx(
-                                  "text-xs font-medium px-2 py-1 rounded-full",
-                                  isActive
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-gray-100 text-gray-600"
-                                )}
-                              >
-                                {isActive ? "Ongoing" : "Completed"}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {selectedRentals.length > 0 && (
-                    <div className="mt-4 p-3 bg-white border border-sky-200 rounded-lg">
-                      <p className="text-sm font-medium text-sky-800">
-                        Selected: {selectedRentals.length} rental{selectedRentals.length > 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {invoice.rental_details && 
-                Array.isArray(invoice.rental_details) && 
-                invoice.rental_details.length > 0 ? (
+            {invoice.rental_details &&
+            Array.isArray(invoice.rental_details) &&
+            invoice.rental_details.length > 0 ? (
               <div className="space-y-4">
                 {invoice.rental_details.map((rental: any, index: number) => (
                   <div
@@ -1903,16 +1910,18 @@ const InvoiceDetailsPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-              ) : (
-                !isEditingRentals && (
-                  <div className="text-center py-8 text-default-500">
-                    <p>No rentals assigned to this invoice.</p>
-                    <p className="text-sm mt-1">Click "Edit Rentals" to add rentals.</p>
-                  </div>
-                )
-              )}
-            </div>
-          )}
+            ) : (
+              !isEditingRentals && (
+                <div className="text-center py-8 text-default-500">
+                  <p>No rentals assigned to this invoice.</p>
+                  <p className="text-sm mt-1">
+                    Click "Edit Rentals" to add rentals.
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+        )}
       </div>
 
       {/* Payment history */}
