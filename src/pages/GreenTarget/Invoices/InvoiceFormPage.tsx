@@ -101,6 +101,7 @@ const InvoiceFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [loading, setLoading] = useState(true); // Start loading
   const [error, setError] = useState<string | null>(null);
+  const [isAmountManuallyChanged, setIsAmountManuallyChanged] = useState(false);
 
   // Payment/E-invoice State (only for create mode)
   const [isPaid, setIsPaid] = useState(false);
@@ -230,11 +231,12 @@ const InvoiceFormPage: React.FC = () => {
 
   // Auto-calculate invoice amount based on selected rentals (RM 200 per rental)
   useEffect(() => {
-    // Only auto-calculate if we're in create mode for regular invoices
+    // Only auto-calculate if we're in create mode for regular invoices and amount hasn't been manually changed
     if (
       !isEditMode &&
       formData.type === "regular" &&
-      selectedRentals.length > 0
+      selectedRentals.length > 0 &&
+      !isAmountManuallyChanged
     ) {
       const calculatedAmount = selectedRentals.length * 200;
 
@@ -248,7 +250,8 @@ const InvoiceFormPage: React.FC = () => {
     } else if (
       !isEditMode &&
       formData.type === "regular" &&
-      selectedRentals.length === 0
+      selectedRentals.length === 0 &&
+      !isAmountManuallyChanged
     ) {
       // Reset to default amount when no rentals selected
       if (formData.amount_before_tax !== 200) {
@@ -263,6 +266,7 @@ const InvoiceFormPage: React.FC = () => {
     isEditMode,
     formData.type,
     formData.amount_before_tax,
+    isAmountManuallyChanged,
   ]);
 
   // --- DATA FETCHING ---
@@ -474,12 +478,32 @@ const InvoiceFormPage: React.FC = () => {
     >
   ) => {
     const { name, value, type } = e.target;
-    setFormData((p) => ({
-      ...p,
-      [name]:
-        type === "number" ? (value === "" ? 0 : parseFloat(value) || 0) : value,
-    }));
+
+    // If user is changing the amount_before_tax field, mark it as manually changed
+    if (name === "amount_before_tax") {
+      setIsAmountManuallyChanged(true);
+
+      // Allow any numeric input without applying the less-than-200 logic during typing
+      const numericValue =
+        type === "number" ? (value === "" ? 0 : parseFloat(value) || 0) : 0;
+
+      setFormData((p) => ({
+        ...p,
+        [name]: numericValue,
+      }));
+    } else {
+      setFormData((p) => ({
+        ...p,
+        [name]:
+          type === "number"
+            ? value === ""
+              ? 0
+              : parseFloat(value) || 0
+            : value,
+      }));
+    }
   };
+
   const handleCustomerChange = (selectedId: string | string[] | null) => {
     const newCustId =
       selectedId && typeof selectedId === "string" ? Number(selectedId) : 0;
@@ -976,13 +1000,17 @@ const InvoiceFormPage: React.FC = () => {
                               ? "cursor-not-allowed"
                               : "hover:bg-gray-50"
                           )}
-                          style={isSelected ? {
-                            backgroundColor: '#f0f9ff',
-                            borderLeft: '4px solid #0ea5e9',
-                            borderRight: 'none',
-                            borderTop: 'none',
-                            borderBottom: 'none'
-                          } : {}}
+                          style={
+                            isSelected
+                              ? {
+                                  backgroundColor: "#f0f9ff",
+                                  borderLeft: "4px solid #0ea5e9",
+                                  borderRight: "none",
+                                  borderTop: "none",
+                                  borderBottom: "none",
+                                }
+                              : {}
+                          }
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
