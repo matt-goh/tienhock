@@ -1125,6 +1125,29 @@ const InvoiceDetailsPage: React.FC = () => {
             >
               {invoice.invoice_number}
             </span>
+            {/* Status Badge */}
+            <span
+              className={`ml-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${getGTStatusBadgeStyle(
+                invoice?.status
+              )}`}
+              title={
+                invoice?.status === "cancelled" && invoice.cancellation_date
+                  ? `Cancelled on ${formatDate(invoice.cancellation_date)}`
+                  : undefined
+              }
+            >
+              {invoice?.status === "cancelled"
+                ? `Cancelled${
+                    invoice.cancellation_date
+                      ? ` (${formatDate(invoice.cancellation_date)})`
+                      : ""
+                  }`
+                : invoice?.status === "overdue"
+                ? "Overdue"
+                : invoice?.current_balance <= 0
+                ? "Paid"
+                : "Unpaid"}
+            </span>
             {/* e-Invoice status badges */}
             {invoice.einvoice_status === "valid" && (
               <button
@@ -1477,193 +1500,98 @@ const InvoiceDetailsPage: React.FC = () => {
 
       {/* Invoice details */}
       <div className="bg-white rounded-lg shadow border border-default-200 overflow-hidden">
-        {/* Status banner */}
-        <div
-          className={`px-6 py-4 ${
-            invoice.status === "cancelled"
-              ? "bg-default-50 border-b border-default-200"
-              : invoice.status === "overdue"
-              ? "bg-red-50 border-b border-red-200"
-              : invoice.current_balance > 0
-              ? "bg-amber-50 border-b border-amber-200"
-              : "bg-green-50 border-b border-green-200"
-          }`}
-        >
-          <div className="flex justify-between items-center">
-            <div>
-              <span
-                className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getGTStatusBadgeStyle(
-                  invoice?.status
-                )}`}
-              >
-                {invoice?.status === "cancelled"
-                  ? "Cancelled"
-                  : invoice?.status === "overdue"
-                  ? "Overdue"
-                  : invoice?.current_balance <= 0
-                  ? "Paid"
-                  : "Unpaid"}
-              </span>
-              {invoice.status === "cancelled" && invoice.cancellation_date && (
-                <span className="ml-2 text-xs text-default-500">
-                  Cancelled on {formatDate(invoice.cancellation_date)}
-                </span>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-default-600">
-                {invoice.status === "cancelled"
-                  ? "Cancelled Amount:"
-                  : "Balance Due:"}
-              </p>
-              <p
-                className={`text-lg font-bold ${
-                  invoice.status === "cancelled"
-                    ? "text-default-600"
-                    : invoice.status === "overdue"
-                    ? "text-red-600"
-                    : invoice.current_balance > 0
-                    ? "text-amber-600"
-                    : "text-green-600"
-                }`}
-              >
-                {formatCurrency(invoice.current_balance)}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Invoice info */}
-        <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h2 className="text-lg font-medium mb-3">Invoice Information</h2>
-            <table className="min-w-full">
-              <tbody>
-                <tr>
-                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
-                    Invoice Number:
-                  </td>
-                  <td className="py-2 font-medium text-default-900">
-                    {invoice.invoice_number}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
-                    Date Issued:
-                  </td>
-                  <td className="py-2 font-medium text-default-900">
-                    {formatDate(invoice.date_issued)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-4 text-default-500 font-medium align-top">
-                    Customer:
-                  </td>
-                  <td className="py-2 font-medium text-default-900">
-                    {invoice.customer_id ? (
-                      <button
-                        onClick={() =>
-                          navigate(
-                            `/greentarget/customers/${invoice.customer_id}`
-                          )
-                        }
-                        className="text-default-900 hover:text-sky-600 font-medium hover:underline focus:outline-none truncate block max-w-[200px] md:max-w-none"
-                        title={invoice.customer_name}
-                      >
-                        {invoice.customer_name}
-                      </button>
-                    ) : (
-                      <span
-                        className="truncate block max-w-[200px] md:max-w-none"
-                        title={invoice.customer_name}
-                      >
-                        {invoice.customer_name}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-medium mb-3">Amount Breakdown</h2>
-            <table className="min-w-full">
-              <tbody>
-                {/* Only show subtotal and tax if tax amount is non-zero */}
-                {parseFloat(invoice.tax_amount.toString()) > 0 && (
-                  <>
-                    <tr>
-                      <td className="py-2 pr-4 text-default-500">Subtotal:</td>
-                      <td className="py-2 font-medium text-right">
-                        {formatCurrency(
-                          parseFloat(invoice.amount_before_tax.toString())
-                        )}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 pr-4 text-default-500">Tax:</td>
-                      <td className="py-2 font-medium text-right">
-                        {formatCurrency(
-                          parseFloat(invoice.tax_amount.toString())
-                        )}
-                      </td>
-                    </tr>
-                    <tr className="border-t">
-                      <td className="py-2 pr-4 font-medium text-default-900">
-                        Total:
-                      </td>
-                      <td className="py-2 font-bold text-right">
-                        {formatCurrency(
-                          parseFloat(invoice.total_amount.toString())
-                        )}
-                      </td>
-                    </tr>
-                  </>
-                )}
-
-                {/* If no tax, just show the total directly */}
-                {parseFloat(invoice.tax_amount.toString()) === 0 && (
-                  <tr>
-                    <td className="py-2 pr-4 font-medium text-default-900">
-                      Total:
-                    </td>
-                    <td className="py-2 font-bold text-right">
-                      {formatCurrency(
-                        parseFloat(invoice.total_amount.toString())
-                      )}
-                    </td>
-                  </tr>
-                )}
-
-                <tr>
-                  <td className="py-2 pr-4 text-default-500 font-medium">
-                    Amount Paid:
-                  </td>
-                  <td className="py-2 font-medium text-right text-green-600">
-                    {formatCurrency(parseFloat(invoice.amount_paid.toString()))}
-                  </td>
-                </tr>
-                <tr className="border-t">
-                  <td className="py-2 pr-4 font-medium text-default-900">
-                    Balance Due:
-                  </td>
-                  <td
-                    className={`py-2 font-bold text-right ${
-                      invoice.status === "overdue"
-                        ? "text-red-600"
-                        : invoice.current_balance > 0
-                        ? "text-amber-600"
-                        : "text-green-600"
-                    }`}
+        <section className="px-6 py-4 border-b border-default-200">
+          <h2 className="text-lg font-medium mb-4 border-b pb-2">
+            Invoice Details
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Invoice Number
+              </span>
+              <span className="text-gray-900 font-medium">
+                {invoice.invoice_number}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Date Issued
+              </span>
+              <span className="text-gray-900 font-medium">
+                {formatDate(invoice.date_issued)}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Customer
+              </span>
+              <div className="flex items-center">
+                {invoice.customer_id ? (
+                  <button
+                    onClick={() =>
+                      navigate(`/greentarget/customers/${invoice.customer_id}`)
+                    }
+                    className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                    title={`${invoice.customer_name} (${invoice.customer_id})`}
                   >
-                    {formatCurrency(invoice.current_balance)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    {invoice.customer_name || invoice.customer_id}
+                  </button>
+                ) : (
+                  <span className="text-gray-900 font-medium">
+                    {invoice.customer_name}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Invoice Type
+              </span>
+              <span className="text-gray-900 font-medium capitalize">
+                {invoice.type}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Total Amount
+              </span>
+              <span className="text-gray-900 font-semibold text-base">
+                {formatCurrency(parseFloat(invoice.total_amount.toString()))}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                Balance Due
+              </span>
+              <div className="flex items-center">
+                <span
+                  className={`font-semibold text-base ${
+                    invoice.current_balance <= 0 ||
+                    invoice.status === "cancelled"
+                      ? "text-green-600"
+                      : invoice.status === "overdue"
+                      ? "text-red-600"
+                      : "text-amber-600"
+                  }`}
+                >
+                  {formatCurrency(invoice.current_balance)}
+                </span>
+                {invoice.current_balance <= 0 &&
+                  invoice.status !== "cancelled" && (
+                    <span className="ml-2 text-green-600 text-sm font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                      Paid in Full
+                    </span>
+                  )}
+                {invoice.status === "cancelled" && (
+                  <span className="ml-2 text-rose-600 text-sm font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                    Cancelled
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
         {/* Rental details for regular invoices */}
         {invoice.type === "regular" && (
