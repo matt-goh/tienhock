@@ -175,8 +175,15 @@ export default function (pool) {
           (rental) => rental.date_picked && rental.date_picked === date_placed
         );
 
-        // Only allow if this is a transition day and there's only one conflict
-        if (!(sameDay && overlapResult.rows.length === 1)) {
+        // Allow multiple 1-day rentals on the same transition day
+        // Check if this is a 1-day rental on a transition day
+        const isOneDayRental = date_picked && date_picked === date_placed;
+        const allConflictsAreTransitionDay = overlapResult.rows.every(
+          (rental) => rental.date_picked && rental.date_picked === date_placed
+        );
+
+        // Only allow if this is a transition day scenario or all conflicts are 1-day rentals on the same day
+        if (!(sameDay || (isOneDayRental && allConflictsAreTransitionDay))) {
           const conflict = overlapResult.rows[0];
           throw new Error(
             `The selected dumpster is not available for the chosen period. ` +
