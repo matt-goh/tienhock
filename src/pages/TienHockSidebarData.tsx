@@ -11,6 +11,8 @@ import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 
 // Accounting related imports
 import DebtorsReportPage from "./Accounting/DebtorsReportPage";
+import AccountCodeListPage from "./Accounting/AccountCodeListPage";
+import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -177,6 +179,24 @@ export const TienHockSidebarData: SidebarItem[] = [
     name: "Accounting",
     icon: IconReportMoney,
     subItems: [
+      {
+        name: "Chart of Accounts",
+        path: "/accounting/account-codes",
+        component: AccountCodeListPage,
+        subItems: [
+          {
+            name: "New Account",
+            path: "/accounting/account-codes/new",
+            component: AccountCodeFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Account",
+            path: "/accounting/account-codes/:code",
+            component: AccountCodeFormPage,
+          },
+        ],
+      },
       {
         name: "Debtors",
         path: "/sales/debtors",

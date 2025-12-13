@@ -796,3 +796,143 @@ export interface MidMonthPayroll {
   notes?: string;
   default_payment_method?: string;
 }
+
+// ==================== ACCOUNTING / JOURNAL SYSTEM TYPES ====================
+
+// Ledger Type (TL column from Chart of Accounts)
+export interface LedgerType {
+  code: string; // e.g., "CS", "GL", "OS", "TD", "TC", "BK"
+  name: string;
+  description?: string;
+  is_system: boolean; // System types cannot be deleted
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Account Code
+export interface AccountCode {
+  id: number;
+  code: string; // e.g., "CS_B21", "ABB", "DEBTOR"
+  description: string;
+  ledger_type: string | null; // Reference to LedgerType.code
+  parent_code: string | null; // Self-referencing for hierarchy
+  level: number; // 1 = top level, 2 = sub-account, etc.
+  sort_order: number;
+  is_active: boolean;
+  is_system: boolean; // System accounts cannot be deleted
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+// Extended Account Code with hierarchy info (from view)
+export interface AccountCodeHierarchy extends AccountCode {
+  path: string; // Full path like "CS > CS_PM > CS_BPMB"
+  path_array: string[]; // Array of codes in path
+  depth: number; // Depth in tree
+  children?: AccountCodeHierarchy[]; // For tree display
+}
+
+// For creating/updating account codes
+export interface AccountCodeInput {
+  code: string;
+  description: string;
+  ledger_type?: string | null;
+  parent_code?: string | null;
+  level?: number;
+  sort_order?: number;
+  is_active?: boolean;
+  notes?: string;
+}
+
+// Journal Entry Types
+export type JournalEntryType = "B" | "C" | "I" | "S" | "J" | "R" | "DR" | "CR" | "O";
+
+export interface JournalEntryTypeInfo {
+  code: JournalEntryType;
+  name: string;
+  description?: string;
+  is_active: boolean;
+}
+
+// Journal Entry Header
+export interface JournalEntry {
+  id: number;
+  reference_no: string; // e.g., "PBE002/06"
+  entry_type: JournalEntryType;
+  entry_date: string; // ISO date string
+  description?: string;
+  total_debit: number;
+  total_credit: number;
+  status: "draft" | "posted" | "cancelled";
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  updated_by?: string;
+  posted_at?: string;
+  posted_by?: string;
+  lines?: JournalEntryLine[]; // Line items
+}
+
+// Journal Entry Line Item
+export interface JournalEntryLine {
+  id?: number;
+  journal_entry_id?: number;
+  line_number: number;
+  account_code: string;
+  account_description?: string; // For display
+  debit_amount: number;
+  credit_amount: number;
+  reference?: string; // e.g., cheque number
+  particulars?: string; // Line description
+  created_at?: string;
+}
+
+// For creating journal entries
+export interface JournalEntryInput {
+  reference_no: string;
+  entry_type: JournalEntryType;
+  entry_date: string;
+  description?: string;
+  lines: JournalEntryLineInput[];
+}
+
+export interface JournalEntryLineInput {
+  line_number: number;
+  account_code: string;
+  debit_amount: number;
+  credit_amount: number;
+  reference?: string;
+  particulars?: string;
+}
+
+// Account Code Import (for CSV migration)
+export interface AccountCodeImportRow {
+  code: string;
+  description: string;
+  tl?: string; // Ledger type
+  main_acc?: string; // Parent account
+  sl_acc?: string; // Sub-ledger accounts (comma-separated)
+}
+
+// Account Code Tree Node (for UI tree display)
+export interface AccountCodeTreeNode {
+  code: string;
+  description: string;
+  ledger_type: string | null;
+  is_active: boolean;
+  level: number;
+  children: AccountCodeTreeNode[];
+  isExpanded?: boolean;
+}
+
+// Filters for account code list
+export interface AccountCodeFilters {
+  search?: string;
+  ledger_type?: string | null;
+  is_active?: boolean | null;
+  parent_code?: string | null;
+}
