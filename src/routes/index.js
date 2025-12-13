@@ -37,6 +37,8 @@ import agamaRouter from "./catalogue/entities/agama.js";
 
 // Accounting routes
 import debtorsRouter from "./accounting/debtors.js";
+import accountCodesRouter from "./accounting/account-codes.js";
+import ledgerTypesRouter from "./accounting/ledger-types.js";
 
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
@@ -138,6 +140,8 @@ export default function setupRoutes(app, pool) {
 
   // Accounting routes
   app.use("/api/debtors", debtorsRouter(pool));
+  app.use("/api/account-codes", accountCodesRouter(pool));
+  app.use("/api/ledger-types", ledgerTypesRouter(pool));
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));

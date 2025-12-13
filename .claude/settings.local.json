@@ -8,7 +8,8 @@
       "Bash(mkdir:*)",
       "Bash(curl:*)",
       "Bash(git checkout:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }
