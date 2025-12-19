@@ -2826,22 +2826,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 : "bg-white"
                             }`}
                           >
-                            <td className="px-6 py-4 whitespace-nowrap align-middle">
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={isSelected}
-                                  onChange={() =>
-                                    handleEmployeeSelection(row.rowKey)
-                                  }
-                                  size={20}
-                                  checkedColor="text-sky-600"
-                                  ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
-                                  buttonClassName="p-1 rounded-lg"
-                                  disabled={
-                                    isSaving || leaveEmployees[row.id]?.selected
-                                  }
-                                />
-                              </div>
+                            <td
+                              className="px-6 py-4 whitespace-nowrap align-middle cursor-pointer"
+                              onClickCapture={(e) => {
+                                e.stopPropagation();
+                                if (
+                                  !isSaving &&
+                                  !leaveEmployees[row.id]?.selected
+                                ) {
+                                  handleEmployeeSelection(row.rowKey);
+                                }
+                              }}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() => {}}
+                                size={20}
+                                checkedColor="text-sky-600"
+                                ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                                buttonClassName="p-1 rounded-lg"
+                                disabled={
+                                  isSaving || leaveEmployees[row.id]?.selected
+                                }
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
                               <SafeLink
@@ -3263,23 +3270,30 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     : "bg-white"
                                 }`}
                               >
-                                <td className="px-6 py-4 whitespace-nowrap align-middle">
-                                  <div onClick={(e) => e.stopPropagation()}>
-                                    <Checkbox
-                                      checked={!!isSelected}
-                                      onChange={() =>
-                                        handleEmployeeSelection(row.rowKey)
-                                      }
-                                      size={20}
-                                      checkedColor="text-sky-600"
-                                      ariaLabel={`Select employee ${row.name}`}
-                                      buttonClassName="p-1 rounded-lg"
-                                      disabled={
-                                        isSaving ||
-                                        leaveEmployees[row.id]?.selected
-                                      }
-                                    />
-                                  </div>
+                                <td
+                                  className="px-6 py-4 whitespace-nowrap align-middle cursor-pointer"
+                                  onClickCapture={(e) => {
+                                    e.stopPropagation();
+                                    if (
+                                      !isSaving &&
+                                      !leaveEmployees[row.id]?.selected
+                                    ) {
+                                      handleEmployeeSelection(row.rowKey);
+                                    }
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={!!isSelected}
+                                    onChange={() => {}}
+                                    size={20}
+                                    checkedColor="text-sky-600"
+                                    ariaLabel={`Select employee ${row.name}`}
+                                    buttonClassName="p-1 rounded-lg"
+                                    disabled={
+                                      isSaving ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
+                                  />
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
                                   <SafeLink
@@ -3602,18 +3616,24 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           handleLeaveSelection(employee.id);
                         }}
                       >
-                        <td className="w-16 px-6 py-4 whitespace-nowrap align-middle">
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => handleLeaveSelection(employee.id)}
-                              size={20}
-                              checkedColor="text-amber-600"
-                              ariaLabel={`Select ${employee.name} for leave`}
-                              buttonClassName="p-1 rounded-lg"
-                              disabled={isSaving}
-                            />
-                          </div>
+                        <td
+                          className="w-16 px-6 py-4 whitespace-nowrap align-middle cursor-pointer"
+                          onClickCapture={(e) => {
+                            e.stopPropagation();
+                            if (!isSaving) {
+                              handleLeaveSelection(employee.id);
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => {}}
+                            size={20}
+                            checkedColor="text-amber-600"
+                            ariaLabel={`Select ${employee.name} for leave`}
+                            buttonClassName="p-1 rounded-lg"
+                            disabled={isSaving}
+                          />
                         </td>
                         <td className="w-1/3 px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
