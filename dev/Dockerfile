@@ -6,9 +6,9 @@ WORKDIR /app
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Clear npm cache and use clean install
+# Clear npm cache and install dependencies
 RUN npm cache clean --force
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application code
 COPY . .
