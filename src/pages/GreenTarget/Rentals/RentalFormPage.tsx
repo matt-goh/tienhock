@@ -461,9 +461,10 @@ const RentalFormPage: React.FC = () => {
           availableDumpster.next_rental.date
         );
         nextRentalStartDate.setHours(0, 0, 0, 0);
-        if (pickupDate >= nextRentalStartDate) {
+        // Allow pickup on the same day as next rental starts (transition day)
+        if (pickupDate > nextRentalStartDate) {
           return false;
-        } // Conflict
+        } // Conflict only if pickup is after next rental starts
       }
       // Check for conflict if rental is ongoing (no pickup date)
       else if (!formData.date_picked && availableDumpster.next_rental?.date) {
@@ -489,7 +490,8 @@ const RentalFormPage: React.FC = () => {
         pickupDate.setHours(0, 0, 0, 0);
         const nextRentalStartDate = new Date(upcomingDumpster.next_rental.date);
         nextRentalStartDate.setHours(0, 0, 0, 0);
-        if (pickupDate >= nextRentalStartDate) return false;
+        // Allow pickup on the same day as next rental starts (transition day)
+        if (pickupDate > nextRentalStartDate) return false;
       } else if (!formData.date_picked && upcomingDumpster.next_rental?.date) {
         return false;
       }
@@ -1305,10 +1307,10 @@ const RentalFormPage: React.FC = () => {
                 <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
                   Invoice Information
                 </h2>
-                <AssociatedInvoiceDisplay 
+                <AssociatedInvoiceDisplay
                   invoiceInfo={formData.invoice_info}
                   onViewInvoice={(invoiceId) => {
-                    window.open(`/greentarget/invoices/${invoiceId}`, '_blank');
+                    window.open(`/greentarget/invoices/${invoiceId}`, "_blank");
                   }}
                 />
               </div>
