@@ -9,7 +9,9 @@
       "Bash(curl:*)",
       "Bash(git checkout:*)",
       "Bash(npx tsc:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)"
     ],
     "deny": []
   }
