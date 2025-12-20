@@ -29,7 +29,6 @@ import {
   IconPlus,
   IconTrash,
   IconDeviceFloppy,
-  IconSend,
   IconFileText,
   IconChevronDown,
   IconCheck,
@@ -164,7 +163,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
       {isOpen && !disabled && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 min-w-[400px] max-h-60 overflow-auto bg-white border border-default-200 rounded-lg shadow-lg"
+          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white border border-default-200 rounded-lg shadow-lg"
         >
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-2 text-sm text-default-500">
@@ -207,7 +206,7 @@ const JournalEntryPage: React.FC = () => {
   });
 
   // Entry status for edit mode
-  const [entryStatus, setEntryStatus] = useState<string>("draft");
+  const [entryStatus, setEntryStatus] = useState<string>("active");
 
   // Reference data
   const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
@@ -222,7 +221,6 @@ const JournalEntryPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showPostDialog, setShowPostDialog] = useState(false);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(
     null
   );
@@ -539,65 +537,6 @@ const JournalEntryPage: React.FC = () => {
     }
   };
 
-  // Post entry
-  const handlePost = async () => {
-    if (!validateForm()) return;
-
-    setIsSaving(true);
-
-    try {
-      // Save first if there are changes
-      if (isFormChanged) {
-        const lines: JournalEntryLineInput[] = formData.lines
-          .filter(
-            (line) =>
-              line.account_code &&
-              (parseFloat(line.debit_amount) > 0 ||
-                parseFloat(line.credit_amount) > 0)
-          )
-          .map((line, index) => ({
-            line_number: index + 1,
-            account_code: line.account_code,
-            debit_amount: parseFloat(line.debit_amount) || 0,
-            credit_amount: parseFloat(line.credit_amount) || 0,
-            reference: line.reference || undefined,
-            particulars: line.particulars || undefined,
-          }));
-
-        const payload = {
-          reference_no: formData.reference_no.trim(),
-          entry_type: formData.entry_type,
-          entry_date: formData.entry_date,
-          description: formData.description.trim() || undefined,
-          lines,
-        };
-
-        if (isEditMode) {
-          await api.put(`/api/journal-entries/${id}`, payload);
-        } else {
-          const response = await api.post("/api/journal-entries", payload);
-          const data = response as { entry: { id: number } };
-          // Update id for posting
-          await api.post(`/api/journal-entries/${data.entry.id}/post`);
-          toast.success("Journal entry created and posted successfully");
-          navigate("/accounting/journal-entries");
-          return;
-        }
-      }
-
-      await api.post(`/api/journal-entries/${id}/post`);
-      toast.success("Journal entry posted successfully");
-      navigate("/accounting/journal-entries");
-    } catch (err: unknown) {
-      console.error("Error posting journal entry:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast.error(errorMessage || "Failed to post journal entry");
-    } finally {
-      setIsSaving(false);
-      setShowPostDialog(false);
-    }
-  };
-
   // Delete entry
   const handleConfirmDelete = async () => {
     if (!id) return;
@@ -654,8 +593,6 @@ const JournalEntryPage: React.FC = () => {
     );
   }
 
-  const isReadOnly = entryStatus === "posted" || entryStatus === "cancelled";
-
   return (
     <div className="container mx-auto px-4 pb-4">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
@@ -680,14 +617,12 @@ const JournalEntryPage: React.FC = () => {
             {isEditMode && (
               <span
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  entryStatus === "posted"
-                    ? "bg-green-100 text-green-800"
-                    : entryStatus === "cancelled"
+                  entryStatus === "cancelled"
                     ? "bg-red-100 text-red-800"
-                    : "bg-yellow-100 text-yellow-800"
+                    : "bg-green-100 text-green-800"
                 }`}
               >
-                {entryStatus.charAt(0).toUpperCase() + entryStatus.slice(1)}
+                {entryStatus === "cancelled" ? "Cancelled" : "Active"}
               </span>
             )}
           </div>
@@ -723,7 +658,7 @@ const JournalEntryPage: React.FC = () => {
                   }
                   placeholder="e.g., PBE001/06"
                   required
-                  disabled={isSaving || isReadOnly}
+                  disabled={isSaving}
                 />
 
                 {/* Entry Type */}
@@ -733,7 +668,7 @@ const JournalEntryPage: React.FC = () => {
                   value={formData.entry_type}
                   onChange={handleEntryTypeChange}
                   options={entryTypeOptions}
-                  disabled={isSaving || isReadOnly}
+                  disabled={isSaving}
                   required
                 />
 
@@ -750,7 +685,7 @@ const JournalEntryPage: React.FC = () => {
                     }))
                   }
                   required
-                  disabled={isSaving || isReadOnly}
+                  disabled={isSaving}
                 />
 
                 {/* Description */}
@@ -765,7 +700,7 @@ const JournalEntryPage: React.FC = () => {
                     }))
                   }
                   placeholder="Optional description"
-                  disabled={isSaving || isReadOnly}
+                  disabled={isSaving}
                 />
               </div>
             </div>
@@ -818,7 +753,7 @@ const JournalEntryPage: React.FC = () => {
                             onChange={(value: string) =>
                               handleLineChange(index, "account_code", value)
                             }
-                            disabled={isReadOnly}
+                            disabled={isSaving}
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -832,7 +767,7 @@ const JournalEntryPage: React.FC = () => {
                                 e.target.value
                               )
                             }
-                            disabled={isReadOnly}
+                            disabled={isSaving}
                             placeholder="Chq No"
                             className="w-full px-2 py-1.5 text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
                           />
@@ -848,7 +783,7 @@ const JournalEntryPage: React.FC = () => {
                                 e.target.value
                               )
                             }
-                            disabled={isReadOnly}
+                            disabled={isSaving}
                             placeholder="Description"
                             className="w-full px-2 py-1.5 text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
                           />
@@ -873,7 +808,7 @@ const JournalEntryPage: React.FC = () => {
                                 formatAmount(e.target.value)
                               )
                             }
-                            disabled={isReadOnly}
+                            disabled={isSaving}
                             placeholder="0.00"
                             className="w-full px-2 py-1.5 text-sm text-right border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
                           />
@@ -898,13 +833,13 @@ const JournalEntryPage: React.FC = () => {
                                 formatAmount(e.target.value)
                               )
                             }
-                            disabled={isReadOnly}
+                            disabled={isSaving}
                             placeholder="0.00"
                             className="w-full px-2 py-1.5 text-sm text-right border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {!isReadOnly && formData.lines.length > 2 && (
+                          {!false && formData.lines.length > 2 && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -924,7 +859,7 @@ const JournalEntryPage: React.FC = () => {
                   <tfoot className="bg-default-50">
                     <tr>
                       <td colSpan={4} className="px-3 py-3">
-                        {!isReadOnly && (
+                        {!false && (
                           <button
                             type="button"
                             onClick={addLine}
@@ -969,7 +904,7 @@ const JournalEntryPage: React.FC = () => {
             {/* Form Actions */}
             <div className="p-6 flex justify-between items-center border-t border-default-200">
               <div>
-                {isEditMode && entryStatus === "draft" && (
+                {isEditMode && entryStatus !== "cancelled" && (
                   <Button
                     type="button"
                     color="rose"
@@ -982,34 +917,16 @@ const JournalEntryPage: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center gap-3">
-                {!isReadOnly && (
-                  <>
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      color="sky"
-                      icon={IconDeviceFloppy}
-                      iconPosition="left"
-                      disabled={isSaving || !isFormChanged}
-                    >
-                      Save Draft
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="filled"
-                      color="green"
-                      icon={IconSend}
-                      iconPosition="left"
-                      onClick={() => setShowPostDialog(true)}
-                      disabled={
-                        isSaving ||
-                        Math.abs(totals.totalDebit - totals.totalCredit) > 0.01
-                      }
-                    >
-                      Save & Post
-                    </Button>
-                  </>
-                )}
+                <Button
+                  type="submit"
+                  variant="filled"
+                  color="sky"
+                  icon={IconDeviceFloppy}
+                  iconPosition="left"
+                  disabled={isSaving || !isFormChanged}
+                >
+                  Save
+                </Button>
               </div>
             </div>
           </form>
@@ -1025,15 +942,6 @@ const JournalEntryPage: React.FC = () => {
         message={`Are you sure you want to delete entry "${formData.reference_no}"? This action cannot be undone.`}
         confirmButtonText="Delete"
         variant="danger"
-      />
-
-      <ConfirmationDialog
-        isOpen={showPostDialog}
-        onClose={() => setShowPostDialog(false)}
-        onConfirm={handlePost}
-        title="Post Journal Entry"
-        message={`Are you sure you want to post entry "${formData.reference_no}"? Posted entries cannot be edited.`}
-        confirmButtonText="Post"
       />
 
       <ConfirmationDialog

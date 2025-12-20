@@ -117,17 +117,13 @@ const JournalEntryListPage: React.FC = () => {
   };
 
   const handleEdit = (entry: JournalEntryListItem) => {
-    if (entry.status !== "draft") {
-      toast.error("Only draft entries can be edited");
-      return;
-    }
     navigate(`/accounting/journal-entries/${entry.id}`);
   };
 
   const handleDeleteClick = (entry: JournalEntryListItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (entry.status !== "draft") {
-      toast.error("Only draft entries can be deleted");
+    if (entry.status === "cancelled") {
+      toast.error("Cancelled entries cannot be deleted");
       return;
     }
     setEntryToDelete(entry);
@@ -178,17 +174,17 @@ const JournalEntryListPage: React.FC = () => {
   // Status badge
   const getStatusBadge = (status: string) => {
     const styles = {
-      draft: "bg-yellow-100 text-yellow-800",
-      posted: "bg-green-100 text-green-800",
+      active: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
     };
+    const displayStatus = status === "cancelled" ? "Cancelled" : "Active";
     return (
       <span
         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          styles[status as keyof typeof styles] || "bg-default-100 text-default-800"
+          styles[status as keyof typeof styles] || "bg-green-100 text-green-800"
         }`}
       >
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {displayStatus}
       </span>
     );
   };
@@ -240,14 +236,14 @@ const JournalEntryListPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-sm text-default-600">Type:</span>
             <Listbox value={selectedType} onChange={setSelectedType}>
-              <div className="relative w-32">
+              <div className="relative w-48">
                 <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                   <span className="block truncate">{selectedType}</span>
                   <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                     <IconChevronDown size={16} className="text-gray-400" />
                   </span>
                 </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <ListboxOptions className="absolute z-10 mt-1 max-h-60 min-w-[280px] overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                   <ListboxOption
                     value="All"
                     className={({ active }) =>
@@ -310,7 +306,7 @@ const JournalEntryListPage: React.FC = () => {
                   </span>
                 </ListboxButton>
                 <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                  {["All", "Draft", "Posted", "Cancelled"].map((status) => (
+                  {["All", "Active"].map((status) => (
                     <ListboxOption
                       key={status}
                       value={status}
@@ -469,26 +465,24 @@ const JournalEntryListPage: React.FC = () => {
                         >
                           <IconEye size={18} />
                         </button>
-                        {entry.status === "draft" && (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(entry);
-                              }}
-                              className="text-sky-600 hover:text-sky-800"
-                              title="Edit"
-                            >
-                              <IconPencil size={18} />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteClick(entry, e)}
-                              className="text-rose-600 hover:text-rose-800"
-                              title="Delete"
-                            >
-                              <IconTrash size={18} />
-                            </button>
-                          </>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(entry);
+                          }}
+                          className="text-sky-600 hover:text-sky-800"
+                          title="Edit"
+                        >
+                          <IconPencil size={18} />
+                        </button>
+                        {entry.status !== "cancelled" && (
+                          <button
+                            onClick={(e) => handleDeleteClick(entry, e)}
+                            className="text-rose-600 hover:text-rose-800"
+                            title="Delete"
+                          >
+                            <IconTrash size={18} />
+                          </button>
                         )}
                       </div>
                     </td>
