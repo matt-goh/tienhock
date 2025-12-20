@@ -2,10 +2,212 @@
 import { Router } from "express";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 
+// Map to track pending invoices with their timeout handlers
+const pendingInvoiceTimeouts = new Map();
+
+/**
+ * Schedule automatic e-invoice status check after 5 minutes for pending invoices
+ * @param {string} invoiceId - The invoice ID to check
+ * @param {object} pool - Database connection pool
+ * @param {object} apiClient - E-invoice API client
+ */
+const schedulePendingInvoiceCheck = (invoiceId, pool, apiClient) => {
+  // Clear existing timeout if any
+  if (pendingInvoiceTimeouts.has(invoiceId)) {
+    clearTimeout(pendingInvoiceTimeouts.get(invoiceId));
+  }
+
+  // Schedule new check after 5 minutes (300,000 ms)
+  const timeoutId = setTimeout(async () => {
+    try {
+      await checkAndUpdatePendingInvoice(invoiceId, pool, apiClient);
+    } catch (error) {
+      console.error(
+        `Error in scheduled pending invoice check for GT invoice ${invoiceId}:`,
+        error
+      );
+    } finally {
+      // Remove from tracking map
+      pendingInvoiceTimeouts.delete(invoiceId);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+
+  pendingInvoiceTimeouts.set(invoiceId, timeoutId);
+  console.log(`Scheduled pending invoice check for GT invoice ${invoiceId} in 5 minutes`);
+};
+
+/**
+ * Check and update a pending e-invoice status
+ * @param {string} invoiceId - The invoice ID to check
+ * @param {object} pool - Database connection pool
+ * @param {object} apiClient - E-invoice API client
+ */
+const checkAndUpdatePendingInvoice = async (invoiceId, pool, apiClient) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Get current invoice status
+    const invoiceQuery = `
+      SELECT invoice_id, uuid, einvoice_status, long_id
+      FROM greentarget.invoices
+      WHERE invoice_id = $1 AND einvoice_status = 'pending' AND uuid IS NOT NULL
+    `;
+    const invoiceResult = await client.query(invoiceQuery, [invoiceId]);
+
+    if (invoiceResult.rows.length === 0) {
+      console.log(`GT Invoice ${invoiceId} is no longer pending or doesn't exist`);
+      await client.query("ROLLBACK");
+      return;
+    }
+
+    const invoice = invoiceResult.rows[0];
+    console.log(
+      `Checking pending GT invoice ${invoiceId} with UUID ${invoice.uuid}`
+    );
+
+    // Call MyInvois API to check current status
+    const documentDetails = await apiClient.makeApiCall(
+      "GET",
+      `/api/v1.0/documents/${invoice.uuid}/details`
+    );
+
+    let newStatus = "pending"; // Default to keep current status
+    let longId = null;
+    let datetimeValidated = null;
+
+    // Determine new status based on response
+    if (documentDetails.longId) {
+      newStatus = "valid";
+      longId = documentDetails.longId;
+      datetimeValidated = documentDetails.dateTimeValidated
+        ? new Date(documentDetails.dateTimeValidated)
+        : null;
+    } else if (
+      documentDetails.status === "Invalid" ||
+      documentDetails.status === "Rejected" ||
+      documentDetails.status === "Cancelled"
+    ) {
+      newStatus = "invalid";
+    }
+
+    // Update in database if status changed
+    if (newStatus !== "pending") {
+      const updateQuery = `
+        UPDATE greentarget.invoices
+        SET einvoice_status = $1,
+            long_id = $2,
+            datetime_validated = $3
+        WHERE invoice_id = $4
+      `;
+
+      await client.query(updateQuery, [
+        newStatus,
+        longId,
+        datetimeValidated,
+        invoiceId,
+      ]);
+
+      await client.query("COMMIT");
+      console.log(
+        `Updated GT invoice ${invoiceId} status from pending to ${newStatus}`
+      );
+    } else {
+      await client.query("ROLLBACK");
+      console.log(`GT Invoice ${invoiceId} status remains pending`);
+    }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`Error checking pending GT invoice ${invoiceId}:`, error);
+
+    // If invoice is invalid due to API error, clear the e-invoice status
+    if (error.status === 404 || error.message?.includes("not found")) {
+      try {
+        await client.query("BEGIN");
+        const clearQuery = `
+          UPDATE greentarget.invoices
+          SET einvoice_status = NULL,
+                  uuid = NULL,
+                  long_id = NULL,
+                  datetime_validated = NULL
+          WHERE invoice_id = $1
+        `;
+        await client.query(clearQuery, [invoiceId]);
+        await client.query("COMMIT");
+        console.log(
+          `Cleared e-invoice status for GT invoice ${invoiceId} due to API error`
+        );
+      } catch (clearError) {
+        await client.query("ROLLBACK");
+        console.error(
+          `Failed to clear e-invoice status for GT invoice ${invoiceId}:`,
+          clearError
+        );
+      }
+    }
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Detect when an invoice is marked as pending and schedule auto-update
+ * @param {string} invoiceId - The invoice ID
+ * @param {string} newStatus - The new e-invoice status
+ * @param {object} pool - Database connection pool
+ * @param {object} apiClient - E-invoice API client
+ */
+const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
+  if (newStatus === "pending") {
+    schedulePendingInvoiceCheck(invoiceId, pool, apiClient);
+  } else {
+    // Clear any existing timeout if status is no longer pending
+    if (pendingInvoiceTimeouts.has(invoiceId)) {
+      clearTimeout(pendingInvoiceTimeouts.get(invoiceId));
+      pendingInvoiceTimeouts.delete(invoiceId);
+      console.log(`Cleared pending check timeout for GT invoice ${invoiceId}`);
+    }
+  }
+};
+
 export default function (pool, defaultConfig) {
   const router = Router();
 
   const apiClient = GTEInvoiceApiClientFactory.getInstance(defaultConfig);
+
+  // Initialize automatic checks for existing pending invoices on server start
+  const initializePendingInvoiceChecks = async () => {
+    try {
+      const pendingQuery = `
+        SELECT invoice_id, uuid
+        FROM greentarget.invoices
+        WHERE einvoice_status = 'pending' AND uuid IS NOT NULL
+      `;
+      const pendingResult = await pool.query(pendingQuery);
+
+      for (const invoice of pendingResult.rows) {
+        // Schedule immediate checks for all pending invoices with a small stagger
+        setTimeout(() => {
+          checkAndUpdatePendingInvoice(invoice.invoice_id, pool, apiClient).catch(
+            (error) =>
+              console.error(
+                `Error in initialization check for GT invoice ${invoice.invoice_id}:`,
+                error
+              )
+          );
+        }, 1000 + Math.random() * 5000);
+      }
+
+      console.log(
+        `Initialized automatic checks for ${pendingResult.rows.length} pending GT invoices`
+      );
+    } catch (error) {
+      console.error("Error initializing pending GT invoice checks:", error);
+    }
+  };
+
+  // Initialize on server start
+  initializePendingInvoiceChecks();
 
   // Generate a unique invoice number
   async function generateInvoiceNumber(client, type) {
