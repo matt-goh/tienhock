@@ -12,9 +12,15 @@ import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../routes/utils/api";
 import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
-import { getJobConfig, getJobIds } from "../../configs/payrollJobConfigs";
+import { getJobConfig, getJobIds, getContextLinkedPayCodes } from "../../configs/payrollJobConfigs";
 import StyledListbox from "../../components/StyledListbox";
 import { Link } from "react-router-dom";
+import ManageActivitiesModal, { ActivityItem } from "../../components/Payroll/ManageActivitiesModal";
+import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
+import {
+  calculateActivityAmount,
+  calculateActivitiesAmounts,
+} from "../../utils/payroll/calculateActivityAmount";
 import {
   Dialog,
   DialogPanel,
@@ -64,8 +70,16 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const navigate = useNavigate();
   const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
+  const {
+    detailedMappings: jobPayCodeDetails,
+    employeeMappings,
+    loading: loadingPayCodeMappings,
+  } = useJobPayCodeMappings();
   const jobConfig = getJobConfig(jobType);
   const JOB_IDS = getJobIds(jobType);
+  const contextLinkedPayCodes = jobConfig
+    ? getContextLinkedPayCodes(jobConfig)
+    : {};
 
   // Form state
   const currentDate = new Date();
@@ -77,6 +91,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   // Employee state
   const [employeeEntries, setEmployeeEntries] = useState<Record<string, EmployeeEntry>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  // Activities state
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeEntry | null>(null);
+  const [employeeActivities, setEmployeeActivities] = useState<Record<string, ActivityItem[]>>({});
 
   // Leave state
   const [existingLeaveRecords, setExistingLeaveRecords] = useState<LeaveEntry[]>([]);
@@ -169,6 +188,183 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       setEmployeeEntries(entries);
     }
   }, [eligibleEmployees, loadingStaffs, mode, existingWorkLog, JOB_IDS, jobConfig]);
+
+  // Fetch and apply activities for selected employees
+  const fetchAndApplyActivities = useCallback(
+    (currentActivities: Record<string, ActivityItem[]>) => {
+      if (loadingPayCodeMappings) return;
+
+      const selectedEntries = Object.values(employeeEntries).filter((e) => e.selected);
+      if (selectedEntries.length === 0) return;
+
+      const newEmployeeActivities: Record<string, ActivityItem[]> = {};
+
+      selectedEntries.forEach((entry) => {
+        const { employeeId, jobType: entryJobType, totalHours } = entry;
+
+        // Get job pay codes from cache
+        const jobPayCodes = jobPayCodeDetails[entryJobType] || [];
+
+        // Get employee-specific pay codes from cache
+        const empPayCodes = employeeMappings[employeeId] || [];
+
+        // Merge pay codes, prioritizing employee-specific ones
+        const allPayCodes = new Map();
+
+        // First add job pay codes
+        jobPayCodes.forEach((pc: any) => {
+          allPayCodes.set(pc.id, { ...pc, source: "job" });
+        });
+
+        // Then add/override with employee-specific pay codes
+        empPayCodes.forEach((pc: any) => {
+          allPayCodes.set(pc.id, { ...pc, source: "employee" });
+        });
+
+        // Convert map back to array
+        const mergedPayCodes = Array.from(allPayCodes.values());
+
+        // Get existing activities for this employee if in edit mode
+        const existingActivitiesForEmployee = currentActivities[employeeId] || [];
+
+        // Filter out overtime codes if hours <= 8 (per day, so for monthly check typical daily hours)
+        const dailyHours = totalHours / 22; // Approximate daily hours
+        const filteredPayCodes =
+          dailyHours > 8
+            ? mergedPayCodes
+            : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
+
+        // Convert to activity format
+        const activities: ActivityItem[] = filteredPayCodes.map((payCode: any) => {
+          const isContextLinked = !!contextLinkedPayCodes[payCode.id];
+
+          // Find existing activity for this pay code if in edit mode
+          const existingActivity =
+            mode === "edit"
+              ? existingActivitiesForEmployee.find((ea) => ea.payCodeId === payCode.id)
+              : null;
+
+          // Use Biasa rate for monthly (default rate)
+          const rate = payCode.override_rate_biasa || payCode.rate_biasa;
+
+          // Determine if selected based on specific rules
+          let isSelected = false;
+
+          if (mode === "edit" && existingActivity) {
+            isSelected = existingActivity.isSelected;
+          } else {
+            // Apply selection rules for new activities
+            if (payCode.pay_type === "Tambahan") {
+              isSelected = false;
+            } else if (payCode.pay_type === "Overtime") {
+              isSelected = dailyHours > 8;
+            } else if (payCode.pay_type === "Base") {
+              isSelected = payCode.is_default_setting;
+            } else {
+              isSelected = payCode.is_default_setting;
+            }
+
+            // Special rules for specific rate units
+            if (
+              isContextLinked ||
+              payCode.rate_unit === "Bag" ||
+              payCode.rate_unit === "Trip" ||
+              payCode.rate_unit === "Day"
+            ) {
+              isSelected = false;
+            }
+          }
+
+          // Determine units produced
+          const unitsProduced = existingActivity
+            ? existingActivity.unitsProduced
+            : payCode.requires_units_input
+            ? 0
+            : undefined;
+
+          return {
+            payCodeId: payCode.id,
+            description: payCode.description,
+            payType: payCode.pay_type,
+            rateUnit: payCode.rate_unit,
+            rate: rate,
+            isDefault: payCode.is_default_setting,
+            isSelected: isSelected,
+            unitsProduced: unitsProduced,
+            isContextLinked: isContextLinked,
+            source: payCode.source,
+            calculatedAmount: calculateActivityAmount(
+              {
+                isSelected,
+                payType: payCode.pay_type,
+                rateUnit: payCode.rate_unit,
+                rate,
+                unitsProduced,
+              },
+              totalHours,
+              {}
+            ),
+          };
+        });
+
+        // Apply calculation logic to all activities
+        const processedActivities = calculateActivitiesAmounts(activities, totalHours, {});
+        newEmployeeActivities[employeeId] = processedActivities;
+      });
+
+      setEmployeeActivities(newEmployeeActivities);
+    },
+    [
+      employeeEntries,
+      loadingPayCodeMappings,
+      jobPayCodeDetails,
+      employeeMappings,
+      contextLinkedPayCodes,
+      mode,
+    ]
+  );
+
+  // Effect to fetch activities when employee selection changes
+  useEffect(() => {
+    if (!loadingPayCodeMappings && Object.keys(employeeEntries).length > 0) {
+      fetchAndApplyActivities(employeeActivities);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeEntries, loadingPayCodeMappings, jobPayCodeDetails, employeeMappings, mode]);
+
+  // Restore activities from existing work log in edit mode
+  useEffect(() => {
+    if (mode === "edit" && existingWorkLog?.employeeEntries) {
+      const restoredActivities: Record<string, ActivityItem[]> = {};
+
+      existingWorkLog.employeeEntries.forEach((entry: any) => {
+        if (entry.activities && entry.activities.length > 0) {
+          restoredActivities[entry.employee_id] = entry.activities.map(
+            (activity: any) => ({
+              payCodeId: activity.pay_code_id,
+              description: activity.description,
+              payType: activity.pay_type,
+              rateUnit: activity.rate_unit,
+              rate: parseFloat(activity.rate_used),
+              unitsProduced: activity.units_produced
+                ? parseFloat(activity.units_produced)
+                : undefined,
+              hoursApplied: activity.hours_applied
+                ? parseFloat(activity.hours_applied)
+                : undefined,
+              calculatedAmount: parseFloat(activity.calculated_amount),
+              isSelected: true,
+              isDefault: false,
+            })
+          );
+        }
+      });
+
+      if (Object.keys(restoredActivities).length > 0) {
+        setEmployeeActivities(restoredActivities);
+      }
+    }
+  }, [mode, existingWorkLog]);
 
   // Fetch existing leave records for the selected month
   useEffect(() => {
@@ -397,6 +593,28 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     setNewLeaveEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Activities handlers
+  const handleManageActivities = (entry: EmployeeEntry) => {
+    setSelectedEmployee(entry);
+    setShowActivitiesModal(true);
+  };
+
+  const handleActivitiesUpdated = (activities: ActivityItem[]) => {
+    if (!selectedEmployee) return;
+
+    // Recalculate amounts
+    const recalculatedActivities = calculateActivitiesAmounts(
+      activities,
+      selectedEmployee.totalHours,
+      {}
+    );
+
+    setEmployeeActivities((prev) => ({
+      ...prev,
+      [selectedEmployee.employeeId]: recalculatedActivities,
+    }));
+  };
+
   const handleSave = async () => {
     const selectedEmployees = Object.values(employeeEntries).filter((e) => e.selected);
 
@@ -427,7 +645,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           jobType: emp.jobType,
           totalHours: emp.totalHours,
           overtimeHours: emp.overtimeHours,
-          activities: [], // Activities can be added later
+          activities: (employeeActivities[emp.employeeId] || []).filter(
+            (a) => a.isSelected
+          ),
         })),
         leaveEntries: newLeaveEntries.map((leave) => ({
           employeeId: leave.employeeId,
@@ -598,6 +818,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
                   Overtime
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                  Activities
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-default-200">
@@ -667,6 +890,23 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       min="0"
                       step="0.5"
                     />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <ActivitiesTooltip
+                        activities={(
+                          employeeActivities[entry.employeeId] || []
+                        ).filter((activity) => activity.isSelected)}
+                        employeeName={entry.employeeName}
+                        className={
+                          !entry.selected
+                            ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                            : ""
+                        }
+                        disabled={!entry.selected}
+                        onClick={() => handleManageActivities(entry)}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1061,6 +1301,32 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           </div>
         </Dialog>
       </Transition>
+
+      {/* Manage Activities Modal */}
+      <ManageActivitiesModal
+        isOpen={showActivitiesModal}
+        onClose={() => setShowActivitiesModal(false)}
+        employee={
+          selectedEmployee
+            ? ({
+                id: selectedEmployee.employeeId,
+                name: selectedEmployee.employeeName,
+              } as Employee)
+            : null
+        }
+        jobType={selectedEmployee?.jobType || ""}
+        jobName={selectedEmployee?.jobName || ""}
+        employeeHours={selectedEmployee?.totalHours || 0}
+        dayType="Biasa"
+        onActivitiesUpdated={handleActivitiesUpdated}
+        existingActivities={
+          selectedEmployee
+            ? employeeActivities[selectedEmployee.employeeId] || []
+            : []
+        }
+        contextLinkedPayCodes={contextLinkedPayCodes}
+        contextData={{}}
+      />
     </div>
   );
 };
