@@ -1,5 +1,11 @@
 // src/pages/Accounting/JournalEntryPage.tsx
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -8,12 +14,15 @@ import {
   JournalEntry,
   JournalEntryType,
   JournalEntryTypeInfo,
-  JournalEntryLine,
   JournalEntryLineInput,
 } from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
-import { FormInput, FormListbox, SelectOption } from "../../components/FormComponents";
+import {
+  FormInput,
+  FormListbox,
+  SelectOption,
+} from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
@@ -22,6 +31,8 @@ import {
   IconDeviceFloppy,
   IconSend,
   IconFileText,
+  IconChevronDown,
+  IconCheck,
 } from "@tabler/icons-react";
 
 interface JournalLineFormData {
@@ -51,6 +62,136 @@ const emptyLine = (lineNumber: number): JournalLineFormData => ({
   credit_amount: "",
 });
 
+// Inline searchable combobox for account code selection
+interface AccountCodeCellProps {
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: AccountCodeCellProps) => {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filteredOptions = useMemo(() => {
+    if (!query) return options;
+    const lowerQuery = query.toLowerCase();
+    return options.filter(
+      (opt: SelectOption) =>
+        opt.id.toString().toLowerCase().includes(lowerQuery) ||
+        opt.name.toLowerCase().includes(lowerQuery)
+    );
+  }, [query, options]);
+
+  const selectedOption = options.find((opt: SelectOption) => opt.id === value);
+  const displayValue = selectedOption?.name || "";
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+        setQuery("");
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const handleSelect = (optionId: string) => {
+    onChange(optionId);
+    setIsOpen(false);
+    setQuery("");
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
+    if (!isOpen) setIsOpen(true);
+  };
+
+  const handleFocus = () => {
+    setIsOpen(true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsOpen(false);
+      setQuery("");
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex">
+        <input
+          ref={inputRef}
+          type="text"
+          value={isOpen ? query : displayValue}
+          onChange={handleInputChange}
+          onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder="Search account..."
+          className="w-full px-2 py-1.5 text-sm border border-default-300 rounded-l focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+        />
+        <button
+          type="button"
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+          className="px-2 border border-l-0 border-default-300 rounded-r bg-default-50 hover:bg-default-100 disabled:bg-gray-50 disabled:cursor-not-allowed"
+        >
+          <IconChevronDown size={16} className="text-default-500" />
+        </button>
+      </div>
+      {isOpen && !disabled && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 mt-1 min-w-[400px] max-h-60 overflow-auto bg-white border border-default-200 rounded-lg shadow-lg"
+        >
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-default-500">
+              No accounts found
+            </div>
+          ) : (
+            filteredOptions.map((opt: SelectOption) => (
+              <div
+                key={opt.id}
+                onClick={() => handleSelect(opt.id.toString())}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-sky-50 flex items-center justify-between gap-2 ${
+                  opt.id === value ? "bg-sky-100 text-sky-900" : ""
+                }`}
+              >
+                <span>{opt.name}</span>
+                {opt.id === value && (
+                  <IconCheck size={16} className="text-sky-600 flex-shrink-0" />
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const JournalEntryPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -62,7 +203,7 @@ const JournalEntryPage: React.FC = () => {
     entry_type: "J",
     entry_date: new Date().toISOString().split("T")[0],
     description: "",
-    lines: [emptyLine(1), emptyLine(2), emptyLine(3), emptyLine(4)],
+    lines: [emptyLine(1)],
   });
 
   // Entry status for edit mode
@@ -82,7 +223,9 @@ const JournalEntryPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPostDialog, setShowPostDialog] = useState(false);
-  const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
+  const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Calculate totals
@@ -122,15 +265,20 @@ const JournalEntryPage: React.FC = () => {
   }, []);
 
   // Fetch next reference number
-  const fetchNextReference = useCallback(async (entryType: JournalEntryType) => {
-    try {
-      const response = await api.get(`/api/journal-entries/next-reference/${entryType}`);
-      const data = response as { reference_no: string };
-      setFormData((prev) => ({ ...prev, reference_no: data.reference_no }));
-    } catch (err: unknown) {
-      console.error("Error fetching next reference:", err);
-    }
-  }, []);
+  const fetchNextReference = useCallback(
+    async (entryType: JournalEntryType) => {
+      try {
+        const response = await api.get(
+          `/api/journal-entries/next-reference/${entryType}`
+        );
+        const data = response as { reference_no: string };
+        setFormData((prev) => ({ ...prev, reference_no: data.reference_no }));
+      } catch (err: unknown) {
+        console.error("Error fetching next reference:", err);
+      }
+    },
+    []
+  );
 
   // Fetch entry data for editing
   const fetchEntryData = useCallback(async () => {
@@ -150,12 +298,13 @@ const JournalEntryPage: React.FC = () => {
         reference: line.reference || "",
         particulars: line.particulars || "",
         debit_amount: line.debit_amount > 0 ? line.debit_amount.toString() : "",
-        credit_amount: line.credit_amount > 0 ? line.credit_amount.toString() : "",
+        credit_amount:
+          line.credit_amount > 0 ? line.credit_amount.toString() : "",
       }));
 
-      // Ensure at least 4 lines
-      while (lines.length < 4) {
-        lines.push(emptyLine(lines.length + 1));
+      // Ensure at least 1 line
+      if (lines.length === 0) {
+        lines.push(emptyLine(1));
       }
 
       const fetchedFormData: JournalEntryFormData = {
@@ -187,7 +336,6 @@ const JournalEntryPage: React.FC = () => {
       if (isEditMode) {
         await fetchEntryData();
       } else {
-        await fetchNextReference("J");
         initialFormDataRef.current = JSON.parse(JSON.stringify(formData));
         setLoading(false);
       }
@@ -326,7 +474,9 @@ const JournalEntryPage: React.FC = () => {
     // Validate totals match
     if (Math.abs(totals.totalDebit - totals.totalCredit) > 0.01) {
       toast.error(
-        `Total debits (${totals.totalDebit.toFixed(2)}) must equal total credits (${totals.totalCredit.toFixed(2)})`
+        `Total debits (${totals.totalDebit.toFixed(
+          2
+        )}) must equal total credits (${totals.totalCredit.toFixed(2)})`
       );
       return false;
     }
@@ -348,7 +498,8 @@ const JournalEntryPage: React.FC = () => {
         .filter(
           (line) =>
             line.account_code &&
-            (parseFloat(line.debit_amount) > 0 || parseFloat(line.credit_amount) > 0)
+            (parseFloat(line.debit_amount) > 0 ||
+              parseFloat(line.credit_amount) > 0)
         )
         .map((line, index) => ({
           line_number: index + 1,
@@ -379,7 +530,10 @@ const JournalEntryPage: React.FC = () => {
     } catch (err: unknown) {
       console.error("Error saving journal entry:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast.error(errorMessage || `Failed to ${isEditMode ? "update" : "create"} journal entry`);
+      toast.error(
+        errorMessage ||
+          `Failed to ${isEditMode ? "update" : "create"} journal entry`
+      );
     } finally {
       setIsSaving(false);
     }
@@ -398,7 +552,8 @@ const JournalEntryPage: React.FC = () => {
           .filter(
             (line) =>
               line.account_code &&
-              (parseFloat(line.debit_amount) > 0 || parseFloat(line.credit_amount) > 0)
+              (parseFloat(line.debit_amount) > 0 ||
+                parseFloat(line.credit_amount) > 0)
           )
           .map((line, index) => ({
             line_number: index + 1,
@@ -617,21 +772,21 @@ const JournalEntryPage: React.FC = () => {
 
             {/* Line Items Table */}
             <div className="p-6">
-              <div className="overflow-x-auto">
+              <div className="overflow-visible">
                 <table className="min-w-full divide-y divide-default-200 border border-default-200 rounded-lg">
                   <thead className="bg-default-100">
                     <tr>
                       <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-12">
                         #
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-64">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-96">
                         Account Code
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-28">
                         Reference
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                        Particulars
+                        Description
                       </th>
                       <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-32">
                         Debit ($)
@@ -639,9 +794,7 @@ const JournalEntryPage: React.FC = () => {
                       <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-32">
                         Credit ($)
                       </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-12">
-
-                      </th>
+                      <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-12"></th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-default-200">
@@ -649,7 +802,9 @@ const JournalEntryPage: React.FC = () => {
                       <tr
                         key={index}
                         className={`${
-                          selectedLineIndex === index ? "bg-sky-50" : "hover:bg-default-50"
+                          selectedLineIndex === index
+                            ? "bg-sky-50"
+                            : "hover:bg-default-50"
                         }`}
                         onClick={() => setSelectedLineIndex(index)}
                       >
@@ -657,28 +812,25 @@ const JournalEntryPage: React.FC = () => {
                           {String(line.line_number).padStart(2, "0")}
                         </td>
                         <td className="px-3 py-2">
-                          <select
+                          <AccountCodeCell
                             value={line.account_code}
-                            onChange={(e) =>
-                              handleLineChange(index, "account_code", e.target.value)
+                            options={accountCodeOptions}
+                            onChange={(value: string) =>
+                              handleLineChange(index, "account_code", value)
                             }
                             disabled={isReadOnly}
-                            className="w-full px-2 py-1.5 text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                          >
-                            <option value="">Select account...</option>
-                            {accountCodeOptions.map((opt) => (
-                              <option key={opt.id} value={opt.id}>
-                                {opt.name}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </td>
                         <td className="px-3 py-2">
                           <input
                             type="text"
                             value={line.reference}
                             onChange={(e) =>
-                              handleLineChange(index, "reference", e.target.value)
+                              handleLineChange(
+                                index,
+                                "reference",
+                                e.target.value
+                              )
                             }
                             disabled={isReadOnly}
                             placeholder="Chq No"
@@ -690,7 +842,11 @@ const JournalEntryPage: React.FC = () => {
                             type="text"
                             value={line.particulars}
                             onChange={(e) =>
-                              handleLineChange(index, "particulars", e.target.value)
+                              handleLineChange(
+                                index,
+                                "particulars",
+                                e.target.value
+                              )
                             }
                             disabled={isReadOnly}
                             placeholder="Description"
@@ -704,10 +860,18 @@ const JournalEntryPage: React.FC = () => {
                             min="0"
                             value={line.debit_amount}
                             onChange={(e) =>
-                              handleLineChange(index, "debit_amount", e.target.value)
+                              handleLineChange(
+                                index,
+                                "debit_amount",
+                                e.target.value
+                              )
                             }
                             onBlur={(e) =>
-                              handleLineChange(index, "debit_amount", formatAmount(e.target.value))
+                              handleLineChange(
+                                index,
+                                "debit_amount",
+                                formatAmount(e.target.value)
+                              )
                             }
                             disabled={isReadOnly}
                             placeholder="0.00"
@@ -721,10 +885,18 @@ const JournalEntryPage: React.FC = () => {
                             min="0"
                             value={line.credit_amount}
                             onChange={(e) =>
-                              handleLineChange(index, "credit_amount", e.target.value)
+                              handleLineChange(
+                                index,
+                                "credit_amount",
+                                e.target.value
+                              )
                             }
                             onBlur={(e) =>
-                              handleLineChange(index, "credit_amount", formatAmount(e.target.value))
+                              handleLineChange(
+                                index,
+                                "credit_amount",
+                                formatAmount(e.target.value)
+                              )
                             }
                             disabled={isReadOnly}
                             placeholder="0.00"
@@ -778,8 +950,9 @@ const JournalEntryPage: React.FC = () => {
               {/* Balance Check */}
               {Math.abs(totals.totalDebit - totals.totalCredit) > 0.01 && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  <strong>Out of Balance:</strong> Debits ({totals.totalDebit.toFixed(2)}) do not
-                  equal Credits ({totals.totalCredit.toFixed(2)}). Difference:{" "}
+                  <strong>Out of Balance:</strong> Debits (
+                  {totals.totalDebit.toFixed(2)}) do not equal Credits (
+                  {totals.totalCredit.toFixed(2)}). Difference:{" "}
                   {Math.abs(totals.totalDebit - totals.totalCredit).toFixed(2)}
                 </div>
               )}
@@ -787,7 +960,8 @@ const JournalEntryPage: React.FC = () => {
               {/* Account Description */}
               {selectedAccountDescription && (
                 <div className="mt-4 p-3 bg-sky-50 border border-sky-200 rounded-lg text-sky-700 text-sm">
-                  <strong>Selected Account:</strong> {selectedAccountDescription}
+                  <strong>Selected Account:</strong>{" "}
+                  {selectedAccountDescription}
                 </div>
               )}
             </div>
