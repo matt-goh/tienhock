@@ -30,6 +30,7 @@ export interface JobTypeConfig {
   defaultHours?: number;
   jobIds: string[];
   replaceUnits?: string;
+  entryMode?: "daily" | "monthly"; // Default: "daily"
 }
 
 export interface JobTypeConfigs {
@@ -134,9 +135,8 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     id: "MAINTENANCE",
     name: "Maintenance",
     section: ["MAINTENANCE"],
-    defaultShifts: [1, 2],
-    requiresOvertimeCalc: true,
-    defaultHours: 50,
+    entryMode: "monthly",
+    defaultHours: 176, // Default monthly hours
     jobIds: ["MAINTEN"],
     contextFields: [],
   },
@@ -165,6 +165,8 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     id: "OFFICE",
     name: "Office",
     section: ["OFFICE"],
+    entryMode: "monthly",
+    defaultHours: 176, // Default monthly hours
     contextFields: [],
     jobIds: ["OFFICE"],
   },
@@ -173,6 +175,8 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     id: "TUKANG_SAPU",
     name: "Tukang Sapu",
     section: ["SAPU"],
+    entryMode: "monthly",
+    defaultHours: 176, // Default monthly hours
     contextFields: [],
     jobIds: ["SAPU"],
   },

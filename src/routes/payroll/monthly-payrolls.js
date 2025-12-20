@@ -87,8 +87,8 @@ export default function (pool) {
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
       const endDate = new Date(year, month, 0).toISOString().split("T")[0]; // Last day of month
 
-      // Query work logs and extract unique employee-job combinations
-      const eligibleEmployeesQuery = `
+      // Query daily work logs and extract unique employee-job combinations
+      const dailyEligibleQuery = `
       SELECT DISTINCT dwle.employee_id, dwle.job_id
       FROM daily_work_logs dwl
       JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
@@ -96,25 +96,50 @@ export default function (pool) {
       AND dwl.status = 'Submitted'
     `;
 
-      const eligibleEmployeesResult = await pool.query(eligibleEmployeesQuery, [
-        startDate,
-        endDate,
+      // Query monthly work logs and extract unique employee-job combinations
+      const monthlyEligibleQuery = `
+      SELECT DISTINCT mwle.employee_id, mwle.job_id
+      FROM monthly_work_logs mwl
+      JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
+      WHERE mwl.log_month = $1 AND mwl.log_year = $2
+      AND mwl.status = 'Submitted'
+    `;
+
+      const [dailyResult, monthlyResult] = await Promise.all([
+        pool.query(dailyEligibleQuery, [startDate, endDate]),
+        pool.query(monthlyEligibleQuery, [month, year]),
       ]);
 
-      // Group employees by job type
+      // Group employees by job type (combine daily and monthly results)
       const jobEmployeeMap = {};
-      eligibleEmployeesResult.rows.forEach((row) => {
+
+      // Add daily log employees
+      dailyResult.rows.forEach((row) => {
         if (!jobEmployeeMap[row.job_id]) {
-          jobEmployeeMap[row.job_id] = [];
+          jobEmployeeMap[row.job_id] = new Set();
         }
-        jobEmployeeMap[row.job_id].push(row.employee_id);
+        jobEmployeeMap[row.job_id].add(row.employee_id);
+      });
+
+      // Add monthly log employees
+      monthlyResult.rows.forEach((row) => {
+        if (!jobEmployeeMap[row.job_id]) {
+          jobEmployeeMap[row.job_id] = new Set();
+        }
+        jobEmployeeMap[row.job_id].add(row.employee_id);
+      });
+
+      // Convert Sets to arrays
+      const finalJobEmployeeMap = {};
+      Object.keys(jobEmployeeMap).forEach((jobId) => {
+        finalJobEmployeeMap[jobId] = Array.from(jobEmployeeMap[jobId]);
       });
 
       res.json({
         month,
         year,
-        eligibleJobs: Object.keys(jobEmployeeMap),
-        jobEmployeeMap,
+        eligibleJobs: Object.keys(finalJobEmployeeMap),
+        jobEmployeeMap: finalJobEmployeeMap,
       });
     } catch (error) {
       console.error("Error fetching eligible employees:", error);
@@ -221,7 +246,8 @@ export default function (pool) {
       const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
       const endDate = new Date(year, month, 0).toISOString().split("T")[0]; // Last day of month
 
-      const workLogsQuery = `
+      // Query daily work logs
+      const dailyWorkLogsQuery = `
         SELECT dwl.*, json_agg(
           json_build_object(
             'employee_id', dwle.employee_id,
@@ -254,19 +280,54 @@ export default function (pool) {
         ORDER BY dwl.log_date
       `;
 
-      const workLogsResult = await pool.query(workLogsQuery, [
-        startDate,
-        endDate,
+      // Query monthly work logs (for MAINTENANCE, OFFICE, TUKANG_SAPU jobs)
+      const monthlyWorkLogsQuery = `
+        SELECT mwl.*, json_agg(
+          json_build_object(
+            'employee_id', mwle.employee_id,
+            'job_id', mwle.job_id,
+            'total_hours', mwle.total_hours,
+            'overtime_hours', mwle.overtime_hours,
+            'activities', (
+              SELECT json_agg(
+                json_build_object(
+                  'pay_code_id', mwla.pay_code_id,
+                  'description', pc.description,
+                  'pay_type', pc.pay_type,
+                  'rate_unit', pc.rate_unit,
+                  'rate_used', mwla.rate_used,
+                  'hours_applied', mwla.hours_applied,
+                  'calculated_amount', mwla.calculated_amount
+                )
+              )
+              FROM monthly_work_log_activities mwla
+              JOIN pay_codes pc ON mwla.pay_code_id = pc.id
+              WHERE mwla.monthly_entry_id = mwle.id
+            )
+          )
+        ) as employee_entries
+        FROM monthly_work_logs mwl
+        JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
+        WHERE mwl.log_month = $1 AND mwl.log_year = $2
+        AND mwl.status = 'Submitted'
+        GROUP BY mwl.id
+        ORDER BY mwl.section
+      `;
+
+      const [dailyLogsResult, monthlyLogsResult] = await Promise.all([
+        pool.query(dailyWorkLogsQuery, [startDate, endDate]),
+        pool.query(monthlyWorkLogsQuery, [month, year]),
       ]);
 
-      // Return the work logs for now
-      // The actual processing will be implemented later
+      // Return both daily and monthly work logs
       res.json({
         message: "Processing initiated",
         month,
         year,
-        work_logs_count: workLogsResult.rows.length,
-        work_logs: workLogsResult.rows,
+        daily_work_logs_count: dailyLogsResult.rows.length,
+        monthly_work_logs_count: monthlyLogsResult.rows.length,
+        daily_work_logs: dailyLogsResult.rows,
+        monthly_work_logs: monthlyLogsResult.rows,
       });
     } catch (error) {
       console.error("Error processing monthly payroll:", error);
