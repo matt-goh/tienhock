@@ -13,6 +13,8 @@ import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 import DebtorsReportPage from "./Accounting/DebtorsReportPage";
 import AccountCodeListPage from "./Accounting/AccountCodeListPage";
 import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
+import JournalEntryListPage from "./Accounting/JournalEntryListPage";
+import JournalEntryPage from "./Accounting/JournalEntryPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -223,6 +225,24 @@ export const TienHockSidebarData: SidebarItem[] = [
     name: "Accounting",
     icon: IconReportMoney,
     subItems: [
+      {
+        name: "Journal Entries",
+        path: "/accounting/journal-entries",
+        component: JournalEntryListPage,
+        subItems: [
+          {
+            name: "New Entry",
+            path: "/accounting/journal-entries/new",
+            component: JournalEntryPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id",
+            component: JournalEntryPage,
+          },
+        ],
+      },
       {
         name: "Chart of Accounts",
         path: "/accounting/account-codes",
