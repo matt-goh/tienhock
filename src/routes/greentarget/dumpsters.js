@@ -158,7 +158,22 @@ export default function (pool) {
           return startDate.getTime() === currentDate.getTime();
         });
 
-        if (isSameDayTransition && !alreadyBookedForToday) {
+        // Allow transition day rentals even if there's already a booking for the same day
+        // as long as all existing bookings on this day are 1-day rentals (pickup same day)
+        const sameDayRentals = dumpsterRentals.filter((rental) => {
+          const startDate = new Date(rental.date_placed);
+          startDate.setHours(0, 0, 0, 0);
+          return startDate.getTime() === currentDate.getTime();
+        });
+        
+        const allSameDayRentalsAreOneDayOnly = sameDayRentals.every((rental) => {
+          if (!rental.date_picked) return false; // Ongoing rental
+          const pickupDate = new Date(rental.date_picked);
+          pickupDate.setHours(0, 0, 0, 0);
+          return pickupDate.getTime() === currentDate.getTime();
+        });
+
+        if (isSameDayTransition && (!alreadyBookedForToday || allSameDayRentalsAreOneDayOnly)) {
           // Add to available with special flag only if not already booked for this day
           available.push({
             ...dumpster,

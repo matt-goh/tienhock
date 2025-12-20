@@ -11,6 +11,10 @@ import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 
 // Accounting related imports
 import DebtorsReportPage from "./Accounting/DebtorsReportPage";
+import AccountCodeListPage from "./Accounting/AccountCodeListPage";
+import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
+import JournalEntryListPage from "./Accounting/JournalEntryListPage";
+import JournalEntryPage from "./Accounting/JournalEntryPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -26,6 +30,9 @@ import DailyLogListPage from "./Payroll/DailyLogListPage";
 import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
+import MonthlyLogListPage from "./Payroll/MonthlyLogListPage";
+import MonthlyLogEntryPage from "./Payroll/MonthlyLogEntryPage";
+import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
@@ -98,39 +105,80 @@ const generatePayrollSubItems = (): SidebarItem[] => {
 
   // Add each production type dynamically
   Object.values(JOB_CONFIGS).forEach((jobConfig) => {
-    const jobTypeLower = jobConfig.id.toLowerCase();
+    const jobTypeLower = jobConfig.id.toLowerCase().replace("_", "-");
+    const isMonthly = jobConfig.entryMode === "monthly";
 
-    payrollSubItems.push({
-      name: jobConfig.name,
-      path: `/payroll/${jobTypeLower}-production`,
-      component: (props: any) => (
-        <DailyLogListPage jobType={jobConfig.id} {...props} />
-      ),
-      subItems: [
-        {
-          name: `New ${jobConfig.name} Entry`,
-          path: `/payroll/${jobTypeLower}-entry`,
-          component: (props: any) => (
-            <DailyLogEntryPage jobType={jobConfig.id} {...props} />
-          ),
-          showInPopover: true,
-        },
-        {
-          name: "View Log",
-          path: `/payroll/${jobTypeLower}-production/:id`,
-          component: (props: any) => (
-            <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
-          ),
-        },
-        {
-          name: "Edit Log",
-          path: `/payroll/${jobTypeLower}-production/:id/edit`,
-          component: (props: any) => (
-            <DailyLogEditPage jobType={jobConfig.id} {...props} />
-          ),
-        },
-      ],
-    });
+    if (isMonthly) {
+      // Monthly job routes (MAINTENANCE, OFFICE, TUKANG_SAPU)
+      payrollSubItems.push({
+        name: jobConfig.name,
+        path: `/payroll/${jobTypeLower}-monthly`,
+        component: (props: any) => (
+          <MonthlyLogListPage jobType={jobConfig.id} {...props} />
+        ),
+        subItems: [
+          {
+            name: `New ${jobConfig.name} Entry`,
+            path: `/payroll/${jobTypeLower}-monthly-entry`,
+            component: (props: any) => (
+              <MonthlyLogEntryPage jobType={jobConfig.id} {...props} />
+            ),
+            showInPopover: true,
+          },
+          {
+            name: "View Log",
+            path: `/payroll/${jobTypeLower}-monthly/:id`,
+            component: (props: any) => (
+              <MonthlyLogDetailsPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+          {
+            name: "Edit Log",
+            path: `/payroll/${jobTypeLower}-monthly/:id/edit`,
+            component: (props: any) => (
+              <MonthlyLogEntryPage
+                mode="edit"
+                jobType={jobConfig.id}
+                {...props}
+              />
+            ),
+          },
+        ],
+      });
+    } else {
+      // Daily job routes (MEE, BIHUN, BOILER, SALESMAN)
+      payrollSubItems.push({
+        name: jobConfig.name,
+        path: `/payroll/${jobTypeLower}-production`,
+        component: (props: any) => (
+          <DailyLogListPage jobType={jobConfig.id} {...props} />
+        ),
+        subItems: [
+          {
+            name: `New ${jobConfig.name} Entry`,
+            path: `/payroll/${jobTypeLower}-entry`,
+            component: (props: any) => (
+              <DailyLogEntryPage jobType={jobConfig.id} {...props} />
+            ),
+            showInPopover: true,
+          },
+          {
+            name: "View Log",
+            path: `/payroll/${jobTypeLower}-production/:id`,
+            component: (props: any) => (
+              <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+          {
+            name: "Edit Log",
+            path: `/payroll/${jobTypeLower}-production/:id/edit`,
+            component: (props: any) => (
+              <DailyLogEditPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+        ],
+      });
+    }
   });
 
   payrollSubItems.push({
@@ -177,6 +225,42 @@ export const TienHockSidebarData: SidebarItem[] = [
     name: "Accounting",
     icon: IconReportMoney,
     subItems: [
+      {
+        name: "Journal Entries",
+        path: "/accounting/journal-entries",
+        component: JournalEntryListPage,
+        subItems: [
+          {
+            name: "New Entry",
+            path: "/accounting/journal-entries/new",
+            component: JournalEntryPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id",
+            component: JournalEntryPage,
+          },
+        ],
+      },
+      {
+        name: "Chart of Accounts",
+        path: "/accounting/account-codes",
+        component: AccountCodeListPage,
+        subItems: [
+          {
+            name: "New Account",
+            path: "/accounting/account-codes/new",
+            component: AccountCodeFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Account",
+            path: "/accounting/account-codes/:code",
+            component: AccountCodeFormPage,
+          },
+        ],
+      },
       {
         name: "Debtors",
         path: "/sales/debtors",
