@@ -74,13 +74,8 @@ const AccountCodeListPage: React.FC = () => {
       const tree = buildTree(accountsRes as AccountCode[]);
       setAccountCodes(tree);
 
-      // Expand top level by default
-      const topLevelCodes = new Set(
-        (accountsRes as AccountCode[])
-          .filter((a) => !a.parent_code)
-          .map((a) => a.code)
-      );
-      setExpandedNodes(topLevelCodes);
+      // Start with all nodes collapsed
+      setExpandedNodes(new Set());
     } catch (error: any) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load account codes");
@@ -439,7 +434,7 @@ const AccountCodeListPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full px-4 md:mx-6">
+    <div className="relative w-full py-4 px-4 md:mx-6">
       {/* Header */}
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
