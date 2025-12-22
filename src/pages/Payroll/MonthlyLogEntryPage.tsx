@@ -200,7 +200,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       const newEmployeeActivities: Record<string, ActivityItem[]> = {};
 
       selectedEntries.forEach((entry) => {
-        const { employeeId, jobType: entryJobType, totalHours } = entry;
+        const { employeeId, jobType: entryJobType, totalHours, overtimeHours } = entry;
 
         // Get job pay codes from cache
         const jobPayCodes = jobPayCodeDetails[entryJobType] || [];
@@ -227,12 +227,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         // Get existing activities for this employee if in edit mode
         const existingActivitiesForEmployee = currentActivities[employeeId] || [];
 
-        // Filter out overtime codes if hours <= 8 (per day, so for monthly check typical daily hours)
-        const dailyHours = totalHours / 22; // Approximate daily hours
-        const filteredPayCodes =
-          dailyHours > 8
-            ? mergedPayCodes
-            : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
+        // Filter out overtime codes if no overtime hours entered
+        const hasOvertimeHours = overtimeHours > 0;
+        const filteredPayCodes = hasOvertimeHours
+          ? mergedPayCodes
+          : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
 
         // Convert to activity format
         const activities: ActivityItem[] = filteredPayCodes.map((payCode: any) => {
@@ -257,7 +256,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             if (payCode.pay_type === "Tambahan") {
               isSelected = false;
             } else if (payCode.pay_type === "Overtime") {
-              isSelected = dailyHours > 8;
+              isSelected = hasOvertimeHours;
             } else if (payCode.pay_type === "Base") {
               isSelected = payCode.is_default_setting;
             } else {
@@ -282,6 +281,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             ? 0
             : undefined;
 
+          // For overtime activities, use overtime hours; otherwise use total hours
+          const hoursToApply = payCode.pay_type === "Overtime" ? overtimeHours : totalHours;
+
           return {
             payCodeId: payCode.id,
             description: payCode.description,
@@ -291,6 +293,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             isDefault: payCode.is_default_setting,
             isSelected: isSelected,
             unitsProduced: unitsProduced,
+            hoursApplied: hoursToApply,
             isContextLinked: isContextLinked,
             source: payCode.source,
             calculatedAmount: calculateActivityAmount(
@@ -300,15 +303,23 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 rateUnit: payCode.rate_unit,
                 rate,
                 unitsProduced,
+                hoursApplied: hoursToApply,
               },
-              totalHours,
+              hoursToApply,
               {}
             ),
           };
         });
 
-        // Apply calculation logic to all activities
-        const processedActivities = calculateActivitiesAmounts(activities, totalHours, {});
+        // Apply calculation logic to all activities with proper hours for each activity type
+        const processedActivities = activities.map(activity => ({
+          ...activity,
+          calculatedAmount: calculateActivityAmount(
+            activity,
+            activity.hoursApplied || totalHours,
+            {}
+          )
+        }));
         newEmployeeActivities[employeeId] = processedActivities;
       });
 
@@ -602,12 +613,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const handleActivitiesUpdated = (activities: ActivityItem[]) => {
     if (!selectedEmployee) return;
 
-    // Recalculate amounts
-    const recalculatedActivities = calculateActivitiesAmounts(
-      activities,
-      selectedEmployee.totalHours,
-      {}
-    );
+    // Recalculate amounts with proper hours for each activity type
+    const recalculatedActivities = activities.map(activity => ({
+      ...activity,
+      calculatedAmount: calculateActivityAmount(
+        activity,
+        activity.hoursApplied || selectedEmployee.totalHours,
+        {}
+      )
+    }));
 
     setEmployeeActivities((prev) => ({
       ...prev,
