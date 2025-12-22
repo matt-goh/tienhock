@@ -873,7 +873,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         handleHoursChange(entry.employeeId, "totalHours", e.target.value)
                       }
                       disabled={!entry.selected || isSaving}
-                      className="w-full px-2 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
+                      className="w-full pl-3 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
                       min="0"
                       step="0.5"
                     />
@@ -886,7 +886,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         handleHoursChange(entry.employeeId, "overtimeHours", e.target.value)
                       }
                       disabled={!entry.selected || isSaving}
-                      className="w-full px-2 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
+                      className="w-full pl-3 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
                       min="0"
                       step="0.5"
                     />
