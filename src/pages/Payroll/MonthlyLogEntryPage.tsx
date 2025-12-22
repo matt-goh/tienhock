@@ -672,6 +672,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         })),
       };
 
+      console.log("Saving monthly log with payload:", payload);
+      console.log("Leave entries to save:", payload.leaveEntries);
+
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/api/monthly-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Monthly work log updated successfully");
@@ -683,6 +686,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
+      console.error("Error details:", error?.response?.data);
       toast.error(error?.response?.data?.message || "Failed to save monthly work log");
     } finally {
       setIsSaving(false);
