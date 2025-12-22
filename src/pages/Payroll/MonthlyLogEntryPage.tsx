@@ -883,26 +883,28 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
                     {entry.jobName}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="number"
                       value={entry.selected ? entry.totalHours : ""}
                       onChange={(e) =>
                         handleHoursChange(entry.employeeId, "totalHours", e.target.value)
                       }
+                      onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
                       className="w-full pl-3 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
                       min="0"
                       step="0.5"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="number"
                       value={entry.selected ? entry.overtimeHours : ""}
                       onChange={(e) =>
                         handleHoursChange(entry.employeeId, "overtimeHours", e.target.value)
                       }
+                      onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
                       className="w-full pl-3 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
                       min="0"
@@ -910,21 +912,19 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <ActivitiesTooltip
-                        activities={(
-                          employeeActivities[entry.employeeId] || []
-                        ).filter((activity) => activity.isSelected)}
-                        employeeName={entry.employeeName}
-                        className={
-                          !entry.selected
-                            ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                            : ""
-                        }
-                        disabled={!entry.selected}
-                        onClick={() => handleManageActivities(entry)}
-                      />
-                    </div>
+                    <ActivitiesTooltip
+                      activities={(
+                        employeeActivities[entry.employeeId] || []
+                      ).filter((activity) => activity.isSelected)}
+                      employeeName={entry.employeeName}
+                      className={
+                        !entry.selected
+                          ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                          : ""
+                      }
+                      disabled={!entry.selected}
+                      onClick={() => handleManageActivities(entry)}
+                    />
                   </td>
                 </tr>
               ))}
