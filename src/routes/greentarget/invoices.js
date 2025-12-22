@@ -206,8 +206,8 @@ export default function (pool, defaultConfig) {
     }
   };
 
-  // Initialize on server start
-  initializePendingInvoiceChecks();
+  // Initialize on server start (delayed to allow DB to fully start)
+  setTimeout(() => initializePendingInvoiceChecks(), 15000);
 
   // Generate a unique invoice number
   async function generateInvoiceNumber(client, type) {
