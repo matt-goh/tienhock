@@ -2906,10 +2906,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
                               <td className="px-6 py-4 whitespace-nowrap text-left">
-                                <div
-                                  className="relative w-40 mx-auto"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
+                                <div className="relative w-40 mx-auto">
                                   <Listbox
                                     value={
                                       locationTypes[row.rowKey || ""] || "Local"
@@ -2924,6 +2921,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   >
                                     <div className="relative">
                                       <ListboxButton
+                                        onClick={(e) => e.stopPropagation()}
                                         className={`relative w-full pl-3 py-1.5 text-left rounded-md border ${
                                           !isSelected
                                             ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
@@ -3066,10 +3064,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </td>
                             ) : (
                               <td className="px-6 py-4 whitespace-nowrap text-right">
-                                <div
-                                  className="flex justify-end"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
+                                <div className="flex justify-end">
                                   <input
                                     type="number"
                                     value={isSelected ? hours.toString() : ""}
@@ -3080,6 +3075,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                       )
                                     }
                                     onBlur={() => handleHoursBlur(row.rowKey)}
+                                    onClick={(e) => e.stopPropagation()}
                                     className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
                                       hours > 8 &&
                                       jobConfig?.requiresOvertimeCalc
@@ -3100,23 +3096,21 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </td>
                             )}
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <ActivitiesTooltip
-                                  activities={(
-                                    employeeActivities[row.rowKey || ""] || []
-                                  ).filter((activity) => activity.isSelected)}
-                                  employeeName={row.name}
-                                  hasUnsavedChanges={hasUnsavedChanges}
-                                  onNavigateAttempt={safeNavigate}
-                                  className={
-                                    !isSelected
-                                      ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                      : ""
-                                  }
-                                  disabled={!isSelected}
-                                  onClick={() => handleManageActivities(row)}
-                                />
-                              </div>
+                              <ActivitiesTooltip
+                                activities={(
+                                  employeeActivities[row.rowKey || ""] || []
+                                ).filter((activity) => activity.isSelected)}
+                                employeeName={row.name}
+                                hasUnsavedChanges={hasUnsavedChanges}
+                                onNavigateAttempt={safeNavigate}
+                                className={
+                                  !isSelected
+                                    ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                    : ""
+                                }
+                                disabled={!isSelected}
+                                onClick={() => handleManageActivities(row)}
+                              />
                             </td>
                           </tr>
                         );
@@ -3321,7 +3315,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </SafeLink>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <div onClick={(e) => e.stopPropagation()}>
+                                  <div>
                                     <input
                                       type="number"
                                       value={
@@ -3336,6 +3330,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           e.target.value
                                         )
                                       }
+                                      onClick={(e) => e.stopPropagation()}
                                       className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
                                       min="0"
                                       disabled={!isSelected}
@@ -3344,7 +3339,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <div onClick={(e) => e.stopPropagation()}>
+                                  <div>
                                     <input
                                       type="number"
                                       value={
@@ -3361,6 +3356,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           e.target.value
                                         )
                                       }
+                                      onClick={(e) => e.stopPropagation()}
                                       className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
                                       min="0"
                                       disabled={!isSelected}
@@ -3369,10 +3365,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <div
-                                    className="relative w-48 mx-auto"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
+                                  <div className="relative w-48 mx-auto">
                                     <Listbox
                                       value={selectedSalesman}
                                       onChange={(value) =>
@@ -3384,6 +3377,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     >
                                       <div className="relative">
                                         <ListboxButton
+                                          onClick={(e) => e.stopPropagation()}
                                           className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
                                         >
                                           <span className="block truncate text-sm">
@@ -3482,31 +3476,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  <div onClick={(e) => e.stopPropagation()}>
-                                    <ActivitiesTooltip
-                                      activities={(
-                                        employeeActivities[row.rowKey || ""] ||
-                                        []
-                                      ).filter(
-                                        (activity) => activity.isSelected
-                                      )}
-                                      employeeName={row.name}
-                                      hasUnsavedChanges={hasUnsavedChanges}
-                                      onNavigateAttempt={safeNavigate}
-                                      className={
-                                        !isSelected
-                                          ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                          : ""
-                                      }
-                                      disabled={
-                                        !isSelected ||
-                                        leaveEmployees[row.id]?.selected
-                                      }
-                                      onClick={() =>
-                                        handleManageActivities(row)
-                                      }
-                                    />
-                                  </div>
+                                  <ActivitiesTooltip
+                                    activities={(
+                                      employeeActivities[row.rowKey || ""] ||
+                                      []
+                                    ).filter(
+                                      (activity) => activity.isSelected
+                                    )}
+                                    employeeName={row.name}
+                                    hasUnsavedChanges={hasUnsavedChanges}
+                                    onNavigateAttempt={safeNavigate}
+                                    className={
+                                      !isSelected
+                                        ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                        : ""
+                                    }
+                                    disabled={
+                                      !isSelected ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
+                                    onClick={() =>
+                                      handleManageActivities(row)
+                                    }
+                                  />
                                 </td>
                               </tr>
                             );
@@ -3682,10 +3674,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div
-                            className="w-full max-w-[180px]"
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                          <div className="w-full max-w-[180px]">
                             <Listbox
                               value={currentLeaveType}
                               onChange={(value) =>
@@ -3698,6 +3687,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             >
                               <div className="relative">
                                 <ListboxButton
+                                  onClick={(e) => e.stopPropagation()}
                                   className={`relative w-full pl-3 pr-8 py-2 text-left rounded-md border ${
                                     !isSelected || isSaving
                                       ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
@@ -3774,29 +3764,27 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           </div>
                         </td>
                         <td className="w-48 px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <ActivitiesTooltip
-                              activities={
-                                isSelected && !isSaving
-                                  ? (
-                                      leaveEmployeeActivities[employee.id] || []
-                                    ).filter((a: ActivityItem) => a.isSelected)
-                                  : [] // Show no activities when disabled
-                              }
-                              employeeName={employee.name}
-                              hasUnsavedChanges={hasUnsavedChanges}
-                              onNavigateAttempt={safeNavigate}
-                              className={
-                                !isSelected || isSaving
-                                  ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                  : ""
-                              }
-                              disabled={!isSelected || isSaving}
-                              onClick={() =>
-                                handleManageLeaveActivities(employee)
-                              }
-                            />
-                          </div>
+                          <ActivitiesTooltip
+                            activities={
+                              isSelected && !isSaving
+                                ? (
+                                    leaveEmployeeActivities[employee.id] || []
+                                  ).filter((a: ActivityItem) => a.isSelected)
+                                : [] // Show no activities when disabled
+                            }
+                            employeeName={employee.name}
+                            hasUnsavedChanges={hasUnsavedChanges}
+                            onNavigateAttempt={safeNavigate}
+                            className={
+                              !isSelected || isSaving
+                                ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                : ""
+                            }
+                            disabled={!isSelected || isSaving}
+                            onClick={() =>
+                              handleManageLeaveActivities(employee)
+                            }
+                          />
                         </td>
                       </tr>
                     );
