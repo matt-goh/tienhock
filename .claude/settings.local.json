@@ -11,7 +11,13 @@
       "Bash(npx tsc:*)",
       "Bash(cat:*)",
       "Bash(findstr:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(where:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": []
   }
