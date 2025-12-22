@@ -890,7 +890,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     <span className="font-medium">{entry.employeeName}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
-                    {entry.jobName}
+                    <Link
+                      to={`/catalogue/job?id=${entry.jobType}`}
+                      className="hover:underline hover:text-sky-600"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {entry.jobName}
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
