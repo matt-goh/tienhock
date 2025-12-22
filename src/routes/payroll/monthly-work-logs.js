@@ -567,9 +567,16 @@ export default function (pool) {
 
       const values = [parseInt(month), parseInt(year)];
 
-      // If section is provided, filter by employees in that section
+      // If section is provided, filter by employees who have entries in that section's monthly log
       if (section) {
-        query += ` AND s.section = $3`;
+        query += ` AND lr.employee_id IN (
+          SELECT DISTINCT mwle.employee_id
+          FROM monthly_work_log_entries mwle
+          JOIN monthly_work_logs mwl ON mwle.monthly_log_id = mwl.id
+          WHERE mwl.section = $3
+            AND mwl.log_month = $1
+            AND mwl.log_year = $2
+        )`;
         values.push(section);
       }
 
