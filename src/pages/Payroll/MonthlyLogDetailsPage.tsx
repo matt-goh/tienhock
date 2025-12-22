@@ -47,6 +47,10 @@ interface Activity {
   hours_applied: number | null;
   rate_used: number;
   calculated_amount: number;
+  pay_type: string;
+  rate_unit: string;
+  units_produced?: number | null;
+  source?: string;
 }
 
 interface LeaveRecord {
@@ -68,6 +72,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   const [workLog, setWorkLog] = useState<MonthlyWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchWorkLog = async () => {
@@ -153,6 +158,33 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
       default:
         return "bg-default-100 text-default-700";
     }
+  };
+
+  const toggleExpansion = (entryId: string) => {
+    setExpandedEntries((prev) => ({
+      ...prev,
+      [entryId]: !prev[entryId],
+    }));
+  };
+
+  // Separate context-linked activities from regular activities
+  const separateActivities = (activities: Activity[]) => {
+    const contextLinked: Activity[] = [];
+    const regular: Activity[] = [];
+
+    activities.forEach((activity) => {
+      const isContextLinked = jobConfig?.contextFields.some(
+        (field) => field.linkedPayCode === activity.pay_code_id
+      );
+
+      if (isContextLinked) {
+        contextLinked.push(activity);
+      } else {
+        regular.push(activity);
+      }
+    });
+
+    return { contextLinked, regular };
   };
 
   if (isLoading) {
@@ -260,54 +292,220 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
             <thead className="bg-default-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase">
-                  ID
+                  Employee
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase">
+                  Hours
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase">
-                  Name
+                  Activities
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase">
-                  Job
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase">
-                  Regular Hours
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase">
-                  Overtime Hours
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase">
-                  Total Hours
+                <th className="px-4 py-3 text-right text-xs font-medium text-default-500 uppercase">
+                  Amount
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-default-200">
-              {workLog.employeeEntries.map((entry) => (
-                <tr key={entry.id} className="bg-white hover:bg-default-50">
-                  <td className="px-4 py-3 text-sm text-default-700">
-                    <Link
-                      to={`/catalogue/staff/${entry.employee_id}`}
-                      className="hover:underline hover:text-sky-600"
-                    >
-                      {entry.employee_id}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-default-900">
-                    {entry.employee_name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-default-600">
-                    {entry.job_name}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-center text-default-700">
-                    {entry.total_hours.toFixed(1)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-center text-default-700">
-                    {entry.overtime_hours.toFixed(1)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-center font-medium text-default-800">
-                    {(entry.total_hours + entry.overtime_hours).toFixed(1)}
-                  </td>
-                </tr>
-              ))}
+              {workLog.employeeEntries.map((entry) => {
+                const employeeTotal = entry.activities.reduce(
+                  (sum, activity) => sum + activity.calculated_amount,
+                  0
+                );
+
+                const { contextLinked, regular } = separateActivities(entry.activities);
+
+                // Calculate total activities count
+                const totalActivities = contextLinked.length + regular.length;
+                // Determine if we need to show the expand/collapse button
+                const needsExpansion = totalActivities > 6;
+                // Check if this entry is expanded
+                const isExpanded = expandedEntries[String(entry.id)] || false;
+
+                // Prepare activities to display based on expansion state
+                const displayContextLinked = isExpanded
+                  ? contextLinked
+                  : needsExpansion && contextLinked.length > 0
+                  ? contextLinked.slice(0, Math.min(contextLinked.length, 6))
+                  : contextLinked;
+
+                const displayRegular = isExpanded
+                  ? regular
+                  : needsExpansion && displayContextLinked.length < 6
+                  ? regular.slice(0, Math.min(regular.length, 6 - displayContextLinked.length))
+                  : needsExpansion
+                  ? []
+                  : regular;
+
+                return (
+                  <tr key={entry.id} className="bg-white hover:bg-default-50 align-top">
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/catalogue/staff/${entry.employee_id}`}
+                        className="text-sky-600 hover:text-sky-800 font-medium"
+                      >
+                        {entry.employee_name}
+                      </Link>
+                      <p className="text-sm text-default-500">
+                        {entry.employee_id} • {entry.job_name}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="text-sm">
+                        <p className="font-medium text-default-800">
+                          {entry.total_hours.toFixed(1)}
+                        </p>
+                        {entry.overtime_hours > 0 && (
+                          <p className="text-default-500 text-xs">
+                            +{entry.overtime_hours.toFixed(1)} OT
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        {/* Context-linked activities */}
+                        {displayContextLinked.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-sky-600 mb-1">
+                              Production Activities
+                            </p>
+                            <div className="space-y-1">
+                              {displayContextLinked.map((activity) => (
+                                <div
+                                  key={activity.id}
+                                  className="flex justify-between text-sm"
+                                >
+                                  <div>
+                                    <span className="font-medium">
+                                      {activity.description}
+                                    </span>
+                                    <span className="text-default-500 ml-2">
+                                      ({activity.pay_type})
+                                    </span>
+                                    <span className="text-default-500 ml-2">
+                                      •{" "}
+                                      {activity.rate_unit === "Percent"
+                                        ? `${activity.rate_used}%`
+                                        : `RM${activity.rate_used}`}
+                                    </span>
+                                    {activity.hours_applied !== null && (
+                                      <span className="text-default-500 ml-2">
+                                        • {activity.hours_applied} hrs
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="font-medium ml-4">
+                                    RM{activity.calculated_amount.toFixed(2)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Regular activities */}
+                        {displayRegular.length > 0 && (
+                          <div>
+                            {displayContextLinked.length > 0 && (
+                              <p className="text-xs font-medium text-default-600 mb-1 mt-2">
+                                Standard Activities
+                              </p>
+                            )}
+                            <div className="space-y-1">
+                              {displayRegular.map((activity) => (
+                                <div
+                                  key={activity.id}
+                                  className="flex justify-between text-sm"
+                                >
+                                  <div>
+                                    <span className="font-medium">
+                                      {activity.description}
+                                    </span>
+                                    <span className="text-default-500 ml-2">
+                                      ({activity.pay_type})
+                                    </span>
+                                    {activity.source === "employee" && (
+                                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                                        Staff
+                                      </span>
+                                    )}
+                                    {activity.source === "job" && (
+                                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                        Job
+                                      </span>
+                                    )}
+                                    <span className="text-default-500 ml-2">
+                                      •{" "}
+                                      {activity.rate_unit === "Percent"
+                                        ? `${activity.rate_used}%`
+                                        : `RM${activity.rate_used}`}
+                                    </span>
+                                    {activity.hours_applied !== null && (
+                                      <span className="text-default-500 ml-2">
+                                        • {activity.hours_applied} hrs
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="font-medium ml-4">
+                                    RM{activity.calculated_amount.toFixed(2)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show more/less button when needed */}
+                        {needsExpansion && (
+                          <button
+                            onClick={() => toggleExpansion(String(entry.id))}
+                            className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
+                          >
+                            {isExpanded
+                              ? "Show Less"
+                              : `Show ${
+                                  totalActivities -
+                                  (displayContextLinked.length + displayRegular.length)
+                                } More...`}
+                          </button>
+                        )}
+
+                        {entry.activities.length === 0 && (
+                          <span className="text-sm text-default-400">No activities</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium">
+                      RM{employeeTotal.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
+            <tfoot className="bg-default-50">
+              <tr>
+                <td
+                  colSpan={3}
+                  className="px-4 py-3 text-right font-medium text-default-800"
+                >
+                  Total
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-default-900">
+                  RM
+                  {workLog.employeeEntries
+                    .reduce(
+                      (sum, entry) =>
+                        sum +
+                        entry.activities.reduce(
+                          (actSum, act) => actSum + act.calculated_amount,
+                          0
+                        ),
+                      0
+                    )
+                    .toFixed(2)}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
@@ -382,13 +580,13 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
           <div>
             <span className="text-default-500">Created:</span>
             <span className="ml-2 text-default-700">
-              {format(new Date(workLog.created_at), "dd MMM yyyy HH:mm")}
+              {format(new Date(workLog.created_at), "dd MMM yyyy hh:mm a")}
             </span>
           </div>
           <div>
             <span className="text-default-500">Last Updated:</span>
             <span className="ml-2 text-default-700">
-              {format(new Date(workLog.updated_at), "dd MMM yyyy HH:mm")}
+              {format(new Date(workLog.updated_at), "dd MMM yyyy hh:mm a")}
             </span>
           </div>
         </div>

@@ -958,18 +958,51 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     employeeId: string,
     leaveType: LeaveType
   ) => {
-    // Check if leave balance is available for the new leave type
-    if (!leaveBalances[employeeId]) {
-      const balanceData = await fetchLeaveBalance(employeeId);
+    // Get balance data - either from state or fetch it
+    let balanceData = leaveBalances[employeeId];
+
+    if (!balanceData) {
+      const fetchResult = await fetchLeaveBalancesBatch([employeeId]);
+      balanceData = fetchResult[employeeId];
       if (!balanceData) {
+        toast.error("Failed to load leave balance");
         return; // Don't proceed if balance fetch failed
       }
     }
 
-    const availability = checkLeaveAvailability(employeeId, leaveType);
+    // Check availability using the balance data directly (not stale state)
+    let remaining = 0;
+    let totalAllowed = 0;
+    let taken = 0;
 
-    if (!availability.available) {
-      toast.error(availability.message);
+    switch (leaveType) {
+      case "cuti_tahunan":
+        totalAllowed = balanceData.cuti_tahunan_total || 0;
+        taken = balanceData.cuti_tahunan_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_sakit":
+        totalAllowed = balanceData.cuti_sakit_total || 0;
+        taken = balanceData.cuti_sakit_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_umum":
+        totalAllowed = balanceData.cuti_umum_total || 0;
+        taken = balanceData.cuti_umum_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+    }
+
+    const available = remaining > 0;
+
+    if (!available) {
+      const leaveTypeName =
+        leaveType === "cuti_tahunan"
+          ? "Annual Leave"
+          : leaveType === "cuti_sakit"
+          ? "Sick Leave"
+          : "Public Holiday Leave";
+      toast.error(`${leaveTypeName} balance exhausted (${taken}/${totalAllowed} days used)`);
       return; // Don't allow the change
     }
 
@@ -983,7 +1016,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     // Show remaining balance for the new leave type
     toast.success(
-      `Leave type changed - ${availability.remaining} days remaining`
+      `Leave type changed - ${remaining} days remaining`
     );
   };
 
@@ -3715,7 +3748,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   leaveFrom="opacity-100"
                                   leaveTo="opacity-0"
                                 >
-                                  <ListboxOptions className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                  <ListboxOptions
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
                                     {leaveOptions.map((option) => (
                                       <ListboxOption
                                         key={option.id}

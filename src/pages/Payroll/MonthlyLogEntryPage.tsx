@@ -100,6 +100,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   // Leave state
   const [existingLeaveRecords, setExistingLeaveRecords] = useState<LeaveEntry[]>([]);
   const [newLeaveEntries, setNewLeaveEntries] = useState<LeaveEntry[]>([]);
+  const [deletedLeaveIds, setDeletedLeaveIds] = useState<number[]>([]);
   const [showAddLeaveModal, setShowAddLeaveModal] = useState(false);
   const [leaveFormData, setLeaveFormData] = useState({
     employeeId: "",
@@ -604,6 +605,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     setNewLeaveEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleRemoveExistingLeave = (leaveId: number) => {
+    // Add to deleted list
+    setDeletedLeaveIds((prev) => [...prev, leaveId]);
+    // Remove from existing records display
+    setExistingLeaveRecords((prev) => prev.filter((leave) => leave.id !== leaveId));
+  };
+
   // Activities handlers
   const handleManageActivities = (entry: EmployeeEntry) => {
     setSelectedEmployee(entry);
@@ -670,6 +678,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           isNew: true,
           amount_paid: 0,
         })),
+        deletedLeaveIds: deletedLeaveIds,
       };
 
       console.log("Saving monthly log with payload:", payload);
@@ -1014,16 +1023,20 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {leave.isNew && (
-                        <button
-                          onClick={() => handleRemoveNewLeave(newLeaveEntries.indexOf(leave as any))}
-                          className="text-rose-600 hover:text-rose-800"
-                          title="Remove"
-                          disabled={isSaving}
-                        >
-                          <IconTrash size={16} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          if (leave.isNew) {
+                            handleRemoveNewLeave(newLeaveEntries.indexOf(leave as any));
+                          } else if (leave.id) {
+                            handleRemoveExistingLeave(leave.id);
+                          }
+                        }}
+                        className="text-rose-600 hover:text-rose-800"
+                        title="Remove"
+                        disabled={isSaving}
+                      >
+                        <IconTrash size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}
