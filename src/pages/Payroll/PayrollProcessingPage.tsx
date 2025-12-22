@@ -222,7 +222,13 @@ const PayrollProcessingPage: React.FC = () => {
       // Fetch work logs for this month/year
       const processResponse = await processMonthlyPayroll(Number(id));
 
-      if (processResponse.work_logs.length === 0) {
+      // Combine daily and monthly work logs
+      const allWorkLogs = [
+        ...(processResponse.daily_work_logs || []),
+        ...(processResponse.monthly_work_logs || []),
+      ];
+
+      if (allWorkLogs.length === 0) {
         toast.error("No work logs found for this month");
         setIsProcessing(false);
         setProcessingProgress({ current: 0, total: 0, stage: "" });
@@ -236,7 +242,7 @@ const PayrollProcessingPage: React.FC = () => {
       });
 
       // Start processing for selected employees
-      await processSelectedEmployees(processResponse.work_logs);
+      await processSelectedEmployees(allWorkLogs);
 
       toast.success("Payroll processing completed");
     } catch (error) {

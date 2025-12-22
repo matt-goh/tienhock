@@ -52,9 +52,13 @@ export interface LeaveRecord {
 
 export interface WorkLog {
   id: number;
-  log_date: string;
-  shift: number;
-  day_type: "Biasa" | "Ahad" | "Umum";
+  // Daily work logs use log_date
+  log_date?: string;
+  shift?: number;
+  day_type?: "Biasa" | "Ahad" | "Umum";
+  // Monthly work logs use log_month and log_year
+  log_month?: number;
+  log_year?: number;
   section: string;
   employee_entries: WorkLogEntry[];
 }
@@ -77,9 +81,18 @@ export class PayrollCalculationService {
     year: number
   ): PayrollItem[] {
     // Filter logs for the specified month and year
+    // Handle both daily logs (with log_date) and monthly logs (with log_month/log_year)
     const targetLogs = workLogs.filter((log) => {
-      const logDate = new Date(log.log_date);
-      return logDate.getMonth() + 1 === month && logDate.getFullYear() === year;
+      // Monthly work logs have log_month and log_year directly
+      if (log.log_month !== undefined && log.log_year !== undefined) {
+        return log.log_month === month && log.log_year === year;
+      }
+      // Daily work logs have log_date
+      if (log.log_date) {
+        const logDate = new Date(log.log_date);
+        return logDate.getMonth() + 1 === month && logDate.getFullYear() === year;
+      }
+      return false;
     });
 
     // Group by pay code and aggregate quantities and amounts

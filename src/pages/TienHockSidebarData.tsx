@@ -33,6 +33,7 @@ import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import MonthlyLogListPage from "./Payroll/MonthlyLogListPage";
 import MonthlyLogEntryPage from "./Payroll/MonthlyLogEntryPage";
 import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
+import MonthlyLogEditPage from "./Payroll/MonthlyLogEditPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
@@ -136,11 +137,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
             name: "Edit Log",
             path: `/payroll/${jobTypeLower}-monthly/:id/edit`,
             component: (props: any) => (
-              <MonthlyLogEntryPage
-                mode="edit"
-                jobType={jobConfig.id}
-                {...props}
-              />
+              <MonthlyLogEditPage jobType={jobConfig.id} {...props} />
             ),
           },
         ],
