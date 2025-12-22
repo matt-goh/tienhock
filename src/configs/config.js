@@ -1,12 +1,24 @@
 // src/config.js
+
+// Check if we're in browser (Vite) or Node.js (server)
+const isBrowser = typeof window !== 'undefined';
+
 const getEnvVariable = (key, defaultValue) => {
-  // Try REACT_APP_ prefix first, then fallback to regular env var, then default
-  return process.env[`REACT_APP_${key}`] || process.env[key] || defaultValue;
+  if (isBrowser) {
+    // Vite environment variables
+    const viteEnv = import.meta.env || {};
+    return viteEnv[`VITE_${key}`] || defaultValue;
+  } else {
+    // Node.js environment variables
+    return process.env[key] || defaultValue;
+  }
 };
 
 // Define defaults based on environment
 const getDefaultApiBaseUrl = () => {
-  const env = process.env.NODE_ENV || "development";
+  const env = isBrowser
+    ? (import.meta.env?.MODE || "development")
+    : (process.env.NODE_ENV || "development");
   return env === "development"
     ? "http://localhost:5000"
     : "https://api.tienhock.com";
@@ -67,7 +79,11 @@ export const {
 };
 
 // Debug logging in development
-if (process.env.NODE_ENV === "development") {
+const isDevelopment = isBrowser
+  ? (import.meta.env?.MODE === "development")
+  : (process.env.NODE_ENV === "development");
+
+if (isDevelopment) {
   console.log("Config loaded:", {
     API_BASE_URL,
     NODE_ENV,
