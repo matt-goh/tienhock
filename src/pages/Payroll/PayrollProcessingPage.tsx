@@ -313,6 +313,22 @@ const PayrollProcessingPage: React.FC = () => {
     const INCOME_TAX_THRESHOLD = 3000;
     const employeesMissingTaxRates: MissingIncomeTaxEmployee[] = [];
 
+    // Fetch existing manual items that will be preserved during reprocessing
+    // This is needed to accurately check for missing income tax rates
+    let existingManualItemsMap: Map<string, number> = new Map();
+    try {
+      const manualItemsRes = await api.get(`/api/employee-payrolls/monthly/${payroll.id}/manual-items`);
+      // api.get returns data directly, not wrapped in {data: ...}
+      if (manualItemsRes?.manual_items) {
+        Object.entries(manualItemsRes.manual_items).forEach(([employeeId, total]) => {
+          existingManualItemsMap.set(employeeId, total as number);
+        });
+      }
+    } catch (error: any) {
+      // First time processing - no existing records
+      console.log("No existing manual items found");
+    }
+
     try {
       // Calculate payrolls for all grouped employees
       const employeePayrolls: EmployeePayroll[] = [];
@@ -374,15 +390,19 @@ const PayrollProcessingPage: React.FC = () => {
             0
           );
 
+          // Include existing manual items that will be preserved during reprocessing
+          const existingManualItemsTotal = existingManualItemsMap.get(primaryEmployee.employeeId) || 0;
+          const totalGrossPayWithManual = combinedGrossPay + existingManualItemsTotal;
+
           // Check if employee is subject to income tax but missing rate
-          if (combinedGrossPay > INCOME_TAX_THRESHOLD) {
-            const incomeTaxRate = findIncomeTaxRate(incomeTaxRates, combinedGrossPay);
+          if (totalGrossPayWithManual > INCOME_TAX_THRESHOLD) {
+            const incomeTaxRate = findIncomeTaxRate(incomeTaxRates, totalGrossPayWithManual);
             if (!incomeTaxRate) {
               // Employee is subject to income tax but no rate recorded
               employeesMissingTaxRates.push({
                 employeeId: primaryEmployee.employeeId,
                 employeeName: employeeName,
-                grossPay: Number(combinedGrossPay.toFixed(2)),
+                grossPay: Number(totalGrossPayWithManual.toFixed(2)),
               });
             }
           }
