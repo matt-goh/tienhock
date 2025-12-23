@@ -11,9 +11,27 @@ import {
 import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { sessionService } from "../../services/SessionService";
-// @ts-expect-error - config.js doesn't have type declarations
-import { API_BASE_URL } from "../../configs/config";
+
+// File System Access API types
+interface FileSystemWritableFileStream extends WritableStream {
+  write(data: string | BufferSource | Blob): Promise<void>;
+  close(): Promise<void>;
+}
+
+interface FileSystemFileHandle {
+  createWritable(): Promise<FileSystemWritableFileStream>;
+}
+
+interface FileSystemDirectoryHandle {
+  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>;
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
+}
+
+declare global {
+  interface Window {
+    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+  }
+}
 
 interface EPFPreviewData {
   count: number;
@@ -150,34 +168,28 @@ const ECarumanPage: React.FC = () => {
     name: String(currentDate.getFullYear() - i),
   }));
 
-  // Helper function to download a single file (uses fetch directly for blob response)
-  const downloadFile = async (endpoint: string, filename: string): Promise<boolean> => {
-    const sessionId = sessionService.getSessionId();
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        "x-session-id": sessionId,
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        // No data found is not an error, just skip
-        return false;
-      }
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to generate file");
+  // Helper function to create nested directories
+  const createNestedDirectory = async (
+    baseDir: FileSystemDirectoryHandle,
+    pathParts: string[]
+  ): Promise<FileSystemDirectoryHandle> => {
+    let currentDir = baseDir;
+    for (const part of pathParts) {
+      currentDir = await currentDir.getDirectoryHandle(part, { create: true });
     }
+    return currentDir;
+  };
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    return true;
+  // Helper function to write file to directory
+  const writeFileToDirectory = async (
+    dir: FileSystemDirectoryHandle,
+    filename: string,
+    content: string
+  ): Promise<void> => {
+    const fileHandle = await dir.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
   };
 
   const handleDownload = async (type: "epf" | "socso" | "sip" | "income_tax") => {
@@ -188,36 +200,46 @@ const ECarumanPage: React.FC = () => {
     try {
       switch (type) {
         case "epf": {
-          // Download both local and foreign EPF files
-          const localEndpoint = `/api/e-caruman/epf?month=${selectedMonth}&year=${selectedYear}&type=local`;
-          const foreignEndpoint = `/api/e-caruman/epf?month=${selectedMonth}&year=${selectedYear}&type=foreign`;
-
-          let downloadedCount = 0;
-
-          // Download local (WARGANEGARA)
-          try {
-            const localDownloaded = await downloadFile(localEndpoint, "EPFORMA2.csv");
-            if (localDownloaded) downloadedCount++;
-          } catch (err) {
-            console.error("Error downloading local EPF:", err);
+          // Check if File System Access API is supported
+          if (!window.showDirectoryPicker) {
+            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
+            break;
           }
 
-          // Small delay between downloads to prevent browser blocking
-          await new Promise((resolve) => setTimeout(resolve, 500));
+          // Get export data from backend
+          const exportData = await api.get(
+            `/api/e-caruman/epf/export?month=${selectedMonth}&year=${selectedYear}&company=TH`
+          );
 
-          // Download foreign (WARGA ASING)
-          try {
-            const foreignDownloaded = await downloadFile(foreignEndpoint, "EPFORMA2.csv");
-            if (foreignDownloaded) downloadedCount++;
-          } catch (err) {
-            console.error("Error downloading foreign EPF:", err);
-          }
-
-          if (downloadedCount === 0) {
+          if (!exportData.files || exportData.files.length === 0) {
             toast.error("No EPF contribution data found for the specified period");
-          } else {
-            toast.success(`EPF files downloaded successfully (${downloadedCount} file${downloadedCount > 1 ? "s" : ""})`);
+            break;
           }
+
+          // Prompt user to select download folder
+          let baseDir: FileSystemDirectoryHandle;
+          try {
+            baseDir = await window.showDirectoryPicker();
+          } catch (err) {
+            // User cancelled the picker
+            if ((err as Error).name === "AbortError") {
+              break;
+            }
+            throw err;
+          }
+
+          // Create folder structure and write files
+          let createdCount = 0;
+          for (const file of exportData.files) {
+            const pathParts = file.path.split("/");
+            const targetDir = await createNestedDirectory(baseDir, pathParts);
+            await writeFileToDirectory(targetDir, file.filename, file.content);
+            createdCount++;
+          }
+
+          toast.success(
+            `EPF files created successfully (${createdCount} file${createdCount > 1 ? "s" : ""}) in EPF/${exportData.year}/TH/${exportData.month}/`
+          );
           break;
         }
         case "socso":
