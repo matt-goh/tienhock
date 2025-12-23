@@ -44,6 +44,7 @@ import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 import IncentivesPage from "./Payroll/IncentivesPage";
 import PinjamListPage from "./Payroll/PinjamListPage";
 import SalaryReportPage from "./Payroll/SalaryReportPage";
+import ECarumanPage from "./Payroll/ECarumanPage";
 
 // Catalogue related imports
 // Staff
@@ -102,6 +103,12 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Salary Report",
     path: "/payroll/salary-report",
     component: SalaryReportPage,
+  });
+
+  payrollSubItems.push({
+    name: "e-Caruman",
+    path: "/payroll/e-caruman",
+    component: ECarumanPage,
   });
 
   // Add each production type dynamically
