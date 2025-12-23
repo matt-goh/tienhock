@@ -71,6 +71,8 @@ interface AccountCodeCellProps {
   disabled?: boolean;
 }
 
+const ACCOUNT_LOAD_INCREMENT = 50;
+
 const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
   value,
   options,
@@ -79,6 +81,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
 }: AccountCodeCellProps) => {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(50);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -92,8 +95,21 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
     );
   }, [query, options]);
 
+  // Paginated options for display
+  const displayedOptions = useMemo(() => {
+    return filteredOptions.slice(0, loadedCount);
+  }, [filteredOptions, loadedCount]);
+
+  const hasMoreOptions = displayedOptions.length < filteredOptions.length;
+  const remainingCount = filteredOptions.length - displayedOptions.length;
+
   const selectedOption = options.find((opt: SelectOption) => opt.id === value);
   const displayValue = selectedOption?.name || "";
+
+  // Reset loaded count when query changes
+  useEffect(() => {
+    setLoadedCount(50);
+  }, [query]);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -139,6 +155,10 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
     }
   };
 
+  const handleLoadMore = () => {
+    setLoadedCount((prev) => prev + ACCOUNT_LOAD_INCREMENT);
+  };
+
   return (
     <div className="relative">
       <div className="flex">
@@ -167,12 +187,12 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
           ref={dropdownRef}
           className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white border border-default-200 rounded-lg shadow-lg"
         >
-          {filteredOptions.length === 0 ? (
+          {displayedOptions.length === 0 ? (
             <div className="px-3 py-2 text-sm text-default-500">
               No accounts found
             </div>
           ) : (
-            filteredOptions.map((opt: SelectOption) => (
+            displayedOptions.map((opt: SelectOption) => (
               <div
                 key={opt.id}
                 onClick={() => handleSelect(opt.id.toString())}
@@ -186,6 +206,26 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
                 )}
               </div>
             ))
+          )}
+
+          {/* Load More Button - at the bottom of options list */}
+          {hasMoreOptions && (
+            <div className="border-t border-gray-200 p-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleLoadMore();
+                }}
+                className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 flex items-center justify-center"
+              >
+                <IconChevronDown size={16} className="mr-1.5" />
+                <span>
+                  Load More Accounts ({remainingCount} remaining)
+                </span>
+              </button>
+            </div>
           )}
         </div>
       )}
