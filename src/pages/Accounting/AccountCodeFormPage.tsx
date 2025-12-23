@@ -1,9 +1,14 @@
 // src/pages/Accounting/AccountCodeFormPage.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { AccountCode, LedgerType } from "../../types/types";
+import { AccountCode } from "../../types/types";
+import {
+  useAccountCodesCache,
+  useLedgerTypesCache,
+  refreshAccountCodesCache,
+} from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import {
@@ -30,6 +35,20 @@ const AccountCodeFormPage: React.FC = () => {
   const { code } = useParams<{ code: string }>();
   const isEditMode = !!code;
 
+  // Cached reference data
+  const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
+  const { accountCodes: allAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+
+  // Filter to only active items for selection
+  const ledgerTypes = useMemo(
+    () => allLedgerTypes.filter((lt) => lt.is_active),
+    [allLedgerTypes]
+  );
+  const parentAccounts = useMemo(
+    () => allAccountCodes.filter((a) => a.is_active),
+    [allAccountCodes]
+  );
+
   // Form state
   const [formData, setFormData] = useState<AccountCodeFormData>({
     code: "",
@@ -41,9 +60,7 @@ const AccountCodeFormPage: React.FC = () => {
     notes: "",
   });
 
-  // Reference data
-  const [ledgerTypes, setLedgerTypes] = useState<LedgerType[]>([]);
-  const [parentAccounts, setParentAccounts] = useState<AccountCode[]>([]);
+  // Additional state for edit mode
   const [childrenCount, setChildrenCount] = useState(0);
   const [isSystem, setIsSystem] = useState(false);
 
@@ -51,28 +68,15 @@ const AccountCodeFormPage: React.FC = () => {
   const initialFormDataRef = useRef<AccountCodeFormData | null>(null);
 
   // UI state
-  const [loading, setLoading] = useState(true);
+  const [pageLoading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch reference data
-  const fetchReferenceData = useCallback(async () => {
-    try {
-      const [ledgerTypesRes, accountsRes] = await Promise.all([
-        api.get("/api/ledger-types?is_active=true"),
-        api.get("/api/account-codes?flat=true&is_active=true"),
-      ]);
-
-      setLedgerTypes(ledgerTypesRes as LedgerType[]);
-      setParentAccounts(accountsRes as AccountCode[]);
-    } catch (err: any) {
-      console.error("Error fetching reference data:", err);
-      toast.error("Failed to load reference data");
-    }
-  }, []);
+  // Combined loading state (page + cache)
+  const loading = pageLoading || ledgerTypesLoading || accountCodesLoading;
 
   // Fetch account data for editing
   const fetchAccountData = useCallback(async () => {
@@ -112,9 +116,6 @@ const AccountCodeFormPage: React.FC = () => {
   // Initial data loading
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
-      await fetchReferenceData();
-
       if (isEditMode) {
         await fetchAccountData();
       } else {
@@ -125,7 +126,8 @@ const AccountCodeFormPage: React.FC = () => {
     };
 
     loadData();
-  }, [isEditMode, fetchReferenceData, fetchAccountData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, fetchAccountData]);
 
   // Form change detection
   useEffect(() => {
@@ -233,12 +235,13 @@ const AccountCodeFormPage: React.FC = () => {
         toast.success("Account code created successfully");
       }
 
+      // Refresh cache to reflect changes
+      refreshAccountCodesCache();
       navigate("/accounting/account-codes");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error saving account code:", err);
-      toast.error(
-        err?.message || `Failed to ${isEditMode ? "update" : "create"} account code`
-      );
+      const errorMessage = err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} account code`;
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -267,10 +270,13 @@ const AccountCodeFormPage: React.FC = () => {
       await api.delete(`/api/account-codes/${code}`);
       toast.success("Account code deleted successfully");
       setShowDeleteDialog(false);
+      // Refresh cache to reflect deletion
+      refreshAccountCodesCache();
       navigate("/accounting/account-codes");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error deleting account:", err);
-      toast.error(err?.message || "Failed to delete account code");
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete account code";
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }

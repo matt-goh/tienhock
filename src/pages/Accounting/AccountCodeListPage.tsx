@@ -1,5 +1,5 @@
 // src/pages/Accounting/AccountCodeListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   IconSearch,
   IconPlus,
@@ -21,7 +21,11 @@ import {
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../routes/utils/api";
-import { AccountCode, LedgerType } from "../../types/types";
+import { AccountCode } from "../../types/types";
+import {
+  useAccountCodesCache,
+  useLedgerTypesCache,
+} from "../../utils/accounting/useAccountingCache";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -35,11 +39,18 @@ interface AccountTreeNode extends AccountCode {
 const AccountCodeListPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // State
-  const [accountCodes, setAccountCodes] = useState<AccountTreeNode[]>([]);
-  const [flatAccounts, setFlatAccounts] = useState<AccountCode[]>([]);
-  const [ledgerTypes, setLedgerTypes] = useState<LedgerType[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Cached data
+  const {
+    accountCodes: flatAccounts,
+    isLoading: accountCodesLoading,
+    refreshAccountCodes,
+  } = useAccountCodesCache();
+  const { ledgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
+
+  // Derived loading state
+  const loading = accountCodesLoading || ledgerTypesLoading;
+
+  // Local state
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   // Filters
@@ -54,48 +65,18 @@ const AccountCodeListPage: React.FC = () => {
     null
   );
 
-  // Fetch data
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [accountsRes, ledgerTypesRes] = await Promise.all([
-        api.get("/api/account-codes?flat=true"),
-        api.get("/api/ledger-types"),
-      ]);
-
-      setFlatAccounts(accountsRes as AccountCode[]);
-      setLedgerTypes(ledgerTypesRes as LedgerType[]);
-
-      // Build tree
-      const tree = buildTree(accountsRes as AccountCode[]);
-      setAccountCodes(tree);
-
-      // Start with all nodes collapsed
-      setExpandedNodes(new Set());
-    } catch (error: any) {
-      console.error("Error fetching data:", error);
-      toast.error("Failed to load account codes");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Build tree structure from flat list
-  const buildTree = (accounts: AccountCode[]): AccountTreeNode[] => {
+  // Build tree structure from flat list (memoized)
+  const accountCodes = useMemo(() => {
     const map = new Map<string, AccountTreeNode>();
     const roots: AccountTreeNode[] = [];
 
     // First pass: create nodes
-    accounts.forEach((account) => {
+    flatAccounts.forEach((account) => {
       map.set(account.code, { ...account, children: [] });
     });
 
     // Second pass: build relationships
-    accounts.forEach((account) => {
+    flatAccounts.forEach((account) => {
       const node = map.get(account.code)!;
       if (account.parent_code && map.has(account.parent_code)) {
         map.get(account.parent_code)!.children.push(node);
@@ -118,7 +99,7 @@ const AccountCodeListPage: React.FC = () => {
     };
 
     return sortNodes(roots);
-  };
+  }, [flatAccounts]);
 
   // Filter accounts
   const filteredAccounts = useMemo(() => {
@@ -233,10 +214,12 @@ const AccountCodeListPage: React.FC = () => {
       toast.success("Account code deleted successfully");
       setShowDeleteDialog(false);
       setAccountToDelete(null);
-      fetchData();
-    } catch (error: any) {
+      // Refresh the cache to reflect the deletion
+      refreshAccountCodes();
+    } catch (error: unknown) {
       console.error("Error deleting account:", error);
-      toast.error(error.message || "Failed to delete account code");
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete account code";
+      toast.error(errorMessage);
     }
   };
 
