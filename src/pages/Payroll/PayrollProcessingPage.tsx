@@ -12,33 +12,32 @@ import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import {
   getMonthlyPayrollDetails,
-  processMonthlyPayroll,
-  saveEmployeePayrollsBatch,
   getEligibleEmployees,
   getMonthName,
 } from "../../utils/payroll/payrollUtils";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import {
-  PayrollCalculationService,
-  WorkLog,
-} from "../../utils/payroll/payrollCalculationService";
 import toast from "react-hot-toast";
 import EmployeeSelectionTooltip from "../../components/Payroll/EmployeeSelectionTooltip";
 import { Link } from "react-router-dom";
-import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
+import { MonthlyPayroll } from "../../types/types";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-import { useContributionRatesCache } from "../../utils/payroll/useContributionRatesCache";
 import { api } from "../../routes/utils/api";
 import MissingIncomeTaxRatesDialog, {
   MissingIncomeTaxEmployee,
 } from "../../components/Payroll/MissingIncomeTaxRatesDialog";
-import { findIncomeTaxRate } from "../../utils/payroll/contributionCalculations";
 
 interface EligibleEmployeesResponse {
   month: number;
   year: number;
   eligibleJobs: string[];
   jobEmployeeMap: Record<string, string[]>;
+}
+
+interface ProcessingResult {
+  success: boolean;
+  processed_count: number;
+  missing_income_tax_employees: MissingIncomeTaxEmployee[];
+  errors: Array<{ employeeId: string; error: string }>;
 }
 
 const PayrollProcessingPage: React.FC = () => {
@@ -53,12 +52,11 @@ const PayrollProcessingPage: React.FC = () => {
   const [selectedEmployees, setSelectedEmployees] = useState<
     Record<string, Record<string, boolean>>
   >({});
-  const [processedPayrolls, setProcessedPayrolls] = useState<EmployeePayroll[]>(
-    []
-  );
-  const [processingStatus, setProcessingStatus] = useState<
-    Record<string, "pending" | "processing" | "success" | "error">
-  >({});
+  const [processedCount, setProcessedCount] = useState<number>(0);
+  const [processingStatus, setProcessingStatus] = useState<{
+    successful: number;
+    errors: number;
+  }>({ successful: 0, errors: 0 });
   const [processingProgress, setProcessingProgress] = useState<{
     current: number;
     total: number;
@@ -70,10 +68,8 @@ const PayrollProcessingPage: React.FC = () => {
   >([]);
   const [showMissingTaxDialog, setShowMissingTaxDialog] = useState(false);
 
-  const { jobs, loading: loadingJobs } = useJobsCache();
+  const { loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
-  const { epfRates, socsoRates, sipRates, incomeTaxRates } =
-    useContributionRatesCache();
 
   // Memoized lookup maps for performance
   const staffsMap = useMemo(() => {
@@ -86,7 +82,7 @@ const PayrollProcessingPage: React.FC = () => {
     const map = new Map();
     staffs.forEach((staff) => {
       if (Array.isArray(staff.job) && Array.isArray(staff.jobType)) {
-        const jobTypeArray = staff.jobType; // Ensures TS knows it's an array
+        const jobTypeArray = staff.jobType;
         staff.job.forEach((jobId, index) => {
           if (!map.has(jobId) && jobTypeArray[index]) {
             map.set(jobId, jobTypeArray[index]);
@@ -96,13 +92,6 @@ const PayrollProcessingPage: React.FC = () => {
     });
     return map;
   }, [staffs]);
-
-  // Memoized jobs map for O(1) lookups during processing
-  const jobsMap = useMemo(() => {
-    const map = new Map();
-    jobs.forEach((job) => map.set(job.id, job));
-    return map;
-  }, [jobs]);
 
   useEffect(() => {
     Promise.all([fetchPayrollDetails(), fetchEligibleEmployees()])
@@ -180,7 +169,7 @@ const PayrollProcessingPage: React.FC = () => {
   // Get job name by ID
   const getJobName = useCallback(
     (jobId: string) => {
-      return jobNameMap.get(jobId) || jobId; // Fallback to ID if name not found
+      return jobNameMap.get(jobId) || jobId;
     },
     [jobNameMap]
   );
@@ -208,11 +197,6 @@ const PayrollProcessingPage: React.FC = () => {
       return;
     }
 
-    if (!epfRates.length || !socsoRates.length || !incomeTaxRates.length) {
-      toast.error("Contribution rates not loaded. Please refresh the page.");
-      return;
-    }
-
     if (loadingStaffs || loadingJobs) {
       toast.error("Still loading employee data. Please wait.");
       return;
@@ -223,373 +207,54 @@ const PayrollProcessingPage: React.FC = () => {
     setProcessingProgress({
       current: 0,
       total: 100,
-      stage: "Validating data and fetching work logs...",
+      stage: "Preparing payroll processing...",
     });
 
     try {
-      // Fetch work logs for this month/year
-      const processResponse = await processMonthlyPayroll(Number(id));
+      // Gather all selected employee-job combinations
+      const selectedCombinations: Array<{ employeeId: string; jobType: string }> = [];
 
-      // Combine daily and monthly work logs
-      const allWorkLogs = [
-        ...(processResponse.daily_work_logs || []),
-        ...(processResponse.monthly_work_logs || []),
-      ];
-
-      if (allWorkLogs.length === 0) {
-        toast.error("No work logs found for this month");
-        setIsProcessing(false);
-        setProcessingProgress({ current: 0, total: 0, stage: "" });
-        return;
-      }
+      Object.entries(selectedEmployees).forEach(([jobId, employees]) => {
+        Object.entries(employees).forEach(([empId, isSelected]) => {
+          if (isSelected) {
+            selectedCombinations.push({
+              employeeId: empId,
+              jobType: jobId,
+            });
+          }
+        });
+      });
 
       setProcessingProgress({
         current: 20,
         total: 100,
-        stage: "Processing employee payrolls...",
+        stage: `Processing ${selectedCombinations.length} employee-job combinations...`,
       });
 
-      // Start processing for selected employees
-      await processSelectedEmployees(allWorkLogs);
-
-      toast.success("Payroll processing completed");
-    } catch (error) {
-      console.error("Error processing payroll:", error);
-      toast.error("Failed to process payroll");
-    } finally {
-      setIsProcessing(false);
-      setProcessingProgress({ current: 0, total: 0, stage: "" });
-    }
-  };
-
-  const processSelectedEmployees = async (logs: WorkLog[]) => {
-    if (!payroll || !eligibleData) return;
-
-    // Gather all selected employee-job combinations
-    const selectedCombinations: Array<{ employeeId: string; jobType: string }> =
-      [];
-
-    Object.entries(selectedEmployees).forEach(([jobId, employees]) => {
-      Object.entries(employees).forEach(([empId, isSelected]) => {
-        if (isSelected) {
-          selectedCombinations.push({
-            employeeId: empId,
-            jobType: jobId,
-          });
-        }
-      });
-    });
-
-    // Group employees by name to combine payrolls for same-named employees
-    const employeesByName = new Map<
-      string,
-      Array<{ employeeId: string; jobType: string }>
-    >();
-
-    selectedCombinations.forEach(({ employeeId, jobType }) => {
-      const employee = staffsMap.get(employeeId);
-      if (employee) {
-        const employeeName = employee.name;
-        if (!employeesByName.has(employeeName)) {
-          employeesByName.set(employeeName, []);
-        }
-        employeesByName.get(employeeName)!.push({ employeeId, jobType });
-      }
-    });
-
-    // Set initial processing status (batched update)
-    const initialStatus: Record<
-      string,
-      "pending" | "processing" | "success" | "error"
-    > = {};
-
-    selectedCombinations.forEach(({ employeeId, jobType }) => {
-      initialStatus[`${employeeId}-${jobType}`] = "processing";
-    });
-
-    setProcessingStatus(initialStatus);
-
-    // Threshold for income tax (RM 3000)
-    const INCOME_TAX_THRESHOLD = 3000;
-    const employeesMissingTaxRates: MissingIncomeTaxEmployee[] = [];
-
-    // Fetch existing manual items that will be preserved during reprocessing
-    // This is needed to accurately check for missing income tax rates
-    let existingManualItemsMap: Map<string, number> = new Map();
-    try {
-      const manualItemsRes = await api.get(`/api/employee-payrolls/monthly/${payroll.id}/manual-items`);
-      // api.get returns data directly, not wrapped in {data: ...}
-      if (manualItemsRes?.manual_items) {
-        Object.entries(manualItemsRes.manual_items).forEach(([employeeId, total]) => {
-          existingManualItemsMap.set(employeeId, total as number);
-        });
-      }
-    } catch (error: any) {
-      // First time processing - no existing records
-      console.log("No existing manual items found");
-    }
-
-    try {
-      // Calculate payrolls for all grouped employees
-      const employeePayrolls: EmployeePayroll[] = [];
-      const calculationErrors: Record<string, "error"> = {};
+      // Call the unified backend endpoint
+      const response: ProcessingResult = await api.post(
+        `/api/monthly-payrolls/${id}/process-all`,
+        { selected_employees: selectedCombinations }
+      );
 
       setProcessingProgress({
-        current: 30,
+        current: 90,
         total: 100,
-        stage: `Calculating payrolls for ${employeesByName.size} grouped employees (${selectedCombinations.length} total jobs)...`,
+        stage: "Finalizing...",
       });
 
-      // Process each group of employees with the same name
-      employeesByName.forEach((employeeJobCombos, employeeName) => {
-        try {
-          // Use the first employee's data as the primary record
-          const primaryEmployee = employeeJobCombos[0];
-          const primaryEmployeeData = staffsMap.get(primaryEmployee.employeeId);
-
-          if (!primaryEmployeeData) {
-            console.error(
-              `Primary employee data not found for ${primaryEmployee.employeeId}`
-            );
-            return;
-          }
-
-          // Combine all work logs from all employee IDs with the same name
-          const allPayrollItemArrays: any[][] = [];
-          let combinedSection = "";
-
-          employeeJobCombos.forEach(({ employeeId, jobType }) => {
-            // Get section from job data (O(1) lookup instead of O(n) find)
-            const job = jobsMap.get(jobType);
-            const section = job?.section?.[0] || "Unknown";
-            if (!combinedSection) combinedSection = section;
-
-            // Calculate individual employee payroll for this job
-            const individualPayroll =
-              PayrollCalculationService.processEmployeePayroll(
-                logs,
-                employeeId,
-                jobType,
-                section,
-                payroll.month,
-                payroll.year
-              );
-
-            // Add this job's payroll items to the array for merging
-            allPayrollItemArrays.push(individualPayroll.items);
-          });
-
-          // Merge all payroll items, combining duplicates
-          const combinedPayrollItems =
-            PayrollCalculationService.mergePayrollItems(allPayrollItemArrays);
-
-          // Now calculate combined payroll with deductions using the primary employee's data
-          // but with the combined gross pay from all jobs
-          const combinedGrossPay = combinedPayrollItems.reduce(
-            (sum, item) => sum + item.amount,
-            0
-          );
-
-          // Include existing manual items that will be preserved during reprocessing
-          const existingManualItemsTotal = existingManualItemsMap.get(primaryEmployee.employeeId) || 0;
-          const totalGrossPayWithManual = combinedGrossPay + existingManualItemsTotal;
-
-          // Check if employee is subject to income tax but missing rate
-          if (totalGrossPayWithManual > INCOME_TAX_THRESHOLD) {
-            const incomeTaxRate = findIncomeTaxRate(incomeTaxRates, totalGrossPayWithManual);
-            if (!incomeTaxRate) {
-              // Employee is subject to income tax but no rate recorded
-              employeesMissingTaxRates.push({
-                employeeId: primaryEmployee.employeeId,
-                employeeName: employeeName,
-                grossPay: Number(totalGrossPayWithManual.toFixed(2)),
-              });
-            }
-          }
-
-          // Calculate deductions for the combined gross pay
-          const deductions = PayrollCalculationService.calculateContributions(
-            combinedPayrollItems,
-            primaryEmployee.employeeId,
-            staffs,
-            epfRates,
-            socsoRates,
-            sipRates,
-            incomeTaxRates
-          );
-
-          // Calculate total employee deductions
-          const totalEmployeeDeductions = deductions.reduce(
-            (sum, deduction) => sum + deduction.employee_amount,
-            0
-          );
-
-          // Create the grouped payroll record
-          const groupedPayroll: EmployeePayroll & { 
-            deductions: any[];
-            grouped_employee_ids?: string[];
-          } = {
-            employee_id: primaryEmployee.employeeId, // Use primary employee ID
-            employee_name: employeeName, // Use the grouped name
-            job_type: employeeJobCombos
-              .map((combo) => combo.jobType)
-              .join(", "), // Show all job types
-            section: combinedSection,
-            gross_pay: Number(combinedGrossPay.toFixed(2)),
-            net_pay: Number(
-              (combinedGrossPay - totalEmployeeDeductions).toFixed(2)
-            ),
-            items: combinedPayrollItems,
-            deductions,
-            // Store all employee IDs in this group for commission retrieval
-            grouped_employee_ids: employeeJobCombos.map(combo => combo.employeeId),
-          };
-
-          employeePayrolls.push(groupedPayroll);
-        } catch (error) {
-          console.error(
-            `Error calculating grouped payroll for ${employeeName}:`,
-            error
-          );
-          // Mark all jobs for this employee group as error
-          employeeJobCombos.forEach(({ employeeId, jobType }) => {
-            const key = `${employeeId}-${jobType}`;
-            calculationErrors[key] = "error";
-          });
-        }
+      // Update state with results
+      setProcessedCount(response.processed_count);
+      setProcessingStatus({
+        successful: response.processed_count - response.errors.length,
+        errors: response.errors.length,
       });
 
-      // Batch update calculation errors
-      if (Object.keys(calculationErrors).length > 0) {
-        setProcessingStatus((prev) => ({ ...prev, ...calculationErrors }));
+      // Handle missing income tax rates
+      if (response.missing_income_tax_employees && response.missing_income_tax_employees.length > 0) {
+        setMissingIncomeTaxEmployees(response.missing_income_tax_employees);
+        setShowMissingTaxDialog(true);
       }
-
-      // First, clear any existing payroll records for this monthly payroll to avoid duplicates
-      setProcessingProgress({
-        current: 60,
-        total: 100,
-        stage: "Clearing existing payroll records...",
-      });
-
-      try {
-        await api.delete(`/api/employee-payrolls/monthly/${payroll.id}`);
-      } catch (error) {
-        console.warn("Could not clear existing payroll records (might be first time processing):", error);
-        // Continue processing even if clear fails - might be first time processing
-      }
-
-      // Process payrolls in chunks to avoid large database operations
-      const CHUNK_SIZE = 50; // Process 50 employees at a time
-      const chunks = [];
-      for (let i = 0; i < employeePayrolls.length; i += CHUNK_SIZE) {
-        chunks.push(employeePayrolls.slice(i, i + CHUNK_SIZE));
-      }
-
-      let allResults: any[] = [];
-      let allErrors: any[] = [];
-      let processedCount = 0;
-
-      // Process each chunk
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        const chunk = chunks[chunkIndex];
-        const baseProgress = 70 + (chunkIndex / chunks.length) * 25; // 70% to 95%
-
-        // Show progress at start of chunk
-        setProcessingProgress({
-          current: Math.round(baseProgress),
-          total: 100,
-          stage: `Saving batch ${chunkIndex + 1}/${chunks.length} (${
-            processedCount + chunk.length
-          }/${employeePayrolls.length} employees)...`,
-        });
-
-        try {
-          // Show mid-chunk progress during database operation
-          const midProgress = baseProgress + (25 / chunks.length) * 0.5;
-          setProcessingProgress({
-            current: Math.round(midProgress),
-            total: 100,
-            stage: `Processing batch ${chunkIndex + 1}/${
-              chunks.length
-            } - saving to database...`,
-          });
-
-          const chunkResponse = await saveEmployeePayrollsBatch(
-            payroll.id,
-            chunk
-          );
-
-          // Show completion progress for this chunk
-          const completeProgress = 70 + ((chunkIndex + 1) / chunks.length) * 25;
-          setProcessingProgress({
-            current: Math.round(completeProgress),
-            total: 100,
-            stage: `Batch ${chunkIndex + 1}/${chunks.length} completed - ${
-              processedCount + chunk.length
-            }/${employeePayrolls.length} employees processed`,
-          });
-
-          // Collect results from this chunk
-          if (chunkResponse.results) {
-            allResults.push(...chunkResponse.results);
-          }
-          if (chunkResponse.errors) {
-            allErrors.push(...chunkResponse.errors);
-          }
-
-          processedCount += chunk.length;
-
-          // Small delay to prevent overwhelming the database
-          if (chunkIndex < chunks.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        } catch (error) {
-          console.error(`Error processing chunk ${chunkIndex + 1}:`, error);
-          // Mark all employees in this chunk as errors
-          chunk.forEach((payroll) => {
-            allErrors.push({
-              employee_id: payroll.employee_id,
-              job_type: payroll.job_type,
-              error: (error as Error).message || "Failed to save",
-            });
-          });
-        }
-      }
-
-      // Combine all chunk responses into a single response format
-      const batchResponse = {
-        results: allResults,
-        errors: allErrors,
-        summary: {
-          total: employeePayrolls.length,
-          successful: allResults.length,
-          errors: allErrors.length,
-        },
-      };
-
-      // Update processing status based on batch response (batched update)
-      const statusUpdates: Record<string, "success" | "error"> = {};
-
-      if (batchResponse.results) {
-        batchResponse.results.forEach((result: any) => {
-          const key = `${result.employee_id}-${result.job_type}`;
-          statusUpdates[key] = "success";
-        });
-      }
-
-      if (batchResponse.errors) {
-        batchResponse.errors.forEach((error: any) => {
-          const key = `${error.employee_id}-${error.job_type}`;
-          statusUpdates[key] = "error";
-        });
-      }
-
-      // Single batched status update
-      if (Object.keys(statusUpdates).length > 0) {
-        setProcessingStatus((prev) => ({ ...prev, ...statusUpdates }));
-      }
-
-      setProcessedPayrolls(employeePayrolls);
 
       setProcessingProgress({
         current: 100,
@@ -597,39 +262,25 @@ const PayrollProcessingPage: React.FC = () => {
         stage: "Processing completed!",
       });
 
-      // Show batch processing summary
-      const {
-        successful = 0,
-        errors: errorCount = 0,
-        total = 0,
-      } = batchResponse.summary || {};
-      if (errorCount > 0) {
+      // Show summary toast
+      if (response.errors.length > 0) {
         toast.error(
-          `Processing completed with ${errorCount} errors out of ${total} employees`
+          `Processing completed with ${response.errors.length} errors out of ${response.processed_count} employees`
         );
       } else {
-        toast.success(`Successfully processed ${successful} employees`);
+        toast.success(`Successfully processed ${response.processed_count} employees`);
       }
 
-      // Show dialog if there are employees missing income tax rates
-      if (employeesMissingTaxRates.length > 0) {
-        setMissingIncomeTaxEmployees(employeesMissingTaxRates);
-        setShowMissingTaxDialog(true);
-      }
+      // Refresh payroll details to show new data
+      await fetchPayrollDetails();
+
     } catch (error) {
-      console.error("Error in batch processing:", error);
-      // Mark all as error if batch processing fails (batched update)
-      const errorUpdates: Record<string, "error"> = {};
-      selectedCombinations.forEach(({ employeeId, jobType }) => {
-        const key = `${employeeId}-${jobType}`;
-        errorUpdates[key] = "error";
-      });
-      setProcessingStatus((prev) => ({ ...prev, ...errorUpdates }));
-      toast.error("Failed to process employee payrolls");
+      console.error("Error processing payroll:", error);
+      toast.error("Failed to process payroll");
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress({ current: 0, total: 0, stage: "" });
     }
-
-    // Refresh payroll details to show new data
-    await fetchPayrollDetails();
   };
 
   const handleEmployeeSelection = (
@@ -689,7 +340,7 @@ const PayrollProcessingPage: React.FC = () => {
 
   // Calculate total selected employees
   const totalSelectedEmployees = Object.entries(selectedEmployees).reduce(
-    (sum, [jobId, employees]) => {
+    (sum, [, employees]) => {
       return sum + Object.values(employees).filter(Boolean).length;
     },
     0
@@ -758,7 +409,7 @@ const PayrollProcessingPage: React.FC = () => {
           </div>
         ) : null}
 
-        {processedPayrolls.length > 0 && !isProcessing && (
+        {processedCount > 0 && !isProcessing && (
           <div className="mb-8 border-b border-default-200 pb-4">
             <h2 className="text-lg font-medium text-default-700 mb-3">
               Processing Summary
@@ -772,7 +423,7 @@ const PayrollProcessingPage: React.FC = () => {
                       Employees Processed
                     </div>
                     <div className="text-xl font-semibold text-default-800">
-                      {processedPayrolls.length}
+                      {processedCount}
                     </div>
                   </div>
                 </div>
@@ -784,11 +435,7 @@ const PayrollProcessingPage: React.FC = () => {
                   <div>
                     <div className="text-sm text-default-500">Successful</div>
                     <div className="text-xl font-semibold text-emerald-600">
-                      {
-                        Object.values(processingStatus).filter(
-                          (s) => s === "success"
-                        ).length
-                      }
+                      {processingStatus.successful}
                     </div>
                   </div>
                 </div>
@@ -800,11 +447,7 @@ const PayrollProcessingPage: React.FC = () => {
                   <div>
                     <div className="text-sm text-default-500">Errors</div>
                     <div className="text-xl font-semibold text-rose-600">
-                      {
-                        Object.values(processingStatus).filter(
-                          (s) => s === "error"
-                        ).length
-                      }
+                      {processingStatus.errors}
                     </div>
                   </div>
                 </div>
@@ -845,10 +488,6 @@ const PayrollProcessingPage: React.FC = () => {
                 <tbody className="bg-white divide-y divide-default-200">
                   {eligibleData.eligibleJobs.map((jobId) => {
                     const employees = getEmployeesForJob(jobId);
-                    const selectedCount = employees.filter(
-                      (emp: { id: string | number }) =>
-                        selectedEmployees[jobId]?.[emp.id]
-                    ).length;
 
                     return (
                       <tr
