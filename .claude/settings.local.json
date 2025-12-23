@@ -17,7 +17,8 @@
       "Bash(docker-compose up:*)",
       "Bash(docker-compose down:*)",
       "Bash(where:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(if not exist \"c:\\\\tienhock\\\\src\\\\utils\\\\accounting\" mkdir \"c:\\\\tienhock\\\\src\\\\utils\\\\accounting\")"
     ],
     "deny": []
   }

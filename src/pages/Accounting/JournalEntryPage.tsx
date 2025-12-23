@@ -10,12 +10,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
-  AccountCode,
   JournalEntry,
   JournalEntryType,
-  JournalEntryTypeInfo,
   JournalEntryLineInput,
 } from "../../types/types";
+import {
+  useAccountCodesCache,
+  useJournalEntryTypesCache,
+} from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import {
@@ -196,6 +198,16 @@ const JournalEntryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
 
+  // Cached reference data
+  const { entryTypes, isLoading: entryTypesLoading } = useJournalEntryTypesCache();
+  const { accountCodes: allAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+
+  // Filter to only active account codes
+  const accountCodes = useMemo(
+    () => allAccountCodes.filter((a) => a.is_active),
+    [allAccountCodes]
+  );
+
   // Form state
   const [formData, setFormData] = useState<JournalEntryFormData>({
     reference_no: "",
@@ -208,15 +220,11 @@ const JournalEntryPage: React.FC = () => {
   // Entry status for edit mode
   const [entryStatus, setEntryStatus] = useState<string>("active");
 
-  // Reference data
-  const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
-  const [accountCodes, setAccountCodes] = useState<AccountCode[]>([]);
-
   // Initial form data for change detection
   const initialFormDataRef = useRef<JournalEntryFormData | null>(null);
 
   // UI state
-  const [loading, setLoading] = useState(true);
+  const [pageLoading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -225,6 +233,9 @@ const JournalEntryPage: React.FC = () => {
     null
   );
   const [error, setError] = useState<string | null>(null);
+
+  // Combined loading state (page + cache)
+  const loading = pageLoading || entryTypesLoading || accountCodesLoading;
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -245,22 +256,6 @@ const JournalEntryPage: React.FC = () => {
     const account = accountCodes.find((a) => a.code === line.account_code);
     return account ? `${account.code} - ${account.description}` : null;
   }, [selectedLineIndex, formData.lines, accountCodes]);
-
-  // Fetch reference data
-  const fetchReferenceData = useCallback(async () => {
-    try {
-      const [typesRes, accountsRes] = await Promise.all([
-        api.get("/api/journal-entries/types"),
-        api.get("/api/account-codes?flat=true&is_active=true"),
-      ]);
-
-      setEntryTypes(typesRes as JournalEntryTypeInfo[]);
-      setAccountCodes(accountsRes as AccountCode[]);
-    } catch (err: unknown) {
-      console.error("Error fetching reference data:", err);
-      toast.error("Failed to load reference data");
-    }
-  }, []);
 
   // Fetch next reference number
   const fetchNextReference = useCallback(
@@ -328,9 +323,6 @@ const JournalEntryPage: React.FC = () => {
   // Initial data loading
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
-      await fetchReferenceData();
-
       if (isEditMode) {
         await fetchEntryData();
       } else {
@@ -341,7 +333,7 @@ const JournalEntryPage: React.FC = () => {
 
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, fetchReferenceData, fetchEntryData]);
+  }, [isEditMode, fetchEntryData]);
 
   // Form change detection
   useEffect(() => {
