@@ -695,8 +695,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
-      console.error("Error details:", error?.response?.data);
-      toast.error(error?.response?.data?.message || "Failed to save monthly work log");
+      console.error("Error details:", error?.data);
+      // Handle specific error messages from API
+      const errorMessage = error?.data?.message || error?.message || "Failed to save monthly work log";
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
