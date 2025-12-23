@@ -229,16 +229,15 @@ export default function (pool) {
    * - Total CP38 Amount (10) pos 43-52 - cents, right justify with zeros
    * - Total CP38 Records (5) pos 53-57 - right justify with zeros
    *
-   * Detail Record (124 chars):
+   * Detail Record (136 chars):
    * - D (1)
    * - Tax Number (11) - without prefix like "OG-"
-   * - Name (60)
-   * - IC Number (12) - empty for foreigners
-   * - Passport (12) - empty for Malaysians
-   * - Country Code (6)
-   * - PCB Amount cents (6)
-   * - CP38 Amount cents (6)
-   * - Short Name (10)
+   * - Name (72)
+   * - IC Number (12) - IC for Malaysians, passport for foreigners
+   * - Foreign Info (14) - country code for foreigners (e.g., "PH"), empty for locals
+   * - PCB Amount cents (9) - left-padded with spaces
+   * - CP38 Amount cents (7) - zeros
+   * - Employee ID (10) - right-padded with spaces
    */
   const generateLHDNContent = (rows, eNumber, month, year) => {
     const lines = [];
@@ -272,40 +271,47 @@ export default function (pool) {
 
     lines.push(headerLine);
 
-    // Build Detail Records (D) - 124 chars total
+    // Build Detail Records (D) - 136 chars total
     rows.forEach((row) => {
       const detailType = "D";
       // Tax number without prefix (e.g., "OG-07139779051" -> "07139779051")
       const taxNumber = padLeft(stripTaxPrefix(row.income_tax_no), 11);
-      const name = padLeft(row.name, 60);
+      // Name (72 chars)
+      const name = padLeft((row.name || "").toUpperCase(), 72);
 
-      // IC for Malaysians, Passport (ic_no) for foreigners
+      // Determine if Malaysian or foreigner
       const isMalaysian = (row.nationality || "").toLowerCase() === "malaysian";
-      const icNumber = isMalaysian ? padLeft(stripIC(row.ic_no), 12) : padLeft("", 12);
-      const passportNumber = !isMalaysian ? padLeft(row.ic_no || "", 12) : padLeft("", 12);
 
-      // Country code (6 chars) - empty for Malaysians (would need country_code field if available)
-      const countryCode = padLeft("", 6);
+      // IC Number (12 chars) - IC for Malaysians, empty for foreigners
+      const icNumber = isMalaysian
+        ? padLeft(stripIC(row.ic_no), 12)
+        : padLeft("", 12); // 12 empty spaces for foreigners
 
-      // PCB Amount in cents (6 chars)
-      const pcbAmountCents = padRight(toCents(row.pcb_amount || 0), 6);
+      // Foreign info field (14 chars):
+      // - For locals: 14 empty spaces
+      // - For foreigners: Passport (9 chars padded) + 3 spaces + Country code (2 chars) = 14 chars
+      const foreignInfo = !isMalaysian
+        ? padLeft(row.ic_no || "", 9) + "   " + "PH"
+        : padLeft("", 14);
 
-      // CP38 Amount in cents (6 chars, zero for now)
-      const cp38AmountCents = padRight(0, 6);
+      // PCB Amount in cents (9 chars, left-padded with spaces)
+      const pcbAmountCents = String(toCents(row.pcb_amount || 0)).padStart(9, " ");
 
-      // Short name (10 chars)
-      const shortName = padLeft((row.name || "").substring(0, 10), 10);
+      // CP38 Amount in cents (7 chars of zeros)
+      const cp38AmountCents = "0000000";
+
+      // Employee ID (10 chars, right-padded with spaces)
+      const employeeId = padLeft(String(row.employee_id || "").toUpperCase(), 10);
 
       const detailLine =
         detailType +
         taxNumber +
         name +
         icNumber +
-        passportNumber +
-        countryCode +
+        foreignInfo +
         pcbAmountCents +
         cp38AmountCents +
-        shortName;
+        employeeId;
 
       lines.push(detailLine);
     });
