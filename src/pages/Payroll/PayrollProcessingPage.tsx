@@ -29,6 +29,10 @@ import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useContributionRatesCache } from "../../utils/payroll/useContributionRatesCache";
 import { api } from "../../routes/utils/api";
+import MissingIncomeTaxRatesDialog, {
+  MissingIncomeTaxEmployee,
+} from "../../components/Payroll/MissingIncomeTaxRatesDialog";
+import { findIncomeTaxRate } from "../../utils/payroll/contributionCalculations";
 
 interface EligibleEmployeesResponse {
   month: number;
@@ -61,6 +65,10 @@ const PayrollProcessingPage: React.FC = () => {
     stage: string;
   }>({ current: 0, total: 0, stage: "" });
   const [lastProcessingTime, setLastProcessingTime] = useState<number>(0);
+  const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
+    MissingIncomeTaxEmployee[]
+  >([]);
+  const [showMissingTaxDialog, setShowMissingTaxDialog] = useState(false);
 
   const { jobs, loading: loadingJobs } = useJobsCache();
   const { staffs, loading: loadingStaffs } = useStaffsCache();
@@ -301,6 +309,10 @@ const PayrollProcessingPage: React.FC = () => {
 
     setProcessingStatus(initialStatus);
 
+    // Threshold for income tax (RM 3000)
+    const INCOME_TAX_THRESHOLD = 3000;
+    const employeesMissingTaxRates: MissingIncomeTaxEmployee[] = [];
+
     try {
       // Calculate payrolls for all grouped employees
       const employeePayrolls: EmployeePayroll[] = [];
@@ -361,6 +373,19 @@ const PayrollProcessingPage: React.FC = () => {
             (sum, item) => sum + item.amount,
             0
           );
+
+          // Check if employee is subject to income tax but missing rate
+          if (combinedGrossPay > INCOME_TAX_THRESHOLD) {
+            const incomeTaxRate = findIncomeTaxRate(incomeTaxRates, combinedGrossPay);
+            if (!incomeTaxRate) {
+              // Employee is subject to income tax but no rate recorded
+              employeesMissingTaxRates.push({
+                employeeId: primaryEmployee.employeeId,
+                employeeName: employeeName,
+                grossPay: Number(combinedGrossPay.toFixed(2)),
+              });
+            }
+          }
 
           // Calculate deductions for the combined gross pay
           const deductions = PayrollCalculationService.calculateContributions(
@@ -564,6 +589,12 @@ const PayrollProcessingPage: React.FC = () => {
         );
       } else {
         toast.success(`Successfully processed ${successful} employees`);
+      }
+
+      // Show dialog if there are employees missing income tax rates
+      if (employeesMissingTaxRates.length > 0) {
+        setMissingIncomeTaxEmployees(employeesMissingTaxRates);
+        setShowMissingTaxDialog(true);
       }
     } catch (error) {
       console.error("Error in batch processing:", error);
@@ -848,6 +879,13 @@ const PayrollProcessingPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Missing Income Tax Rates Dialog */}
+      <MissingIncomeTaxRatesDialog
+        isOpen={showMissingTaxDialog}
+        onClose={() => setShowMissingTaxDialog(false)}
+        employees={missingIncomeTaxEmployees}
+      />
     </div>
   );
 };
