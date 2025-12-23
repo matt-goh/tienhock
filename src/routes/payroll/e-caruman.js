@@ -206,6 +206,114 @@ export default function (pool) {
   };
 
   /**
+   * Strip prefix from tax number (e.g., "OG-07139779051" -> "07139779051")
+   */
+  const stripTaxPrefix = (taxNo) => {
+    if (!taxNo) return "";
+    // Remove any prefix like "OG-", "SG-", etc.
+    return taxNo.replace(/^[A-Za-z]+-/, "");
+  };
+
+  /**
+   * Generate LHDN fixed-width text file content (LHDN*.TXT)
+   * Format based on working sample file LHDN1125.TXT
+   *
+   * Header Record (57 chars):
+   * - H (1) pos 1
+   * - E Number HQ (10) pos 2-11 - right justify with zeros
+   * - E Number (10) pos 12-21 - right justify with zeros
+   * - Year (4) pos 22-25
+   * - Month (2) pos 26-27
+   * - Total MTD Amount (10) pos 28-37 - cents, right justify with zeros
+   * - Total MTD Records (5) pos 38-42 - right justify with zeros
+   * - Total CP38 Amount (10) pos 43-52 - cents, right justify with zeros
+   * - Total CP38 Records (5) pos 53-57 - right justify with zeros
+   *
+   * Detail Record (124 chars):
+   * - D (1)
+   * - Tax Number (11) - without prefix like "OG-"
+   * - Name (60)
+   * - IC Number (12) - empty for foreigners
+   * - Passport (12) - empty for Malaysians
+   * - Country Code (6)
+   * - PCB Amount cents (6)
+   * - CP38 Amount cents (6)
+   * - Short Name (10)
+   */
+  const generateLHDNContent = (rows, eNumber, month, year) => {
+    const lines = [];
+
+    // Calculate totals for header
+    let totalPCBCents = 0;
+    rows.forEach((row) => {
+      totalPCBCents += toCents(row.pcb_amount || 0);
+    });
+
+    // Build Header Record (H) - 57 chars total
+    const headerType = "H";
+    const eNumPadded = padRight(eNumber.replace(/\D/g, ""), 10); // E Number (10) - right justify with zeros
+    const yearStr = String(year);
+    const monthStr = String(month).padStart(2, "0");
+    const totalMTDAmount = padRight(totalPCBCents, 10); // Total MTD Amount (10)
+    const totalMTDRecords = padRight(rows.length, 5); // Total MTD Records (5)
+    const totalCP38Amount = padRight(0, 10); // Total CP38 Amount (10)
+    const totalCP38Records = padRight(0, 5); // Total CP38 Records (5)
+
+    const headerLine =
+      headerType +
+      eNumPadded +
+      eNumPadded +
+      yearStr +
+      monthStr +
+      totalMTDAmount +
+      totalMTDRecords +
+      totalCP38Amount +
+      totalCP38Records;
+
+    lines.push(headerLine);
+
+    // Build Detail Records (D) - 124 chars total
+    rows.forEach((row) => {
+      const detailType = "D";
+      // Tax number without prefix (e.g., "OG-07139779051" -> "07139779051")
+      const taxNumber = padLeft(stripTaxPrefix(row.income_tax_no), 11);
+      const name = padLeft(row.name, 60);
+
+      // IC for Malaysians, Passport (ic_no) for foreigners
+      const isMalaysian = (row.nationality || "").toLowerCase() === "malaysian";
+      const icNumber = isMalaysian ? padLeft(stripIC(row.ic_no), 12) : padLeft("", 12);
+      const passportNumber = !isMalaysian ? padLeft(row.ic_no || "", 12) : padLeft("", 12);
+
+      // Country code (6 chars) - empty for Malaysians (would need country_code field if available)
+      const countryCode = padLeft("", 6);
+
+      // PCB Amount in cents (6 chars)
+      const pcbAmountCents = padRight(toCents(row.pcb_amount || 0), 6);
+
+      // CP38 Amount in cents (6 chars, zero for now)
+      const cp38AmountCents = padRight(0, 6);
+
+      // Short name (10 chars)
+      const shortName = padLeft((row.name || "").substring(0, 10), 10);
+
+      const detailLine =
+        detailType +
+        taxNumber +
+        name +
+        icNumber +
+        passportNumber +
+        countryCode +
+        pcbAmountCents +
+        cp38AmountCents +
+        shortName;
+
+      lines.push(detailLine);
+    });
+
+    return lines.join("\n");
+  };
+
+  /**
    * Combined preview endpoint - returns EPF and SOCSO/EIS data in one response
    * @query month - Month (1-12)
    * @query year - Year
@@ -299,11 +407,34 @@ export default function (pool) {
         ORDER BY s.name
       `;
 
+      // Income Tax / PCB Query
+      const incomeTaxQuery = `
+        SELECT
+          s.id as employee_id,
+          s.ic_no,
+          s.income_tax_no,
+          s.nationality,
+          s.name,
+          COALESCE(pcb.employee_amount, 0) as pcb_amount
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON ep.employee_id = s.id
+        JOIN payroll_deductions pcb ON pcb.employee_payroll_id = ep.id AND pcb.deduction_type = 'income_tax'
+        WHERE mp.month = $1
+          AND mp.year = $2
+          AND s.income_tax_no IS NOT NULL
+          AND s.income_tax_no != ''
+          AND pcb.employee_amount IS NOT NULL
+          AND pcb.employee_amount > 0
+        ORDER BY s.name
+      `;
+
       // Execute all queries in parallel
-      const [epfResult, socsoResult, sipResult] = await Promise.all([
+      const [epfResult, socsoResult, sipResult, incomeTaxResult] = await Promise.all([
         pool.query(epfQuery, [month, year]),
         pool.query(socsoQuery, [month, year]),
         pool.query(sipQuery, [month, year]),
+        pool.query(incomeTaxQuery, [month, year]),
       ]);
 
       // Calculate EPF totals
@@ -338,6 +469,15 @@ export default function (pool) {
           return acc;
         },
         { eis_employer: 0, eis_employee: 0 }
+      );
+
+      // Calculate Income Tax totals
+      const incomeTaxTotals = incomeTaxResult.rows.reduce(
+        (acc, row) => {
+          acc.pcb_amount += parseFloat(row.pcb_amount || 0);
+          return acc;
+        },
+        { pcb_amount: 0 }
       );
 
       res.json({
@@ -393,7 +533,16 @@ export default function (pool) {
             sip_total: Math.round((sipTotals.eis_employer + sipTotals.eis_employee) * 100) / 100,
           },
         } : null,
-        income_tax: null, // Placeholder for future implementation
+        income_tax: incomeTaxResult.rows.length > 0 ? {
+          count: incomeTaxResult.rows.length,
+          data: incomeTaxResult.rows.map((row) => ({
+            ...row,
+            pcb_amount: parseFloat(row.pcb_amount || 0),
+          })),
+          totals: {
+            pcb_amount: Math.round(incomeTaxTotals.pcb_amount * 100) / 100,
+          },
+        } : null,
       });
     } catch (error) {
       console.error("Error fetching preview data:", error);
@@ -994,6 +1143,107 @@ export default function (pool) {
       console.error("Error generating SIP export data:", error);
       res.status(500).json({
         message: "Error generating SIP export data",
+        error: error.message,
+      });
+    }
+  });
+
+  // ============================================
+  // INCOME TAX / PCB ROUTES
+  // ============================================
+
+  /**
+   * Get Income Tax/PCB data for folder-based export (returns JSON with file content)
+   * Generates LHDN*.TXT file for LHDN e-PCB submission
+   * @query month - Month (1-12)
+   * @query year - Year
+   * @query company - Company code (default: TH)
+   * @query eNumber - LHDN E Number (employer number) - required
+   */
+  router.get("/income-tax/export", async (req, res) => {
+    const { month, year, company = "TH", eNumber } = req.query;
+
+    if (!month || !year) {
+      return res.status(400).json({
+        message: "Month and year are required",
+      });
+    }
+
+    if (!eNumber) {
+      return res.status(400).json({
+        message: "E Number is required for Income Tax export",
+      });
+    }
+
+    try {
+      const query = `
+        SELECT
+          s.id as employee_id,
+          s.ic_no,
+          s.income_tax_no,
+          s.nationality,
+          s.name,
+          COALESCE(pcb.employee_amount, 0) as pcb_amount
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON ep.employee_id = s.id
+        JOIN payroll_deductions pcb ON pcb.employee_payroll_id = ep.id AND pcb.deduction_type = 'income_tax'
+        WHERE mp.month = $1
+          AND mp.year = $2
+          AND s.income_tax_no IS NOT NULL
+          AND s.income_tax_no != ''
+          AND pcb.employee_amount IS NOT NULL
+          AND pcb.employee_amount > 0
+        ORDER BY s.name
+      `;
+
+      const result = await pool.query(query, [month, year]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "No Income Tax/PCB contribution data found for the specified period",
+        });
+      }
+
+      // Format month as 2 digits (01-12)
+      const monthStr = String(month).padStart(2, "0");
+
+      // Generate the LHDN fixed-width text file content
+      const content = generateLHDNContent(result.rows, eNumber, month, year);
+
+      // File naming: LHDN{MMYY}.TXT (e.g., LHDN1125.TXT for Nov 2025)
+      const filePrefix = `${monthStr}${String(year).slice(-2)}`;
+      const files = [
+        {
+          path: `PCB/${year}/${company}/${monthStr}`,
+          filename: `LHDN${filePrefix}.TXT`,
+          content: content,
+          count: result.rows.length,
+        },
+      ];
+
+      // Calculate totals for response
+      const totalPCB = result.rows.reduce(
+        (acc, row) => acc + parseFloat(row.pcb_amount || 0),
+        0
+      );
+
+      res.json({
+        success: true,
+        year,
+        month: monthStr,
+        company,
+        eNumber,
+        files,
+        totalEmployees: result.rows.length,
+        totals: {
+          pcb_amount: Math.round(totalPCB * 100) / 100,
+        },
+      });
+    } catch (error) {
+      console.error("Error generating Income Tax export data:", error);
+      res.status(500).json({
+        message: "Error generating Income Tax export data",
         error: error.message,
       });
     }
