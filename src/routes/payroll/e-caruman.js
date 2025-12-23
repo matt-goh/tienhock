@@ -124,6 +124,101 @@ export default function (pool) {
   });
 
   /**
+   * Get EPF data for folder-based export (returns JSON with file content)
+   * @query month - Month (1-12)
+   * @query year - Year
+   * @query company - Company code (default: TH)
+   */
+  router.get("/epf/export", async (req, res) => {
+    const { month, year, company = "TH" } = req.query;
+
+    if (!month || !year) {
+      return res.status(400).json({
+        message: "Month and year are required",
+      });
+    }
+
+    try {
+      const query = `
+        SELECT DISTINCT ON (s.id)
+          s.epf_no as member_no,
+          s.ic_no,
+          s.name,
+          s.nationality,
+          pd.wage_amount as salary,
+          pd.employer_amount as em_share,
+          pd.employee_amount as emp_share
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON ep.employee_id = s.id
+        JOIN payroll_deductions pd ON pd.employee_payroll_id = ep.id AND pd.deduction_type = 'epf'
+        WHERE mp.month = $1
+          AND mp.year = $2
+          AND s.epf_no IS NOT NULL
+          AND s.epf_no != ''
+          AND pd.employee_amount > 0
+        ORDER BY s.id, ep.id DESC
+      `;
+
+      const result = await pool.query(query, [month, year]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "No EPF contribution data found for the specified period",
+        });
+      }
+
+      // Separate local and foreign workers
+      const localRows = result.rows.filter(
+        (row) => (row.nationality || "").toLowerCase() === "malaysian"
+      );
+      const foreignRows = result.rows.filter(
+        (row) => (row.nationality || "").toLowerCase() !== "malaysian"
+      );
+
+      // Format month as 2 digits (01-12)
+      const monthStr = String(month).padStart(2, "0");
+
+      // Build response with folder structure info
+      const files = [];
+
+      if (localRows.length > 0) {
+        files.push({
+          path: `EPF/${year}/${company}/${monthStr}/WARGANEGARA`,
+          filename: "EPFORMA2.csv",
+          content: generateCSVContent(localRows),
+          count: localRows.length,
+        });
+      }
+
+      if (foreignRows.length > 0) {
+        files.push({
+          path: `EPF/${year}/${company}/${monthStr}/WARGA ASING`,
+          filename: "EPFORMA2.csv",
+          content: generateCSVContent(foreignRows),
+          count: foreignRows.length,
+        });
+      }
+
+      res.json({
+        success: true,
+        year,
+        month: monthStr,
+        company,
+        files,
+        totalLocal: localRows.length,
+        totalForeign: foreignRows.length,
+      });
+    } catch (error) {
+      console.error("Error generating EPF export data:", error);
+      res.status(500).json({
+        message: "Error generating EPF export data",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
    * Preview EPF data without downloading
    */
   router.get("/epf/preview", async (req, res) => {
