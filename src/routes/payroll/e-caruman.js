@@ -54,6 +54,28 @@ export default function (pool) {
     return Math.round(parseFloat(amount || 0) * 100);
   };
 
+  // Format date as DDMMYYYY for SIP fixed-width file
+  const formatDateDDMMYYYY = (dateStr) => {
+    if (!dateStr) return "        "; // 8 spaces if no date
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "        ";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}${month}${year}`;
+  };
+
+  // Format date as DD/MM/YYYY for SIP CSV file
+  const formatDateSlash = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   /**
    * Generate SOCSO fixed-width text file content
    * Format: 223 characters per line
@@ -104,6 +126,85 @@ export default function (pool) {
   };
 
   /**
+   * Generate SIP fixed-width text file content (SIP*.TXT)
+   * Format: 223 characters per line
+   * Fields:
+   * 1. Employer Code (12) pos 1-12
+   * 2. MyCoID/SSM Number (20) pos 13-32
+   * 3. IC Number (12) pos 33-44
+   * 4. Employee Name (150) pos 45-194
+   * 5. Month Contribution MMYYYY (6) pos 195-200
+   * 6. SIP Amount in cents (14) pos 201-214
+   * 7. Employment Start Date DDMMYYYY (8) pos 215-222
+   * 8. Indicator (1) pos 223 - 'B' for new or space
+   */
+  const generateSIPContent = (rows, employerCode, myCoId, month, year) => {
+    const lines = [];
+    const monthContribution = String(month).padStart(2, "0") + String(year);
+
+    rows.forEach((row) => {
+      // Field 1: Employer Code (12 chars, left justified)
+      const field1 = padLeft(employerCode, 12);
+      // Field 2: MyCoID/SSM Number (20 chars, left justified)
+      const field2 = padLeft(myCoId, 20);
+      // Field 3: IC Number (12 chars)
+      const field3 = padLeft(stripIC(row.ic_no), 12);
+      // Field 4: Employee Name (150 chars, left justified)
+      const field4 = padLeft(row.name, 150);
+      // Field 5: Month Contribution MMYYYY (6 chars)
+      const field5 = monthContribution;
+      // Field 6: SIP Amount in cents (14 chars, right justified) - total EIS contribution
+      const sipAmount = toCents(parseFloat(row.eis_employer || 0) + parseFloat(row.eis_employee || 0));
+      const field6 = padRight(sipAmount, 14);
+      // Field 7: Employment Start Date DDMMYYYY (8 chars)
+      const field7 = formatDateDDMMYYYY(row.date_joined);
+      // Field 8: Indicator (1 char) - 'B' for new employees or space
+      const field8 = row.indicator || " ";
+
+      lines.push(
+        field1 +
+        field2 +
+        field3 +
+        field4 +
+        field5 +
+        field6 +
+        field7 +
+        field8
+      );
+    });
+
+    return lines.join("\n");
+  };
+
+  /**
+   * Generate SIP CSV file content (SIPE*.TXT)
+   * Format: Row,EmployerCode,MyCoID,ICNo,Name,Month,Amount,StartDate,Indicator
+   */
+  const generateSIPEContent = (rows, employerCode, myCoId, month, year) => {
+    const lines = [];
+    const monthContribution = String(month).padStart(2, "0") + String(year);
+
+    rows.forEach((row, index) => {
+      const rowNum = index + 1;
+      // SIP amount with decimal (RM), right-padded with spaces
+      const sipAmount = (parseFloat(row.eis_employer || 0) + parseFloat(row.eis_employee || 0)).toFixed(2);
+      const sipAmountPadded = sipAmount.padStart(14, " ");
+      // Start date in DD/MM/YYYY format
+      const startDate = formatDateSlash(row.date_joined);
+      // Indicator padded to 10 chars
+      const indicator = (row.indicator || "").padEnd(10, " ");
+      // Name padded to 110 chars for CSV
+      const namePadded = (row.name || "").substring(0, 110).padEnd(110, " ");
+
+      lines.push(
+        `${rowNum},${employerCode},${padLeft(myCoId, 20)},${stripIC(row.ic_no)},${namePadded},${monthContribution},${sipAmountPadded},${startDate},${indicator}`
+      );
+    });
+
+    return lines.join("\n");
+  };
+
+  /**
    * Combined preview endpoint - returns EPF and SOCSO/EIS data in one response
    * @query month - Month (1-12)
    * @query year - Year
@@ -140,7 +241,7 @@ export default function (pool) {
         ORDER BY s.id, ep.id DESC
       `;
 
-      // SOCSO+EIS Query
+      // SOCSO Query
       const socsoQuery = `
         SELECT
           s.id as employee_id,
@@ -171,10 +272,35 @@ export default function (pool) {
         ORDER BY s.name
       `;
 
-      // Execute both queries in parallel
-      const [epfResult, socsoResult] = await Promise.all([
+      // SIP/EIS Query - Note: deduction_type is 'sip' in the database
+      const sipQuery = `
+        SELECT
+          s.id as employee_id,
+          s.ic_no,
+          s.name,
+          s.date_joined,
+          COALESCE(sip.employer_amount, 0) as eis_employer,
+          COALESCE(sip.employee_amount, 0) as eis_employee
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON ep.employee_id = s.id
+        JOIN payroll_deductions sip ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
+        WHERE mp.month = $1
+          AND mp.year = $2
+          AND s.ic_no IS NOT NULL
+          AND s.ic_no != ''
+          AND (
+            (sip.employer_amount IS NOT NULL AND sip.employer_amount > 0)
+            OR (sip.employee_amount IS NOT NULL AND sip.employee_amount > 0)
+          )
+        ORDER BY s.name
+      `;
+
+      // Execute all queries in parallel
+      const [epfResult, socsoResult, sipResult] = await Promise.all([
         pool.query(epfQuery, [month, year]),
         pool.query(socsoQuery, [month, year]),
+        pool.query(sipQuery, [month, year]),
       ]);
 
       // Calculate EPF totals
@@ -188,7 +314,7 @@ export default function (pool) {
         { salary: 0, em_share: 0, emp_share: 0 }
       );
 
-      // Calculate SOCSO+EIS totals
+      // Calculate SOCSO totals
       const socsoTotals = socsoResult.rows.reduce(
         (acc, row) => {
           acc.salary += parseFloat(row.salary || 0);
@@ -199,6 +325,16 @@ export default function (pool) {
           return acc;
         },
         { salary: 0, socso_employer: 0, socso_employee: 0, eis_employer: 0, eis_employee: 0 }
+      );
+
+      // Calculate SIP totals
+      const sipTotals = sipResult.rows.reduce(
+        (acc, row) => {
+          acc.eis_employer += parseFloat(row.eis_employer || 0);
+          acc.eis_employee += parseFloat(row.eis_employee || 0);
+          return acc;
+        },
+        { eis_employer: 0, eis_employee: 0 }
       );
 
       res.json({
@@ -238,6 +374,20 @@ export default function (pool) {
             total_contribution: Math.round(
               (socsoTotals.socso_employer + socsoTotals.socso_employee + socsoTotals.eis_employer + socsoTotals.eis_employee) * 100
             ) / 100,
+          },
+        } : null,
+        sip: sipResult.rows.length > 0 ? {
+          count: sipResult.rows.length,
+          data: sipResult.rows.map((row) => ({
+            ...row,
+            eis_employer: parseFloat(row.eis_employer || 0),
+            eis_employee: parseFloat(row.eis_employee || 0),
+            sip_total: parseFloat(row.eis_employer || 0) + parseFloat(row.eis_employee || 0),
+          })),
+          totals: {
+            eis_employer: Math.round(sipTotals.eis_employer * 100) / 100,
+            eis_employee: Math.round(sipTotals.eis_employee * 100) / 100,
+            sip_total: Math.round((sipTotals.eis_employer + sipTotals.eis_employee) * 100) / 100,
           },
         } : null,
         income_tax: null, // Placeholder for future implementation
@@ -713,6 +863,132 @@ export default function (pool) {
       console.error("Error generating SOCSO export data:", error);
       res.status(500).json({
         message: "Error generating SOCSO export data",
+        error: error.message,
+      });
+    }
+  });
+
+  // ============================================
+  // SIP/EIS ROUTES
+  // ============================================
+
+  /**
+   * Get SIP/EIS data for folder-based export (returns JSON with file content)
+   * Generates both SIP*.TXT (fixed-width) and SIPE*.TXT (CSV) files
+   * @query month - Month (1-12)
+   * @query year - Year
+   * @query company - Company code (default: TH)
+   * @query employerCode - SIP employer code (required)
+   * @query myCoId - Company SSM/MyCoID number (required)
+   */
+  router.get("/sip/export", async (req, res) => {
+    const { month, year, company = "TH", employerCode, myCoId } = req.query;
+
+    if (!month || !year) {
+      return res.status(400).json({
+        message: "Month and year are required",
+      });
+    }
+
+    if (!employerCode) {
+      return res.status(400).json({
+        message: "Employer code is required for SIP export",
+      });
+    }
+
+    if (!myCoId) {
+      return res.status(400).json({
+        message: "MyCoID/SSM number is required for SIP export",
+      });
+    }
+
+    try {
+      // Note: deduction_type is 'sip' in the database
+      const query = `
+        SELECT
+          s.id as employee_id,
+          s.ic_no,
+          s.name,
+          s.date_joined,
+          COALESCE(sip.employer_amount, 0) as eis_employer,
+          COALESCE(sip.employee_amount, 0) as eis_employee
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON ep.employee_id = s.id
+        JOIN payroll_deductions sip ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
+        WHERE mp.month = $1
+          AND mp.year = $2
+          AND s.ic_no IS NOT NULL
+          AND s.ic_no != ''
+          AND (
+            (sip.employer_amount IS NOT NULL AND sip.employer_amount > 0)
+            OR (sip.employee_amount IS NOT NULL AND sip.employee_amount > 0)
+          )
+        ORDER BY s.name
+      `;
+
+      const result = await pool.query(query, [month, year]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "No SIP/EIS contribution data found for the specified period",
+        });
+      }
+
+      // Format month as 2 digits (01-12)
+      const monthStr = String(month).padStart(2, "0");
+
+      // Generate both file contents
+      const sipContent = generateSIPContent(result.rows, employerCode, myCoId, month, year);
+      const sipeContent = generateSIPEContent(result.rows, employerCode, myCoId, month, year);
+
+      // Build response with folder structure info
+      // File naming: SIP{month}{year}.TXT and SIPE{month}{year}.TXT (e.g., SIP1125.TXT for Nov 2025)
+      const filePrefix = `${monthStr}${String(year).slice(-2)}`;
+      const files = [
+        {
+          path: `SIP/${year}/${company}/${monthStr}`,
+          filename: `SIP${filePrefix}.TXT`,
+          content: sipContent,
+          count: result.rows.length,
+        },
+        {
+          path: `SIP/${year}/${company}/${monthStr}`,
+          filename: `SIPE${filePrefix}.TXT`,
+          content: sipeContent,
+          count: result.rows.length,
+        },
+      ];
+
+      // Calculate totals for response
+      const totals = result.rows.reduce(
+        (acc, row) => {
+          acc.eis_employer += parseFloat(row.eis_employer || 0);
+          acc.eis_employee += parseFloat(row.eis_employee || 0);
+          return acc;
+        },
+        { eis_employer: 0, eis_employee: 0 }
+      );
+
+      res.json({
+        success: true,
+        year,
+        month: monthStr,
+        company,
+        employerCode,
+        myCoId,
+        files,
+        totalEmployees: result.rows.length,
+        totals: {
+          eis_employer: Math.round(totals.eis_employer * 100) / 100,
+          eis_employee: Math.round(totals.eis_employee * 100) / 100,
+          sip_total: Math.round((totals.eis_employer + totals.eis_employee) * 100) / 100,
+        },
+      });
+    } catch (error) {
+      console.error("Error generating SIP export data:", error);
+      res.status(500).json({
+        message: "Error generating SIP export data",
         error: error.message,
       });
     }

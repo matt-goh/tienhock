@@ -6,6 +6,7 @@ import {
   IconShieldCheck,
   IconReceipt,
   IconLoader2,
+  IconUmbrella,
 } from "@tabler/icons-react";
 import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
@@ -75,14 +76,35 @@ interface SOCSOPreviewData {
   };
 }
 
+interface SIPPreviewData {
+  count: number;
+  data: {
+    employee_id: number;
+    ic_no: string;
+    name: string;
+    date_joined: string | null;
+    eis_employer: number;
+    eis_employee: number;
+    sip_total: number;
+  }[];
+  totals: {
+    eis_employer: number;
+    eis_employee: number;
+    sip_total: number;
+  };
+}
+
 interface PreviewState {
   epf: EPFPreviewData | null;
   socso: SOCSOPreviewData | null;
+  sip: SIPPreviewData | null;
   income_tax: null; // Placeholder for future implementation
 }
 
-// SOCSO Employer Code - This should match your company's PERKESO registration
+// SOCSO/SIP Employer Code - This should match your company's PERKESO registration
 const SOCSO_EMPLOYER_CODE = "F9600025897Z";
+// Company SSM/MyCoID number for SIP export
+const SIP_MYCOID = "953309-T";
 
 // Format IC number as ######-##-####
 const formatIC = (ic: string): string => {
@@ -101,6 +123,7 @@ const ECarumanPage: React.FC = () => {
   const [preview, setPreview] = useState<PreviewState>({
     epf: null,
     socso: null,
+    sip: null,
     income_tax: null,
   });
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -160,11 +183,12 @@ const ECarumanPage: React.FC = () => {
         setPreview({
           epf: previewData.epf,
           socso: previewData.socso,
+          sip: previewData.sip,
           income_tax: previewData.income_tax,
         });
       } catch (error) {
         console.error("Error fetching preview data:", error);
-        setPreview({ epf: null, socso: null, income_tax: null });
+        setPreview({ epf: null, socso: null, sip: null, income_tax: null });
       } finally {
         setPreviewLoading(false);
       }
@@ -219,7 +243,7 @@ const ECarumanPage: React.FC = () => {
     await writable.close();
   };
 
-  const handleDownload = async (type: "epf" | "socso" | "income_tax") => {
+  const handleDownload = async (type: "epf" | "socso" | "sip" | "income_tax") => {
     if (loadingType) return; // Prevent multiple downloads
 
     setLoadingType(type);
@@ -308,7 +332,50 @@ const ECarumanPage: React.FC = () => {
           }
 
           toast.success(
-            `SOCSO+EIS file created successfully in SOCSO/${socsoExportData.year}/TH/${socsoExportData.month}/`
+            `SOCSO file created successfully in SOCSO/${socsoExportData.year}/TH/${socsoExportData.month}/`
+          );
+          break;
+        }
+        case "sip": {
+          // Check if File System Access API is supported
+          if (!window.showDirectoryPicker) {
+            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
+            break;
+          }
+
+          // Get export data from backend
+          const sipExportData = await api.get(
+            `/api/e-caruman/sip/export?month=${selectedMonth}&year=${selectedYear}&company=TH&employerCode=${SOCSO_EMPLOYER_CODE}&myCoId=${SIP_MYCOID}`
+          );
+
+          if (!sipExportData.files || sipExportData.files.length === 0) {
+            toast.error("No SIP/EIS contribution data found for the specified period");
+            break;
+          }
+
+          // Prompt user to select download folder
+          let sipBaseDir: FileSystemDirectoryHandle;
+          try {
+            sipBaseDir = await window.showDirectoryPicker();
+          } catch (err) {
+            // User cancelled the picker
+            if ((err as Error).name === "AbortError") {
+              break;
+            }
+            throw err;
+          }
+
+          // Create folder structure and write files
+          let sipCreatedCount = 0;
+          for (const file of sipExportData.files) {
+            const pathParts = file.path.split("/");
+            const targetDir = await createNestedDirectory(sipBaseDir, pathParts);
+            await writeFileToDirectory(targetDir, file.filename, file.content);
+            sipCreatedCount++;
+          }
+
+          toast.success(
+            `SIP files created successfully (${sipCreatedCount} files) in SIP/${sipExportData.year}/TH/${sipExportData.month}/`
           );
           break;
         }
@@ -345,7 +412,7 @@ const ECarumanPage: React.FC = () => {
               value={selectedMonth}
               onChange={(value) => setSelectedMonth(Number(value))}
               options={monthOptions}
-              className="w-52"
+              className="w-[196px]"
               rounded="lg"
             />
           </div>
@@ -357,7 +424,7 @@ const ECarumanPage: React.FC = () => {
               value={selectedYear}
               onChange={(value) => setSelectedYear(Number(value))}
               options={yearOptions}
-              className="w-[9rem]"
+              className="w-[150px]"
               rounded="lg"
             />
           </div>
@@ -381,7 +448,7 @@ const ECarumanPage: React.FC = () => {
             <span className="ml-2 text-gray-500">Loading preview data...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* EPF Preview Card */}
             <div
               className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 ${loadingType === "epf" ? "opacity-70" : ""}`}
@@ -597,6 +664,114 @@ const ECarumanPage: React.FC = () => {
                           </td>
                           <td className="px-2 py-1.5 text-right text-green-600 font-mono border-t">
                             {preview.socso.totals.socso_employee.toFixed(2)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* SIP/EIS Preview Card */}
+            <div
+              className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 ${loadingType === "sip" ? "opacity-70" : ""}`}
+              onMouseEnter={() => handleCardMouseEnter("sip")}
+              onMouseLeave={handleCardMouseLeave}
+              onClick={() => handleDownload("sip")}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <IconUmbrella size={20} className="text-purple-600" />
+                </div>
+                <h3 className="font-medium text-gray-900">SIP / EIS</h3>
+                <div className="ml-auto">
+                  {loadingType === "sip" ? (
+                    <IconLoader2 size={20} className="animate-spin text-purple-600" />
+                  ) : (
+                    <IconFileDownload size={20} className="text-gray-400" />
+                  )}
+                </div>
+              </div>
+              {preview.sip ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Employees:</span>
+                    <span className="font-medium">{preview.sip.count}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Employer Share:</span>
+                    <span className="font-medium">
+                      RM {preview.sip.totals.eis_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Employee Share:</span>
+                    <span className="font-medium">
+                      RM {preview.sip.totals.eis_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                    <span className="text-gray-700 font-medium">Total:</span>
+                    <span className="font-semibold text-purple-600">
+                      RM {preview.sip.totals.sip_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No data available</p>
+              )}
+
+              {/* SIP Detailed Tooltip */}
+              {hoveredCard === "sip" && preview.sip && preview.sip.data.length > 0 && (
+                <div
+                  className="absolute right-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  onMouseEnter={handleTooltipMouseEnter}
+                  onMouseLeave={handleTooltipMouseLeave}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">SIP File Preview</h4>
+                    <span className="text-xs text-gray-500">{preview.sip.count} records</span>
+                  </div>
+                  <div className="max-h-64 overflow-auto border border-gray-100 rounded">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Employer</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Employee</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {preview.sip.data.map((row, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-2 py-1.5 text-gray-700 font-mono">{formatIC(row.ic_no)}</td>
+                            <td className="px-2 py-1.5 text-gray-900">{row.name}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                              {row.eis_employer.toFixed(2)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                              {row.eis_employee.toFixed(2)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                              {row.sip_total.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-purple-50 sticky bottom-0">
+                        <tr className="font-medium">
+                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 border-t">Total</td>
+                          <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
+                            {preview.sip.totals.eis_employer.toFixed(2)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
+                            {preview.sip.totals.eis_employee.toFixed(2)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
+                            {preview.sip.totals.sip_total.toFixed(2)}
                           </td>
                         </tr>
                       </tfoot>
