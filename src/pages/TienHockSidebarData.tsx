@@ -179,12 +179,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Cuti Management",
-    path: "/payroll/cuti-management",
-    component: CutiManagementPage,
-  });
-
-  payrollSubItems.push({
     name: "Mid-month Pay",
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
@@ -200,12 +194,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Pinjam",
     path: "/payroll/pinjam",
     component: PinjamListPage,
-  });
-
-  payrollSubItems.push({
-    name: "Contribution Rates",
-    path: "/payroll/contribution-rates",
-    component: ContributionRatesPage,
   });
 
   return payrollSubItems;
@@ -365,6 +353,16 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Pay Codes",
         path: "/catalogue/pay-codes",
         component: PayCodePage,
+      },
+      {
+        name: "Cuti Management",
+        path: "/catalogue/cuti-management",
+        component: CutiManagementPage,
+      },
+      {
+        name: "Contribution Rates",
+        path: "/catalogue/contribution-rates",
+        component: ContributionRatesPage,
       },
       {
         name: "Job Category",
