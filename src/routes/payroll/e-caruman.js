@@ -189,19 +189,20 @@ export default function (pool) {
       // SIP amount with decimal (RM), right-padded with spaces
       const sipAmount = (parseFloat(row.eis_employer || 0) + parseFloat(row.eis_employee || 0)).toFixed(2);
       const sipAmountPadded = sipAmount.padStart(14, " ");
-      // Start date in DD/MM/YYYY format
+      // Start date in DD/MM/YYYY format (empty if no date)
       const startDate = formatDateSlash(row.date_joined);
       // Indicator padded to 10 chars
       const indicator = (row.indicator || "").padEnd(10, " ");
-      // Name padded to 110 chars for CSV
-      const namePadded = (row.name || "").substring(0, 110).padEnd(110, " ");
+      // Name padded to 130 chars total (including name characters)
+      const namePadded = (row.name || "").substring(0, 130).padEnd(130, " ");
 
       lines.push(
         `${rowNum},${employerCode},${padLeft(myCoId, 20)},${stripIC(row.ic_no)},${namePadded},${monthContribution},${sipAmountPadded},${startDate},${indicator}`
       );
     });
 
-    return lines.join("\n");
+    // Add SUB character (ASCII 26 / 0x1A) at end of file as per PERKESO format
+    return lines.join("\n") + "\n\x1A";
   };
 
   /**
