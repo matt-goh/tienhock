@@ -680,9 +680,6 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         deletedLeaveIds: deletedLeaveIds,
       };
 
-      console.log("Saving monthly log with payload:", payload);
-      console.log("Leave entries to save:", payload.leaveEntries);
-
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/api/monthly-work-logs/${existingWorkLog.id}`, payload);
         toast.success("Monthly work log updated successfully");
