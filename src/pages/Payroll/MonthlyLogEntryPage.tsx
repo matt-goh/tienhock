@@ -19,7 +19,6 @@ import ManageActivitiesModal, { ActivityItem } from "../../components/Payroll/Ma
 import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
 import {
   calculateActivityAmount,
-  calculateActivitiesAmounts,
 } from "../../utils/payroll/calculateActivityAmount";
 import {
   Dialog,
