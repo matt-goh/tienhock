@@ -273,6 +273,7 @@ export default function (pool) {
       `;
 
       // SIP/EIS Query - Note: deduction_type is 'sip' in the database
+      // SIP only applies to Malaysian citizens
       const sipQuery = `
         SELECT
           s.id as employee_id,
@@ -289,6 +290,7 @@ export default function (pool) {
           AND mp.year = $2
           AND s.ic_no IS NOT NULL
           AND s.ic_no != ''
+          AND s.nationality = 'Malaysian'
           AND (
             (sip.employer_amount IS NOT NULL AND sip.employer_amount > 0)
             OR (sip.employee_amount IS NOT NULL AND sip.employee_amount > 0)
@@ -904,6 +906,7 @@ export default function (pool) {
 
     try {
       // Note: deduction_type is 'sip' in the database
+      // SIP only applies to Malaysian citizens
       const query = `
         SELECT
           s.id as employee_id,
@@ -920,6 +923,7 @@ export default function (pool) {
           AND mp.year = $2
           AND s.ic_no IS NOT NULL
           AND s.ic_no != ''
+          AND s.nationality = 'Malaysian'
           AND (
             (sip.employer_amount IS NOT NULL AND sip.employer_amount > 0)
             OR (sip.employee_amount IS NOT NULL AND sip.employee_amount > 0)

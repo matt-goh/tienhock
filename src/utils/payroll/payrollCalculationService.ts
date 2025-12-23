@@ -417,8 +417,10 @@ export class PayrollCalculationService {
       });
     }
 
-    // 3. Calculate SIP (using total gross pay including overtime, only for employees under 60)
-    if (age < 60) {
+    // 3. Calculate SIP (using total gross pay including overtime)
+    // SIP only applies to Malaysian citizens under 60 years old
+    const isMalaysian = nationality === "Malaysian";
+    if (age < 60 && isMalaysian) {
       const sipRate = findSIPRate(sipRates, totalGrossPay);
       if (sipRate) {
         const sipContribution = calculateSIP(sipRate, totalGrossPay, age);
