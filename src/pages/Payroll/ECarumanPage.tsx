@@ -94,17 +94,34 @@ interface SIPPreviewData {
   };
 }
 
+interface IncomeTaxPreviewData {
+  count: number;
+  data: {
+    employee_id: number;
+    ic_no: string;
+    income_tax_no: string;
+    nationality: string;
+    name: string;
+    pcb_amount: number;
+  }[];
+  totals: {
+    pcb_amount: number;
+  };
+}
+
 interface PreviewState {
   epf: EPFPreviewData | null;
   socso: SOCSOPreviewData | null;
   sip: SIPPreviewData | null;
-  income_tax: null; // Placeholder for future implementation
+  income_tax: IncomeTaxPreviewData | null;
 }
 
 // SOCSO/SIP Employer Code - This should match your company's PERKESO registration
 const SOCSO_EMPLOYER_CODE = "F9600025897Z";
 // Company SSM/MyCoID number for SIP export
 const SIP_MYCOID = "953309-T";
+// LHDN E Number for Income Tax/PCB export (from sample: 9112779708)
+const LHDN_E_NUMBER = "9112779708";
 
 // Format IC number as ######-##-####
 const formatIC = (ic: string): string => {
@@ -379,9 +396,47 @@ const ECarumanPage: React.FC = () => {
           );
           break;
         }
-        case "income_tax":
-          toast.error("Income Tax export not yet implemented");
+        case "income_tax": {
+          // Check if File System Access API is supported
+          if (!window.showDirectoryPicker) {
+            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
+            break;
+          }
+
+          // Get export data from backend
+          const incomeTaxExportData = await api.get(
+            `/api/e-caruman/income-tax/export?month=${selectedMonth}&year=${selectedYear}&company=TH&eNumber=${LHDN_E_NUMBER}`
+          );
+
+          if (!incomeTaxExportData.files || incomeTaxExportData.files.length === 0) {
+            toast.error("No Income Tax/PCB contribution data found for the specified period");
+            break;
+          }
+
+          // Prompt user to select download folder
+          let incomeTaxBaseDir: FileSystemDirectoryHandle;
+          try {
+            incomeTaxBaseDir = await window.showDirectoryPicker();
+          } catch (err) {
+            // User cancelled the picker
+            if ((err as Error).name === "AbortError") {
+              break;
+            }
+            throw err;
+          }
+
+          // Create folder structure and write files
+          for (const file of incomeTaxExportData.files) {
+            const pathParts = file.path.split("/");
+            const targetDir = await createNestedDirectory(incomeTaxBaseDir, pathParts);
+            await writeFileToDirectory(targetDir, file.filename, file.content);
+          }
+
+          toast.success(
+            `Income Tax file created successfully in PCB/${incomeTaxExportData.year}/TH/${incomeTaxExportData.month}/`
+          );
           break;
+        }
       }
     } catch (error) {
       console.error(`Error downloading ${type} file:`, error);
@@ -617,7 +672,7 @@ const ECarumanPage: React.FC = () => {
               {/* SOCSO Detailed Tooltip */}
               {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[550px]"
+                  className="absolute left-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[550px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -781,7 +836,7 @@ const ECarumanPage: React.FC = () => {
               )}
             </div>
 
-            {/* Income Tax Preview Card (Placeholder) */}
+            {/* Income Tax Preview Card */}
             <div
               className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-amber-300 ${loadingType === "income_tax" ? "opacity-70" : ""}`}
               onMouseEnter={() => handleCardMouseEnter("income_tax")}
@@ -801,12 +856,66 @@ const ECarumanPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <p className="text-sm text-gray-400 italic">Not yet implemented</p>
+              {preview.income_tax ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Employees:</span>
+                    <span className="font-medium">{preview.income_tax.count}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                    <span className="text-gray-700 font-medium">Total PCB:</span>
+                    <span className="font-semibold text-amber-600">
+                      RM {preview.income_tax.totals.pcb_amount.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No data available</p>
+              )}
 
-              {/* Income Tax Detailed Tooltip (placeholder for future) */}
-              {hoveredCard === "income_tax" && preview.income_tax && (
-                <div className="absolute left-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]">
-                  {/* Future: Income Tax table preview */}
+              {/* Income Tax Detailed Tooltip */}
+              {hoveredCard === "income_tax" && preview.income_tax && preview.income_tax.data.length > 0 && (
+                <div
+                  className="absolute right-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  onMouseEnter={handleTooltipMouseEnter}
+                  onMouseLeave={handleTooltipMouseLeave}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">Income Tax File Preview (LHDN*.TXT)</h4>
+                    <span className="text-xs text-gray-500">{preview.income_tax.count} records</span>
+                  </div>
+                  <div className="max-h-64 overflow-auto border border-gray-100 rounded">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Tax No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">PCB Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {preview.income_tax.data.map((row, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-2 py-1.5 text-gray-700 font-mono">{row.income_tax_no}</td>
+                            <td className="px-2 py-1.5 text-gray-900">{row.name}</td>
+                            <td className="px-2 py-1.5 text-gray-700 font-mono">{formatIC(row.ic_no)}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                              {row.pcb_amount.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-amber-50 sticky bottom-0">
+                        <tr className="font-medium">
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 border-t">Total</td>
+                          <td className="px-2 py-1.5 text-right text-amber-600 font-mono border-t">
+                            {preview.income_tax.totals.pcb_amount.toFixed(2)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
