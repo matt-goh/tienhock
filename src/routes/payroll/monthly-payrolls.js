@@ -440,8 +440,13 @@ export default function (pool) {
           FROM staffs
         `),
 
-        // Jobs data
-        client.query("SELECT id, section FROM jobs"),
+        // Jobs data with full section name from sections table (use DISTINCT ON to avoid duplicates)
+        client.query(`
+          SELECT DISTINCT ON (j.id) j.id, j.section as section_code, COALESCE(s.name, j.section) as section
+          FROM jobs j
+          LEFT JOIN sections s ON j.section = s.id OR j.section = s.name OR UPPER(j.section) = UPPER(LEFT(s.name, 1))
+          ORDER BY j.id, s.name
+        `),
 
         // Contribution rates
         client.query("SELECT * FROM epf_rates WHERE is_active = true"),
@@ -776,7 +781,7 @@ export default function (pool) {
 
           // Get job section
           const job = jobsMap.get(primaryEmployee.jobType);
-          const section = job?.section?.[0] || "Unknown";
+          const section = Array.isArray(job?.section) ? job.section[0] : (job?.section || "Unknown");
           const jobTypes = employeeJobCombos.map(c => c.jobType).join(", ");
 
           // 6. Save to database - Check if payroll exists
