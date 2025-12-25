@@ -1,4 +1,13 @@
 @echo off
+:: Check if we're already in the dev window
+if "%DEV_WINDOW%"=="1" goto :run_dev
+
+:: Not in dev window, so open a new one that won't be interrupted by VSCode
+set DEV_WINDOW=1
+start "Tien Hock Dev" cmd /k "%~f0"
+exit /b
+
+:run_dev
 echo Starting Tien Hock ERP development environment...
 echo.
 
@@ -6,9 +15,9 @@ echo.
 set "PATH=%PATH%;%USERPROFILE%\.nvm\versions\node\v23.6.0\bin;%USERPROFILE%\.nvm\versions\node\v23.6.0"
 
 :: Start database in Docker
-cd dev
+cd /d "%~dp0dev"
 docker compose up -d dev_db --remove-orphans
-cd ..
+cd /d "%~dp0"
 
 :: Wait for database to be ready
 echo Waiting for database...
