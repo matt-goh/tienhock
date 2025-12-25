@@ -936,3 +936,113 @@ export interface AccountCodeFilters {
   is_active?: boolean | null;
   parent_code?: string | null;
 }
+
+// ==================== STOCK & PRODUCTION SYSTEM TYPES ====================
+
+// Product for stock system (simplified)
+export interface StockProduct {
+  id: string;
+  description: string;
+  type: "BH" | "MEE" | "JP" | "OTH" | "TAX";
+  price_per_unit?: number;
+}
+
+// Production Entry
+export interface ProductionEntry {
+  id?: number;
+  entry_date: string; // YYYY-MM-DD
+  product_id: string;
+  worker_id: string;
+  worker_name?: string;
+  bags_packed: number;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  product_description?: string;
+  product_type?: string;
+}
+
+// Production Entry Batch (for daily form submission)
+export interface ProductionEntryBatch {
+  date: string; // YYYY-MM-DD
+  product_id: string;
+  entries: Array<{
+    worker_id: string;
+    bags_packed: number;
+  }>;
+  created_by?: string;
+}
+
+// Production Worker (for worker selection)
+export interface ProductionWorker {
+  id: string;
+  name: string;
+  job: string[];
+}
+
+// Stock Movement (single day)
+export interface StockMovement {
+  date: string; // YYYY-MM-DD
+  day: number;
+  bf: number; // Brought Forward
+  production: number;
+  adj_in: number; // Placeholder for future
+  returns: number;
+  sold_out: number;
+  adj_out: number; // Placeholder for future
+  foc: number;
+  cf: number; // Carry Forward
+}
+
+// Stock API Response
+export interface StockMovementResponse {
+  product_id: string;
+  product_description: string;
+  product_type: string;
+  opening_balance: number;
+  date_range: {
+    start_date: string;
+    end_date: string;
+    view_type: "month" | "rolling" | "custom";
+  };
+  movements: StockMovement[];
+  monthly_totals: {
+    production: number;
+    adj_in: number;
+    returns: number;
+    sold_out: number;
+    adj_out: number;
+    foc: number;
+  };
+}
+
+// Opening Balance
+export interface OpeningBalance {
+  id?: number;
+  product_id: string;
+  balance: number;
+  effective_date: string; // YYYY-MM-DD
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  product_description?: string;
+  product_type?: string;
+}
+
+// Stock Adjustment (for future ADJ/IN, ADJ/OUT features)
+export interface StockAdjustment {
+  id?: number;
+  entry_date: string; // YYYY-MM-DD
+  product_id: string;
+  adjustment_type: "ADJ_IN" | "ADJ_OUT" | "DEFECT";
+  quantity: number;
+  reason?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  product_description?: string;
+}
+
+// Stock View Type
+export type StockViewType = "month" | "rolling" | "custom";

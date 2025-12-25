@@ -5,6 +5,7 @@ import {
   IconListDetails,
   IconUserDollar,
   IconReportMoney,
+  IconPackage,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
@@ -24,6 +25,10 @@ import PaymentPage from "./Payments/PaymentPage";
 
 // Sales related imports
 import SalesSummaryPage from "./Sales/SalesSummaryPage";
+
+// Stock related imports
+import ProductionEntryPage from "./Stock/ProductionEntryPage";
+import StockMovementPage from "./Stock/StockMovementPage";
 
 // Payroll related imports
 import DailyLogListPage from "./Payroll/DailyLogListPage";
@@ -298,6 +303,22 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Payments",
         path: "/sales/payments",
         component: PaymentPage,
+      },
+    ],
+  },
+  {
+    name: "Stock",
+    icon: IconPackage,
+    subItems: [
+      {
+        name: "Production Entry",
+        path: "/stock/production",
+        component: ProductionEntryPage,
+      },
+      {
+        name: "Stock Movement",
+        path: "/stock/movement",
+        component: StockMovementPage,
       },
     ],
   },
