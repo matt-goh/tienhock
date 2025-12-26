@@ -32,7 +32,7 @@ export default function (pool) {
         ON stock_opening_balances(effective_date)
       `);
 
-      // Create stock_adjustments table (for future ADJ/IN, ADJ/OUT)
+      // Create stock_adjustments table (for ADJ_IN, ADJ_OUT)
       await pool.query(`
         CREATE TABLE IF NOT EXISTS stock_adjustments (
           id SERIAL PRIMARY KEY,
@@ -40,12 +40,26 @@ export default function (pool) {
           product_id VARCHAR(50) NOT NULL,
           adjustment_type VARCHAR(20) NOT NULL,
           quantity INTEGER NOT NULL DEFAULT 0,
+          reference VARCHAR(100),
           reason TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           created_by VARCHAR(50),
           CONSTRAINT valid_adjustment_type CHECK (adjustment_type IN ('ADJ_IN', 'ADJ_OUT', 'DEFECT'))
         )
+      `);
+
+      // Add reference column if it doesn't exist (for existing databases)
+      await pool.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'stock_adjustments' AND column_name = 'reference'
+          ) THEN
+            ALTER TABLE stock_adjustments ADD COLUMN reference VARCHAR(100);
+          END IF;
+        END $$;
       `);
 
       await pool.query(`
@@ -55,6 +69,10 @@ export default function (pool) {
       await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product
         ON stock_adjustments(product_id)
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_stock_adjustments_reference
+        ON stock_adjustments(reference)
       `);
 
       console.log("Stock tables initialized successfully");
@@ -742,6 +760,285 @@ export default function (pool) {
       console.error("Error deleting stock adjustment:", error);
       res.status(500).json({
         message: "Error deleting stock adjustment",
+        error: error.message,
+      });
+    }
+  });
+
+  // --- Monthly Stock Adjustments (ADJ+/ADJ-) Routes ---
+
+  /**
+   * GET /api/stock/adjustments/references
+   * List unique references for a given month with summary info
+   * Query params: month=YYYY-MM
+   */
+  router.get("/adjustments/references", async (req, res) => {
+    try {
+      const { month } = req.query;
+
+      if (!month) {
+        return res.status(400).json({
+          message: "month parameter is required (format: YYYY-MM)",
+        });
+      }
+
+      // Parse month to get date range
+      const [year, monthNum] = month.split("-").map(Number);
+      const startDate = new Date(year, monthNum - 1, 1);
+      const endDate = new Date(year, monthNum, 0); // Last day of month
+
+      const query = `
+        SELECT
+          reference,
+          COUNT(DISTINCT product_id) as product_count,
+          SUM(CASE WHEN adjustment_type = 'ADJ_IN' THEN quantity ELSE 0 END) as total_adj_in,
+          SUM(CASE WHEN adjustment_type IN ('ADJ_OUT', 'DEFECT') THEN quantity ELSE 0 END) as total_adj_out,
+          MIN(created_at) as created_at
+        FROM stock_adjustments
+        WHERE entry_date BETWEEN $1 AND $2
+          AND reference IS NOT NULL
+        GROUP BY reference
+        ORDER BY created_at DESC
+      `;
+
+      const result = await pool.query(query, [
+        startDate.toISOString().split("T")[0],
+        endDate.toISOString().split("T")[0],
+      ]);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching adjustment references:", error);
+      res.status(500).json({
+        message: "Error fetching adjustment references",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * GET /api/stock/adjustments/by-reference
+   * Get all adjustments for a specific reference in a month
+   * Query params: month=YYYY-MM, reference=REF-123
+   */
+  router.get("/adjustments/by-reference", async (req, res) => {
+    try {
+      const { month, reference } = req.query;
+
+      if (!month || !reference) {
+        return res.status(400).json({
+          message: "month and reference parameters are required",
+        });
+      }
+
+      // Parse month to get date range
+      const [year, monthNum] = month.split("-").map(Number);
+      const startDate = new Date(year, monthNum - 1, 1);
+      const endDate = new Date(year, monthNum, 0);
+
+      const query = `
+        SELECT
+          sa.id,
+          sa.entry_date,
+          sa.product_id,
+          sa.adjustment_type,
+          sa.quantity,
+          sa.reference,
+          sa.reason,
+          sa.created_at,
+          p.description as product_description,
+          p.type as product_type
+        FROM stock_adjustments sa
+        LEFT JOIN products p ON sa.product_id = p.id
+        WHERE sa.entry_date BETWEEN $1 AND $2
+          AND sa.reference = $3
+        ORDER BY p.type, p.id
+      `;
+
+      const result = await pool.query(query, [
+        startDate.toISOString().split("T")[0],
+        endDate.toISOString().split("T")[0],
+        reference,
+      ]);
+
+      // Group by product_id and combine ADJ_IN and ADJ_OUT
+      const adjustmentsByProduct = new Map();
+      for (const row of result.rows) {
+        if (!adjustmentsByProduct.has(row.product_id)) {
+          adjustmentsByProduct.set(row.product_id, {
+            product_id: row.product_id,
+            product_description: row.product_description,
+            product_type: row.product_type,
+            adj_in: 0,
+            adj_out: 0,
+          });
+        }
+        const entry = adjustmentsByProduct.get(row.product_id);
+        if (row.adjustment_type === "ADJ_IN") {
+          entry.adj_in += row.quantity;
+        } else {
+          entry.adj_out += row.quantity;
+        }
+      }
+
+      res.json({
+        reference,
+        month,
+        adjustments: Array.from(adjustmentsByProduct.values()),
+      });
+    } catch (error) {
+      console.error("Error fetching adjustments by reference:", error);
+      res.status(500).json({
+        message: "Error fetching adjustments by reference",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * POST /api/stock/adjustments/batch
+   * Batch save adjustments for a month with a reference
+   * Body: { month: "YYYY-MM", reference: "REF-123", adjustments: [{ product_id, adj_in, adj_out }] }
+   */
+  router.post("/adjustments/batch", async (req, res) => {
+    try {
+      const { month, reference, adjustments, created_by } = req.body;
+
+      if (!month || !reference || !Array.isArray(adjustments)) {
+        return res.status(400).json({
+          message: "month, reference, and adjustments array are required",
+        });
+      }
+
+      // Parse month to get last day
+      const [year, monthNum] = month.split("-").map(Number);
+      const lastDayOfMonth = new Date(year, monthNum, 0);
+      const entryDate = lastDayOfMonth.toISOString().split("T")[0];
+
+      const client = await pool.connect();
+
+      try {
+        await client.query("BEGIN");
+
+        // First, delete existing adjustments for this reference and month
+        await client.query(
+          `DELETE FROM stock_adjustments
+           WHERE reference = $1
+           AND entry_date = $2`,
+          [reference, entryDate]
+        );
+
+        const savedEntries = [];
+
+        for (const adj of adjustments) {
+          const { product_id, adj_in, adj_out } = adj;
+
+          if (!product_id) continue;
+
+          // Insert ADJ_IN if quantity > 0
+          if (adj_in && adj_in > 0) {
+            const result = await client.query(
+              `INSERT INTO stock_adjustments (entry_date, product_id, adjustment_type, quantity, reference, created_by)
+               VALUES ($1, $2, 'ADJ_IN', $3, $4, $5)
+               RETURNING *`,
+              [entryDate, product_id, adj_in, reference, created_by || null]
+            );
+            savedEntries.push(result.rows[0]);
+          }
+
+          // Insert ADJ_OUT if quantity > 0
+          if (adj_out && adj_out > 0) {
+            const result = await client.query(
+              `INSERT INTO stock_adjustments (entry_date, product_id, adjustment_type, quantity, reference, created_by)
+               VALUES ($1, $2, 'ADJ_OUT', $3, $4, $5)
+               RETURNING *`,
+              [entryDate, product_id, adj_out, reference, created_by || null]
+            );
+            savedEntries.push(result.rows[0]);
+          }
+        }
+
+        await client.query("COMMIT");
+
+        // Calculate totals
+        const totalAdjIn = savedEntries
+          .filter((e) => e.adjustment_type === "ADJ_IN")
+          .reduce((sum, e) => sum + e.quantity, 0);
+        const totalAdjOut = savedEntries
+          .filter((e) => e.adjustment_type === "ADJ_OUT")
+          .reduce((sum, e) => sum + e.quantity, 0);
+
+        res.json({
+          message: "Stock adjustments saved successfully",
+          reference,
+          entry_date: entryDate,
+          entry_count: savedEntries.length,
+          total_adj_in: totalAdjIn,
+          total_adj_out: totalAdjOut,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error("Error batch saving stock adjustments:", error);
+      res.status(500).json({
+        message: "Error saving stock adjustments",
+        error: error.message,
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/stock/adjustments/by-reference
+   * Delete all adjustments for a specific reference in a month
+   * Query params: month=YYYY-MM, reference=REF-123
+   */
+  router.delete("/adjustments/by-reference", async (req, res) => {
+    try {
+      const { month, reference } = req.query;
+
+      if (!month || !reference) {
+        return res.status(400).json({
+          message: "month and reference parameters are required",
+        });
+      }
+
+      // Parse month to get date range
+      const [year, monthNum] = month.split("-").map(Number);
+      const startDate = new Date(year, monthNum - 1, 1);
+      const endDate = new Date(year, monthNum, 0);
+
+      const query = `
+        DELETE FROM stock_adjustments
+        WHERE entry_date BETWEEN $1 AND $2
+          AND reference = $3
+        RETURNING *
+      `;
+
+      const result = await pool.query(query, [
+        startDate.toISOString().split("T")[0],
+        endDate.toISOString().split("T")[0],
+        reference,
+      ]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "No adjustments found for this reference",
+        });
+      }
+
+      res.json({
+        message: "Stock adjustments deleted successfully",
+        deleted_count: result.rows.length,
+        reference,
+      });
+    } catch (error) {
+      console.error("Error deleting adjustments by reference:", error);
+      res.status(500).json({
+        message: "Error deleting stock adjustments",
         error: error.message,
       });
     }
