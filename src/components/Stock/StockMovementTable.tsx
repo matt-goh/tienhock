@@ -23,7 +23,7 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
 }) => {
   // Column headers configuration
   const columns = [
-    { key: "day", label: "Day", align: "center" as const, width: "w-16" },
+    { key: "day", label: "Day", align: "center" as const, width: "w-20" },
     { key: "bf", label: "B/F", align: "right" as const, width: "w-20", color: "text-default-600" },
     { key: "production", label: "PROD", align: "right" as const, width: "w-20", color: "text-green-600" },
     { key: "adj_in", label: "ADJ+", align: "right" as const, width: "w-20", color: "text-teal-600", placeholder: true },
@@ -43,7 +43,10 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
   // Format date for row
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.getDate();
+    return date.toLocaleDateString("en-MY", {
+      day: "numeric",
+      month: "short",
+    });
   };
 
   if (isLoading) {
@@ -174,33 +177,33 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
         {/* Footer with totals */}
         {monthlyTotals && (
           <tfoot>
-            <tr className="bg-default-100 font-semibold">
-              <td className="border-t-2 border-default-300 px-3 py-3 text-center text-sm uppercase text-default-700">
+            <tr className="bg-default-50">
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-default-600">
                 Totals
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right text-default-500">
-                -
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right text-default-300">
+                —
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right tabular-nums text-green-700">
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-green-700">
                 {formatNumber(monthlyTotals.production)}
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right tabular-nums text-teal-600">
-                {monthlyTotals.adj_in > 0 ? formatNumber(monthlyTotals.adj_in) : "-"}
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-teal-600">
+                {monthlyTotals.adj_in > 0 ? formatNumber(monthlyTotals.adj_in) : <span className="text-default-300">—</span>}
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right tabular-nums text-blue-700">
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-blue-700">
                 {formatNumber(monthlyTotals.returns)}
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right tabular-nums text-rose-700">
+              <td className="w-24 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-rose-700">
                 {formatNumber(monthlyTotals.sold_out)}
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right tabular-nums text-orange-600">
-                {monthlyTotals.adj_out > 0 ? formatNumber(monthlyTotals.adj_out) : "-"}
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-orange-600">
+                {monthlyTotals.adj_out > 0 ? formatNumber(monthlyTotals.adj_out) : <span className="text-default-300">—</span>}
               </td>
-              <td className="border-t-2 border-default-300 px-3 py-3 text-right tabular-nums text-purple-700">
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-purple-700">
                 {formatNumber(monthlyTotals.foc)}
               </td>
-              <td className="border-t-2 border-default-300 bg-default-200 px-3 py-3 text-right text-default-500">
-                -
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right text-default-300">
+                —
               </td>
             </tr>
           </tfoot>

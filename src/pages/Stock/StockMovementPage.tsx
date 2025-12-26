@@ -374,7 +374,12 @@ const StockMovementPage: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-default-500">
-                  Brought Forward (B/F)
+                  Brought Forward from{" "}
+                  {new Date(
+                    selectedMonth.getFullYear(),
+                    selectedMonth.getMonth() - 1,
+                    1
+                  ).toLocaleDateString("en-MY", { month: "short" })}
                 </p>
                 <p className="text-2xl font-bold text-default-900">
                   {openingBalance.toLocaleString()}{" "}
@@ -481,35 +486,49 @@ const StockMovementPage: React.FC = () => {
 
       {/* Summary Cards */}
       {monthlyTotals && movements.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
-          <SummaryCard
-            label="Production"
-            value={monthlyTotals.production}
-            color="green"
-          />
-          <SummaryCard
-            label="Returns"
-            value={monthlyTotals.returns}
-            color="blue"
-          />
-          <SummaryCard
-            label="Sold/Out"
-            value={monthlyTotals.sold_out}
-            color="rose"
-          />
-          <SummaryCard label="FOC" value={monthlyTotals.foc} color="purple" />
-          <SummaryCard
-            label="Adj In"
-            value={monthlyTotals.adj_in}
-            color="teal"
-            placeholder
-          />
-          <SummaryCard
-            label="Adj Out"
-            value={monthlyTotals.adj_out}
-            color="orange"
-            placeholder
-          />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-default-700">
+              Summary for{" "}
+              <span className="text-default-900">
+                {viewType === "month"
+                  ? formatMonthDisplay(selectedMonth)
+                  : viewType === "rolling"
+                    ? `${new Date(dateRange.start).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} - ${new Date(dateRange.end).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`
+                    : `${new Date(customStartDate).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} - ${new Date(customEndDate).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`}
+              </span>
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
+            <SummaryCard
+              label="Production"
+              value={monthlyTotals.production}
+              color="green"
+            />
+            <SummaryCard
+              label="Returns"
+              value={monthlyTotals.returns}
+              color="blue"
+            />
+            <SummaryCard
+              label="Sold/Out"
+              value={monthlyTotals.sold_out}
+              color="rose"
+            />
+            <SummaryCard label="FOC" value={monthlyTotals.foc} color="purple" />
+            <SummaryCard
+              label="Adj In"
+              value={monthlyTotals.adj_in}
+              color="teal"
+              placeholder
+            />
+            <SummaryCard
+              label="Adj Out"
+              value={monthlyTotals.adj_out}
+              color="orange"
+              placeholder
+            />
+          </div>
         </div>
       )}
     </div>
