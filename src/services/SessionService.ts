@@ -16,6 +16,7 @@ export interface StoredSession {
 
 export interface SessionError extends Error {
   code: "INITIALIZATION_ERROR" | "NETWORK_ERROR" | "STORAGE_ERROR";
+  cause?: Error;
 }
 
 export interface AuthenticatedSession extends StoredSession {
