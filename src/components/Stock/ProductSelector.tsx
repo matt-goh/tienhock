@@ -159,7 +159,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
           <ComboboxOptions
             className={clsx(
               "absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg",
-              "bg-white py-1 text-sm shadow-lg ring-1 ring-black/5",
+              "bg-white pb-1 text-sm shadow-lg ring-1 ring-black/5",
               "focus:outline-none"
             )}
           >
