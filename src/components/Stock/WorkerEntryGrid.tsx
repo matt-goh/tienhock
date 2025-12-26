@@ -115,8 +115,8 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
               index % 2 === 0 ? "bg-white" : "bg-default-50/50"
             )}
           >
-            <div className="flex items-center gap-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-default-200 text-xs font-medium text-default-600">
+            <div className="flex items-center gap-6">
+              <span className="w-5 text-sm tabular-nums text-default-500 text-right">
                 {index + 1}
               </span>
               <div className="flex flex-col">
@@ -138,7 +138,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                 disabled={disabled}
                 placeholder="0"
                 className={clsx(
-                  "w-20 rounded-lg border border-default-300 px-3 py-1.5 text-center text-sm",
+                  "w-20 rounded-lg border border-default-300 pl-6 px-3 py-1.5 text-center text-sm",
                   "focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500",
                   "disabled:bg-gray-100 disabled:cursor-not-allowed",
                   entries[worker.id] && entries[worker.id] > 0
@@ -153,7 +153,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
 
       {/* Total row */}
       <div className="grid grid-cols-[1fr_120px] items-center border-t-2 border-default-200 bg-default-100 px-4 py-3">
-        <div className="font-semibold text-default-900">TOTAL</div>
+        <div className="font-semibold text-default-900">Total</div>
         <div className="flex justify-center">
           <span
             className={clsx(
