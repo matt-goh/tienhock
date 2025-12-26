@@ -52,7 +52,8 @@ const AssociatePayCodesWithEmployeesModal: React.FC<
     .filter((emp) =>
       searchQuery
         ? emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          emp.id.toLowerCase().includes(searchQuery.toLowerCase())
+          emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          emp.job.some((job) => job.toLowerCase().includes(searchQuery.toLowerCase()))
         : true
     )
     .sort((a, b) => {

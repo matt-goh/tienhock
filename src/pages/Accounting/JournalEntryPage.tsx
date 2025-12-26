@@ -10,12 +10,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
-  AccountCode,
   JournalEntry,
   JournalEntryType,
-  JournalEntryTypeInfo,
   JournalEntryLineInput,
 } from "../../types/types";
+import {
+  useAccountCodesCache,
+  useJournalEntryTypesCache,
+} from "../../utils/accounting/useAccountingCache";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import {
@@ -69,6 +71,8 @@ interface AccountCodeCellProps {
   disabled?: boolean;
 }
 
+const ACCOUNT_LOAD_INCREMENT = 50;
+
 const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
   value,
   options,
@@ -77,6 +81,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
 }: AccountCodeCellProps) => {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(50);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -90,8 +95,21 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
     );
   }, [query, options]);
 
+  // Paginated options for display
+  const displayedOptions = useMemo(() => {
+    return filteredOptions.slice(0, loadedCount);
+  }, [filteredOptions, loadedCount]);
+
+  const hasMoreOptions = displayedOptions.length < filteredOptions.length;
+  const remainingCount = filteredOptions.length - displayedOptions.length;
+
   const selectedOption = options.find((opt: SelectOption) => opt.id === value);
   const displayValue = selectedOption?.name || "";
+
+  // Reset loaded count when query changes
+  useEffect(() => {
+    setLoadedCount(50);
+  }, [query]);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -137,6 +155,10 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
     }
   };
 
+  const handleLoadMore = () => {
+    setLoadedCount((prev) => prev + ACCOUNT_LOAD_INCREMENT);
+  };
+
   return (
     <div className="relative">
       <div className="flex">
@@ -165,12 +187,12 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
           ref={dropdownRef}
           className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white border border-default-200 rounded-lg shadow-lg"
         >
-          {filteredOptions.length === 0 ? (
+          {displayedOptions.length === 0 ? (
             <div className="px-3 py-2 text-sm text-default-500">
               No accounts found
             </div>
           ) : (
-            filteredOptions.map((opt: SelectOption) => (
+            displayedOptions.map((opt: SelectOption) => (
               <div
                 key={opt.id}
                 onClick={() => handleSelect(opt.id.toString())}
@@ -185,6 +207,26 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
               </div>
             ))
           )}
+
+          {/* Load More Button - at the bottom of options list */}
+          {hasMoreOptions && (
+            <div className="border-t border-gray-200 p-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleLoadMore();
+                }}
+                className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 flex items-center justify-center"
+              >
+                <IconChevronDown size={16} className="mr-1.5" />
+                <span>
+                  Load More Accounts ({remainingCount} remaining)
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -195,6 +237,16 @@ const JournalEntryPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+
+  // Cached reference data
+  const { entryTypes, isLoading: entryTypesLoading } = useJournalEntryTypesCache();
+  const { accountCodes: allAccountCodes, isLoading: accountCodesLoading } = useAccountCodesCache();
+
+  // Filter to only active account codes
+  const accountCodes = useMemo(
+    () => allAccountCodes.filter((a) => a.is_active),
+    [allAccountCodes]
+  );
 
   // Form state
   const [formData, setFormData] = useState<JournalEntryFormData>({
@@ -208,15 +260,11 @@ const JournalEntryPage: React.FC = () => {
   // Entry status for edit mode
   const [entryStatus, setEntryStatus] = useState<string>("active");
 
-  // Reference data
-  const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
-  const [accountCodes, setAccountCodes] = useState<AccountCode[]>([]);
-
   // Initial form data for change detection
   const initialFormDataRef = useRef<JournalEntryFormData | null>(null);
 
   // UI state
-  const [loading, setLoading] = useState(true);
+  const [pageLoading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
@@ -225,6 +273,9 @@ const JournalEntryPage: React.FC = () => {
     null
   );
   const [error, setError] = useState<string | null>(null);
+
+  // Combined loading state (page + cache)
+  const loading = pageLoading || entryTypesLoading || accountCodesLoading;
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -245,22 +296,6 @@ const JournalEntryPage: React.FC = () => {
     const account = accountCodes.find((a) => a.code === line.account_code);
     return account ? `${account.code} - ${account.description}` : null;
   }, [selectedLineIndex, formData.lines, accountCodes]);
-
-  // Fetch reference data
-  const fetchReferenceData = useCallback(async () => {
-    try {
-      const [typesRes, accountsRes] = await Promise.all([
-        api.get("/api/journal-entries/types"),
-        api.get("/api/account-codes?flat=true&is_active=true"),
-      ]);
-
-      setEntryTypes(typesRes as JournalEntryTypeInfo[]);
-      setAccountCodes(accountsRes as AccountCode[]);
-    } catch (err: unknown) {
-      console.error("Error fetching reference data:", err);
-      toast.error("Failed to load reference data");
-    }
-  }, []);
 
   // Fetch next reference number
   const fetchNextReference = useCallback(
@@ -328,9 +363,6 @@ const JournalEntryPage: React.FC = () => {
   // Initial data loading
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
-      await fetchReferenceData();
-
       if (isEditMode) {
         await fetchEntryData();
       } else {
@@ -341,7 +373,7 @@ const JournalEntryPage: React.FC = () => {
 
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, fetchReferenceData, fetchEntryData]);
+  }, [isEditMode, fetchEntryData]);
 
   // Form change detection
   useEffect(() => {

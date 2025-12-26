@@ -79,7 +79,12 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
         ref={buttonRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onClick={disabled ? undefined : onClick}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled && onClick) {
+            onClick();
+          }
+        }}
         className={`text-sky-600 hover:text-sky-900 disabled:text-default-300 disabled:cursor-not-allowed ${className}`}
         type="button"
         disabled={disabled}
@@ -106,6 +111,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* --- Sticky Header --- */}
             <div className="flex-shrink-0">

@@ -58,6 +58,11 @@ import contributionRatesRouter from "./payroll/contribution-rates.js";
 import midMonthPayrollsRouter from "./payroll/mid-month-payrolls.js";
 import pinjamRecordsRouter from "./payroll/pinjam-records.js";
 import salaryReportRouter from "./payroll/salary-report.js";
+import eCarumanRouter from "./payroll/e-caruman.js";
+
+// Stock routes
+import productionEntriesRouter from "./stock/production-entries.js";
+import stockRouter from "./stock/stock.js";
 
 // Green Target routes
 import greenTargetCustomerRouter from "./greentarget/customers.js";
@@ -163,6 +168,11 @@ export default function setupRoutes(app, pool) {
   app.use("/api/mid-month-payrolls", midMonthPayrollsRouter(pool));
   app.use("/api/pinjam-records", pinjamRecordsRouter(pool));
   app.use("/api/salary-report", salaryReportRouter(pool));
+  app.use("/api/e-caruman", eCarumanRouter(pool));
+
+  // Stock routes
+  app.use("/api/production-entries", productionEntriesRouter(pool));
+  app.use("/api/stock", stockRouter(pool));
 
   // Green Target routes
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));

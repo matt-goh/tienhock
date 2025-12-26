@@ -62,7 +62,38 @@ This is a comprehensive ERP system supporting three companies:
 - **Routes**: Backend API routes in `src/routes/` mirroring frontend page structure
 - **Types**: TypeScript definitions in `src/types/types.ts`
 
-### Environment Setup
-- Environment variables loaded via dotenv
-- CORS configured differently for development vs production
-- Production serves static files from build directory, development uses separate frontend/backend ports
+### Development Setup
+The project uses a hybrid setup: Docker for the database, native Node.js for the server and Vite for the frontend.
+
+**Prerequisites:**
+- Node.js (via NVM recommended)
+- Docker Desktop
+
+**Starting Development:**
+```bash
+# First time only - install dependencies
+npm install --legacy-peer-deps
+
+# Start development environment
+dev.bat
+```
+
+This starts:
+- **PostgreSQL** in Docker (port 5434)
+- **API Server** with nodemon (port 5000) - auto-restarts on backend changes
+- **Vite Frontend** (port 3000) - fast HMR for frontend changes
+
+**Useful Commands:**
+- `Ctrl+C` - Stop all services
+- Type `rs` + Enter - Restart API server only
+- `cd dev && docker compose down` - Stop database
+
+**Environment Variables:**
+- Development: `.env` file in project root
+- Production: Server environment variables (not from .env)
+
+### Production Setup
+- Frontend built with `npm run build` (outputs to `build/` directory)
+- Server runs with `npm run server-prod` (node server.js directly)
+- Database connection via production environment variables
+- CORS configured for production domain

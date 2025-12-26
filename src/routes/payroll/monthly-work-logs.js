@@ -167,6 +167,7 @@ export default function (pool) {
       );
 
       // Get leave records for this month and section's employees
+      // Include employees whose job includes this section (not just those with work entries)
       const leaveQuery = `
         SELECT
           lr.*,
@@ -176,15 +177,13 @@ export default function (pool) {
         LEFT JOIN staffs s ON lr.employee_id = s.id
         WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
           AND EXTRACT(YEAR FROM lr.leave_date) = $2
-          AND lr.employee_id IN (
-            SELECT DISTINCT employee_id FROM monthly_work_log_entries WHERE monthly_log_id = $3
-          )
+          AND s.job::jsonb ? $3
         ORDER BY lr.leave_date, s.name
       `;
       const leaveResult = await pool.query(leaveQuery, [
         workLog.log_month,
         workLog.log_year,
-        id,
+        workLog.section,
       ]);
 
       res.json({
@@ -364,6 +363,7 @@ export default function (pool) {
       status,
       employeeEntries,
       leaveEntries,
+      deletedLeaveIds,
     } = req.body;
 
     if (!employeeEntries || employeeEntries.length === 0) {
@@ -457,6 +457,13 @@ export default function (pool) {
               ]);
             }
           }
+        }
+      }
+
+      // Delete specified leave records
+      if (deletedLeaveIds && Array.isArray(deletedLeaveIds) && deletedLeaveIds.length > 0) {
+        for (const leaveId of deletedLeaveIds) {
+          await pool.query("DELETE FROM leave_records WHERE id = $1", [leaveId]);
         }
       }
 
@@ -567,9 +574,9 @@ export default function (pool) {
 
       const values = [parseInt(month), parseInt(year)];
 
-      // If section is provided, filter by employees in that section
+      // If section is provided, filter by employees whose job includes this section
       if (section) {
-        query += ` AND s.section = $3`;
+        query += ` AND s.job::jsonb ? $3`;
         values.push(section);
       }
 
