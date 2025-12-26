@@ -29,6 +29,7 @@ import SalesSummaryPage from "./Sales/SalesSummaryPage";
 // Stock related imports
 import ProductionEntryPage from "./Stock/ProductionEntryPage";
 import StockMovementPage from "./Stock/StockMovementPage";
+import StockAdjustmentEntryPage from "./Stock/StockAdjustmentEntryPage";
 
 // Payroll related imports
 import DailyLogListPage from "./Payroll/DailyLogListPage";
@@ -314,6 +315,11 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
+      },
+      {
+        name: "Stock Adjustments",
+        path: "/stock/adjustments",
+        component: StockAdjustmentEntryPage,
       },
       {
         name: "Stock Movement",

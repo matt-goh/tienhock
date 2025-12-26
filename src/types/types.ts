@@ -1031,18 +1031,37 @@ export interface OpeningBalance {
   product_type?: string;
 }
 
-// Stock Adjustment (for future ADJ/IN, ADJ/OUT features)
+// Stock Adjustment (for ADJ_IN, ADJ_OUT features)
 export interface StockAdjustment {
   id?: number;
   entry_date: string; // YYYY-MM-DD
   product_id: string;
   adjustment_type: "ADJ_IN" | "ADJ_OUT" | "DEFECT";
   quantity: number;
+  reference?: string; // Reference code for the adjustment batch
   reason?: string;
   created_at?: string;
   updated_at?: string;
   created_by?: string;
   product_description?: string;
+}
+
+// Stock Adjustment Reference (for listing adjustment batches)
+export interface StockAdjustmentReference {
+  reference: string;
+  product_count: number;
+  total_adj_in: number;
+  total_adj_out: number;
+  created_at: string;
+}
+
+// Stock Adjustment Entry (for the entry form)
+export interface StockAdjustmentEntry {
+  product_id: string;
+  product_description?: string;
+  product_type?: string;
+  adj_in: number;
+  adj_out: number;
 }
 
 // Stock View Type

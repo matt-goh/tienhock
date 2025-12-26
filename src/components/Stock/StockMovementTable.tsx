@@ -21,15 +21,13 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
   monthlyTotals,
   isLoading = false,
 }) => {
-  // Column headers configuration
+  // Column headers configuration (ADJ+/ADJ- only shown in footer totals, not daily rows)
   const columns = [
     { key: "day", label: "Day", align: "center" as const, width: "w-20" },
     { key: "bf", label: "B/F", align: "right" as const, width: "w-20", color: "text-default-600" },
-    { key: "production", label: "PRODUCTION", align: "right" as const, width: "w-20", color: "text-green-600" },
-    { key: "adj_in", label: "ADJ+", align: "right" as const, width: "w-20", color: "text-teal-600", placeholder: true },
+    { key: "production", label: "PRODUCTION", align: "right" as const, width: "w-24", color: "text-green-600" },
     { key: "returns", label: "RETURN", align: "right" as const, width: "w-20", color: "text-blue-600" },
     { key: "sold_out", label: "SOLD", align: "right" as const, width: "w-24", color: "text-rose-600" },
-    { key: "adj_out", label: "ADJ-", align: "right" as const, width: "w-20", color: "text-orange-600", placeholder: true },
     { key: "foc", label: "FOC", align: "right" as const, width: "w-20", color: "text-purple-600" },
     { key: "cf", label: "C/F", align: "right" as const, width: "w-20", color: "text-default-900 font-semibold" },
   ];
@@ -81,18 +79,12 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
               <th
                 key={col.key}
                 className={clsx(
-                  "border-b border-default-200 px-3 py-3 text-xs font-semibold uppercase tracking-wider",
+                  "border-b border-default-200 px-3 py-3 text-xs font-semibold uppercase tracking-wider text-default-600",
                   col.width,
-                  col.align === "right" ? "text-right" : "text-center",
-                  col.placeholder ? "text-default-400" : "text-default-600"
+                  col.align === "right" ? "text-right" : "text-center"
                 )}
               >
                 {col.label}
-                {col.placeholder && (
-                  <span className="ml-1 text-[10px] font-normal normal-case text-default-400">
-                    (TBD)
-                  </span>
-                )}
               </th>
             ))}
           </tr>
@@ -126,14 +118,6 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
                 {row.production > 0 ? formatNumber(row.production) : "-"}
               </td>
 
-              {/* ADJ+ (placeholder) */}
-              <td className={clsx(
-                "px-3 py-2 text-right tabular-nums",
-                row.adj_in > 0 ? "text-teal-600" : "text-default-300"
-              )}>
-                {row.adj_in > 0 ? formatNumber(row.adj_in) : "-"}
-              </td>
-
               {/* Returns */}
               <td className={clsx(
                 "px-3 py-2 text-right tabular-nums",
@@ -148,14 +132,6 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
                 row.sold_out > 0 ? "text-rose-600 font-medium" : "text-default-400"
               )}>
                 {row.sold_out > 0 ? formatNumber(row.sold_out) : "-"}
-              </td>
-
-              {/* ADJ- (placeholder) */}
-              <td className={clsx(
-                "px-3 py-2 text-right tabular-nums",
-                row.adj_out > 0 ? "text-orange-600" : "text-default-300"
-              )}>
-                {row.adj_out > 0 ? formatNumber(row.adj_out) : "-"}
               </td>
 
               {/* FOC */}
@@ -184,20 +160,14 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
               <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right text-default-300">
                 —
               </td>
-              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-green-700">
+              <td className="w-24 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-green-700">
                 {formatNumber(monthlyTotals.production)}
-              </td>
-              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-teal-600">
-                {monthlyTotals.adj_in > 0 ? formatNumber(monthlyTotals.adj_in) : <span className="text-default-300">—</span>}
               </td>
               <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-blue-700">
                 {formatNumber(monthlyTotals.returns)}
               </td>
               <td className="w-24 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-rose-700">
                 {formatNumber(monthlyTotals.sold_out)}
-              </td>
-              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-orange-600">
-                {monthlyTotals.adj_out > 0 ? formatNumber(monthlyTotals.adj_out) : <span className="text-default-300">—</span>}
               </td>
               <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-purple-700">
                 {formatNumber(monthlyTotals.foc)}
