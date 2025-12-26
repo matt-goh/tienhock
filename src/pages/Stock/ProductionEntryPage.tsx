@@ -25,10 +25,25 @@ const ProductionEntryPage: React.FC = () => {
   );
   const [entries, setEntries] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [originalEntries, setOriginalEntries] = useState<
     Record<string, number>
   >({});
+
+  // Compute hasUnsavedChanges by comparing entries with originalEntries
+  const hasUnsavedChanges = useMemo(() => {
+    const currentKeys = Object.keys(entries);
+    const originalKeys = Object.keys(originalEntries);
+
+    // Different number of keys means changes
+    if (currentKeys.length !== originalKeys.length) return true;
+
+    // Check if all values match
+    for (const key of currentKeys) {
+      if (entries[key] !== originalEntries[key]) return true;
+    }
+
+    return false;
+  }, [entries, originalEntries]);
 
   // Get products cache
   const { products } = useProductsCache("all");
@@ -122,7 +137,6 @@ const ProductionEntryPage: React.FC = () => {
 
         setEntries(entriesMap);
         setOriginalEntries(entriesMap);
-        setHasUnsavedChanges(false);
       } catch (error) {
         console.error("Error fetching existing entries:", error);
         // Don't show error toast here as it's common to have no entries
@@ -145,7 +159,6 @@ const ProductionEntryPage: React.FC = () => {
       }
       return newEntries;
     });
-    setHasUnsavedChanges(true);
   }, []);
 
   // Handle save
@@ -184,7 +197,6 @@ const ProductionEntryPage: React.FC = () => {
         `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
       );
       setOriginalEntries({ ...entries });
-      setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Error saving production entries:", error);
       toast.error("Failed to save production entries");
@@ -196,7 +208,6 @@ const ProductionEntryPage: React.FC = () => {
   // Handle reset
   const handleReset = () => {
     setEntries({ ...originalEntries });
-    setHasUnsavedChanges(false);
   };
 
   // Format date for display (English full date + Malay weekday only)
@@ -269,7 +280,6 @@ const ProductionEntryPage: React.FC = () => {
                     )
                   ) {
                     setSelectedProductId(id);
-                    setHasUnsavedChanges(false);
                   }
                 } else {
                   setSelectedProductId(id);
@@ -311,7 +321,6 @@ const ProductionEntryPage: React.FC = () => {
                           )
                         ) {
                           setSelectedProductId(product.id);
-                          setHasUnsavedChanges(false);
                         }
                       } else {
                         setSelectedProductId(product.id);
