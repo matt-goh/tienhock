@@ -1,5 +1,5 @@
 // src/components/Stock/ProductSelector.tsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   Combobox,
   ComboboxInput,
@@ -7,10 +7,18 @@ import {
   ComboboxOptions,
   ComboboxOption,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck, IconSearch } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconCheck,
+  IconSearch,
+  IconStar,
+  IconStarFilled,
+} from "@tabler/icons-react";
 import clsx from "clsx";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { StockProduct } from "../../types/types";
+
+const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 interface ProductSelectorProps {
   value: string | null;
@@ -43,6 +51,40 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   const [query, setQuery] = useState("");
   const { products, isLoading } = useProductsCache("all");
 
+  // Favorites state - initialized from localStorage
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Toggle favorite and persist to localStorage
+  const toggleFavorite = useCallback(
+    (e: React.MouseEvent, productId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFavorites((prev) => {
+        const newFavorites = new Set(prev);
+        if (newFavorites.has(productId)) {
+          newFavorites.delete(productId);
+        } else {
+          newFavorites.add(productId);
+        }
+        localStorage.setItem(
+          FAVORITES_STORAGE_KEY,
+          JSON.stringify([...newFavorites])
+        );
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent("favorites-changed"));
+        return newFavorites;
+      });
+    },
+    []
+  );
+
   // Filter and group products by type
   const groupedProducts = useMemo(() => {
     const filtered = products.filter((product) =>
@@ -66,6 +108,15 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     return grouped;
   }, [products, productTypes]);
 
+  // Get favorite products
+  const favoriteProducts = useMemo(() => {
+    return products.filter(
+      (product) =>
+        favorites.has(product.id) &&
+        productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH")
+    ) as StockProduct[];
+  }, [products, favorites, productTypes]);
+
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
     if (!query) return groupedProducts;
@@ -80,7 +131,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
     Object.entries(groupedProducts).forEach(([type, prods]) => {
       filtered[type as keyof GroupedProducts] = prods.filter(
-        (product: { id: string; description: string; }) =>
+        (product: { id: string; description: string }) =>
           product.id.toLowerCase().includes(lowerQuery) ||
           product.description?.toLowerCase().includes(lowerQuery)
       );
@@ -88,6 +139,18 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
     return filtered;
   }, [groupedProducts, query]);
+
+  // Filter favorite products based on search query
+  const filteredFavorites = useMemo(() => {
+    if (!query) return favoriteProducts;
+
+    const lowerQuery = query.toLowerCase();
+    return favoriteProducts.filter(
+      (product) =>
+        product.id.toLowerCase().includes(lowerQuery) ||
+        product.description?.toLowerCase().includes(lowerQuery)
+    );
+  }, [favoriteProducts, query]);
 
   // Get selected product
   const selectedProduct = useMemo(() => {
@@ -97,8 +160,11 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
   // Check if there are any results
   const hasResults = useMemo(() => {
-    return Object.values(filteredProducts).some((group) => group.length > 0);
-  }, [filteredProducts]);
+    return (
+      filteredFavorites.length > 0 ||
+      Object.values(filteredProducts).some((group) => group.length > 0)
+    );
+  }, [filteredProducts, filteredFavorites]);
 
   // Category labels
   const categoryLabels: Record<string, string> = {
@@ -186,11 +252,75 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   </ComboboxOption>
                 )}
 
+                {/* Favorites category */}
+                {showCategories && filteredFavorites.length > 0 && (
+                  <div>
+                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 bg-amber-50">
+                      Favorites ({filteredFavorites.length})
+                    </div>
+                    {filteredFavorites.map((product) => (
+                      <ComboboxOption
+                        key={`fav-${product.id}`}
+                        value={product.id}
+                        className={({ active }) =>
+                          clsx(
+                            "relative cursor-pointer select-none py-2 pl-10 pr-10",
+                            active
+                              ? "bg-sky-100 text-sky-900"
+                              : "text-default-900"
+                          )
+                        }
+                      >
+                        {({ selected, active }) => (
+                          <>
+                            <div className="flex flex-col">
+                              <span
+                                className={clsx(
+                                  "block truncate font-medium",
+                                  selected && "font-semibold"
+                                )}
+                              >
+                                {product.id}
+                              </span>
+                              {product.description && (
+                                <span
+                                  className={clsx(
+                                    "block truncate text-xs",
+                                    active ? "text-sky-700" : "text-default-500"
+                                  )}
+                                >
+                                  {product.description}
+                                </span>
+                              )}
+                            </div>
+                            {selected && (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                <IconCheck className="h-4 w-4" aria-hidden="true" />
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleFavorite(e, product.id);
+                              }}
+                              className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-500 hover:text-amber-600"
+                            >
+                              <IconStarFilled className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </ComboboxOption>
+                    ))}
+                  </div>
+                )}
+
                 {/* Grouped products */}
                 {showCategories
                   ? productTypes.map((type) => {
-                      const products = filteredProducts[type];
-                      if (products.length === 0) return null;
+                      const prods = filteredProducts[type];
+                      if (prods.length === 0) return null;
 
                       return (
                         <div key={type}>
@@ -201,17 +331,17 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                               categoryColors[type] || "text-default-500 bg-default-50"
                             )}
                           >
-                            {categoryLabels[type]} ({products.length})
+                            {categoryLabels[type]} ({prods.length})
                           </div>
 
                           {/* Products in category */}
-                          {products.map((product) => (
+                          {prods.map((product) => (
                             <ComboboxOption
                               key={product.id}
                               value={product.id}
                               className={({ active }) =>
                                 clsx(
-                                  "relative cursor-pointer select-none py-2 pl-10 pr-4",
+                                  "relative cursor-pointer select-none py-2 pl-10 pr-10",
                                   active
                                     ? "bg-sky-100 text-sky-900"
                                     : "text-default-900"
@@ -243,18 +373,30 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                     )}
                                   </div>
                                   {selected && (
-                                    <span
-                                      className={clsx(
-                                        "absolute inset-y-0 left-0 flex items-center pl-3",
-                                        active ? "text-sky-600" : "text-sky-600"
-                                      )}
-                                    >
-                                      <IconCheck
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                      />
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                      <IconCheck className="h-4 w-4" aria-hidden="true" />
                                     </span>
                                   )}
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      toggleFavorite(e, product.id);
+                                    }}
+                                    className={clsx(
+                                      "absolute inset-y-0 right-0 flex items-center pr-3",
+                                      favorites.has(product.id)
+                                        ? "text-amber-500 hover:text-amber-600"
+                                        : "text-default-300 hover:text-amber-500"
+                                    )}
+                                  >
+                                    {favorites.has(product.id) ? (
+                                      <IconStarFilled className="h-4 w-4" />
+                                    ) : (
+                                      <IconStar className="h-4 w-4" />
+                                    )}
+                                  </button>
                                 </>
                               )}
                             </ComboboxOption>
@@ -271,7 +413,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                           value={product.id}
                           className={({ active }) =>
                             clsx(
-                              "relative cursor-pointer select-none py-2 pl-10 pr-4",
+                              "relative cursor-pointer select-none py-2 pl-10 pr-10",
                               active
                                 ? "bg-sky-100 text-sky-900"
                                 : "text-default-900"
@@ -303,18 +445,30 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                 )}
                               </div>
                               {selected && (
-                                <span
-                                  className={clsx(
-                                    "absolute inset-y-0 left-0 flex items-center pl-3",
-                                    active ? "text-sky-600" : "text-sky-600"
-                                  )}
-                                >
-                                  <IconCheck
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                  />
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                  <IconCheck className="h-4 w-4" aria-hidden="true" />
                                 </span>
                               )}
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  toggleFavorite(e, product.id);
+                                }}
+                                className={clsx(
+                                  "absolute inset-y-0 right-0 flex items-center pr-3",
+                                  favorites.has(product.id)
+                                    ? "text-amber-500 hover:text-amber-600"
+                                    : "text-default-300 hover:text-amber-500"
+                                )}
+                              >
+                                {favorites.has(product.id) ? (
+                                  <IconStarFilled className="h-4 w-4" />
+                                ) : (
+                                  <IconStar className="h-4 w-4" />
+                                )}
+                              </button>
                             </>
                           )}
                         </ComboboxOption>

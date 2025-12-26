@@ -11,7 +11,9 @@ import {
   ProductionWorker,
   StockProduct,
 } from "../../types/types";
-import { IconCalendar, IconDeviceFloppy, IconRefresh } from "@tabler/icons-react";
+import { IconCalendar, IconDeviceFloppy, IconRefresh, IconStarFilled } from "@tabler/icons-react";
+
+const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 const ProductionEntryPage: React.FC = () => {
   // State
@@ -32,6 +34,41 @@ const ProductionEntryPage: React.FC = () => {
 
   // Get products cache
   const { products } = useProductsCache("all");
+
+  // Get favorites from localStorage
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Listen for favorites changes (when favorites are updated in ProductSelector)
+  useEffect(() => {
+    const handleFavoritesChange = () => {
+      try {
+        const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+        setFavorites(stored ? new Set(JSON.parse(stored)) : new Set());
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    // Listen for custom event dispatched by ProductSelector
+    window.addEventListener("favorites-changed", handleFavoritesChange);
+    return () => window.removeEventListener("favorites-changed", handleFavoritesChange);
+  }, []);
+
+  // Get favorite products (only BH and MEE types)
+  const favoriteProducts = useMemo(() => {
+    return products.filter(
+      (product) =>
+        favorites.has(product.id) &&
+        (product.type === "BH" || product.type === "MEE")
+    ) as StockProduct[];
+  }, [products, favorites]);
 
   // Get selected product details
   const selectedProduct = useMemo(() => {
@@ -266,6 +303,38 @@ const ProductionEntryPage: React.FC = () => {
                 {selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING"}{" "}
                 job will be shown
               </p>
+            )}
+            {/* Quick access favorite pills */}
+            {favoriteProducts.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <IconStarFilled size={12} className="text-amber-500" />
+                {favoriteProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => {
+                      if (hasUnsavedChanges) {
+                        if (
+                          window.confirm(
+                            "You have unsaved changes. Do you want to discard them?"
+                          )
+                        ) {
+                          setSelectedProductId(product.id);
+                          setHasUnsavedChanges(false);
+                        }
+                      } else {
+                        setSelectedProductId(product.id);
+                      }
+                    }}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      selectedProductId === product.id
+                        ? "bg-sky-500 text-white"
+                        : "bg-default-100 text-default-600 hover:bg-default-200"
+                    }`}
+                  >
+                    {product.id}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
