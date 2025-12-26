@@ -223,14 +223,15 @@ export default function (pool) {
       const priorAdjOut = parseInt(priorAdjustmentsResult.rows[0]?.adj_out || 0);
 
       // Calculate opening balance (B/F)
+      // Returns DEDUCT from stock (products returned to supplier/factory)
       const openingBalance =
         initialBalance +
         priorProduction +
-        priorReturns +
         priorAdjIn -
         priorSold -
         priorFoc -
-        priorAdjOut;
+        priorAdjOut -
+        priorReturns;
 
       // Get production data grouped by date
       const productionQuery = `
@@ -347,15 +348,16 @@ export default function (pool) {
       for (const [, data] of dataByDate) {
         data.bf = runningBalance;
 
-        // C/F = B/F + PRODUCTION + ADJ_IN + RETURN - SOLD_OUT - ADJ_OUT - FOC
+        // C/F = B/F + PRODUCTION + ADJ_IN - SOLD_OUT - ADJ_OUT - FOC - RETURNS
+        // Returns DEDUCT from stock (products returned to supplier/factory)
         data.cf =
           data.bf +
           data.production +
-          data.adj_in +
-          data.returns -
+          data.adj_in -
           data.sold_out -
           data.adj_out -
-          data.foc;
+          data.foc -
+          data.returns;
 
         runningBalance = data.cf;
         movements.push(data);
