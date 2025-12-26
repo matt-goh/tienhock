@@ -127,8 +127,9 @@ export default function (pool) {
       }
 
       // Determine date range based on view type
+      // Use frontend-provided dates whenever available (frontend correctly handles all months including leap years)
       let dateRange;
-      if (view_type === "custom" && start_date && end_date) {
+      if (start_date && end_date) {
         dateRange = { startDate: start_date, endDate: end_date };
       } else {
         dateRange = getDateRange(
