@@ -80,7 +80,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
     Object.entries(groupedProducts).forEach(([type, prods]) => {
       filtered[type as keyof GroupedProducts] = prods.filter(
-        (product) =>
+        (product: { id: string; description: string; }) =>
           product.id.toLowerCase().includes(lowerQuery) ||
           product.description?.toLowerCase().includes(lowerQuery)
       );
@@ -197,7 +197,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                           {/* Category header */}
                           <div
                             className={clsx(
-                              "sticky top-0 px-4 py-2 text-xs font-semibold uppercase tracking-wider",
+                              "sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider",
                               categoryColors[type] || "text-default-500 bg-default-50"
                             )}
                           >
