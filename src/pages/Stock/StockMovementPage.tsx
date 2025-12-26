@@ -5,7 +5,8 @@ import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import StockMovementTable from "../../components/Stock/StockMovementTable";
 import Button from "../../components/Button";
-import { StockMovement, StockMovementResponse } from "../../types/types";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import { StockMovement, StockMovementResponse, StockProduct } from "../../types/types";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -15,8 +16,11 @@ import {
   IconEdit,
   IconCheck,
   IconX,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import clsx from "clsx";
+
+const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 type ViewType = "month" | "rolling" | "custom";
 
@@ -38,6 +42,43 @@ const StockMovementPage: React.FC = () => {
   const [isEditingBalance, setIsEditingBalance] = useState(false);
   const [editBalanceValue, setEditBalanceValue] = useState<string>("");
   const [isSavingBalance, setIsSavingBalance] = useState(false);
+
+  // Get products cache for favorites
+  const { products } = useProductsCache("all");
+
+  // Get favorites from localStorage
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Listen for favorites changes
+  useEffect(() => {
+    const handleFavoritesChange = () => {
+      try {
+        const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+        setFavorites(stored ? new Set(JSON.parse(stored)) : new Set());
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    window.addEventListener("favorites-changed", handleFavoritesChange);
+    return () => window.removeEventListener("favorites-changed", handleFavoritesChange);
+  }, []);
+
+  // Get favorite products (only BH and MEE types)
+  const favoriteProducts = useMemo(() => {
+    return products.filter(
+      (product) =>
+        favorites.has(product.id) &&
+        (product.type === "BH" || product.type === "MEE")
+    ) as StockProduct[];
+  }, [products, favorites]);
 
   // Calculate date range based on view type
   const dateRange = useMemo(() => {
@@ -192,6 +233,25 @@ const StockMovementPage: React.FC = () => {
               showCategories={true}
               required
             />
+            {/* Quick access favorite pills */}
+            {favoriteProducts.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <IconStarFilled size={12} className="text-amber-500" />
+                {favoriteProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => setSelectedProductId(product.id)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      selectedProductId === product.id
+                        ? "bg-sky-500 text-white"
+                        : "bg-default-100 text-default-600 hover:bg-default-200"
+                    }`}
+                  >
+                    {product.id}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* View Type Selector */}
