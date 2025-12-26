@@ -89,6 +89,14 @@ const StockMovementPage: React.FC = () => {
     ) as StockProduct[];
   }, [products, favorites]);
 
+  // Format date to YYYY-MM-DD in local timezone (not UTC)
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Calculate date range based on view type
   const dateRange = useMemo(() => {
     if (viewType === "month") {
@@ -97,16 +105,16 @@ const StockMovementPage: React.FC = () => {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0);
       return {
-        start: startDate.toISOString().split("T")[0],
-        end: endDate.toISOString().split("T")[0],
+        start: formatDateLocal(startDate),
+        end: formatDateLocal(endDate),
       };
     } else if (viewType === "rolling") {
       const today = new Date();
       const thirtyOneDaysAgo = new Date(today);
       thirtyOneDaysAgo.setDate(today.getDate() - 30);
       return {
-        start: thirtyOneDaysAgo.toISOString().split("T")[0],
-        end: today.toISOString().split("T")[0],
+        start: formatDateLocal(thirtyOneDaysAgo),
+        end: formatDateLocal(today),
       };
     } else {
       return {

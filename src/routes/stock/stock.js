@@ -85,6 +85,17 @@ export default function (pool) {
   initializeTables();
 
   /**
+   * Format date to YYYY-MM-DD in local timezone (not UTC)
+   * This prevents timezone issues where toISOString() converts to UTC
+   */
+  const formatDateLocal = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  /**
    * Helper function to get date range based on view type
    */
   const getDateRange = (viewType, year, month) => {
@@ -95,8 +106,8 @@ export default function (pool) {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0); // Last day of month
       return {
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
+        startDate: formatDateLocal(startDate),
+        endDate: formatDateLocal(endDate),
       };
     } else if (viewType === "rolling") {
       // Rolling 31-day view
@@ -104,16 +115,16 @@ export default function (pool) {
       const startDate = new Date(now);
       startDate.setDate(startDate.getDate() - 30);
       return {
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
+        startDate: formatDateLocal(startDate),
+        endDate: formatDateLocal(endDate),
       };
     } else {
       // Default: current month
       const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       return {
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
+        startDate: formatDateLocal(startDate),
+        endDate: formatDateLocal(endDate),
       };
     }
   };
@@ -311,11 +322,14 @@ export default function (pool) {
       const dataByDate = new Map();
 
       // Generate all dates in range
-      const currentDate = new Date(startDate);
-      const endDateObj = new Date(endDate);
+      // Parse dates carefully to avoid timezone issues
+      const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+      const [endYear, endMonth, endDay] = endDate.split("-").map(Number);
+      const currentDate = new Date(startYear, startMonth - 1, startDay);
+      const endDateObj = new Date(endYear, endMonth - 1, endDay);
 
       while (currentDate <= endDateObj) {
-        const dateStr = currentDate.toISOString().split("T")[0];
+        const dateStr = formatDateLocal(currentDate);
         dataByDate.set(dateStr, {
           date: dateStr,
           day: currentDate.getDate(),
