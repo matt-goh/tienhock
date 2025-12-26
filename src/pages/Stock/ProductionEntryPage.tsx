@@ -223,7 +223,7 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full space-y-6 p-4">
+    <div className="w-full space-y-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
