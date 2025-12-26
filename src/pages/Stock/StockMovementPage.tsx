@@ -236,7 +236,7 @@ const StockMovementPage: React.FC = () => {
                 >
                   <IconChevronLeft size={20} />
                 </button>
-                <div className="flex-1 rounded-lg border border-default-300 bg-default-50 px-4 py-2 text-center font-medium text-default-900">
+                <div className="flex-1 rounded-lg border border-default-300 bg-default-50 px-4 py-2 text-sm text-center font-medium text-default-900">
                   {formatMonthDisplay(selectedMonth)}
                 </div>
                 <button
