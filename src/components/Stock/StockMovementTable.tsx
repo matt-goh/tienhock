@@ -25,9 +25,9 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
   const columns = [
     { key: "day", label: "Day", align: "center" as const, width: "w-20" },
     { key: "bf", label: "B/F", align: "right" as const, width: "w-20", color: "text-default-600" },
-    { key: "production", label: "PROD", align: "right" as const, width: "w-20", color: "text-green-600" },
+    { key: "production", label: "PRODUCTION", align: "right" as const, width: "w-20", color: "text-green-600" },
     { key: "adj_in", label: "ADJ+", align: "right" as const, width: "w-20", color: "text-teal-600", placeholder: true },
-    { key: "returns", label: "RET", align: "right" as const, width: "w-20", color: "text-blue-600" },
+    { key: "returns", label: "RETURN", align: "right" as const, width: "w-20", color: "text-blue-600" },
     { key: "sold_out", label: "SOLD", align: "right" as const, width: "w-24", color: "text-rose-600" },
     { key: "adj_out", label: "ADJ-", align: "right" as const, width: "w-20", color: "text-orange-600", placeholder: true },
     { key: "foc", label: "FOC", align: "right" as const, width: "w-20", color: "text-purple-600" },
@@ -209,34 +209,6 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
           </tfoot>
         )}
       </table>
-
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-4 border-t border-default-200 pt-4 text-xs text-default-500">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-default-600">B/F:</span> Brought Forward
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-green-600">PROD:</span> Production
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-teal-600">ADJ+:</span> Adjustment In (TBD)
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-blue-600">RET:</span> Returns
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-rose-600">SOLD:</span> Sold/Out
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-orange-600">ADJ-:</span> Adjustment Out (TBD)
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-purple-600">FOC:</span> Free of Charge
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-default-900">C/F:</span> Carry Forward
-        </div>
-      </div>
     </div>
   );
 };
