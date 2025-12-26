@@ -449,56 +449,56 @@ const StockMovementPage: React.FC = () => {
       )}
 
       {/* Stock Movement Table */}
-      <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-default-900">
-            Daily Stock Movements
-          </h2>
-          {movements.length > 0 && (
-            <span className="text-sm text-default-500">
-              {movements.length} day{movements.length !== 1 ? "s" : ""} of data
-            </span>
-          )}
+      {!selectedProductId ? (
+        <div className="rounded-lg border border-dashed border-default-300 p-12 text-center">
+          <IconPackage className="mx-auto h-12 w-12 text-default-300" />
+          <p className="mt-4 text-default-500">
+            Please select a product to view stock movements
+          </p>
         </div>
-
-        {!selectedProductId ? (
-          <div className="rounded-lg border border-dashed border-default-300 p-12 text-center">
-            <IconPackage className="mx-auto h-12 w-12 text-default-300" />
-            <p className="mt-4 text-default-500">
-              Please select a product to view stock movements
-            </p>
-          </div>
-        ) : viewType === "custom" && (!customStartDate || !customEndDate) ? (
-          <div className="rounded-lg border border-dashed border-default-300 p-12 text-center">
-            <IconCalendar className="mx-auto h-12 w-12 text-default-300" />
-            <p className="mt-4 text-default-500">
-              Please select a date range to view stock movements
-            </p>
-          </div>
-        ) : (
-          <StockMovementTable
-            movements={movements}
-            monthlyTotals={monthlyTotals || undefined}
-            isLoading={isLoading}
-          />
-        )}
-      </div>
+      ) : viewType === "custom" && (!customStartDate || !customEndDate) ? (
+        <div className="rounded-lg border border-dashed border-default-300 p-12 text-center">
+          <IconCalendar className="mx-auto h-12 w-12 text-default-300" />
+          <p className="mt-4 text-default-500">
+            Please select a date range to view stock movements
+          </p>
+        </div>
+      ) : (
+        <StockMovementTable
+          movements={movements}
+          monthlyTotals={monthlyTotals || undefined}
+          isLoading={isLoading}
+        />
+      )}
 
       {/* Summary Cards */}
       {monthlyTotals && movements.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-default-700">
-              Summary for{" "}
-              <span className="text-default-900">
-                {viewType === "month"
-                  ? formatMonthDisplay(selectedMonth)
-                  : viewType === "rolling"
-                    ? `${new Date(dateRange.start).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} - ${new Date(dateRange.end).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`
-                    : `${new Date(customStartDate).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} - ${new Date(customEndDate).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`}
-              </span>
-            </h3>
-          </div>
+          <h3 className="text-sm font-medium text-default-700">
+            Summary for{" "}
+            <span className="text-default-900">
+              {viewType === "month"
+                ? formatMonthDisplay(selectedMonth)
+                : viewType === "rolling"
+                ? `${new Date(dateRange.start).toLocaleDateString("en-MY", {
+                    day: "numeric",
+                    month: "short",
+                  })} - ${new Date(dateRange.end).toLocaleDateString(
+                    "en-MY",
+                    { day: "numeric", month: "short" }
+                  )}`
+                : `${new Date(customStartDate).toLocaleDateString("en-MY", {
+                    day: "numeric",
+                    month: "short",
+                  })} - ${new Date(customEndDate).toLocaleDateString(
+                    "en-MY",
+                    { day: "numeric", month: "short" }
+                  )}`}
+            </span>{" "}
+            <span className="text-default-500">
+              ({movements.length} day{movements.length !== 1 ? "s" : ""})
+            </span>
+          </h3>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
             <SummaryCard
               label="Production"
