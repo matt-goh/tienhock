@@ -217,10 +217,10 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                     {index + 1}
                   </span>
                   <div className="flex flex-col min-w-0">
-                    <span className="font-medium text-default-900 text-sm truncate">
+                    <span className="font-medium text-default-900 text-sm truncate" title={worker.name}>
                       {worker.name}
                     </span>
-                    <span className="text-xs text-default-400 truncate">
+                    <span className="text-xs text-default-400 truncate" title={worker.id}>
                       {worker.id}
                     </span>
                   </div>
