@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import WorkerEntryGrid from "../../components/Stock/WorkerEntryGrid";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
   ProductionEntry,
   ProductionWorker,
@@ -22,9 +23,7 @@ const ProductionEntryPage: React.FC = () => {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     null
   );
-  const [workers, setWorkers] = useState<ProductionWorker[]>([]);
   const [entries, setEntries] = useState<Record<string, number>>({});
-  const [isLoadingWorkers, setIsLoadingWorkers] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [originalEntries, setOriginalEntries] = useState<
@@ -33,6 +32,9 @@ const ProductionEntryPage: React.FC = () => {
 
   // Get products cache
   const { products } = useProductsCache("all");
+
+  // Get staffs cache for production workers
+  const { staffs, loading: isLoadingWorkers } = useStaffsCache();
 
   // Get favorites from localStorage
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -84,31 +86,20 @@ const ProductionEntryPage: React.FC = () => {
     return selectedProduct.type === "MEE" ? "MEE" : "BH";
   }, [selectedProduct]);
 
-  // Fetch workers when product type changes
-  useEffect(() => {
-    const fetchWorkers = async () => {
-      if (!productType) {
-        setWorkers([]);
-        return;
-      }
+  // Filter workers from cached staffs based on product type
+  const workers: ProductionWorker[] = useMemo(() => {
+    if (!productType) return [];
 
-      setIsLoadingWorkers(true);
-      try {
-        const response = await api.get(
-          `/api/production-entries/workers?product_type=${productType}`
-        );
-        setWorkers(response || []);
-      } catch (error) {
-        console.error("Error fetching workers:", error);
-        toast.error("Failed to load workers");
-        setWorkers([]);
-      } finally {
-        setIsLoadingWorkers(false);
-      }
-    };
+    const jobFilter = productType === "MEE" ? "MEE_PACKING" : "BH_PACKING";
 
-    fetchWorkers();
-  }, [productType]);
+    return staffs
+      .filter((staff) => staff.job.includes(jobFilter))
+      .map((staff) => ({
+        id: staff.id,
+        name: staff.name,
+        job: staff.job,
+      }));
+  }, [staffs, productType]);
 
   // Fetch existing entries when date or product changes
   useEffect(() => {
