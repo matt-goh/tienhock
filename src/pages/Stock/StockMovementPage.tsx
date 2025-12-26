@@ -4,7 +4,6 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import StockMovementTable from "../../components/Stock/StockMovementTable";
-import Button from "../../components/Button";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { StockMovement, StockMovementResponse, StockProduct } from "../../types/types";
 import {
@@ -211,7 +210,7 @@ const StockMovementPage: React.FC = () => {
   }, [selectedMonth]);
 
   return (
-    <div className="w-full space-y-6 p-4">
+    <div className="w-full space-y-4 p-4">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-default-900">Stock Movement</h1>
@@ -356,16 +355,16 @@ const StockMovementPage: React.FC = () => {
 
       {/* Opening Balance */}
       {selectedProductId && (
-        <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
-                <IconPackage className="text-sky-600" size={20} />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">Opening Balance</p>
+        <div className="group rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+              <IconPackage className="text-sky-600" size={20} />
+            </div>
+            <div>
+              <p className="text-sm text-default-500">Opening Balance</p>
+              <div className="flex items-center gap-2">
                 {isEditingBalance ? (
-                  <div className="flex items-center gap-2 mt-1">
+                  <>
                     <input
                       type="number"
                       value={editBalanceValue}
@@ -388,21 +387,23 @@ const StockMovementPage: React.FC = () => {
                     >
                       <IconX size={18} />
                     </button>
-                  </div>
+                  </>
                 ) : (
-                  <p className="text-2xl font-bold text-default-900">
-                    {openingBalance.toLocaleString()}{" "}
-                    <span className="text-base font-normal text-default-500">bags</span>
-                  </p>
+                  <>
+                    <p className="text-2xl font-bold text-default-900">
+                      {openingBalance.toLocaleString()}{" "}
+                      <span className="text-base font-normal text-default-500">bags</span>
+                    </p>
+                    <button
+                      onClick={handleEditBalance}
+                      className="rounded-lg p-1.5 text-default-400 hover:bg-default-100 hover:text-default-600 transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <IconEdit size={18} />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
-            {!isEditingBalance && (
-              <Button onClick={handleEditBalance} color="default" size="sm">
-                <IconEdit size={16} className="mr-1" />
-                Edit
-              </Button>
-            )}
           </div>
           <p className="mt-2 text-xs text-default-400">
             Effective from: {dateRange.start}
