@@ -371,87 +371,237 @@ const StockMovementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Balance Section - Only show in month view */}
-      {selectedProductId && viewType === "month" && (
+      {/* Summary Section - Shows when data is available */}
+      {selectedProductId && monthlyTotals && movements.length > 0 && (
         <div className="group rounded-lg border border-default-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            {/* Left side - B/F (Brought Forward) */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
-                <IconPackage className="text-sky-600" size={20} />
+            {/* Left side - Main summary with | separators */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* B/F (Brought Forward) */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+                  <IconPackage className="text-sky-600" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm text-default-500">
+                    Brought Forward from{" "}
+                    {new Date(
+                      selectedMonth.getFullYear(),
+                      selectedMonth.getMonth() - 1,
+                      1
+                    ).toLocaleDateString("en-MY", { month: "short" })}
+                  </p>
+                  <p className="text-2xl font-bold text-default-900">
+                    {openingBalance.toLocaleString()}{" "}
+                    <span className="text-base font-normal text-default-500">
+                      bags
+                    </span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-default-500">
-                  Brought Forward from{" "}
-                  {new Date(
-                    selectedMonth.getFullYear(),
-                    selectedMonth.getMonth() - 1,
-                    1
-                  ).toLocaleDateString("en-MY", { month: "short" })}
+
+              <span className="text-default-200 text-xl">|</span>
+
+              {/* Stock In Group */}
+              <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-xs text-green-500">Production</p>
+                    <p className="text-lg font-bold tabular-nums text-green-700">
+                      {monthlyTotals.production.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="h-6 w-px bg-green-200" />
+                  <div>
+                    <p className="text-xs text-green-500">Returns</p>
+                    <p className="text-lg font-bold tabular-nums text-green-700">
+                      {monthlyTotals.returns.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="h-6 w-px bg-green-200" />
+                  <div>
+                    <p className="text-xs text-green-500">Adj+</p>
+                    <p className="text-lg font-bold tabular-nums text-green-700">
+                      {monthlyTotals.adj_in.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <span className="text-default-200 text-xl">|</span>
+
+              {/* Stock Out Group */}
+              <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-xs text-rose-500">Sold</p>
+                    <p className="text-lg font-bold tabular-nums text-rose-700">
+                      {monthlyTotals.sold_out.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="h-6 w-px bg-rose-200" />
+                  <div>
+                    <p className="text-xs text-rose-500">FOC</p>
+                    <p className="text-lg font-bold tabular-nums text-rose-700">
+                      {monthlyTotals.foc.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="h-6 w-px bg-rose-200" />
+                  <div>
+                    <p className="text-xs text-rose-500">Adj-</p>
+                    <p className="text-lg font-bold tabular-nums text-rose-700">
+                      {monthlyTotals.adj_out.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <span className="text-default-200 text-xl">|</span>
+
+              {/* Net Change */}
+              <div
+                className={clsx(
+                  "rounded-lg border px-3 py-1.5",
+                  monthlyTotals.production +
+                    monthlyTotals.returns +
+                    monthlyTotals.adj_in -
+                    monthlyTotals.sold_out -
+                    monthlyTotals.foc -
+                    monthlyTotals.adj_out >=
+                    0
+                    ? "border-green-200 bg-green-50"
+                    : "border-rose-200 bg-rose-50"
+                )}
+              >
+                <p
+                  className={clsx(
+                    "text-xs",
+                    monthlyTotals.production +
+                      monthlyTotals.returns +
+                      monthlyTotals.adj_in -
+                      monthlyTotals.sold_out -
+                      monthlyTotals.foc -
+                      monthlyTotals.adj_out >=
+                      0
+                      ? "text-green-500"
+                      : "text-rose-500"
+                  )}
+                >
+                  Net Change
                 </p>
-                <p className="text-2xl font-bold text-default-900">
-                  {openingBalance.toLocaleString()}{" "}
-                  <span className="text-base font-normal text-default-500">
-                    bags
-                  </span>
+                <p
+                  className={clsx(
+                    "text-lg font-bold tabular-nums",
+                    monthlyTotals.production +
+                      monthlyTotals.returns +
+                      monthlyTotals.adj_in -
+                      monthlyTotals.sold_out -
+                      monthlyTotals.foc -
+                      monthlyTotals.adj_out >=
+                      0
+                      ? "text-green-700"
+                      : "text-rose-700"
+                  )}
+                >
+                  {monthlyTotals.production +
+                    monthlyTotals.returns +
+                    monthlyTotals.adj_in -
+                    monthlyTotals.sold_out -
+                    monthlyTotals.foc -
+                    monthlyTotals.adj_out >=
+                  0
+                    ? "+"
+                    : ""}
+                  {(
+                    monthlyTotals.production +
+                    monthlyTotals.returns +
+                    monthlyTotals.adj_in -
+                    monthlyTotals.sold_out -
+                    monthlyTotals.foc -
+                    monthlyTotals.adj_out
+                  ).toLocaleString()}
                 </p>
+              </div>
+
+              <span className="text-default-200 text-xl">|</span>
+
+              {/* Closing Balance */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+                  <IconPackage className="text-sky-600" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm text-default-500">
+                    Carry Forward to{" "}
+                    {new Date(
+                      selectedMonth.getFullYear(),
+                      selectedMonth.getMonth() + 1,
+                      1
+                    ).toLocaleDateString("en-MY", { month: "short" })}
+                  </p>
+                  <p className="text-2xl font-bold text-default-900">
+                    {movements[movements.length - 1]?.cf.toLocaleString()}{" "}
+                    <span className="text-base font-normal text-default-500">
+                      bags
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* Divider - only visible on hover */}
-            <div className="h-12 w-px bg-default-200 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="h-12 w-px bg-default-200 opacity-0 group-hover:opacity-100 transition-opacity ml-3" />
 
             {/* Right side - Initial Balance (editable for migration) - only visible on hover */}
-            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div>
-                <p className="text-sm text-default-500 text-right">
-                  Initial Global Balance (dari system lama)
-                </p>
-                <div className="flex justify-end items-center gap-2">
-                  {isEditingBalance ? (
-                    <>
-                      <input
-                        type="number"
-                        value={editBalanceValue}
-                        onChange={(e) => setEditBalanceValue(e.target.value)}
-                        min="0"
-                        className="w-32 rounded-lg border border-default-300 px-3 py-1 text-lg font-bold text-right focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleSaveBalance}
-                        disabled={isSavingBalance}
-                        className="rounded-lg bg-green-500 p-1.5 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
-                      >
-                        <IconCheck size={18} />
-                      </button>
-                      <button
-                        onClick={handleCancelEditBalance}
-                        disabled={isSavingBalance}
-                        className="rounded-lg bg-default-200 p-1.5 text-default-600 hover:bg-default-300 transition-colors disabled:opacity-50"
-                      >
-                        <IconX size={18} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold text-default-900 text-right">
-                        {initialBalance.toLocaleString()}{" "}
-                        <span className="text-base font-normal text-default-500">
-                          bags
-                        </span>
-                      </p>
-                      <button
-                        onClick={handleEditBalance}
-                        className="rounded-lg p-1.5 text-default-400 hover:bg-default-100 hover:text-default-600 transition-all opacity-0 group-hover:opacity-100"
-                      >
-                        <IconEdit size={18} />
-                      </button>
-                    </>
-                  )}
+            {viewType === "month" && (
+              <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div>
+                  <p className="text-xs text-default-400 text-right">
+                    Initial Balance
+                  </p>
+                  <div className="flex justify-end items-center gap-2">
+                    {isEditingBalance ? (
+                      <>
+                        <input
+                          type="number"
+                          value={editBalanceValue}
+                          onChange={(e) => setEditBalanceValue(e.target.value)}
+                          min="0"
+                          className="w-24 rounded-lg border border-default-300 px-2 py-1 text-sm font-bold text-right focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleSaveBalance}
+                          disabled={isSavingBalance}
+                          className="rounded-lg bg-green-500 p-1 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                        >
+                          <IconCheck size={16} />
+                        </button>
+                        <button
+                          onClick={handleCancelEditBalance}
+                          disabled={isSavingBalance}
+                          className="rounded-lg bg-default-200 p-1 text-default-600 hover:bg-default-300 transition-colors disabled:opacity-50"
+                        >
+                          <IconX size={16} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-lg font-bold tabular-nums text-default-800">
+                          {initialBalance.toLocaleString()}
+                        </p>
+                        <button
+                          onClick={handleEditBalance}
+                          className="rounded-lg p-1 text-default-400 hover:bg-default-100 hover:text-default-600 transition-all"
+                        >
+                          <IconEdit size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -479,191 +629,6 @@ const StockMovementPage: React.FC = () => {
         />
       )}
 
-      {/* Summary Overview */}
-      {monthlyTotals && movements.length > 0 && (
-        <div className="rounded-lg border border-default-200 bg-white p-5 shadow-sm">
-          {/* Header */}
-          <h3 className="mb-4 text-sm font-medium text-default-700">
-            Summary for{" "}
-            <span className="text-default-900">
-              {viewType === "month"
-                ? formatMonthDisplay(selectedMonth)
-                : viewType === "rolling"
-                ? `${new Date(dateRange.start).toLocaleDateString("en-MY", {
-                    day: "numeric",
-                    month: "short",
-                  })} - ${new Date(dateRange.end).toLocaleDateString("en-MY", {
-                    day: "numeric",
-                    month: "short",
-                  })}`
-                : `${new Date(customStartDate).toLocaleDateString("en-MY", {
-                    day: "numeric",
-                    month: "short",
-                  })} - ${new Date(customEndDate).toLocaleDateString("en-MY", {
-                    day: "numeric",
-                    month: "short",
-                  })}`}
-            </span>{" "}
-            <span className="text-default-400">
-              ({movements.length} day{movements.length !== 1 ? "s" : ""})
-            </span>
-          </h3>
-
-          {/* Combined Overview */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Opening Balance */}
-            <div className="flex items-center gap-3 rounded-lg border border-default-200 bg-default-50 px-4 py-2.5">
-              <div>
-                <p className="text-xs text-default-400">
-                  B/F (
-                  {new Date(
-                    selectedMonth.getFullYear(),
-                    selectedMonth.getMonth() - 1,
-                    1
-                  ).toLocaleDateString("en-MY", { month: "short" })}
-                  )
-                </p>
-                <p className="text-xl font-bold tabular-nums text-default-800">
-                  {openingBalance.toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            <span className="text-default-200">|</span>
-
-            {/* Stock In Group */}
-            <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-xs text-green-500">Production</p>
-                  <p className="text-xl font-bold tabular-nums text-green-700">
-                    {monthlyTotals.production.toLocaleString()}
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-green-200" />
-                <div>
-                  <p className="text-xs text-green-500">Returns</p>
-                  <p className="text-xl font-bold tabular-nums text-green-700">
-                    {monthlyTotals.returns.toLocaleString()}
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-green-200" />
-                <div>
-                  <p className="text-xs text-green-500">Adj In</p>
-                  <p className="text-xl font-bold tabular-nums text-green-700">
-                    {monthlyTotals.adj_in.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <span className="text-default-200">|</span>
-
-            {/* Stock Out Group */}
-            <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-xs text-rose-500">Sold</p>
-                  <p className="text-xl font-bold tabular-nums text-rose-700">
-                    {monthlyTotals.sold_out.toLocaleString()}
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-rose-200" />
-                <div>
-                  <p className="text-xs text-rose-500">FOC</p>
-                  <p className="text-xl font-bold tabular-nums text-rose-700">
-                    {monthlyTotals.foc.toLocaleString()}
-                  </p>
-                </div>
-                <div className="h-8 w-px bg-rose-200" />
-                <div>
-                  <p className="text-xs text-rose-500">Adj Out</p>
-                  <p className="text-xl font-bold tabular-nums text-rose-700">
-                    {monthlyTotals.adj_out.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <span className="text-default-200">|</span>
-
-            {/* Net Change */}
-            <div
-              className={clsx(
-                "rounded-lg border px-4 py-2.5",
-                monthlyTotals.production +
-                  monthlyTotals.returns +
-                  monthlyTotals.adj_in -
-                  monthlyTotals.sold_out -
-                  monthlyTotals.foc -
-                  monthlyTotals.adj_out >=
-                  0
-                  ? "border-green-200 bg-green-50"
-                  : "border-rose-200 bg-rose-50"
-              )}
-            >
-              <p
-                className={clsx(
-                  "text-xs",
-                  monthlyTotals.production +
-                    monthlyTotals.returns +
-                    monthlyTotals.adj_in -
-                    monthlyTotals.sold_out -
-                    monthlyTotals.foc -
-                    monthlyTotals.adj_out >=
-                    0
-                    ? "text-green-500"
-                    : "text-rose-500"
-                )}
-              >
-                Net Change
-              </p>
-              <p
-                className={clsx(
-                  "text-xl font-bold tabular-nums",
-                  monthlyTotals.production +
-                    monthlyTotals.returns +
-                    monthlyTotals.adj_in -
-                    monthlyTotals.sold_out -
-                    monthlyTotals.foc -
-                    monthlyTotals.adj_out >=
-                    0
-                    ? "text-green-700"
-                    : "text-rose-700"
-                )}
-              >
-                {monthlyTotals.production +
-                  monthlyTotals.returns +
-                  monthlyTotals.adj_in -
-                  monthlyTotals.sold_out -
-                  monthlyTotals.foc -
-                  monthlyTotals.adj_out >=
-                0
-                  ? "+"
-                  : ""}
-                {(
-                  monthlyTotals.production +
-                  monthlyTotals.returns +
-                  monthlyTotals.adj_in -
-                  monthlyTotals.sold_out -
-                  monthlyTotals.foc -
-                  monthlyTotals.adj_out
-                ).toLocaleString()}
-              </p>
-            </div>
-
-            <span className="text-default-200">|</span>
-
-            {/* Closing Balance */}
-            <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5">
-              <p className="text-xs font-medium text-sky-500">Closing Balance</p>
-              <p className="text-xl font-bold tabular-nums text-sky-700">
-                {movements[movements.length - 1]?.cf.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
