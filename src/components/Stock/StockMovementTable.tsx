@@ -72,7 +72,7 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-lg border border-default-200 bg-white">
       <table className="w-full border-collapse">
         {/* Header */}
         <thead>
