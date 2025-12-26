@@ -159,10 +159,6 @@ export default function (pool) {
 
       const { startDate, endDate } = dateRange;
 
-      // Convert dates to timestamps for invoice queries (milliseconds)
-      const startTimestamp = new Date(startDate).setHours(0, 0, 0, 0);
-      const endTimestamp = new Date(endDate).setHours(23, 59, 59, 999);
-
       // Get product info
       const productQuery = `SELECT id, description, type FROM products WHERE id = $1`;
       const productResult = await pool.query(productQuery, [product_id]);
@@ -189,13 +185,13 @@ export default function (pool) {
 
       // Calculate brought forward (B/F) by summing all movements BEFORE start date
       // B/F = Initial Balance + (production + returns + adj_in) - (sold + foc + adj_out) before start_date
-      const priorStartTimestamp = new Date(startDate).setHours(0, 0, 0, 0) - 1; // Day before start
+      // Use DATE comparison for consistency (not timestamp)
 
       // Get prior production total
       const priorProductionQuery = `
         SELECT COALESCE(SUM(bags_packed), 0) as total
         FROM production_entries
-        WHERE product_id = $1 AND entry_date < $2
+        WHERE product_id = $1 AND entry_date < $2::date
       `;
       const priorProductionResult = await pool.query(priorProductionQuery, [
         product_id,
@@ -204,6 +200,7 @@ export default function (pool) {
       const priorProduction = parseInt(priorProductionResult.rows[0]?.total || 0);
 
       // Get prior sales totals (sold, foc, returns)
+      // Use DATE extraction to match the period query's date grouping logic
       const priorSalesQuery = `
         SELECT
           COALESCE(SUM(od.quantity), 0) as sold,
@@ -215,11 +212,11 @@ export default function (pool) {
           AND i.invoice_status != 'cancelled'
           AND od.issubtotal IS NOT TRUE
           AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-          AND CAST(i.createddate AS bigint) < $2
+          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) < $2::date
       `;
       const priorSalesResult = await pool.query(priorSalesQuery, [
         product_id,
-        priorStartTimestamp.toString(),
+        startDate,
       ]);
       const priorSold = parseInt(priorSalesResult.rows[0]?.sold || 0);
       const priorFoc = parseInt(priorSalesResult.rows[0]?.foc || 0);
@@ -269,6 +266,7 @@ export default function (pool) {
       ]);
 
       // Get sales data from order_details (sold, FOC, returns)
+      // Use DATE comparison for consistency with prior sales query
       const salesQuery = `
         SELECT
           DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000))::text as date,
@@ -281,14 +279,14 @@ export default function (pool) {
           AND i.invoice_status != 'cancelled'
           AND od.issubtotal IS NOT TRUE
           AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-          AND CAST(i.createddate AS bigint) BETWEEN $2 AND $3
+          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) BETWEEN $2::date AND $3::date
         GROUP BY DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000))
         ORDER BY date
       `;
       const salesResult = await pool.query(salesQuery, [
         product_id,
-        startTimestamp.toString(),
-        endTimestamp.toString(),
+        startDate,
+        endDate,
       ]);
 
       // Get adjustments data (for future use)

@@ -21,14 +21,16 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
   monthlyTotals,
   isLoading = false,
 }) => {
-  // Column headers configuration (ADJ+/ADJ- only shown in footer totals, not daily rows)
+  // Column headers configuration
   const columns = [
     { key: "day", label: "Day", align: "center" as const, width: "w-20" },
     { key: "bf", label: "B/F", align: "right" as const, width: "w-20", color: "text-default-600" },
     { key: "production", label: "PRODUCTION", align: "right" as const, width: "w-24", color: "text-green-600" },
-    { key: "returns", label: "RETURN", align: "right" as const, width: "w-20", color: "text-blue-600" },
+    { key: "returns", label: "RETURN", align: "right" as const, width: "w-20", color: "text-green-600" },
+    { key: "adj_in", label: "ADJ+", align: "right" as const, width: "w-20", color: "text-green-600" },
     { key: "sold_out", label: "SOLD", align: "right" as const, width: "w-24", color: "text-rose-600" },
-    { key: "foc", label: "FOC", align: "right" as const, width: "w-20", color: "text-purple-600" },
+    { key: "foc", label: "FOC", align: "right" as const, width: "w-20", color: "text-rose-600" },
+    { key: "adj_out", label: "ADJ-", align: "right" as const, width: "w-20", color: "text-rose-600" },
     { key: "cf", label: "C/F", align: "right" as const, width: "w-20", color: "text-default-900 font-semibold" },
   ];
 
@@ -121,9 +123,17 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
               {/* Returns */}
               <td className={clsx(
                 "px-3 py-2 text-right tabular-nums",
-                row.returns > 0 ? "text-blue-600" : "text-default-400"
+                row.returns > 0 ? "text-green-600" : "text-default-400"
               )}>
                 {row.returns > 0 ? formatNumber(row.returns) : "-"}
+              </td>
+
+              {/* ADJ+ */}
+              <td className={clsx(
+                "px-3 py-2 text-right tabular-nums",
+                row.adj_in > 0 ? "text-green-600" : "text-default-400"
+              )}>
+                {row.adj_in > 0 ? formatNumber(row.adj_in) : "-"}
               </td>
 
               {/* Sold/Out */}
@@ -137,9 +147,17 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
               {/* FOC */}
               <td className={clsx(
                 "px-3 py-2 text-right tabular-nums",
-                row.foc > 0 ? "text-purple-600" : "text-default-400"
+                row.foc > 0 ? "text-rose-600" : "text-default-400"
               )}>
                 {row.foc > 0 ? formatNumber(row.foc) : "-"}
+              </td>
+
+              {/* ADJ- */}
+              <td className={clsx(
+                "px-3 py-2 text-right tabular-nums",
+                row.adj_out > 0 ? "text-rose-600" : "text-default-400"
+              )}>
+                {row.adj_out > 0 ? formatNumber(row.adj_out) : "-"}
               </td>
 
               {/* C/F */}
@@ -163,17 +181,23 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
               <td className="w-24 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-green-700">
                 {formatNumber(monthlyTotals.production)}
               </td>
-              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-blue-700">
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-green-700">
                 {formatNumber(monthlyTotals.returns)}
+              </td>
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-green-700">
+                {formatNumber(monthlyTotals.adj_in)}
               </td>
               <td className="w-24 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-rose-700">
                 {formatNumber(monthlyTotals.sold_out)}
               </td>
-              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-purple-700">
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-rose-700">
                 {formatNumber(monthlyTotals.foc)}
               </td>
-              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right text-default-300">
-                —
+              <td className="w-20 border-t-2 border-default-300 px-3 py-2 text-right tabular-nums font-semibold text-rose-700">
+                {formatNumber(monthlyTotals.adj_out)}
+              </td>
+              <td className="w-20 border-l border-t-2 border-default-300 bg-sky-50 px-3 py-2 text-right tabular-nums font-bold text-sky-700">
+                {formatNumber(movements[movements.length - 1]?.cf)}
               </td>
             </tr>
           </tfoot>
