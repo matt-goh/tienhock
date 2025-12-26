@@ -129,11 +129,11 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
         disabled={disabled || isLoading}
       >
         <div className="relative">
-          <div className="relative w-full">
+          <ComboboxButton as="div" className="relative w-full cursor-pointer">
             <ComboboxInput
               className={clsx(
                 "w-full rounded-lg border border-default-300 bg-white py-2 pl-10 pr-10",
-                "text-sm leading-5 text-default-900",
+                "text-sm leading-5 text-default-900 cursor-pointer",
                 "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
                 "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
               )}
@@ -148,13 +148,13 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <IconSearch className="h-4 w-4 text-default-400" />
             </div>
-            <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
                 className="h-5 w-5 text-default-400"
                 aria-hidden="true"
               />
-            </ComboboxButton>
-          </div>
+            </div>
+          </ComboboxButton>
 
           <ComboboxOptions
             className={clsx(
