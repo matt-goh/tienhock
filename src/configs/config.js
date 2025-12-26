@@ -57,12 +57,12 @@ export const {
   SERVER_PORT: getEnvVariable("SERVER_PORT", "5000"),
   SERVER_HOST: getEnvVariable("SERVER_HOST", "0.0.0.0"),
 
-  // Database Configuration
+  // Database Configuration (defaults match dev Docker config)
   DB_USER: getEnvVariable("DB_USER", "postgres"),
   DB_HOST: getEnvVariable("DB_HOST", "localhost"),
   DB_NAME: getEnvVariable("DB_NAME", "tienhock"),
-  DB_PASSWORD: getEnvVariable("DB_PASSWORD", ""),
-  DB_PORT: getEnvVariable("DB_PORT", "5432"),
+  DB_PASSWORD: getEnvVariable("DB_PASSWORD", "foodmaker"),
+  DB_PORT: getEnvVariable("DB_PORT", "5434"),
 
   // MyInvois Configuration
   MYINVOIS_API_BASE_URL: getEnvVariable("MYINVOIS_API_BASE_URL", ""),

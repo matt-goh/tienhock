@@ -19,13 +19,13 @@ const port = 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Create enhanced PostgreSQL pool
+// Create enhanced PostgreSQL pool (defaults match dev Docker config)
 export const pool = createDatabasePool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  user: process.env.DB_USER || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  database: process.env.DB_NAME || "tienhock",
+  password: process.env.DB_PASSWORD || "foodmaker",
+  port: process.env.DB_PORT || 5434,
 });
 
 // Middleware to handle database maintenance mode
