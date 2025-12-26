@@ -5,6 +5,7 @@ import {
   IconListDetails,
   IconUserDollar,
   IconReportMoney,
+  IconPackage,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
@@ -25,6 +26,10 @@ import PaymentPage from "./Payments/PaymentPage";
 // Sales related imports
 import SalesSummaryPage from "./Sales/SalesSummaryPage";
 
+// Stock related imports
+import ProductionEntryPage from "./Stock/ProductionEntryPage";
+import StockMovementPage from "./Stock/StockMovementPage";
+
 // Payroll related imports
 import DailyLogListPage from "./Payroll/DailyLogListPage";
 import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
@@ -33,6 +38,7 @@ import DailyLogEditPage from "./Payroll/DailyLogEditPage";
 import MonthlyLogListPage from "./Payroll/MonthlyLogListPage";
 import MonthlyLogEntryPage from "./Payroll/MonthlyLogEntryPage";
 import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
+import MonthlyLogEditPage from "./Payroll/MonthlyLogEditPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
@@ -43,6 +49,7 @@ import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 import IncentivesPage from "./Payroll/IncentivesPage";
 import PinjamListPage from "./Payroll/PinjamListPage";
 import SalaryReportPage from "./Payroll/SalaryReportPage";
+import ECarumanPage from "./Payroll/ECarumanPage";
 
 // Catalogue related imports
 // Staff
@@ -103,6 +110,12 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: SalaryReportPage,
   });
 
+  payrollSubItems.push({
+    name: "e-Caruman",
+    path: "/payroll/e-caruman",
+    component: ECarumanPage,
+  });
+
   // Add each production type dynamically
   Object.values(JOB_CONFIGS).forEach((jobConfig) => {
     const jobTypeLower = jobConfig.id.toLowerCase().replace("_", "-");
@@ -136,11 +149,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
             name: "Edit Log",
             path: `/payroll/${jobTypeLower}-monthly/:id/edit`,
             component: (props: any) => (
-              <MonthlyLogEntryPage
-                mode="edit"
-                jobType={jobConfig.id}
-                {...props}
-              />
+              <MonthlyLogEditPage jobType={jobConfig.id} {...props} />
             ),
           },
         ],
@@ -182,12 +191,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Cuti Management",
-    path: "/payroll/cuti-management",
-    component: CutiManagementPage,
-  });
-
-  payrollSubItems.push({
     name: "Mid-month Pay",
     path: "/payroll/mid-month-payrolls",
     component: MidMonthPayrollPage,
@@ -203,12 +206,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "Pinjam",
     path: "/payroll/pinjam",
     component: PinjamListPage,
-  });
-
-  payrollSubItems.push({
-    name: "Contribution Rates",
-    path: "/payroll/contribution-rates",
-    component: ContributionRatesPage,
   });
 
   return payrollSubItems;
@@ -310,6 +307,22 @@ export const TienHockSidebarData: SidebarItem[] = [
     ],
   },
   {
+    name: "Stock",
+    icon: IconPackage,
+    subItems: [
+      {
+        name: "Production Entry",
+        path: "/stock/production",
+        component: ProductionEntryPage,
+      },
+      {
+        name: "Stock Movement",
+        path: "/stock/movement",
+        component: StockMovementPage,
+      },
+    ],
+  },
+  {
     name: "Catalogue",
     icon: IconListDetails,
     subItems: [
@@ -368,6 +381,16 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Pay Codes",
         path: "/catalogue/pay-codes",
         component: PayCodePage,
+      },
+      {
+        name: "Cuti Management",
+        path: "/catalogue/cuti-management",
+        component: CutiManagementPage,
+      },
+      {
+        name: "Contribution Rates",
+        path: "/catalogue/contribution-rates",
+        component: ContributionRatesPage,
       },
       {
         name: "Job Category",

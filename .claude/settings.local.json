@@ -11,7 +11,16 @@
       "Bash(npx tsc:*)",
       "Bash(cat:*)",
       "Bash(findstr:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(where:*)",
+      "Bash(docker exec:*)",
+      "Bash(if not exist \"c:\\\\tienhock\\\\src\\\\utils\\\\accounting\" mkdir \"c:\\\\tienhock\\\\src\\\\utils\\\\accounting\")",
+      "Bash(del \"c:\\\\tienhock\\\\start-dev.bat\")",
+      "Bash(cmd /c del \"c:\\\\tienhock\\\\start-dev.bat\")"
     ],
     "deny": []
   }

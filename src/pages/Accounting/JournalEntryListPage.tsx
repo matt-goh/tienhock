@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { JournalEntry, JournalEntryTypeInfo } from "../../types/types";
+import { JournalEntry } from "../../types/types";
+import { useJournalEntryTypesCache } from "../../utils/accounting/useAccountingCache";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -14,7 +15,6 @@ import {
   IconTrash,
   IconEye,
   IconCheck,
-  IconFilter,
   IconRefresh,
 } from "@tabler/icons-react";
 import {
@@ -32,9 +32,11 @@ interface JournalEntryListItem extends JournalEntry {
 const JournalEntryListPage: React.FC = () => {
   const navigate = useNavigate();
 
+  // Cached entry types
+  const { entryTypes } = useJournalEntryTypesCache();
+
   // Data state
   const [entries, setEntries] = useState<JournalEntryListItem[]>([]);
-  const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -55,18 +57,6 @@ const JournalEntryListPage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<JournalEntryListItem | null>(null);
 
-  // Fetch entry types
-  useEffect(() => {
-    const fetchTypes = async () => {
-      try {
-        const response = await api.get("/api/journal-entries/types");
-        setEntryTypes(response as JournalEntryTypeInfo[]);
-      } catch (error) {
-        console.error("Error fetching entry types:", error);
-      }
-    };
-    fetchTypes();
-  }, []);
 
   // Fetch entries
   const fetchEntries = useCallback(async () => {
@@ -243,7 +233,7 @@ const JournalEntryListPage: React.FC = () => {
                     <IconChevronDown size={16} className="text-gray-400" />
                   </span>
                 </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 min-w-[280px] overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <ListboxOptions className="absolute z-10 mt-1 max-h-60 min-w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                   <ListboxOption
                     value="All"
                     className={({ active }) =>

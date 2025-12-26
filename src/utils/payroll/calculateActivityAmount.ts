@@ -12,10 +12,17 @@ export function calculateActivityAmount(
 
   switch (activity.rateUnit) {
     case "Hour":
-      // For overtime pay codes, only apply to hours beyond 8
+      // For overtime pay codes, use hoursApplied if provided (for monthly entries)
+      // Otherwise calculate overtime as hours beyond 8 (for daily entries)
       if (activity.payType === "Overtime") {
-        const overtimeHours = Math.max(0, hours - 8);
-        calculatedAmount = activity.rate * overtimeHours;
+        if (activity.hoursApplied !== undefined && activity.hoursApplied !== null) {
+          // Monthly entry: use the explicitly provided overtime hours
+          calculatedAmount = activity.rate * activity.hoursApplied;
+        } else {
+          // Daily entry: calculate overtime as hours beyond 8
+          const overtimeHours = Math.max(0, hours - 8);
+          calculatedAmount = activity.rate * overtimeHours;
+        }
       } else {
         calculatedAmount = activity.rate * hours;
       }

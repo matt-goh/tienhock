@@ -1,0 +1,7 @@
+{
+  "watch": ["server.js", "src/routes", "src/utils", "src/middleware"],
+  "ignore": ["node_modules", "build", "src/pages", "src/components"],
+  "ext": "js,json",
+  "delay": 1000,
+  "verbose": false
+}

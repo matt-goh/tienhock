@@ -124,8 +124,6 @@ const DebtorsReportPage: React.FC = () => {
         url += `?month=${params.month}&year=${params.year}`;
       }
 
-      console.log("Fetching debtors from URL:", url); // For debugging
-
       try {
         setLoading(true);
         setError(null);

@@ -19,7 +19,6 @@ import ManageActivitiesModal, { ActivityItem } from "../../components/Payroll/Ma
 import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
 import {
   calculateActivityAmount,
-  calculateActivitiesAmounts,
 } from "../../utils/payroll/calculateActivityAmount";
 import {
   Dialog,
@@ -100,6 +99,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   // Leave state
   const [existingLeaveRecords, setExistingLeaveRecords] = useState<LeaveEntry[]>([]);
   const [newLeaveEntries, setNewLeaveEntries] = useState<LeaveEntry[]>([]);
+  const [deletedLeaveIds, setDeletedLeaveIds] = useState<number[]>([]);
   const [showAddLeaveModal, setShowAddLeaveModal] = useState(false);
   const [leaveFormData, setLeaveFormData] = useState({
     employeeId: "",
@@ -200,7 +200,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       const newEmployeeActivities: Record<string, ActivityItem[]> = {};
 
       selectedEntries.forEach((entry) => {
-        const { employeeId, jobType: entryJobType, totalHours } = entry;
+        const { employeeId, jobType: entryJobType, totalHours, overtimeHours } = entry;
 
         // Get job pay codes from cache
         const jobPayCodes = jobPayCodeDetails[entryJobType] || [];
@@ -227,12 +227,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         // Get existing activities for this employee if in edit mode
         const existingActivitiesForEmployee = currentActivities[employeeId] || [];
 
-        // Filter out overtime codes if hours <= 8 (per day, so for monthly check typical daily hours)
-        const dailyHours = totalHours / 22; // Approximate daily hours
-        const filteredPayCodes =
-          dailyHours > 8
-            ? mergedPayCodes
-            : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
+        // Filter out overtime codes if no overtime hours entered
+        const hasOvertimeHours = overtimeHours > 0;
+        const filteredPayCodes = hasOvertimeHours
+          ? mergedPayCodes
+          : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
 
         // Convert to activity format
         const activities: ActivityItem[] = filteredPayCodes.map((payCode: any) => {
@@ -257,7 +256,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             if (payCode.pay_type === "Tambahan") {
               isSelected = false;
             } else if (payCode.pay_type === "Overtime") {
-              isSelected = dailyHours > 8;
+              isSelected = hasOvertimeHours;
             } else if (payCode.pay_type === "Base") {
               isSelected = payCode.is_default_setting;
             } else {
@@ -282,6 +281,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             ? 0
             : undefined;
 
+          // For overtime activities, use overtime hours; otherwise use total hours
+          const hoursToApply = payCode.pay_type === "Overtime" ? overtimeHours : totalHours;
+
           return {
             payCodeId: payCode.id,
             description: payCode.description,
@@ -291,6 +293,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             isDefault: payCode.is_default_setting,
             isSelected: isSelected,
             unitsProduced: unitsProduced,
+            hoursApplied: hoursToApply,
             isContextLinked: isContextLinked,
             source: payCode.source,
             calculatedAmount: calculateActivityAmount(
@@ -300,15 +303,23 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 rateUnit: payCode.rate_unit,
                 rate,
                 unitsProduced,
+                hoursApplied: hoursToApply,
               },
-              totalHours,
+              hoursToApply,
               {}
             ),
           };
         });
 
-        // Apply calculation logic to all activities
-        const processedActivities = calculateActivitiesAmounts(activities, totalHours, {});
+        // Apply calculation logic to all activities with proper hours for each activity type
+        const processedActivities = activities.map(activity => ({
+          ...activity,
+          calculatedAmount: calculateActivityAmount(
+            activity,
+            activity.hoursApplied || totalHours,
+            {}
+          )
+        }));
         newEmployeeActivities[employeeId] = processedActivities;
       });
 
@@ -593,6 +604,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     setNewLeaveEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleRemoveExistingLeave = (leaveId: number) => {
+    // Add to deleted list
+    setDeletedLeaveIds((prev) => [...prev, leaveId]);
+    // Remove from existing records display
+    setExistingLeaveRecords((prev) => prev.filter((leave) => leave.id !== leaveId));
+  };
+
   // Activities handlers
   const handleManageActivities = (entry: EmployeeEntry) => {
     setSelectedEmployee(entry);
@@ -602,12 +620,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const handleActivitiesUpdated = (activities: ActivityItem[]) => {
     if (!selectedEmployee) return;
 
-    // Recalculate amounts
-    const recalculatedActivities = calculateActivitiesAmounts(
-      activities,
-      selectedEmployee.totalHours,
-      {}
-    );
+    // Recalculate amounts with proper hours for each activity type
+    const recalculatedActivities = activities.map(activity => ({
+      ...activity,
+      calculatedAmount: calculateActivityAmount(
+        activity,
+        activity.hoursApplied || selectedEmployee.totalHours,
+        {}
+      )
+    }));
 
     setEmployeeActivities((prev) => ({
       ...prev,
@@ -656,6 +677,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           isNew: true,
           amount_paid: 0,
         })),
+        deletedLeaveIds: deletedLeaveIds,
       };
 
       if (mode === "edit" && existingWorkLog) {
@@ -669,7 +691,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
-      toast.error(error?.response?.data?.message || "Failed to save monthly work log");
+      console.error("Error details:", error?.data);
+      // Handle specific error messages from API
+      const errorMessage = error?.data?.message || error?.message || "Failed to save monthly work log";
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -863,28 +888,36 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     <span className="font-medium">{entry.employeeName}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
-                    {entry.jobName}
+                    <Link
+                      to={`/catalogue/job?id=${entry.jobType}`}
+                      className="hover:underline hover:text-sky-600"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {entry.jobName}
+                    </Link>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="number"
                       value={entry.selected ? entry.totalHours : ""}
                       onChange={(e) =>
                         handleHoursChange(entry.employeeId, "totalHours", e.target.value)
                       }
+                      onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
                       className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
                       min="0"
                       step="0.5"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="number"
                       value={entry.selected ? entry.overtimeHours : ""}
                       onChange={(e) =>
                         handleHoursChange(entry.employeeId, "overtimeHours", e.target.value)
                       }
+                      onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
                       className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
                       min="0"
@@ -892,21 +925,19 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <ActivitiesTooltip
-                        activities={(
-                          employeeActivities[entry.employeeId] || []
-                        ).filter((activity) => activity.isSelected)}
-                        employeeName={entry.employeeName}
-                        className={
-                          !entry.selected
-                            ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                            : ""
-                        }
-                        disabled={!entry.selected}
-                        onClick={() => handleManageActivities(entry)}
-                      />
-                    </div>
+                    <ActivitiesTooltip
+                      activities={(
+                        employeeActivities[entry.employeeId] || []
+                      ).filter((activity) => activity.isSelected)}
+                      employeeName={entry.employeeName}
+                      className={
+                        !entry.selected
+                          ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                          : ""
+                      }
+                      disabled={!entry.selected}
+                      onClick={() => handleManageActivities(entry)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -996,16 +1027,20 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {leave.isNew && (
-                        <button
-                          onClick={() => handleRemoveNewLeave(newLeaveEntries.indexOf(leave as any))}
-                          className="text-rose-600 hover:text-rose-800"
-                          title="Remove"
-                          disabled={isSaving}
-                        >
-                          <IconTrash size={16} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          if (leave.isNew) {
+                            handleRemoveNewLeave(newLeaveEntries.indexOf(leave as any));
+                          } else if (leave.id) {
+                            handleRemoveExistingLeave(leave.id);
+                          }
+                        }}
+                        className="text-rose-600 hover:text-rose-800"
+                        title="Remove"
+                        disabled={isSaving}
+                      >
+                        <IconTrash size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}

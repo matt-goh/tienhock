@@ -294,8 +294,9 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       });
     }
 
-    // Calculate SIP
-    if (age < 60) {
+    // Calculate SIP (only for Malaysian citizens under 60)
+    const isMalaysian = (employeeInfo.nationality || "").toLowerCase() === "malaysian";
+    if (age < 60 && isMalaysian) {
       const sipRate = findRateByWage(sipRates, grossPay);
       if (sipRate) {
         deductions.push({
@@ -610,6 +611,37 @@ export default function (pool) {
       console.error("Error fetching batch employee payroll details:", error);
       res.status(500).json({
         message: "Error fetching batch employee payroll details",
+        error: error.message,
+      });
+    }
+  });
+
+  // Get manual items totals for a monthly payroll (used during reprocessing)
+  router.get("/monthly/:monthlyPayrollId/manual-items", async (req, res) => {
+    const { monthlyPayrollId } = req.params;
+
+    try {
+      // Get all employee payrolls with their manual items for this monthly payroll
+      const query = `
+        SELECT ep.employee_id, SUM(pi.amount) as manual_items_total
+        FROM employee_payrolls ep
+        JOIN payroll_items pi ON ep.id = pi.employee_payroll_id
+        WHERE ep.monthly_payroll_id = $1 AND pi.is_manual = true
+        GROUP BY ep.employee_id
+      `;
+      const result = await pool.query(query, [monthlyPayrollId]);
+
+      // Return as a map of employee_id -> manual_items_total
+      const manualItemsMap = {};
+      result.rows.forEach(row => {
+        manualItemsMap[row.employee_id] = parseFloat(row.manual_items_total);
+      });
+
+      res.json({ manual_items: manualItemsMap });
+    } catch (error) {
+      console.error("Error fetching manual items for monthly payroll:", error);
+      res.status(500).json({
+        message: "Error fetching manual items",
         error: error.message,
       });
     }
@@ -987,9 +1019,9 @@ export default function (pool) {
               employeePayrollId,
             ]);
 
-            // Delete existing items to replace with new ones
+            // Delete existing non-manual items to replace with new ones (preserve manually added items)
             await client.query(
-              "DELETE FROM payroll_items WHERE employee_payroll_id = $1",
+              "DELETE FROM payroll_items WHERE employee_payroll_id = $1 AND is_manual = false",
               [employeePayrollId]
             );
           } else {
@@ -1170,9 +1202,9 @@ export default function (pool) {
           employeePayrollId,
         ]);
 
-        // Delete existing items to replace with new ones
+        // Delete existing non-manual items to replace with new ones (preserve manually added items)
         await pool.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = $1",
+          "DELETE FROM payroll_items WHERE employee_payroll_id = $1 AND is_manual = false",
           [employeePayrollId]
         );
       } else {
@@ -1394,11 +1426,12 @@ export default function (pool) {
   });
 
   // Clear all employee payrolls for a specific monthly payroll (used when reprocessing with grouped payrolls)
+  // Preserves employee payrolls that have manual items, only deletes non-manual items from those
   router.delete("/monthly/:monthlyPayrollId", async (req, res) => {
     const { monthlyPayrollId } = req.params;
 
     const client = await pool.connect();
-    
+
     try {
       await client.query("BEGIN");
 
@@ -1411,31 +1444,56 @@ export default function (pool) {
       const employeePayrollIds = employeePayrollsResult.rows.map(row => row.id);
 
       if (employeePayrollIds.length > 0) {
-        // Delete related data in correct order (foreign key dependencies)
-        
-        // Delete payroll deductions
-        await client.query(
-          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+        // Find employee payrolls that have manual items (these should be preserved)
+        const payrollsWithManualItemsResult = await client.query(
+          `SELECT DISTINCT employee_payroll_id FROM payroll_items
+           WHERE employee_payroll_id = ANY($1) AND is_manual = true`,
           [employeePayrollIds]
         );
-
-        // Delete payroll items
-        await client.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
-          [employeePayrollIds]
+        const payrollsWithManualItems = new Set(
+          payrollsWithManualItemsResult.rows.map(row => row.employee_payroll_id)
         );
 
-        // Delete employee payrolls
-        const deleteResult = await client.query(
-          "DELETE FROM employee_payrolls WHERE monthly_payroll_id = $1",
-          [monthlyPayrollId]
-        );
+        // Separate payrolls into those to preserve (have manual items) and those to delete completely
+        const payrollsToPreserve = employeePayrollIds.filter(id => payrollsWithManualItems.has(id));
+        const payrollsToDelete = employeePayrollIds.filter(id => !payrollsWithManualItems.has(id));
+
+        // For payrolls to preserve: only delete non-manual items and deductions
+        if (payrollsToPreserve.length > 0) {
+          await client.query(
+            "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+            [payrollsToPreserve]
+          );
+          await client.query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1) AND is_manual = false",
+            [payrollsToPreserve]
+          );
+        }
+
+        // For payrolls to delete: remove everything
+        let deletedCount = 0;
+        if (payrollsToDelete.length > 0) {
+          await client.query(
+            "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+            [payrollsToDelete]
+          );
+          await client.query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
+            [payrollsToDelete]
+          );
+          const deleteResult = await client.query(
+            "DELETE FROM employee_payrolls WHERE id = ANY($1)",
+            [payrollsToDelete]
+          );
+          deletedCount = deleteResult.rowCount;
+        }
 
         await client.query("COMMIT");
 
         res.json({
           message: "Employee payrolls cleared successfully",
-          deleted_count: deleteResult.rowCount,
+          deleted_count: deletedCount,
+          preserved_count: payrollsToPreserve.length,
           cleared_employee_payrolls: employeePayrollIds.length
         });
       } else {
@@ -1443,6 +1501,7 @@ export default function (pool) {
         res.json({
           message: "No employee payrolls found for this monthly payroll",
           deleted_count: 0,
+          preserved_count: 0,
           cleared_employee_payrolls: 0
         });
       }
