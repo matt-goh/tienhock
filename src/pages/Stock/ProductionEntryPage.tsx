@@ -4,14 +4,13 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import WorkerEntryGrid from "../../components/Stock/WorkerEntryGrid";
-import Button from "../../components/Button";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
   ProductionEntry,
   ProductionWorker,
   StockProduct,
 } from "../../types/types";
-import { IconCalendar, IconDeviceFloppy, IconRefresh, IconStarFilled } from "@tabler/icons-react";
+import { IconCalendar, IconStarFilled } from "@tabler/icons-react";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -28,9 +27,9 @@ const ProductionEntryPage: React.FC = () => {
   const [isLoadingWorkers, setIsLoadingWorkers] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [originalEntries, setOriginalEntries] = useState<Record<string, number>>(
-    {}
-  );
+  const [originalEntries, setOriginalEntries] = useState<
+    Record<string, number>
+  >({});
 
   // Get products cache
   const { products } = useProductsCache("all");
@@ -58,7 +57,8 @@ const ProductionEntryPage: React.FC = () => {
 
     // Listen for custom event dispatched by ProductSelector
     window.addEventListener("favorites-changed", handleFavoritesChange);
-    return () => window.removeEventListener("favorites-changed", handleFavoritesChange);
+    return () =>
+      window.removeEventListener("favorites-changed", handleFavoritesChange);
   }, []);
 
   // Get favorite products (only BH and MEE types)
@@ -73,7 +73,9 @@ const ProductionEntryPage: React.FC = () => {
   // Get selected product details
   const selectedProduct = useMemo(() => {
     if (!selectedProductId) return null;
-    return products.find((p) => p.id === selectedProductId) as StockProduct | undefined;
+    return products.find((p) => p.id === selectedProductId) as
+      | StockProduct
+      | undefined;
   }, [selectedProductId, products]);
 
   // Determine product type for worker filtering
@@ -206,20 +208,19 @@ const ProductionEntryPage: React.FC = () => {
     setHasUnsavedChanges(false);
   };
 
-  // Calculate total
-  const totalBags = useMemo(() => {
-    return Object.values(entries).reduce((sum, bags) => sum + (bags || 0), 0);
-  }, [entries]);
-
-  // Format date for display
+  // Format date for display (English full date + Malay weekday only)
   const formatDateDisplay = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("en-MY", {
+    const english = date.toLocaleDateString("en-MY", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
     });
+    const malayWeekday = date.toLocaleDateString("ms-MY", {
+      weekday: "long",
+    });
+    return { english, malay: malayWeekday };
   };
 
   return (
@@ -260,7 +261,7 @@ const ProductionEntryPage: React.FC = () => {
               className="w-full rounded-lg border border-default-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
             />
             <p className="text-xs text-default-500">
-              {formatDateDisplay(selectedDate)}
+              {formatDateDisplay(selectedDate).english} ({formatDateDisplay(selectedDate).malay})
             </p>
           </div>
 
@@ -341,64 +342,24 @@ const ProductionEntryPage: React.FC = () => {
       </div>
 
       {/* Workers entry grid */}
-      <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-default-900">
-            Worker Production
-          </h2>
-          {selectedProductId && workers.length > 0 && (
-            <span className="text-sm text-default-500">
-              {workers.length} worker{workers.length !== 1 ? "s" : ""} available
-            </span>
-          )}
+      {!selectedProductId ? (
+        <div className="rounded-lg border border-dashed border-default-300 p-8 text-center">
+          <p className="text-default-500">
+            Please select a product to view workers
+          </p>
         </div>
-
-        {!selectedProductId ? (
-          <div className="rounded-lg border border-dashed border-default-300 p-8 text-center">
-            <p className="text-default-500">
-              Please select a product to view workers
-            </p>
-          </div>
-        ) : (
-          <WorkerEntryGrid
-            workers={workers}
-            entries={entries}
-            onEntryChange={handleEntryChange}
-            isLoading={isLoadingWorkers}
-            disabled={isSaving}
-          />
-        )}
-      </div>
-
-      {/* Action buttons */}
-      {selectedProductId && workers.length > 0 && (
-        <div className="flex items-center justify-between rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-          <div className="text-lg">
-            <span className="text-default-500">Total Production:</span>{" "}
-            <span className="font-bold text-default-900">
-              {totalBags.toLocaleString()} bags
-            </span>
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              onClick={handleReset}
-              disabled={!hasUnsavedChanges || isSaving}
-              color="default"
-            >
-              <IconRefresh size={18} className="mr-2" />
-              Reset
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!hasUnsavedChanges || isSaving}
-              color="sky"
-            >
-              <IconDeviceFloppy size={18} className="mr-2" />
-              {isSaving ? "Saving..." : "Save Production"}
-            </Button>
-          </div>
-        </div>
+      ) : (
+        <WorkerEntryGrid
+          workers={workers}
+          entries={entries}
+          onEntryChange={handleEntryChange}
+          isLoading={isLoadingWorkers}
+          disabled={isSaving}
+          onSave={handleSave}
+          onReset={handleReset}
+          hasUnsavedChanges={hasUnsavedChanges}
+          isSaving={isSaving}
+        />
       )}
     </div>
   );
