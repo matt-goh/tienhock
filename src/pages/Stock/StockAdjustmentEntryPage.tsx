@@ -631,7 +631,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
                                   handleEntryChange(product.id, "adj_in", value);
                                 }}
                                 placeholder="0"
-                                className="w-full rounded-lg border border-default-300 px-3 py-1.5 text-center text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                className="w-full rounded-lg border border-default-300 pl-6 px-3 py-1.5 text-center text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
                               />
                             </td>
                             <td className="px-4 py-2">
@@ -648,7 +648,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
                                   );
                                 }}
                                 placeholder="0"
-                                className="w-full rounded-lg border border-default-300 px-3 py-1.5 text-center text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                className="w-full rounded-lg border border-default-300 pl-6 px-3 py-1.5 text-center text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                               />
                             </td>
                           </tr>
