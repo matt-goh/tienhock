@@ -204,7 +204,7 @@ const StockMovementPage: React.FC = () => {
             <div className="flex gap-2">
               {[
                 { value: "month", label: "Month" },
-                { value: "rolling", label: "Rolling 31" },
+                { value: "rolling", label: "Last 31 Days" },
                 { value: "custom", label: "Custom" },
               ].map((option) => (
                 <button
