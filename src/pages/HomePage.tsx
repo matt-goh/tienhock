@@ -8,6 +8,7 @@ import {
   IconUserDollar,
   IconChevronRight,
   IconReportMoney,
+  IconPackage,
 } from "@tabler/icons-react";
 import TienHockLogo from "../utils/TienHockLogo";
 import GreenTargetLogo from "../utils/GreenTargetLogo";
@@ -92,6 +93,10 @@ const HomePage: React.FC = () => {
           case "Catalogue":
             icon = IconListDetails;
             description = "Manage staff, customers, products, etc";
+            break;
+          case "Stock":
+            icon = IconPackage;
+            description = "Manage inventory and stock levels";
             break;
         }
 

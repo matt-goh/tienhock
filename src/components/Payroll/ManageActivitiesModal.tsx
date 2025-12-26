@@ -19,7 +19,7 @@ import {
   IconUser,
   IconPackage,
 } from "@tabler/icons-react";
-import { calculateActivitiesAmounts } from "../../utils/payroll/calculateActivityAmount";
+import { calculateActivitiesAmounts, calculateActivityAmount } from "../../utils/payroll/calculateActivityAmount";
 import SafeLink from "../SafeLink";
 
 export interface ActivityItem {
@@ -31,6 +31,7 @@ export interface ActivityItem {
   isDefault: boolean;
   isSelected: boolean;
   unitsProduced?: number;
+  hoursApplied?: number;
   calculatedAmount: number;
   isContextLinked?: boolean;
   source?: "job" | "employee";
@@ -203,10 +204,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
       isSelected: newSelectAll,
     }));
 
-    const recalculatedActivities = calculateActivitiesAmounts(
-      updatedActivities,
-      employeeHours
-    );
+    // Recalculate amounts, respecting hoursApplied for each activity
+    const recalculatedActivities = updatedActivities.map(activity => ({
+      ...activity,
+      calculatedAmount: calculateActivityAmount(
+        activity,
+        activity.hoursApplied || employeeHours,
+        contextData,
+        locationType
+      )
+    }));
     setActivities(recalculatedActivities);
   };
 
@@ -215,11 +222,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     const newActivities = [...activities];
     newActivities[index].isSelected = !newActivities[index].isSelected;
 
-    // Recalculate amounts after toggling
-    const updatedActivities = calculateActivitiesAmounts(
-      newActivities,
-      employeeHours
-    );
+    // Recalculate amounts after toggling, respecting hoursApplied for each activity
+    const updatedActivities = newActivities.map(activity => ({
+      ...activity,
+      calculatedAmount: calculateActivityAmount(
+        activity,
+        activity.hoursApplied || employeeHours,
+        contextData,
+        locationType
+      )
+    }));
     setActivities(updatedActivities);
   };
 
@@ -228,13 +240,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     const newActivities = [...activities];
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
 
-    // Use the centralized calculation function
-    const updatedActivities = calculateActivitiesAmounts(
-      newActivities,
-      (isSalesman || isSalesmanIkut) ? 0 : employeeHours, // Use 0 hours for salesmen and salesman ikut
-      contextData,
-      locationType
-    );
+    // Recalculate amounts, respecting hoursApplied for each activity
+    const updatedActivities = newActivities.map(activity => ({
+      ...activity,
+      calculatedAmount: calculateActivityAmount(
+        activity,
+        activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
+        contextData,
+        locationType
+      )
+    }));
     setActivities(updatedActivities);
   };
 
