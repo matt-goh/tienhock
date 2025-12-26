@@ -870,13 +870,17 @@ const JournalEntryPage: React.FC = () => {
                           </button>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right font-semibold text-default-900">
-                        {totals.totalDebit.toFixed(2)}
+                      <td className="px-3 py-2">
+                        <div className="w-full pl-2 pr-5 py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                          {totals.totalDebit.toFixed(2)}
+                        </div>
                       </td>
-                      <td className="px-3 py-3 text-right font-semibold text-default-900">
-                        {totals.totalCredit.toFixed(2)}
+                      <td className="px-3 py-2">
+                        <div className="w-full pl-2 pr-5 py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                          {totals.totalCredit.toFixed(2)}
+                        </div>
                       </td>
-                      <td></td>
+                      <td className="px-3 py-2 text-center"></td>
                     </tr>
                   </tfoot>
                 </table>
