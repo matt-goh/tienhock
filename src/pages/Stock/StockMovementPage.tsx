@@ -9,6 +9,7 @@ import { StockMovement, StockMovementResponse } from "../../types/types";
 import {
   IconChevronLeft,
   IconChevronRight,
+  IconChevronsRight,
   IconCalendar,
   IconPackage,
   IconEdit,
@@ -250,6 +251,19 @@ const StockMovementPage: React.FC = () => {
                   )}
                 >
                   <IconChevronRight size={20} />
+                </button>
+                <button
+                  onClick={() => setSelectedMonth(new Date())}
+                  disabled={isCurrentMonth}
+                  title="Go to current month"
+                  className={clsx(
+                    "rounded-lg border border-default-300 p-2 transition-colors",
+                    isCurrentMonth
+                      ? "cursor-not-allowed text-default-300"
+                      : "text-default-600 hover:bg-default-50"
+                  )}
+                >
+                  <IconChevronsRight size={20} />
                 </button>
               </div>
             ) : viewType === "rolling" ? (
