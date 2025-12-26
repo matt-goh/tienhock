@@ -312,6 +312,11 @@ export const TienHockSidebarData: SidebarItem[] = [
     icon: IconPackage,
     subItems: [
       {
+        name: "Stock Movement",
+        path: "/stock/movement",
+        component: StockMovementPage,
+      },
+      {
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
@@ -320,11 +325,6 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Stock Adjustments",
         path: "/stock/adjustments",
         component: StockAdjustmentEntryPage,
-      },
-      {
-        name: "Stock Movement",
-        path: "/stock/movement",
-        component: StockMovementPage,
       },
     ],
   },
