@@ -272,8 +272,8 @@ export default function (pool, config) {
     }
   };
 
-  // Initialize on server start
-  initializePendingInvoiceChecks();
+  // Initialize on server start (delayed to allow DB to fully start)
+  setTimeout(() => initializePendingInvoiceChecks(), 15000);
 
   // Customer data cache
   const customerCache = new Map();

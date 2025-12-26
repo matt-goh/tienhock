@@ -37,6 +37,9 @@ import agamaRouter from "./catalogue/entities/agama.js";
 
 // Accounting routes
 import debtorsRouter from "./accounting/debtors.js";
+import accountCodesRouter from "./accounting/account-codes.js";
+import ledgerTypesRouter from "./accounting/ledger-types.js";
+import journalEntriesRouter from "./accounting/journal-entries.js";
 
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
@@ -45,6 +48,7 @@ import eInvoiceRouter from "./sales/invoices/e-invoices.js";
 
 // Payroll routes
 import dailyWorkLogsRouter from "./payroll/daily-work-logs.js";
+import monthlyWorkLogsRouter from "./payroll/monthly-work-logs.js";
 import holidaysRouter from "./payroll/holidays.js";
 import monthlyPayrollsRouter from "./payroll/monthly-payrolls.js";
 import leaveManagementRoutes from "./payroll/leave-management.js";
@@ -54,6 +58,11 @@ import contributionRatesRouter from "./payroll/contribution-rates.js";
 import midMonthPayrollsRouter from "./payroll/mid-month-payrolls.js";
 import pinjamRecordsRouter from "./payroll/pinjam-records.js";
 import salaryReportRouter from "./payroll/salary-report.js";
+import eCarumanRouter from "./payroll/e-caruman.js";
+
+// Stock routes
+import productionEntriesRouter from "./stock/production-entries.js";
+import stockRouter from "./stock/stock.js";
 
 // Green Target routes
 import greenTargetCustomerRouter from "./greentarget/customers.js";
@@ -138,6 +147,9 @@ export default function setupRoutes(app, pool) {
 
   // Accounting routes
   app.use("/api/debtors", debtorsRouter(pool));
+  app.use("/api/account-codes", accountCodesRouter(pool));
+  app.use("/api/ledger-types", ledgerTypesRouter(pool));
+  app.use("/api/journal-entries", journalEntriesRouter(pool));
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
@@ -146,6 +158,7 @@ export default function setupRoutes(app, pool) {
 
   // Payroll routes
   app.use("/api/daily-work-logs", dailyWorkLogsRouter(pool));
+  app.use("/api/monthly-work-logs", monthlyWorkLogsRouter(pool));
   app.use("/api/holidays", holidaysRouter(pool));
   app.use("/api/monthly-payrolls", monthlyPayrollsRouter(pool));
   app.use("/api/employee-payrolls", employeePayrollsRouter(pool));
@@ -155,6 +168,11 @@ export default function setupRoutes(app, pool) {
   app.use("/api/mid-month-payrolls", midMonthPayrollsRouter(pool));
   app.use("/api/pinjam-records", pinjamRecordsRouter(pool));
   app.use("/api/salary-report", salaryReportRouter(pool));
+  app.use("/api/e-caruman", eCarumanRouter(pool));
+
+  // Stock routes
+  app.use("/api/production-entries", productionEntriesRouter(pool));
+  app.use("/api/stock", stockRouter(pool));
 
   // Green Target routes
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));

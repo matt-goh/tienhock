@@ -20,6 +20,7 @@ interface StyledListboxProps {
   options: SelectOption[];
   className?: string;
   placeholder?: string;
+  rounded?: "full" | "lg";
 }
 
 const StyledListbox: React.FC<StyledListboxProps> = ({
@@ -28,16 +29,18 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
   options,
   className = "",
   placeholder = "Select...",
+  rounded = "full",
 }) => {
   const selectedOption = options.find((option) => option.id === value);
   const displayValue = selectedOption?.name ?? placeholder;
+  const roundedClass = rounded === "full" ? "rounded-full" : "rounded-lg";
 
   return (
     <div className={`w-full ${className}`}>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-            <span className="block truncate pl-2">{displayValue}</span>
+          <ListboxButton className={`w-full ${roundedClass} border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500`}>
+            <span className="block truncate">{displayValue}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
               <IconChevronDown
                 className="h-5 w-5 text-default-400"
@@ -51,7 +54,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            <ListboxOptions className="absolute z-[100] w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
               {options.map((option) => (
                 <ListboxOption
                   key={option.id}

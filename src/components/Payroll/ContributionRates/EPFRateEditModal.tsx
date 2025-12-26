@@ -35,11 +35,12 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
 
   useEffect(() => {
     if (rate) {
+      const isForeign = rate.employee_type.startsWith("foreign_");
       setFormData({
         employee_rate_percentage: rate.employee_rate_percentage.toString(),
         employer_rate_percentage:
-          rate.employer_rate_percentage?.toString() || "",
-        employer_fixed_amount: rate.employer_fixed_amount?.toString() || "",
+          rate.employer_rate_percentage?.toString() || (isForeign ? "2" : ""),
+        employer_fixed_amount: isForeign ? "" : (rate.employer_fixed_amount?.toString() || ""),
       });
     }
   }, [rate]);
@@ -52,6 +53,9 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
     setError(null);
 
     try {
+      // Foreign workers should always have employer_fixed_amount as null
+      const isForeign = rate.employee_type.startsWith("foreign_");
+
       const payload = {
         employee_type: rate.employee_type,
         wage_threshold: rate.wage_threshold,
@@ -59,9 +63,9 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
         employer_rate_percentage: formData.employer_rate_percentage
           ? parseFloat(formData.employer_rate_percentage)
           : null,
-        employer_fixed_amount: formData.employer_fixed_amount
-          ? parseFloat(formData.employer_fixed_amount)
-          : null,
+        employer_fixed_amount: isForeign
+          ? null
+          : (formData.employer_fixed_amount ? parseFloat(formData.employer_fixed_amount) : null),
       };
 
       await api.put(`/api/contribution-rates/epf/${rate.id}`, payload);
@@ -99,7 +103,6 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
     }
   };
 
-  const isForeignWorker = rate?.employee_type.startsWith("foreign_");
   const isForeignOver60 = rate?.employee_type === "foreign_over_60";
 
   return (
@@ -168,26 +171,15 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
                   {!isForeignOver60 && (
                     <FormInput
                       name="employer_rate_percentage"
-                      label={`Employer Rate (${
-                        isForeignWorker ? "Fixed Amount)" : "%)"
-                      }`}
+                      label="Employer Rate (%)"
                       type="number"
-                      value={
-                        isForeignWorker
-                          ? formData.employer_fixed_amount
-                          : formData.employer_rate_percentage
-                      }
+                      value={formData.employer_rate_percentage}
                       onChange={(e) =>
-                        handleChange(
-                          isForeignWorker
-                            ? "employer_fixed_amount"
-                            : "employer_rate_percentage",
-                          e.target.value
-                        )
+                        handleChange("employer_rate_percentage", e.target.value)
                       }
-                      step={"0.1"}
+                      step="0.1"
                       min={0}
-                      max={isForeignWorker ? undefined : 100}
+                      max={100}
                     />
                   )}
 

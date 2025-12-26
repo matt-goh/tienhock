@@ -5,12 +5,17 @@ import {
   IconListDetails,
   IconUserDollar,
   IconReportMoney,
+  IconPackage,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 
 // Accounting related imports
 import DebtorsReportPage from "./Accounting/DebtorsReportPage";
+import AccountCodeListPage from "./Accounting/AccountCodeListPage";
+import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
+import JournalEntryListPage from "./Accounting/JournalEntryListPage";
+import JournalEntryPage from "./Accounting/JournalEntryPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -21,11 +26,20 @@ import PaymentPage from "./Payments/PaymentPage";
 // Sales related imports
 import SalesSummaryPage from "./Sales/SalesSummaryPage";
 
+// Stock related imports
+import ProductionEntryPage from "./Stock/ProductionEntryPage";
+import StockMovementPage from "./Stock/StockMovementPage";
+import StockAdjustmentEntryPage from "./Stock/StockAdjustmentEntryPage";
+
 // Payroll related imports
 import DailyLogListPage from "./Payroll/DailyLogListPage";
 import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLogEditPage";
+import MonthlyLogListPage from "./Payroll/MonthlyLogListPage";
+import MonthlyLogEntryPage from "./Payroll/MonthlyLogEntryPage";
+import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
+import MonthlyLogEditPage from "./Payroll/MonthlyLogEditPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
 import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
@@ -36,6 +50,7 @@ import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
 import IncentivesPage from "./Payroll/IncentivesPage";
 import PinjamListPage from "./Payroll/PinjamListPage";
 import SalaryReportPage from "./Payroll/SalaryReportPage";
+import ECarumanPage from "./Payroll/ECarumanPage";
 
 // Catalogue related imports
 // Staff
@@ -96,47 +111,84 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: SalaryReportPage,
   });
 
-  // Add each production type dynamically
-  Object.values(JOB_CONFIGS).forEach((jobConfig) => {
-    const jobTypeLower = jobConfig.id.toLowerCase();
-
-    payrollSubItems.push({
-      name: jobConfig.name,
-      path: `/payroll/${jobTypeLower}-production`,
-      component: (props: any) => (
-        <DailyLogListPage jobType={jobConfig.id} {...props} />
-      ),
-      subItems: [
-        {
-          name: `New ${jobConfig.name} Entry`,
-          path: `/payroll/${jobTypeLower}-entry`,
-          component: (props: any) => (
-            <DailyLogEntryPage jobType={jobConfig.id} {...props} />
-          ),
-          showInPopover: true,
-        },
-        {
-          name: "View Log",
-          path: `/payroll/${jobTypeLower}-production/:id`,
-          component: (props: any) => (
-            <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
-          ),
-        },
-        {
-          name: "Edit Log",
-          path: `/payroll/${jobTypeLower}-production/:id/edit`,
-          component: (props: any) => (
-            <DailyLogEditPage jobType={jobConfig.id} {...props} />
-          ),
-        },
-      ],
-    });
+  payrollSubItems.push({
+    name: "e-Caruman",
+    path: "/payroll/e-caruman",
+    component: ECarumanPage,
   });
 
-  payrollSubItems.push({
-    name: "Cuti Management",
-    path: "/payroll/cuti-management",
-    component: CutiManagementPage,
+  // Add each production type dynamically
+  Object.values(JOB_CONFIGS).forEach((jobConfig) => {
+    const jobTypeLower = jobConfig.id.toLowerCase().replace("_", "-");
+    const isMonthly = jobConfig.entryMode === "monthly";
+
+    if (isMonthly) {
+      // Monthly job routes (MAINTENANCE, OFFICE, TUKANG_SAPU)
+      payrollSubItems.push({
+        name: jobConfig.name,
+        path: `/payroll/${jobTypeLower}-monthly`,
+        component: (props: any) => (
+          <MonthlyLogListPage jobType={jobConfig.id} {...props} />
+        ),
+        subItems: [
+          {
+            name: `New ${jobConfig.name} Entry`,
+            path: `/payroll/${jobTypeLower}-monthly-entry`,
+            component: (props: any) => (
+              <MonthlyLogEntryPage jobType={jobConfig.id} {...props} />
+            ),
+            showInPopover: true,
+          },
+          {
+            name: "View Log",
+            path: `/payroll/${jobTypeLower}-monthly/:id`,
+            component: (props: any) => (
+              <MonthlyLogDetailsPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+          {
+            name: "Edit Log",
+            path: `/payroll/${jobTypeLower}-monthly/:id/edit`,
+            component: (props: any) => (
+              <MonthlyLogEditPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+        ],
+      });
+    } else {
+      // Daily job routes (MEE, BIHUN, BOILER, SALESMAN)
+      payrollSubItems.push({
+        name: jobConfig.name,
+        path: `/payroll/${jobTypeLower}-production`,
+        component: (props: any) => (
+          <DailyLogListPage jobType={jobConfig.id} {...props} />
+        ),
+        subItems: [
+          {
+            name: `New ${jobConfig.name} Entry`,
+            path: `/payroll/${jobTypeLower}-entry`,
+            component: (props: any) => (
+              <DailyLogEntryPage jobType={jobConfig.id} {...props} />
+            ),
+            showInPopover: true,
+          },
+          {
+            name: "View Log",
+            path: `/payroll/${jobTypeLower}-production/:id`,
+            component: (props: any) => (
+              <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+          {
+            name: "Edit Log",
+            path: `/payroll/${jobTypeLower}-production/:id/edit`,
+            component: (props: any) => (
+              <DailyLogEditPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+        ],
+      });
+    }
   });
 
   payrollSubItems.push({
@@ -157,12 +209,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: PinjamListPage,
   });
 
-  payrollSubItems.push({
-    name: "Contribution Rates",
-    path: "/payroll/contribution-rates",
-    component: ContributionRatesPage,
-  });
-
   return payrollSubItems;
 };
 
@@ -177,6 +223,42 @@ export const TienHockSidebarData: SidebarItem[] = [
     name: "Accounting",
     icon: IconReportMoney,
     subItems: [
+      {
+        name: "Journal Entries",
+        path: "/accounting/journal-entries",
+        component: JournalEntryListPage,
+        subItems: [
+          {
+            name: "New Entry",
+            path: "/accounting/journal-entries/new",
+            component: JournalEntryPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id",
+            component: JournalEntryPage,
+          },
+        ],
+      },
+      {
+        name: "Chart of Accounts",
+        path: "/accounting/account-codes",
+        component: AccountCodeListPage,
+        subItems: [
+          {
+            name: "New Account",
+            path: "/accounting/account-codes/new",
+            component: AccountCodeFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Account",
+            path: "/accounting/account-codes/:code",
+            component: AccountCodeFormPage,
+          },
+        ],
+      },
       {
         name: "Debtors",
         path: "/sales/debtors",
@@ -222,6 +304,27 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Payments",
         path: "/sales/payments",
         component: PaymentPage,
+      },
+    ],
+  },
+  {
+    name: "Stock",
+    icon: IconPackage,
+    subItems: [
+      {
+        name: "Stock Movement",
+        path: "/stock/movement",
+        component: StockMovementPage,
+      },
+      {
+        name: "Production Entry",
+        path: "/stock/production",
+        component: ProductionEntryPage,
+      },
+      {
+        name: "Stock Adjustments",
+        path: "/stock/adjustments",
+        component: StockAdjustmentEntryPage,
       },
     ],
   },
@@ -284,6 +387,16 @@ export const TienHockSidebarData: SidebarItem[] = [
         name: "Pay Codes",
         path: "/catalogue/pay-codes",
         component: PayCodePage,
+      },
+      {
+        name: "Cuti Management",
+        path: "/catalogue/cuti-management",
+        component: CutiManagementPage,
+      },
+      {
+        name: "Contribution Rates",
+        path: "/catalogue/contribution-rates",
+        component: ContributionRatesPage,
       },
       {
         name: "Job Category",
