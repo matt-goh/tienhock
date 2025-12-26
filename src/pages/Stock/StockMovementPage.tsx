@@ -5,7 +5,11 @@ import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
 import StockMovementTable from "../../components/Stock/StockMovementTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
-import { StockMovement, StockMovementResponse, StockProduct } from "../../types/types";
+import {
+  StockMovement,
+  StockMovementResponse,
+  StockProduct,
+} from "../../types/types";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -25,7 +29,9 @@ type ViewType = "month" | "rolling" | "custom";
 
 const StockMovementPage: React.FC = () => {
   // State
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(
+    null
+  );
   const [viewType, setViewType] = useState<ViewType>("month");
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
   const [customStartDate, setCustomStartDate] = useState<string>("");
@@ -33,8 +39,11 @@ const StockMovementPage: React.FC = () => {
 
   // Data state
   const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [openingBalance, setOpeningBalance] = useState<number>(0);
-  const [monthlyTotals, setMonthlyTotals] = useState<StockMovementResponse["monthly_totals"] | null>(null);
+  const [openingBalance, setOpeningBalance] = useState<number>(0); // Calculated B/F
+  const [initialBalance, setInitialBalance] = useState<number>(0); // Admin-set migration balance
+  const [monthlyTotals, setMonthlyTotals] = useState<
+    StockMovementResponse["monthly_totals"] | null
+  >(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Opening balance edit state
@@ -67,7 +76,8 @@ const StockMovementPage: React.FC = () => {
     };
 
     window.addEventListener("favorites-changed", handleFavoritesChange);
-    return () => window.removeEventListener("favorites-changed", handleFavoritesChange);
+    return () =>
+      window.removeEventListener("favorites-changed", handleFavoritesChange);
   }, []);
 
   // Get favorite products (only BH and MEE types)
@@ -122,6 +132,7 @@ const StockMovementPage: React.FC = () => {
 
       setMovements(response.movements || []);
       setOpeningBalance(response.opening_balance || 0);
+      setInitialBalance(response.initial_balance || 0);
       setMonthlyTotals(response.monthly_totals || null);
     } catch (error) {
       console.error("Error fetching stock movements:", error);
@@ -159,9 +170,9 @@ const StockMovementPage: React.FC = () => {
     });
   };
 
-  // Handle opening balance edit
+  // Handle initial balance edit
   const handleEditBalance = () => {
-    setEditBalanceValue(openingBalance.toString());
+    setEditBalanceValue(initialBalance.toString());
     setIsEditingBalance(true);
   };
 
@@ -184,13 +195,12 @@ const StockMovementPage: React.FC = () => {
       await api.post("/api/stock/opening-balance", {
         product_id: selectedProductId,
         balance: newBalance,
-        effective_date: dateRange.start,
       });
 
-      toast.success("Opening balance updated");
-      setOpeningBalance(newBalance);
+      toast.success("Initial balance updated");
+      setInitialBalance(newBalance);
       setIsEditingBalance(false);
-      // Refresh movements to recalculate with new balance
+      // Refresh movements to recalculate B/F with new initial balance
       fetchMovements();
     } catch (error) {
       console.error("Error saving opening balance:", error);
@@ -353,61 +363,83 @@ const StockMovementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Opening Balance */}
-      {selectedProductId && (
+      {/* Balance Section - Only show in month view */}
+      {selectedProductId && viewType === "month" && (
         <div className="group rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
-              <IconPackage className="text-sky-600" size={20} />
+          <div className="flex items-center justify-between">
+            {/* Left side - B/F (Brought Forward) */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+                <IconPackage className="text-sky-600" size={20} />
+              </div>
+              <div>
+                <p className="text-sm text-default-500">
+                  Brought Forward (B/F)
+                </p>
+                <p className="text-2xl font-bold text-default-900">
+                  {openingBalance.toLocaleString()}{" "}
+                  <span className="text-base font-normal text-default-500">
+                    bags
+                  </span>
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-default-500">Opening Balance</p>
-              <div className="flex items-center gap-2">
-                {isEditingBalance ? (
-                  <>
-                    <input
-                      type="number"
-                      value={editBalanceValue}
-                      onChange={(e) => setEditBalanceValue(e.target.value)}
-                      min="0"
-                      className="w-32 rounded-lg border border-default-300 px-3 py-1 text-lg font-bold focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleSaveBalance}
-                      disabled={isSavingBalance}
-                      className="rounded-lg bg-green-500 p-1.5 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
-                    >
-                      <IconCheck size={18} />
-                    </button>
-                    <button
-                      onClick={handleCancelEditBalance}
-                      disabled={isSavingBalance}
-                      className="rounded-lg bg-default-200 p-1.5 text-default-600 hover:bg-default-300 transition-colors disabled:opacity-50"
-                    >
-                      <IconX size={18} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-2xl font-bold text-default-900">
-                      {openingBalance.toLocaleString()}{" "}
-                      <span className="text-base font-normal text-default-500">bags</span>
-                    </p>
-                    <button
-                      onClick={handleEditBalance}
-                      className="rounded-lg p-1.5 text-default-400 hover:bg-default-100 hover:text-default-600 transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <IconEdit size={18} />
-                    </button>
-                  </>
-                )}
+
+            {/* Divider - only visible on hover */}
+            <div className="h-12 w-px bg-default-200 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+            {/* Right side - Initial Balance (editable for migration) - only visible on hover */}
+            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div>
+                <p className="text-sm text-default-500 text-right">
+                  Initial Global Balance (dari system lama)
+                </p>
+                <div className="flex justify-end items-center gap-2">
+                  {isEditingBalance ? (
+                    <>
+                      <input
+                        type="number"
+                        value={editBalanceValue}
+                        onChange={(e) => setEditBalanceValue(e.target.value)}
+                        min="0"
+                        className="w-32 rounded-lg border border-default-300 px-3 py-1 text-lg font-bold text-right focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveBalance}
+                        disabled={isSavingBalance}
+                        className="rounded-lg bg-green-500 p-1.5 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                      >
+                        <IconCheck size={18} />
+                      </button>
+                      <button
+                        onClick={handleCancelEditBalance}
+                        disabled={isSavingBalance}
+                        className="rounded-lg bg-default-200 p-1.5 text-default-600 hover:bg-default-300 transition-colors disabled:opacity-50"
+                      >
+                        <IconX size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-default-900 text-right">
+                        {initialBalance.toLocaleString()}{" "}
+                        <span className="text-base font-normal text-default-500">
+                          bags
+                        </span>
+                      </p>
+                      <button
+                        onClick={handleEditBalance}
+                        className="rounded-lg p-1.5 text-default-400 hover:bg-default-100 hover:text-default-600 transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <IconEdit size={18} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          <p className="mt-2 text-xs text-default-400">
-            Effective from: {dateRange.start}
-          </p>
         </div>
       )}
 

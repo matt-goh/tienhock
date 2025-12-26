@@ -999,7 +999,8 @@ export interface StockMovementResponse {
   product_id: string;
   product_description: string;
   product_type: string;
-  opening_balance: number;
+  opening_balance: number; // Calculated B/F from prior movements
+  initial_balance: number; // Admin-set migration balance
   date_range: {
     start_date: string;
     end_date: string;

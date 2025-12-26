@@ -157,20 +157,80 @@ export default function (pool) {
 
       const product = productResult.rows[0];
 
-      // Get opening balance (most recent effective_date <= startDate)
-      const openingBalanceQuery = `
-        SELECT balance, effective_date
+      // Get initial balance (admin-set migration balance)
+      const initialBalanceQuery = `
+        SELECT balance
         FROM stock_opening_balances
-        WHERE product_id = $1 AND effective_date <= $2
+        WHERE product_id = $1
         ORDER BY effective_date DESC
         LIMIT 1
       `;
-      const openingResult = await pool.query(openingBalanceQuery, [
+      const initialResult = await pool.query(initialBalanceQuery, [product_id]);
+      const initialBalance =
+        initialResult.rows.length > 0 ? initialResult.rows[0].balance : 0;
+
+      // Calculate brought forward (B/F) by summing all movements BEFORE start date
+      // B/F = Initial Balance + (production + returns + adj_in) - (sold + foc + adj_out) before start_date
+      const priorStartTimestamp = new Date(startDate).setHours(0, 0, 0, 0) - 1; // Day before start
+
+      // Get prior production total
+      const priorProductionQuery = `
+        SELECT COALESCE(SUM(bags_packed), 0) as total
+        FROM production_entries
+        WHERE product_id = $1 AND entry_date < $2
+      `;
+      const priorProductionResult = await pool.query(priorProductionQuery, [
         product_id,
         startDate,
       ]);
+      const priorProduction = parseInt(priorProductionResult.rows[0]?.total || 0);
+
+      // Get prior sales totals (sold, foc, returns)
+      const priorSalesQuery = `
+        SELECT
+          COALESCE(SUM(od.quantity), 0) as sold,
+          COALESCE(SUM(COALESCE(od.freeproduct, 0)), 0) as foc,
+          COALESCE(SUM(COALESCE(od.returnproduct, 0)), 0) as returns
+        FROM invoices i
+        JOIN order_details od ON od.invoiceid = i.id
+        WHERE od.code = $1
+          AND i.invoice_status != 'cancelled'
+          AND od.issubtotal IS NOT TRUE
+          AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+          AND CAST(i.createddate AS bigint) < $2
+      `;
+      const priorSalesResult = await pool.query(priorSalesQuery, [
+        product_id,
+        priorStartTimestamp.toString(),
+      ]);
+      const priorSold = parseInt(priorSalesResult.rows[0]?.sold || 0);
+      const priorFoc = parseInt(priorSalesResult.rows[0]?.foc || 0);
+      const priorReturns = parseInt(priorSalesResult.rows[0]?.returns || 0);
+
+      // Get prior adjustments totals
+      const priorAdjustmentsQuery = `
+        SELECT
+          COALESCE(SUM(CASE WHEN adjustment_type = 'ADJ_IN' THEN quantity ELSE 0 END), 0) as adj_in,
+          COALESCE(SUM(CASE WHEN adjustment_type IN ('ADJ_OUT', 'DEFECT') THEN quantity ELSE 0 END), 0) as adj_out
+        FROM stock_adjustments
+        WHERE product_id = $1 AND entry_date < $2
+      `;
+      const priorAdjustmentsResult = await pool.query(priorAdjustmentsQuery, [
+        product_id,
+        startDate,
+      ]);
+      const priorAdjIn = parseInt(priorAdjustmentsResult.rows[0]?.adj_in || 0);
+      const priorAdjOut = parseInt(priorAdjustmentsResult.rows[0]?.adj_out || 0);
+
+      // Calculate opening balance (B/F)
       const openingBalance =
-        openingResult.rows.length > 0 ? openingResult.rows[0].balance : 0;
+        initialBalance +
+        priorProduction +
+        priorReturns +
+        priorAdjIn -
+        priorSold -
+        priorFoc -
+        priorAdjOut;
 
       // Get production data grouped by date
       const productionQuery = `
@@ -327,6 +387,7 @@ export default function (pool) {
         product_description: product.description,
         product_type: product.type,
         opening_balance: openingBalance,
+        initial_balance: initialBalance,
         date_range: {
           start_date: startDate,
           end_date: endDate,
@@ -422,14 +483,14 @@ export default function (pool) {
   });
 
   // POST /api/stock/opening-balance - Set/update opening balance
+  // Opening balance is now global per product (not tied to a specific date)
   router.post("/opening-balance", async (req, res) => {
     try {
-      const { product_id, balance, effective_date, notes, created_by } =
-        req.body;
+      const { product_id, balance, notes, created_by } = req.body;
 
-      if (!product_id || balance === undefined || !effective_date) {
+      if (!product_id || balance === undefined) {
         return res.status(400).json({
-          message: "product_id, balance, and effective_date are required",
+          message: "product_id and balance are required",
         });
       }
 
@@ -445,6 +506,15 @@ export default function (pool) {
         });
       }
 
+      // Use a far-future date for global balance (ensures it's always picked first by ORDER BY effective_date DESC)
+      const fixedDate = "9999-12-31";
+
+      // First, delete any old date-specific records for this product (migration cleanup)
+      await pool.query(
+        "DELETE FROM stock_opening_balances WHERE product_id = $1 AND effective_date != $2",
+        [product_id, fixedDate]
+      );
+
       const query = `
         INSERT INTO stock_opening_balances (product_id, balance, effective_date, notes, created_by)
         VALUES ($1, $2, $3, $4, $5)
@@ -459,7 +529,7 @@ export default function (pool) {
       const result = await pool.query(query, [
         product_id,
         balance,
-        effective_date,
+        fixedDate,
         notes || null,
         created_by || null,
       ]);
