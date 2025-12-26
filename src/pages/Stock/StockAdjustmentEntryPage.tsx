@@ -661,40 +661,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
 
               {/* Footer with Totals and Actions */}
               <div className="border-t border-default-200 bg-default-50 p-4">
-                <div className="flex items-center justify-between">
-                  {/* Totals */}
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-default-500">
-                        {activeTab} Total:
-                      </span>
-                      <span className="font-semibold text-teal-600">
-                        +
-                        {activeTab === "BH"
-                          ? totals.bhAdjIn
-                          : totals.meeAdjIn}
-                      </span>
-                      <span className="font-semibold text-orange-600">
-                        -
-                        {activeTab === "BH"
-                          ? totals.bhAdjOut
-                          : totals.meeAdjOut}
-                      </span>
-                    </div>
-                    <div className="h-6 w-px bg-default-300" />
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-default-500">
-                        Grand Total:
-                      </span>
-                      <span className="font-semibold text-teal-600">
-                        +{totals.totalAdjIn}
-                      </span>
-                      <span className="font-semibold text-orange-600">
-                        -{totals.totalAdjOut}
-                      </span>
-                    </div>
-                  </div>
-
+                <div className="flex items-center justify-end">
                   {/* Actions */}
                   <div className="flex gap-3">
                     <Button
