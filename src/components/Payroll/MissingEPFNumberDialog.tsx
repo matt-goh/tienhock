@@ -34,7 +34,7 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
 
   const handleNavigateToStaff = (employeeId: number) => {
     onClose();
-    navigate(`/catalogue/staffs/${employeeId}`);
+    navigate(`/catalogue/staff/${employeeId}`);
   };
 
   const formatCurrency = (amount: number): string => {
