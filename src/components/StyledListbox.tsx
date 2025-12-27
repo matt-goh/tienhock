@@ -36,7 +36,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
   const roundedClass = rounded === "full" ? "rounded-full" : "rounded-lg";
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={className}>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
           <ListboxButton className={`w-full ${roundedClass} border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500`}>
