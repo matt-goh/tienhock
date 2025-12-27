@@ -23,6 +23,13 @@ import {
   calculateIncomeTax,
 } from "./contributionCalculations";
 import { groupItemsByType } from "./payrollUtils";
+import {
+  addMoney,
+  multiplyMoney,
+  calculatePercentage,
+  roundMoney,
+  sumMoneyBy,
+} from "./moneyUtils";
 
 export interface WorkLogActivity {
   pay_code_id: string;
@@ -152,7 +159,10 @@ export class PayrollCalculationService {
 
           // Add to existing quantity and amount
           aggregatedItems[pay_code_id].quantity += quantity;
-          aggregatedItems[pay_code_id].amount += activity.calculated_amount;
+          aggregatedItems[pay_code_id].amount = addMoney(
+            aggregatedItems[pay_code_id].amount,
+            activity.calculated_amount
+          );
         });
       });
     });
@@ -183,10 +193,10 @@ export class PayrollCalculationService {
       case "Day":
       case "Bag":
       case "Trip":
-        amount = rate * quantity;
+        amount = multiplyMoney(rate, quantity);
         break;
       case "Percent":
-        amount = (rate * quantity) / 100;
+        amount = calculatePercentage(quantity, rate);
         break;
       case "Fixed":
         amount = rate; // Fixed rate is just the rate amount
@@ -196,7 +206,7 @@ export class PayrollCalculationService {
     }
 
     // Round to 2 decimal places for money values
-    return Number(amount.toFixed(2));
+    return roundMoney(amount);
   }
 
   /**
@@ -252,23 +262,23 @@ export class PayrollCalculationService {
     net_pay: number;
   } {
     // Sum all amounts to get gross pay from work items
-    const workGrossPay = items.reduce((sum, item) => sum + item.amount, 0);
-    
+    const workGrossPay = sumMoneyBy(items, (item) => item.amount);
+
     // Sum all leave amounts
-    const leaveGrossPay = leaveRecords 
-      ? leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0) 
+    const leaveGrossPay = leaveRecords
+      ? sumMoneyBy(leaveRecords, (record) => record.amount_paid)
       : 0;
-    
+
     // Total gross pay includes both work and leave
-    const grossPay = workGrossPay + leaveGrossPay;
+    const grossPay = addMoney(workGrossPay, leaveGrossPay);
 
     // For now, net pay equals gross pay
     // This can be extended to handle deductions
     const netPay = grossPay;
 
     return {
-      gross_pay: Number(grossPay.toFixed(2)),
-      net_pay: Number(netPay.toFixed(2)),
+      gross_pay: roundMoney(grossPay),
+      net_pay: roundMoney(netPay),
     };
   }
 
@@ -347,21 +357,18 @@ export class PayrollCalculationService {
     const groupedItems = groupItemsByType(payrollItems);
 
     // Calculate leave amounts
-    const leaveGrossPay = leaveRecords 
-      ? leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0) 
+    const leaveGrossPay = leaveRecords
+      ? sumMoneyBy(leaveRecords, (record) => record.amount_paid)
       : 0;
 
     // Calculate EPF gross pay (excludes Overtime but includes leave)
-    const epfGrossPay =
-      groupedItems.Base.reduce((sum, item) => sum + item.amount, 0) +
-      groupedItems.Tambahan.reduce((sum, item) => sum + item.amount, 0) +
-      leaveGrossPay;
+    const baseTotal = sumMoneyBy(groupedItems.Base, (item) => item.amount);
+    const tambahanTotal = sumMoneyBy(groupedItems.Tambahan, (item) => item.amount);
+    const epfGrossPay = addMoney(addMoney(baseTotal, tambahanTotal), leaveGrossPay);
 
     // Calculate total gross pay (includes all pay types and leave for SOCSO and SIP)
-    const totalGrossPay = payrollItems.reduce(
-      (sum, item) => sum + item.amount,
-      0
-    ) + leaveGrossPay;
+    const workTotal = sumMoneyBy(payrollItems, (item) => item.amount);
+    const totalGrossPay = addMoney(workTotal, leaveGrossPay);
 
     // Determine employee type for EPF
     const employeeType = getEmployeeType(nationality, age);
@@ -492,15 +499,15 @@ export class PayrollCalculationService {
         } else {
           // Merge with existing item
           mergedItems[key].quantity += item.quantity;
-          mergedItems[key].amount += item.amount;
+          mergedItems[key].amount = addMoney(mergedItems[key].amount, item.amount);
         }
       });
     });
 
     // Convert back to array and ensure proper rounding
-    return Object.values(mergedItems).map(item => ({
+    return Object.values(mergedItems).map((item) => ({
       ...item,
-      amount: Number(item.amount.toFixed(2))
+      amount: roundMoney(item.amount),
     }));
   }
 
@@ -558,17 +565,17 @@ export class PayrollCalculationService {
     );
 
     // Calculate total employee deductions
-    const totalEmployeeDeductions = deductions.reduce(
-      (sum, deduction) => sum + deduction.employee_amount,
-      0
+    const totalEmployeeDeductions = sumMoneyBy(
+      deductions,
+      (deduction) => deduction.employee_amount
     );
 
     // Update net pay by subtracting deductions
-    const net_pay = basePayroll.gross_pay - totalEmployeeDeductions;
+    const net_pay = addMoney(basePayroll.gross_pay, -totalEmployeeDeductions);
 
     return {
       ...basePayroll,
-      net_pay: Number(net_pay.toFixed(2)),
+      net_pay: roundMoney(net_pay),
       deductions,
     };
   }

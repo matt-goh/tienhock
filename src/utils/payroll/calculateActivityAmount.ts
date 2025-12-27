@@ -1,4 +1,10 @@
 // src/utils/payroll/calculateActivityAmount.ts
+import {
+  multiplyMoney,
+  calculatePercentage,
+  roundMoney,
+} from "./moneyUtils";
+
 export function calculateActivityAmount(
   activity: any,
   hours: number = 0,
@@ -17,14 +23,14 @@ export function calculateActivityAmount(
       if (activity.payType === "Overtime") {
         if (activity.hoursApplied !== undefined && activity.hoursApplied !== null) {
           // Monthly entry: use the explicitly provided overtime hours
-          calculatedAmount = activity.rate * activity.hoursApplied;
+          calculatedAmount = multiplyMoney(activity.rate, activity.hoursApplied);
         } else {
           // Daily entry: calculate overtime as hours beyond 8
           const overtimeHours = Math.max(0, hours - 8);
-          calculatedAmount = activity.rate * overtimeHours;
+          calculatedAmount = multiplyMoney(activity.rate, overtimeHours);
         }
       } else {
-        calculatedAmount = activity.rate * hours;
+        calculatedAmount = multiplyMoney(activity.rate, hours);
       }
       break;
 
@@ -36,7 +42,7 @@ export function calculateActivityAmount(
         activity.unitsProduced !== null &&
         activity.unitsProduced !== undefined
       ) {
-        calculatedAmount = activity.rate * activity.unitsProduced;
+        calculatedAmount = multiplyMoney(activity.rate, activity.unitsProduced);
       } else {
         calculatedAmount = 0;
       }
@@ -48,7 +54,7 @@ export function calculateActivityAmount(
         activity.unitsProduced !== null &&
         activity.unitsProduced !== undefined
       ) {
-        calculatedAmount = (activity.rate * activity.unitsProduced) / 100;
+        calculatedAmount = calculatePercentage(activity.unitsProduced, activity.rate);
       } else {
         calculatedAmount = 0;
       }
@@ -63,7 +69,7 @@ export function calculateActivityAmount(
       calculatedAmount = 0;
   }
 
-  return Number(calculatedAmount.toFixed(2));
+  return roundMoney(calculatedAmount);
 }
 
 // Update the calculateActivitiesAmounts function too
