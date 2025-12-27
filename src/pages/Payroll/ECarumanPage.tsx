@@ -467,7 +467,7 @@ const ECarumanPage: React.FC = () => {
               value={selectedMonth}
               onChange={(value) => setSelectedMonth(Number(value))}
               options={monthOptions}
-              className="w-60"
+              className="w-44"
               rounded="lg"
             />
           </div>
@@ -479,7 +479,7 @@ const ECarumanPage: React.FC = () => {
               value={selectedYear}
               onChange={(value) => setSelectedYear(Number(value))}
               options={yearOptions}
-              className="w-52"
+              className="w-28"
               rounded="lg"
             />
           </div>
