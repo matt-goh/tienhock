@@ -9,6 +9,12 @@ import {
   CustomProduct,
   Payment,
 } from "../../types/types";
+import {
+  addMoney,
+  multiplyMoney,
+  sumMoney,
+  roundMoney,
+} from "../../utils/moneyUtils";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -288,27 +294,33 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [invoiceData?.customerid, fetchCustomerProducts]);
 
-  // Recalculate totals effect (remains the same)
+  // Recalculate totals effect using sen-based arithmetic
   useEffect(() => {
     if (!invoiceData) return;
 
-    let subtotal = 0;
-    let taxTotal = 0;
+    // Collect amounts for sen-safe summing
+    const subtotalAmounts: number[] = [];
+    const taxAmounts: number[] = [];
+
     invoiceData.products.forEach((item) => {
       if (!item.issubtotal && !item.istotal) {
         if (item.code === "OTH" || item.code === "LESS") {
           // For 'OTH' or 'LESS' products, use price directly as the line total, ignoring quantity.
-          subtotal += Number(item.price) || 0;
+          subtotalAmounts.push(Number(item.price) || 0);
         } else {
           // For all other products, calculate total as quantity * price.
-          subtotal += (Number(item.quantity) || 0) * (Number(item.price) || 0);
+          const quantity = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          subtotalAmounts.push(multiplyMoney(price, quantity));
         }
-        taxTotal += Number(item.tax) || 0;
+        taxAmounts.push(Number(item.tax) || 0);
       }
     });
 
+    const subtotal = sumMoney(subtotalAmounts);
+    const taxTotal = sumMoney(taxAmounts);
     const rounding = Number(invoiceData.rounding) || 0;
-    const totalPayable = subtotal + taxTotal + rounding;
+    const totalPayable = addMoney(addMoney(subtotal, taxTotal), rounding);
 
     if (
       Math.abs(invoiceData.total_excluding_tax - subtotal) > 0.001 ||
@@ -319,10 +331,10 @@ const InvoiceFormPage: React.FC = () => {
         prev
           ? {
               ...prev,
-              total_excluding_tax: parseFloat(subtotal.toFixed(2)),
-              tax_amount: parseFloat(taxTotal.toFixed(2)),
-              totalamountpayable: parseFloat(totalPayable.toFixed(2)),
-              balance_due: parseFloat(totalPayable.toFixed(2)), // Set balance initially
+              total_excluding_tax: roundMoney(subtotal),
+              tax_amount: roundMoney(taxTotal),
+              totalamountpayable: roundMoney(totalPayable),
+              balance_due: roundMoney(totalPayable), // Set balance initially
             }
           : null
       );
@@ -398,21 +410,23 @@ const InvoiceFormPage: React.FC = () => {
   );
 
   const handleLineItemsChange = useCallback(
-    // Logic remains the same
+    // Logic using sen-based arithmetic for subtotal calculations
     (updatedItems: ProductItem[]) => {
       const itemsWithUid = updatedItems.map((item) => ({
         ...item,
         uid: item.uid || crypto.randomUUID(),
       }));
 
-      let runningTotal = 0;
+      // Collect amounts for sen-safe subtotal calculation
+      const runningTotalAmounts: number[] = [];
       const recalculatedItems = itemsWithUid.map((item) => {
         if (!item.issubtotal && !item.istotal) {
           const itemTotal = parseFloat(item.total || "0");
-          runningTotal += itemTotal;
+          runningTotalAmounts.push(itemTotal);
           return item;
         } else if (item.issubtotal) {
-          return { ...item, total: runningTotal.toFixed(2) };
+          const subtotal = sumMoney(runningTotalAmounts);
+          return { ...item, total: subtotal.toFixed(2) };
         }
         return item;
       });
@@ -425,10 +439,10 @@ const InvoiceFormPage: React.FC = () => {
   );
 
   const handleRoundingChange = useCallback(
-    // Logic remains the same
+    // Logic using sen-based arithmetic
     (newRounding: number) => {
       setInvoiceData((prev) =>
-        prev ? { ...prev, rounding: parseFloat(newRounding.toFixed(2)) } : null
+        prev ? { ...prev, rounding: roundMoney(newRounding) } : null
       );
     },
     []
@@ -453,16 +467,17 @@ const InvoiceFormPage: React.FC = () => {
   };
 
   const handleAddSubtotal = () => {
-    // Logic remains the same
+    // Logic using sen-based arithmetic
     if (!invoiceData) return;
-    let runningTotal = 0;
+    const totalsToSum: number[] = [];
     for (let i = invoiceData.products.length - 1; i >= 0; i--) {
       const item = invoiceData.products[i];
       if (item.issubtotal) break;
       if (!item.istotal) {
-        runningTotal += parseFloat(item.total || "0");
+        totalsToSum.push(parseFloat(item.total || "0"));
       }
     }
+    const runningTotal = sumMoney(totalsToSum);
     const subtotalRow: ProductItem = {
       uid: crypto.randomUUID(),
       code: "SUBTOTAL",

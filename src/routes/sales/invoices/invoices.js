@@ -2,6 +2,13 @@
 import { Router } from "express";
 import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
+import {
+  addMoney,
+  multiplyMoney,
+  sumMoney,
+  sumMoneyBy,
+  roundMoney,
+} from "../../utils/moneyUtils.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -701,10 +708,10 @@ export default function (pool, config) {
 
       const result = await pool.query(query, filterParams);
 
-      // Calculate total amount
-      const totalAmount = result.rows.reduce(
-        (sum, row) => sum + parseFloat(row.totalamountpayable || 0),
-        0
+      // Calculate total amount using sen-based arithmetic
+      const totalAmount = sumMoneyBy(
+        result.rows,
+        (row) => parseFloat(row.totalamountpayable || 0)
       );
 
       // Extract just the IDs for the response
@@ -1063,7 +1070,7 @@ export default function (pool, config) {
         const quantity = parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
         const total =
-          code === "OTH" || code === "LESS" ? price : quantity * price;
+          code === "OTH" || code === "LESS" ? price : multiplyMoney(price, quantity);
         const returnQty = parseInt(product.returnproduct || 0);
 
         // Group products by category
@@ -1086,7 +1093,7 @@ export default function (pool, config) {
 
         if (category) {
           categories[category].quantity += quantity;
-          categories[category].amount += total;
+          categories[category].amount = addMoney(categories[category].amount, total);
 
           // Track individual products using the category-specific Map
           if (!productsByCategory[category].has(code)) {
@@ -1100,7 +1107,7 @@ export default function (pool, config) {
           }
           const prod = productsByCategory[category].get(code);
           prod.quantity += quantity;
-          prod.amount += total;
+          prod.amount = addMoney(prod.amount, total);
 
           // Add description to the set if it's different
           if (product.description && product.description.trim()) {
@@ -1110,8 +1117,12 @@ export default function (pool, config) {
 
         // Handle returns separately
         if (returnQty > 0) {
+          const returnAmount = multiplyMoney(price, returnQty);
           categories.category_returns.quantity += returnQty;
-          categories.category_returns.amount += returnQty * price;
+          categories.category_returns.amount = addMoney(
+            categories.category_returns.amount,
+            returnAmount
+          );
 
           // Track return products
           if (!productsByCategory.category_returns.has(code)) {
@@ -1124,7 +1135,7 @@ export default function (pool, config) {
           }
           const returnProd = productsByCategory.category_returns.get(code);
           returnProd.quantity += returnQty;
-          returnProd.amount += returnQty * price;
+          returnProd.amount = addMoney(returnProd.amount, returnAmount);
         }
 
         // Track type statistics (need to fetch product type from cache)
@@ -1195,7 +1206,7 @@ export default function (pool, config) {
         const code = product.code;
         const quantity = parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
-        const total = quantity * price;
+        const total = multiplyMoney(price, quantity);
         const foc = parseInt(product.freeproduct || 0);
         const returns = parseInt(product.returnproduct || 0);
 
@@ -1212,7 +1223,7 @@ export default function (pool, config) {
 
         const prod = salesmenData[salesmanId].products.get(code);
         prod.quantity += quantity;
-        prod.amount += total;
+        prod.amount = addMoney(prod.amount, total);
 
         // Add description to the set if it's different
         if (product.description && product.description.trim()) {
@@ -1222,7 +1233,10 @@ export default function (pool, config) {
         if (code !== "LESS") {
           salesmenData[salesmanId].total.quantity += quantity;
         }
-        salesmenData[salesmanId].total.amount += total;
+        salesmenData[salesmanId].total.amount = addMoney(
+          salesmenData[salesmanId].total.amount,
+          total
+        );
 
         // Track FOC and returns (also apply the same filtering)
         if (foc > 0) {
@@ -1311,7 +1325,7 @@ export default function (pool, config) {
         const code = product.code;
         const quantity = parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
-        const total = quantity * price;
+        const total = multiplyMoney(price, quantity);
 
         let category = null;
         if (code.startsWith("EMPTY_BAG")) category = "empty_bag";
@@ -1320,7 +1334,7 @@ export default function (pool, config) {
 
         if (category) {
           categories[category].quantity += quantity;
-          categories[category].amount += total;
+          categories[category].amount = addMoney(categories[category].amount, total);
 
           // Track individual products
           const key = `${category}_${code}`;
@@ -1334,7 +1348,7 @@ export default function (pool, config) {
           }
           const prod = productMap.get(key);
           prod.quantity += quantity;
-          prod.amount += total;
+          prod.amount = addMoney(prod.amount, total);
         }
       });
     });
@@ -1596,7 +1610,7 @@ export default function (pool, config) {
         if (productMap.has(productId)) {
           const existingProduct = productMap.get(productId);
           existingProduct.quantity += quantity;
-          existingProduct.totalSales += total;
+          existingProduct.totalSales = addMoney(existingProduct.totalSales, total);
           existingProduct.foc += foc;
           existingProduct.returns += returns;
 
@@ -2349,7 +2363,7 @@ export default function (pool, config) {
               const tax = 0; // <<< Hardcoded to 0
               const freeProduct = Number(product.freeProduct || 0);
               const returnProduct = Number(product.returnProduct || 0);
-              const total = (quantity * price).toFixed(2); // Calculate total without tax
+              const total = multiplyMoney(price, quantity).toFixed(2); // Calculate total without tax
               const description =
                 product.description || productDescriptions[product.code] || "";
 
@@ -3210,9 +3224,9 @@ export default function (pool, config) {
       const deleteQuery = `DELETE FROM order_details WHERE invoiceid = $1`;
       await client.query(deleteQuery, [id]);
 
-      // 5. Calculate new totals
-      let subtotal = 0;
-      let taxTotal = 0;
+      // 5. Prepare arrays for sen-safe totals calculation
+      const subtotalAmounts = [];
+      const taxAmounts = [];
 
       // 6. Insert new order details
       const insertQuery = `
@@ -3243,14 +3257,16 @@ export default function (pool, config) {
           const quantity = parseInt(product.quantity || 0);
           const price = parseFloat(product.price || 0);
           const tax = parseFloat(product.tax || 0);
-          subtotal += quantity * price;
-          taxTotal += tax;
+          subtotalAmounts.push(multiplyMoney(price, quantity));
+          taxAmounts.push(tax);
         }
       }
 
-      // 7. Calculate new totals
-      const totalPayable = subtotal + taxTotal;
-      const newTotal = parseFloat(totalPayable.toFixed(2));
+      // 7. Calculate new totals using sen-based arithmetic
+      const subtotal = sumMoney(subtotalAmounts);
+      const taxTotal = sumMoney(taxAmounts);
+      const totalPayable = addMoney(subtotal, taxTotal);
+      const newTotal = roundMoney(totalPayable);
 
       // Get current payments breakdown
       const paymentsBreakdownQuery = `

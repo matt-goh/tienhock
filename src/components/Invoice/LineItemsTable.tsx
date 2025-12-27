@@ -2,6 +2,7 @@
 import React, { useState, useCallback, ChangeEvent, useEffect } from "react";
 import { ProductItem, CustomProduct } from "../../types/types"; // Use Product type from cache
 import { IconTrash } from "@tabler/icons-react";
+import { addMoney, multiplyMoney } from "../../utils/moneyUtils";
 import {
   Combobox,
   ComboboxInput,
@@ -53,9 +54,9 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
         const tax = Number(item.tax) || 0; // Will be 0 for LESS items
         // Special calculation for OTH/LESS products - use price only, not quantity * price
         if (item.code === "OTH" || item.code === "LESS") {
-          item.total = (price + tax).toFixed(2);
+          item.total = addMoney(price, tax).toFixed(2);
         } else {
-          item.total = (quantity * price + tax).toFixed(2);
+          item.total = addMoney(multiplyMoney(price, quantity), tax).toFixed(2);
         }
       }
       newItems[index] = item;
@@ -107,7 +108,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
       const quantity = Number(item.quantity) || 1; // Default to 1 if not set
       const priceForCalc = Number(item.price) || 0;
       const taxForCalc = Number(item.tax) || 0; // Will be 0 for LESS
-      item.total = (quantity * priceForCalc + taxForCalc).toFixed(2);
+      item.total = addMoney(multiplyMoney(priceForCalc, quantity), taxForCalc).toFixed(2);
 
       newItems[index] = item;
       onItemsChange(newItems);
