@@ -903,12 +903,12 @@ const JournalEntryPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-5 py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
                           {totals.totalDebit.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-5 py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
                           {totals.totalCredit.toFixed(2)}
                         </div>
                       </td>
