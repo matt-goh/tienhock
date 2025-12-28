@@ -45,12 +45,7 @@ export default function (pool) {
 
       query += " ORDER BY cr.commission_date DESC";
 
-      console.log("Incentives API - Final query:", query);
-      console.log("Incentives API - Query values:", values);
-
       const result = await pool.query(query, values);
-
-      console.log("Incentives API - Result rows count:", result.rows.length);
 
       res.json(result.rows);
     } catch (error) {
