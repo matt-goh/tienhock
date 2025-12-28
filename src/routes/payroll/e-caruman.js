@@ -356,6 +356,25 @@ export default function (pool) {
         ORDER BY s.id, ep.id DESC
       `;
 
+      // Query for employees with EPF contributions but missing EPF number
+      const missingEpfNoQuery = `
+        SELECT DISTINCT ON (s.id)
+          s.id as employee_id,
+          s.name,
+          s.nationality,
+          pd.employee_amount as emp_share,
+          pd.employer_amount as em_share
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON ep.employee_id = s.id
+        JOIN payroll_deductions pd ON pd.employee_payroll_id = ep.id AND pd.deduction_type = 'epf'
+        WHERE mp.month = $1
+          AND mp.year = $2
+          AND (s.epf_no IS NULL OR s.epf_no = '')
+          AND pd.employee_amount > 0
+        ORDER BY s.id, ep.id DESC
+      `;
+
       // SOCSO Query
       const socsoQuery = `
         SELECT
@@ -436,11 +455,12 @@ export default function (pool) {
       `;
 
       // Execute all queries in parallel
-      const [epfResult, socsoResult, sipResult, incomeTaxResult] = await Promise.all([
+      const [epfResult, socsoResult, sipResult, incomeTaxResult, missingEpfNoResult] = await Promise.all([
         pool.query(epfQuery, [month, year]),
         pool.query(socsoQuery, [month, year]),
         pool.query(sipQuery, [month, year]),
         pool.query(incomeTaxQuery, [month, year]),
+        pool.query(missingEpfNoQuery, [month, year]),
       ]);
 
       // Calculate EPF totals
@@ -548,6 +568,16 @@ export default function (pool) {
           totals: {
             pcb_amount: Math.round(incomeTaxTotals.pcb_amount * 100) / 100,
           },
+        } : null,
+        missing_epf_no: missingEpfNoResult.rows.length > 0 ? {
+          count: missingEpfNoResult.rows.length,
+          data: missingEpfNoResult.rows.map((row) => ({
+            employee_id: row.employee_id,
+            name: row.name,
+            nationality: row.nationality,
+            emp_share: parseFloat(row.emp_share || 0),
+            em_share: parseFloat(row.em_share || 0),
+          })),
         } : null,
       });
     } catch (error) {
