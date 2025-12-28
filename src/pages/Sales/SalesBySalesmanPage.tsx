@@ -7,7 +7,7 @@ import {
   IconSortDescending,
 } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
-import StyledListbox from "../../components/StyledListbox";
+import MonthNavigator from "../../components/MonthNavigator";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -36,11 +36,6 @@ interface SalesmanData {
   cashCount: number; // Number of cash bills
 }
 
-interface MonthOption {
-  id: number;
-  name: string;
-}
-
 interface DateRange {
   start: Date;
   end: Date;
@@ -61,29 +56,10 @@ const SalesBySalesmanPage: React.FC = () => {
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
-  // Month options
-  const monthOptions = useMemo(() => {
-    return [
-      { id: 0, name: "January" },
-      { id: 1, name: "February" },
-      { id: 2, name: "March" },
-      { id: 3, name: "April" },
-      { id: 4, name: "May" },
-      { id: 5, name: "June" },
-      { id: 6, name: "July" },
-      { id: 7, name: "August" },
-      { id: 8, name: "September" },
-      { id: 9, name: "October" },
-      { id: 10, name: "November" },
-      { id: 11, name: "December" },
-    ];
-  }, []);
-
-  // State hooks
-  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(() => {
-    return monthOptions[currentMonth];
+  // State hooks - Month selection uses Date object for MonthNavigator
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    return new Date(currentYear, currentMonth, 1);
   });
-  const [selectedYear, setSelectedYear] = useState<number>(() => currentYear);
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     // Create start date (1st of the selected month)
     const startDate = new Date(currentYear, currentMonth, 1);
@@ -118,14 +94,14 @@ const SalesBySalesmanPage: React.FC = () => {
 
   useEffect(() => {
     // Dispatch month selection event when it changes
-    if (selectedMonth && selectedYear) {
+    if (selectedMonth) {
       window.dispatchEvent(
         new CustomEvent("monthSelectionChanged", {
-          detail: { month: selectedMonth.id, year: selectedYear },
+          detail: { month: selectedMonth.getMonth(), year: selectedMonth.getFullYear() },
         })
       );
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth]);
 
   useEffect(() => {
     if (salesmenData.length > 0) {
@@ -145,23 +121,16 @@ const SalesBySalesmanPage: React.FC = () => {
     }
   }, [salesmen, maxChartSalesmen]);
 
-  // Handle month selection change
-  const handleMonthChange = (monthId: string | number) => {
-    const month = monthOptions.find((m) => m.id === Number(monthId));
-    if (!month) return;
-
-    setSelectedMonth(month);
-
-    // If selected month is ahead of current month, use previous year
-    const year = month.id > currentMonth ? currentYear - 1 : currentYear;
-    setSelectedYear(year);
+  // Handle month selection change from MonthNavigator
+  const handleMonthChange = (newDate: Date) => {
+    setSelectedMonth(newDate);
 
     // Create start date (1st of the selected month)
-    const startDate = new Date(year, month.id, 1);
+    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
 
     // Create end date (last day of the selected month)
-    const endDate = new Date(year, month.id + 1, 0);
+    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
     endDate.setHours(23, 59, 59, 999);
 
     // Update date range
@@ -376,15 +345,11 @@ const SalesBySalesmanPage: React.FC = () => {
             />
 
             {/* Month Selection */}
-            <div className="w-40">
-              <StyledListbox
-                value={selectedMonth.id}
-                onChange={handleMonthChange}
-                options={monthOptions}
-              />
-            </div>
-
-            <div className="text-default-500 font-medium">{selectedYear}</div>
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={handleMonthChange}
+              showGoToCurrentButton={false}
+            />
           </div>
           <div className="text-lg text-right font-bold text-default-700">
             Total Sales: {formatCurrency(summary.totalSales)}
