@@ -6,6 +6,12 @@ import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../ConfirmationDialog";
 import {
+  addMoney,
+  multiplyMoney,
+  sumMoneyBy,
+  roundMoney,
+} from "../../utils/moneyUtils";
+import {
   IconCircleCheck,
   IconFileInvoice,
   IconFileSettings,
@@ -297,12 +303,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     }).format(amount);
   };
   const getTotalAmountSelected = (): number => {
-    return eligibleInvoices
-      .filter((invoice) => selectedInvoices.has(invoice.id))
-      .reduce((sum, invoice) => sum + (invoice.totalamountpayable || 0), 0);
+    const selectedInvoiceList = eligibleInvoices.filter((invoice) =>
+      selectedInvoices.has(invoice.id)
+    );
+    return sumMoneyBy(
+      selectedInvoiceList,
+      (invoice) => invoice.totalamountpayable || 0
+    );
   };
 
-  // Calculate consolidation preview that exactly matches EInvoiceConsolidatedTemplate logic
+  // Calculate consolidation preview using sen-based arithmetic
   const calculateConsolidationPreview = (
     invoices: EligibleInvoice[],
     targetMonth: number,
@@ -312,53 +322,54 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       return null;
     }
 
-    let totalExcludingTax = 0;
-    let totalPayableAmount = 0;
-    let totalRounding = 0;
-    let totalProductTax = 0;
+    // Collect amounts for sen-safe summing
+    const excludingTaxAmounts: number[] = [];
+    const payableAmounts: number[] = [];
+    const roundingAmounts: number[] = [];
+    const productTaxAmounts: number[] = [];
 
     invoices.forEach((invoice) => {
       // Calculate true tax-exclusive amount using product data if available
       // Handle both products and orderDetails arrays for different company systems
       const productData = invoice.products || invoice.orderDetails;
-      
+
       if (productData && Array.isArray(productData)) {
         // Sum product price * quantity for true tax-exclusive amount
         // Handle different product types: regular products, OTH (Other), LESS (Discount)
-        const invoiceSubtotal = productData.reduce((sum, product) => {
+        const productAmounts: number[] = [];
+        productData.forEach((product) => {
           if (!product.issubtotal) {
             const quantity = Number(product.quantity) || 0;
             const price = Number(product.price) || 0;
 
             // For products with no quantity (like OTH, LESS), use the total field directly
             if (quantity === 0 && product.total) {
-              return sum + (Number(product.total) || 0);
+              productAmounts.push(Number(product.total) || 0);
+            } else {
+              // For regular products, use price * quantity
+              productAmounts.push(multiplyMoney(price, quantity));
             }
 
-            // For regular products, use price * quantity
-            return sum + price * quantity;
-          }
-          return sum;
-        }, 0);
-        totalExcludingTax += invoiceSubtotal;
-
-        // Sum product taxes
-        productData.forEach((product) => {
-          if (!product.issubtotal) {
-            totalProductTax += Number(product.tax) || 0;
+            // Collect product taxes
+            productTaxAmounts.push(Number(product.tax) || 0);
           }
         });
+        excludingTaxAmounts.push(
+          ...productAmounts.map((amt) => roundMoney(amt))
+        );
       } else {
         // Fallback: Use amount directly if specified as tax-exclusive
-        totalExcludingTax += Number(invoice.amount) || 0;
+        excludingTaxAmounts.push(Number(invoice.amount) || 0);
       }
 
-      totalPayableAmount += Number(invoice.totalamountpayable) || 0;
-      totalRounding += Number(invoice.rounding) || 0;
+      payableAmounts.push(Number(invoice.totalamountpayable) || 0);
+      roundingAmounts.push(Number(invoice.rounding) || 0);
     });
 
-    // Calculate tax amount - prefer product-level calculation
-    let taxAmount = totalProductTax;
+    const totalExcludingTax = sumMoneyBy(excludingTaxAmounts, (amt) => amt);
+    const totalPayableAmount = sumMoneyBy(payableAmounts, (amt) => amt);
+    const totalRounding = sumMoneyBy(roundingAmounts, (amt) => amt);
+    let taxAmount = sumMoneyBy(productTaxAmounts, (amt) => amt);
 
     // Only use fallback calculation if we have a meaningful difference that suggests tax
     if (
@@ -366,10 +377,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       invoices.some((inv) => inv.tax_amount && Number(inv.tax_amount) > 0)
     ) {
       // If no product-level taxes found but invoice has tax_amount field, use that
-      taxAmount = invoices.reduce(
-        (sum, inv) => sum + (Number(inv.tax_amount) || 0),
-        0
-      );
+      taxAmount = sumMoneyBy(invoices, (inv) => Number(inv.tax_amount) || 0);
     }
 
     // Generate consolidated ID
@@ -379,10 +387,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     )}`;
 
     return {
-      totalExcludingTax: Number(totalExcludingTax.toFixed(2)),
-      taxAmount: Number(taxAmount.toFixed(2)),
-      totalRounding: Number(totalRounding.toFixed(2)),
-      totalPayable: Number(totalPayableAmount.toFixed(2)),
+      totalExcludingTax: roundMoney(totalExcludingTax),
+      taxAmount: roundMoney(taxAmount),
+      totalRounding: roundMoney(totalRounding),
+      totalPayable: roundMoney(totalPayableAmount),
       invoiceCount: invoices.length,
       consolidatedId,
     };

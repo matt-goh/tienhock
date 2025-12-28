@@ -7,10 +7,14 @@ import {
   IconReceipt,
   IconLoader2,
   IconUmbrella,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+import MissingEPFNumberDialog, {
+  MissingEPFEmployee,
+} from "../../components/Payroll/MissingEPFNumberDialog";
 
 // File System Access API types
 interface FileSystemWritableFileStream extends WritableStream {
@@ -109,11 +113,17 @@ interface IncomeTaxPreviewData {
   };
 }
 
+interface MissingEPFNoData {
+  count: number;
+  data: MissingEPFEmployee[];
+}
+
 interface PreviewState {
   epf: EPFPreviewData | null;
   socso: SOCSOPreviewData | null;
   sip: SIPPreviewData | null;
   income_tax: IncomeTaxPreviewData | null;
+  missing_epf_no: MissingEPFNoData | null;
 }
 
 // SOCSO/SIP Employer Code - This should match your company's PERKESO registration
@@ -142,7 +152,9 @@ const ECarumanPage: React.FC = () => {
     socso: null,
     sip: null,
     income_tax: null,
+    missing_epf_no: null,
   });
+  const [showMissingEPFDialog, setShowMissingEPFDialog] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const isTooltipHovered = useRef(false);
   const isCardHovered = useRef(false);
@@ -202,10 +214,11 @@ const ECarumanPage: React.FC = () => {
           socso: previewData.socso,
           sip: previewData.sip,
           income_tax: previewData.income_tax,
+          missing_epf_no: previewData.missing_epf_no,
         });
       } catch (error) {
         console.error("Error fetching preview data:", error);
-        setPreview({ epf: null, socso: null, sip: null, income_tax: null });
+        setPreview({ epf: null, socso: null, sip: null, income_tax: null, missing_epf_no: null });
       } finally {
         setPreviewLoading(false);
       }
@@ -268,6 +281,11 @@ const ECarumanPage: React.FC = () => {
     try {
       switch (type) {
         case "epf": {
+          // Show warning dialog if there are employees with missing EPF numbers
+          if (preview.missing_epf_no && preview.missing_epf_no.count > 0) {
+            setShowMissingEPFDialog(true);
+          }
+
           // Check if File System Access API is supported
           if (!window.showDirectoryPicker) {
             toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
@@ -447,7 +465,7 @@ const ECarumanPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 w-full">
       <div className="mb-4">
         <h1 className="text-2xl font-semibold text-gray-900">e-Caruman</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -467,7 +485,7 @@ const ECarumanPage: React.FC = () => {
               value={selectedMonth}
               onChange={(value) => setSelectedMonth(Number(value))}
               options={monthOptions}
-              className="w-60"
+              className="w-44"
               rounded="lg"
             />
           </div>
@@ -479,7 +497,7 @@ const ECarumanPage: React.FC = () => {
               value={selectedYear}
               onChange={(value) => setSelectedYear(Number(value))}
               options={yearOptions}
-              className="w-52"
+              className="w-28"
               rounded="lg"
             />
           </div>
@@ -516,6 +534,19 @@ const ECarumanPage: React.FC = () => {
                   <IconBuildingBank size={20} className="text-blue-600" />
                 </div>
                 <h3 className="font-medium text-gray-900">EPF / KWSP</h3>
+                {preview.missing_epf_no && preview.missing_epf_no.count > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMissingEPFDialog(true);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium hover:bg-amber-200 transition-colors"
+                    title="Click to view employees with missing EPF numbers"
+                  >
+                    <IconAlertTriangle size={14} />
+                    {preview.missing_epf_no.count}
+                  </button>
+                )}
                 <div className="ml-auto">
                   {loadingType === "epf" ? (
                     <IconLoader2 size={20} className="animate-spin text-blue-600" />
@@ -922,6 +953,13 @@ const ECarumanPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Missing EPF Number Dialog */}
+      <MissingEPFNumberDialog
+        isOpen={showMissingEPFDialog}
+        onClose={() => setShowMissingEPFDialog(false)}
+        employees={preview.missing_epf_no?.data || []}
+      />
     </div>
   );
 };
