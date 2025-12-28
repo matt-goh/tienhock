@@ -73,9 +73,9 @@ export default function NavbarDropdown({
   const itemRefs = useRef<{ [key: string]: HTMLElement | null }>({});
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Filter out items without path (non-navigable) and showInPopover items
+  // Filter out items without path (non-navigable), showInPopover items, and route parameter items
   const navigableItems = items.filter(
-    (item) => item.path && !item.showInPopover
+    (item) => item.path && !item.showInPopover && !item.path.includes(":")
   );
 
   const isMegaMenu = shouldUseMegaMenu(categoryName, navigableItems.length);

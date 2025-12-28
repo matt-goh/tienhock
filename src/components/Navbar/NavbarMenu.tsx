@@ -28,6 +28,15 @@ export default function NavbarMenu({
   // Filter out the Bookmarks category (handled separately)
   const menuItems = items.filter((item) => item.name !== "Bookmarks");
 
+  // Helper function to check if item has navigable sub-items
+  // (excludes showInPopover items and items with route parameters)
+  const hasNavigableSubItems = (item: SidebarItem): boolean => {
+    if (!item.subItems || item.subItems.length === 0) return false;
+    return item.subItems.some(
+      (subItem) => subItem.path && !subItem.showInPopover && !subItem.path.includes(":")
+    );
+  };
+
   const getButtonRef = (name: string) => {
     if (!buttonRefs.current[name]) {
       buttonRefs.current[name] = React.createRef<HTMLButtonElement>();
@@ -68,11 +77,11 @@ export default function NavbarMenu({
   };
 
   const renderMenuItem = (item: SidebarItem) => {
-    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const hasSubItems = hasNavigableSubItems(item);
     const isActive = isMenuActive(item);
     const buttonRef = getButtonRef(item.name);
 
-    // Items with subItems show dropdown
+    // Items with navigable subItems show dropdown
     if (hasSubItems) {
       return (
         <div

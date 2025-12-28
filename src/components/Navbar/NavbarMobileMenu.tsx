@@ -149,9 +149,7 @@ export default function NavbarMobileMenu({
           {/* Header */}
           <div className={`flex items-center justify-between px-4 py-3 border-b border-default-200 ${theme.bg}`}>
             <div className="flex items-center gap-3">
-              <div className="bg-white rounded-md p-1">
-                {getCompanyLogo(activeCompany.id)}
-              </div>
+              {getCompanyLogo(activeCompany.id)}
               <span className={`font-bold text-lg ${theme.text}`}>{activeCompany.name}</span>
             </div>
             <button
@@ -197,9 +195,7 @@ export default function NavbarMobileMenu({
                         isActive ? `${itemTheme.bg} ${itemTheme.text}` : "hover:bg-default-100 text-default-700"
                       }`}
                     >
-                      <div className="bg-white rounded p-0.5">
-                        {getCompanyLogo(company.id, 20)}
-                      </div>
+                      {getCompanyLogo(company.id, 20)}
                       <span className="flex-1 text-left font-medium text-sm">
                         {company.name}
                       </span>
