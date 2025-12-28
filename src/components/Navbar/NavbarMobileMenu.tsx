@@ -109,11 +109,11 @@ export default function NavbarMobileMenu({
   // Filter menu items - only top-level categories, exclude Bookmarks
   const menuCategories = navData.filter((item) => item.name !== "Bookmarks");
 
-  // Get navigable items for a category (filter out showInPopover and items without path)
+  // Get navigable items for a category (filter out showInPopover, items without path, and items with route parameters)
   const getNavigableItems = (category: SidebarItem): SidebarItem[] => {
     if (!category.subItems) return [];
     return category.subItems.filter(
-      (item) => item.path && !item.showInPopover
+      (item) => item.path && !item.showInPopover && !item.path.includes(":")
     );
   };
 
@@ -149,7 +149,9 @@ export default function NavbarMobileMenu({
           {/* Header */}
           <div className={`flex items-center justify-between px-4 py-3 border-b border-default-200 ${theme.bg}`}>
             <div className="flex items-center gap-3">
-              {getCompanyLogo(activeCompany.id)}
+              <div className="bg-white rounded-md p-1">
+                {getCompanyLogo(activeCompany.id)}
+              </div>
               <span className={`font-bold text-lg ${theme.text}`}>{activeCompany.name}</span>
             </div>
             <button
@@ -195,7 +197,9 @@ export default function NavbarMobileMenu({
                         isActive ? `${itemTheme.bg} ${itemTheme.text}` : "hover:bg-default-100 text-default-700"
                       }`}
                     >
-                      {getCompanyLogo(company.id, 20)}
+                      <div className="bg-white rounded p-0.5">
+                        {getCompanyLogo(company.id, 20)}
+                      </div>
                       <span className="flex-1 text-left font-medium text-sm">
                         {company.name}
                       </span>
