@@ -55,7 +55,7 @@ export default function Navbar() {
             >
               <IconMenu2 size={24} />
             </button>
-            
+
             {/* Company Switcher (Desktop) */}
             <div className="hidden lg:block">
               <CompanySwitcher />
