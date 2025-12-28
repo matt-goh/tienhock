@@ -26,6 +26,8 @@ interface MonthNavigatorProps {
   size?: "sm" | "md";
   /** Optional callback before month changes. Return false to cancel navigation. */
   beforeChange?: () => boolean;
+  /** Optional date range to determine if full month is selected */
+  dateRange?: { start: Date; end: Date };
 }
 
 const MonthNavigator: React.FC<MonthNavigatorProps> = ({
@@ -38,6 +40,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   label,
   size = "md",
   beforeChange,
+  dateRange,
 }) => {
   // Check if current month is the current calendar month
   const isCurrentMonth = useMemo(() => {
@@ -47,6 +50,39 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
       selectedMonth.getMonth() === now.getMonth()
     );
   }, [selectedMonth]);
+
+  // Check if the full month is selected (dateRange covers entire month)
+  const isFullMonthSelected = useMemo(() => {
+    if (!dateRange) return true; // If no dateRange provided, assume full month
+
+    const monthStart = new Date(
+      selectedMonth.getFullYear(),
+      selectedMonth.getMonth(),
+      1
+    );
+    monthStart.setHours(0, 0, 0, 0);
+
+    const monthEnd = new Date(
+      selectedMonth.getFullYear(),
+      selectedMonth.getMonth() + 1,
+      0
+    );
+    monthEnd.setHours(23, 59, 59, 999);
+
+    // Check if dateRange start is the first day of the month
+    const startMatches =
+      dateRange.start.getFullYear() === monthStart.getFullYear() &&
+      dateRange.start.getMonth() === monthStart.getMonth() &&
+      dateRange.start.getDate() === monthStart.getDate();
+
+    // Check if dateRange end is the last day of the month
+    const endMatches =
+      dateRange.end.getFullYear() === monthEnd.getFullYear() &&
+      dateRange.end.getMonth() === monthEnd.getMonth() &&
+      dateRange.end.getDate() === monthEnd.getDate();
+
+    return startMatches && endMatches;
+  }, [dateRange, selectedMonth]);
 
   // Default format function
   const defaultFormatDisplay = (date: Date): string => {
@@ -80,6 +116,27 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
       return;
     }
     onChange(new Date());
+  };
+
+  // Handle month display click - prioritizes selecting full month, then navigating to current month
+  const handleMonthDisplayClick = () => {
+    // Check beforeChange callback if provided
+    if (beforeChange && !beforeChange()) {
+      return;
+    }
+
+    // If not full month selected, select the full month first
+    if (!isFullMonthSelected) {
+      const fullMonth = new Date(
+        selectedMonth.getFullYear(),
+        selectedMonth.getMonth(),
+        1
+      );
+      onChange(fullMonth);
+    } else if (!isCurrentMonth) {
+      // If full month is selected but not current month, go to current month
+      onChange(new Date());
+    }
   };
 
   // Size-based classes
@@ -116,20 +173,26 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
           <IconChevronLeft size={iconSize} />
         </button>
 
-        {/* Month Display - Clickable when not on current month */}
-        {isCurrentMonth ? (
+        {/* Month Display - Clickable when full month is not selected OR not on current month */}
+        {isFullMonthSelected && isCurrentMonth ? (
           <div className={clsx(displayClasses, "bg-default-50")}>
             {displayFormatter(selectedMonth)}
           </div>
         ) : (
           <button
-            onClick={goToCurrentMonth}
+            onClick={handleMonthDisplayClick}
             className={clsx(
               displayClasses,
               "bg-default-50 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 cursor-pointer"
             )}
-            title="Click to go to current month"
-            aria-label="Go to current month"
+            title={
+              !isFullMonthSelected
+                ? "Click to select full month"
+                : "Click to go to current month"
+            }
+            aria-label={
+              !isFullMonthSelected ? "Select full month" : "Go to current month"
+            }
           >
             {displayFormatter(selectedMonth)}
           </button>
