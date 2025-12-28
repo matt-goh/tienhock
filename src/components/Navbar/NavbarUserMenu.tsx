@@ -84,14 +84,6 @@ export default function NavbarUserMenu() {
         {isOpen && (
           <div className="absolute right-0 z-50 mt-2 w-56 bg-white border border-default-200 rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-100">
             <div className="px-1 py-1">
-              {/* User Info */}
-              <div className="px-3 py-2 border-b border-default-200 mb-1">
-                <p className="text-sm font-medium text-default-800">
-                  {user?.id || "User"}
-                </p>
-                <p className="text-xs text-default-500">Logged in</p>
-              </div>
-
               {/* Dark Mode Toggle */}
               <div
                 onClick={toggleDarkMode}
