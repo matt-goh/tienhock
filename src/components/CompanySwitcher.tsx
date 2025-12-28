@@ -56,6 +56,10 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
     }, 150);
   };
 
+  const handleButtonClick = () => {
+    setIsOpen((prev) => !prev);
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -118,6 +122,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
     >
       {/* Trigger Button */}
       <button
+        onClick={handleButtonClick}
         className={`
           flex items-center gap-2 px-3 py-1.5 rounded-lg border
           transition-all duration-200
