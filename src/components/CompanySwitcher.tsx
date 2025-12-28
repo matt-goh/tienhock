@@ -144,9 +144,9 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
         leaveFrom="opacity-100 scale-100 translate-y-0"
         leaveTo="opacity-0 scale-95 -translate-y-1"
       >
-        <div className="absolute left-0 mt-2 w-52 bg-white rounded-xl shadow-lg z-50 border border-default-200 overflow-hidden">
+        <div className="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-lg z-50 border border-default-200 overflow-hidden">
           {/* Company Options */}
-          <div className="p-1.5">
+          <div className="px-1 py-0.5">
             {companies.map((company) => {
               const isActive = company.id === activeCompany.id;
               const itemTheme = getCompanyTheme(company.id);
@@ -156,7 +156,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
                   key={company.id}
                   onClick={() => handleCompanyChange(company)}
                   className={`
-                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+                    w-full flex items-center gap-3 px-2 py-1.5 my-0.5 rounded-lg
                     transition-all duration-150
                     ${isActive
                       ? `${itemTheme.activeBg} ${itemTheme.text}`
