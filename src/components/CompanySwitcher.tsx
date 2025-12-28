@@ -145,13 +145,6 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
         leaveTo="opacity-0 scale-95 -translate-y-1"
       >
         <div className="absolute left-0 mt-2 w-52 bg-white rounded-xl shadow-lg z-50 border border-default-200 overflow-hidden">
-          {/* Header */}
-          <div className="px-3 py-2 bg-default-50 border-b border-default-200">
-            <p className="text-xs font-medium text-default-500 uppercase tracking-wide">
-              Switch Company
-            </p>
-          </div>
-
           {/* Company Options */}
           <div className="p-1.5">
             {companies.map((company) => {
