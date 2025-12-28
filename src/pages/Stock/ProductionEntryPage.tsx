@@ -1,5 +1,6 @@
 // src/pages/Stock/ProductionEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
@@ -16,18 +17,47 @@ import { IconCalendar, IconStarFilled } from "@tabler/icons-react";
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 const ProductionEntryPage: React.FC = () => {
-  // State
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get initial values from URL params or defaults
+  const getInitialDate = () => {
+    const dateParam = searchParams.get("date");
+    if (dateParam) {
+      // Validate the date format
+      const parsed = new Date(dateParam);
+      if (!isNaN(parsed.getTime())) {
+        return dateParam;
+      }
+    }
     return new Date().toISOString().split("T")[0];
-  });
+  };
+
+  const getInitialProduct = () => {
+    return searchParams.get("product") || null;
+  };
+
+  // State
+  const [selectedDate, setSelectedDate] = useState<string>(getInitialDate);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
-    null
+    getInitialProduct
   );
   const [entries, setEntries] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [originalEntries, setOriginalEntries] = useState<
     Record<string, number>
   >({});
+
+  // Update URL params when date or product changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedDate) {
+      params.set("date", selectedDate);
+    }
+    if (selectedProductId) {
+      params.set("product", selectedProductId);
+    }
+    setSearchParams(params, { replace: true });
+  }, [selectedDate, selectedProductId, setSearchParams]);
 
   // Compute hasUnsavedChanges by comparing entries with originalEntries
   const hasUnsavedChanges = useMemo(() => {

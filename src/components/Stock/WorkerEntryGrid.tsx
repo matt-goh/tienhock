@@ -1,5 +1,6 @@
 // src/components/Stock/WorkerEntryGrid.tsx
 import React, { useMemo, useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import clsx from "clsx";
 import {
   IconSearch,
@@ -216,14 +217,24 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   <span className="w-5 text-sm tabular-nums text-default-400 text-right flex-shrink-0">
                     {index + 1}
                   </span>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-medium text-default-900 text-sm truncate" title={worker.name}>
+                  <Link
+                    to={`/catalogue/staff/${worker.id}`}
+                    className="flex flex-col min-w-0 hover:text-sky-600 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span
+                      className="font-medium text-default-900 text-sm truncate hover:text-sky-600 hover:underline"
+                      title={worker.name}
+                    >
                       {worker.name}
                     </span>
-                    <span className="text-xs text-default-400 truncate" title={worker.id}>
+                    <span
+                      className="text-xs text-default-400 truncate w-fit hover:underline"
+                      title={worker.id}
+                    >
                       {worker.id}
                     </span>
-                  </div>
+                  </Link>
                 </div>
                 <input
                   id={`worker-input-${worker.id}`}
@@ -276,13 +287,17 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
           <div className="ml-4 pl-6 border-l border-default-300">
             <p className="text-2xl font-bold text-default-900">
               {totalBags.toLocaleString()}{" "}
-              <span className="text-base font-normal text-default-500">bags</span>
+              <span className="text-base font-normal text-default-500">
+                bags
+              </span>
             </p>
           </div>
           <div className="ml-4 pl-6 border-l border-default-300">
             <p className="text-2xl font-bold text-default-900">
               {workingWorkersCount}{" "}
-              <span className="text-base font-normal text-default-500">perkerja</span>
+              <span className="text-base font-normal text-default-500">
+                perkerja
+              </span>
             </p>
           </div>
         </div>
