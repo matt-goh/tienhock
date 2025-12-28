@@ -56,6 +56,8 @@ import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
 import GTStatementModal from "../../../components/GreenTarget/GTStatementModal";
+import DateNavigator from "../../../components/DateNavigator";
+import MonthNavigator from "../../../components/MonthNavigator";
 
 interface InvoiceCardProps {
   invoice: InvoiceGT;
@@ -714,10 +716,10 @@ const InvoiceListPage: React.FC = () => {
       start: new Date(new Date().setMonth(new Date().getMonth() - 1)),
       end: new Date(),
     };
-  }; // Month options setup
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
+  };
+
+  // Month state for MonthNavigator
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   // Define default filter values as constants
   const DEFAULT_FILTERS: InvoiceFilters = {
@@ -725,26 +727,6 @@ const InvoiceListPage: React.FC = () => {
     status: ["active", "overdue", "paid", "cancelled"],
     consolidation: "all",
   };
-
-  // Month options
-  const monthOptions = [
-    { id: 0, name: "January" },
-    { id: 1, name: "February" },
-    { id: 2, name: "March" },
-    { id: 3, name: "April" },
-    { id: 4, name: "May" },
-    { id: 5, name: "June" },
-    { id: 6, name: "July" },
-    { id: 7, name: "August" },
-    { id: 8, name: "September" },
-    { id: 9, name: "October" },
-    { id: 10, name: "November" },
-    { id: 11, name: "December" },
-  ];
-
-  const [selectedMonth, setSelectedMonth] = useState(
-    monthOptions[currentMonth]
-  );
   const [dateRange, setDateRange] = useState(getInitialDates());
   const [invoices, setInvoices] = useState<InvoiceGT[]>([]);
   const [loading, setLoading] = useState(true);
@@ -834,21 +816,15 @@ const InvoiceListPage: React.FC = () => {
   };
 
   // Handle month selection
-  const handleMonthChange = (month: { id: number; name: string }) => {
-    setSelectedMonth(month);
-
-    // Get the current year
-    const year = currentYear;
-
-    // If the selected month is after the current month, it must be from last year
-    const selectedYear = month.id > currentMonth ? year - 1 : year;
+  const handleMonthChange = (newDate: Date) => {
+    setSelectedMonth(newDate);
 
     // Create start date (1st of the selected month)
-    const startDate = new Date(selectedYear, month.id, 1);
+    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
 
     // Create end date (last day of the selected month)
-    const endDate = new Date(selectedYear, month.id + 1, 0);
+    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
     endDate.setHours(23, 59, 59, 999);
 
     // Save to storage and update state
@@ -861,6 +837,21 @@ const InvoiceListPage: React.FC = () => {
     });
 
     // Reset to first page when date changes
+    setCurrentPage(1);
+  };
+
+  // Handle date navigator change (single day selection)
+  const handleDateNavigatorChange = (newDate: Date) => {
+    const startOfDay = new Date(newDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(newDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    saveDatesToStorage(startOfDay, endOfDay);
+    setDateRange({
+      start: startOfDay,
+      end: endOfDay,
+    });
     setCurrentPage(1);
   };
 
@@ -1785,59 +1776,20 @@ const InvoiceListPage: React.FC = () => {
               />
             </div>
 
-            {/* Month selection */}
-            <div className="w-full sm:w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
-                    <span className="block truncate pl-2">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <ListboxOptions className="absolute z-30 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-                    {monthOptions.map((month) => (
-                      <ListboxOption
-                        key={month.id}
-                        className={({ active }) =>
-                          `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                            active
-                              ? "bg-default-100 text-default-900"
-                              : "text-default-900"
-                          }`
-                        }
-                        value={month}
-                      >
-                        {({ selected }) => (
-                          <>
-                            <span
-                              className={`block truncate ${
-                                selected ? "font-medium" : "font-normal"
-                              }`}
-                            >
-                              {month.name}
-                            </span>
-                            {selected && (
-                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
-                                <IconCheck
-                                  className="h-5 w-5"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </ListboxOption>
-                    ))}
-                  </ListboxOptions>
-                </div>
-              </Listbox>
-            </div>
+            {/* Date Navigator */}
+            <DateNavigator
+              selectedDate={dateRange.start || new Date()}
+              onChange={handleDateNavigatorChange}
+              showGoToTodayButton={false}
+            />
+
+            {/* Month Navigator */}
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={handleMonthChange}
+              showGoToCurrentButton={false}
+              dateRange={dateRange}
+            />
 
             {/* Filters button */}
             <div className="relative">
@@ -1845,7 +1797,7 @@ const InvoiceListPage: React.FC = () => {
                 onClick={() => setShowFilters(true)}
                 icon={IconFilter}
                 variant="outline"
-                className="relative w-full"
+                className="relative w-full rounded-lg h-[40px]"
                 onMouseEnter={() => {
                   setIsFilterButtonHovered(true);
                   setHasViewedFilters(true);
@@ -1945,7 +1897,7 @@ const InvoiceListPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search"
-                className="w-full pl-10 py-2 border focus:border-default-500 rounded-full"
+                className="w-full pl-10 py-2 border focus:border-default-500 rounded-lg h-[40px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -2411,14 +2363,14 @@ const InvoiceListPage: React.FC = () => {
       <GTStatementModal
         isOpen={isStatementModalOpen}
         onClose={() => setIsStatementModalOpen(false)}
-        month={selectedMonth.id}
-        year={currentYear}
+        month={selectedMonth.getMonth()}
+        year={selectedMonth.getFullYear()}
       />
       <GTConsolidatedInvoiceModal
         isOpen={isConsolidateModalOpen}
         onClose={() => setIsConsolidateModalOpen(false)}
-        month={selectedMonth.id}
-        year={currentYear}
+        month={selectedMonth.getMonth()}
+        year={selectedMonth.getFullYear()}
       />
       {/* ++ PDF Handlers (Rendered conditionally) ++ */}
       {showPrintOverlay && invoicesForPDF.length > 0 && (

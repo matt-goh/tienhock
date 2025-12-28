@@ -280,6 +280,7 @@ const StockMovementPage: React.FC = () => {
                 selectedMonth={selectedMonth}
                 onChange={setSelectedMonth}
                 showGoToCurrentButton={false}
+                fixedHeight={false}
               />
             ) : viewType === "rolling" ? (
               <div className="rounded-lg border border-default-300 bg-default-50 px-4 py-2 text-center text-sm text-default-600">
