@@ -177,17 +177,23 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
     }
   };
 
-  const getDayTypeColor = (dayType: string) => {
-    switch (dayType) {
-      case "Biasa":
-        return "text-default-700";
-      case "Ahad":
-        return "text-amber-600";
-      case "Umum":
-        return "text-red-600";
-      default:
-        return "text-default-700";
+  const getDayTypeColor = (dayType: string, logDate?: string) => {
+    if (dayType === "Umum") return "text-red-600";
+    if (dayType === "Ahad") return "text-amber-600";
+    // Check if it's Saturday (and not a holiday)
+    if (logDate && dayType === "Biasa") {
+      const date = new Date(logDate);
+      if (date.getDay() === 6) return "text-sky-600";
     }
+    return "text-default-700";
+  };
+
+  const getDisplayDayType = (dayType: string, logDate?: string): string => {
+    if (dayType === "Biasa" && logDate) {
+      const date = new Date(logDate);
+      if (date.getDay() === 6) return "Sabtu";
+    }
+    return dayType;
   };
 
   return (
@@ -305,10 +311,11 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                     </td>
                     <td
                       className={`px-4 py-3 text-sm text-center font-medium ${getDayTypeColor(
-                        log.day_type
+                        log.day_type,
+                        log.log_date
                       )}`}
                     >
-                      {log.day_type}
+                      {getDisplayDayType(log.day_type, log.log_date)}
                     </td>
                     {/* Dynamic context values */}
                     {jobConfig?.contextFields

@@ -97,17 +97,23 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     navigate(`/payroll/${jobType.toLowerCase()}-production/${id}/edit`);
   };
 
-  const getDayTypeColor = (dayType: string) => {
-    switch (dayType) {
-      case "Biasa":
-        return "text-default-700";
-      case "Ahad":
-        return "text-amber-600";
-      case "Umum":
-        return "text-red-600";
-      default:
-        return "text-default-700";
+  const getDayTypeColor = (dayType: string, logDate?: string) => {
+    if (dayType === "Umum") return "text-red-600";
+    if (dayType === "Ahad") return "text-amber-600";
+    // Check if it's Saturday (and not a holiday)
+    if (logDate && dayType === "Biasa") {
+      const date = new Date(logDate);
+      if (date.getDay() === 6) return "text-sky-600";
     }
+    return "text-default-700";
+  };
+
+  const getDisplayDayType = (dayType: string, logDate?: string): string => {
+    if (dayType === "Biasa" && logDate) {
+      const date = new Date(logDate);
+      if (date.getDay() === 6) return "Sabtu";
+    }
+    return dayType;
   };
 
   const toggleExpansion = (entryId: string) => {
@@ -213,9 +219,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               <div>
                 <p className="text-sm text-default-500">Date & Type</p>
                 <p
-                  className={`font-medium ${getDayTypeColor(workLog.day_type)}`}
+                  className={`font-medium ${getDayTypeColor(workLog.day_type, workLog.log_date)}`}
                 >
-                  {workLog.day_type} Rate
+                  {getDisplayDayType(workLog.day_type, workLog.log_date)}
+                  {getDisplayDayType(workLog.day_type, workLog.log_date) !== "Sabtu" && " Rate"}
                 </p>
               </div>
             </div>
