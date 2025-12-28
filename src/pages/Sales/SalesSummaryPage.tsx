@@ -14,9 +14,9 @@ const SalesSummaryPage: React.FC = () => {
         <SalesSummarySelectionTooltip activeTab={activeTab} />
       </div>
 
-      <Tab labels={["Products", "Salesman"]} defaultActiveTab={0}>
-        <SalesByProductsPage />
+      <Tab labels={["Salesman", "Products"]} defaultActiveTab={0}>
         <SalesBySalesmanPage />
+        <SalesByProductsPage />
       </Tab>
     </div>
   );

@@ -62,12 +62,12 @@ const SalesBySalesmanPage: React.FC = () => {
     return new Date(currentYear, currentMonth, 1);
   });
   const [dateRange, setDateRange] = useState<DateRange>(() => {
-    // Create start date (1st of the selected month)
-    const startDate = new Date(currentYear, currentMonth, 1);
+    // Create start date (today)
+    const startDate = new Date();
     startDate.setHours(0, 0, 0, 0);
 
-    // Create end date (last day of the selected month)
-    const endDate = new Date(currentYear, currentMonth + 1, 0);
+    // Create end date (today)
+    const endDate = new Date();
     endDate.setHours(23, 59, 59, 999);
 
     return { start: startDate, end: endDate };
