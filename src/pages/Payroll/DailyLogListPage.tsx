@@ -228,6 +228,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                 setFilters({ ...filters, shift: value.toString() })
               }
               options={shiftOptions}
+              rounded="lg"
             />
           </div>
           {/* Status Listbox */}
@@ -238,6 +239,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                 setFilters({ ...filters, status: value.toString() })
               }
               options={statusOptions}
+              rounded="lg"
             />
           </div>
         </div>

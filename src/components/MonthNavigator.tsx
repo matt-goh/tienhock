@@ -141,15 +141,15 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
 
   // Size-based classes
   const buttonClasses = clsx(
-    "rounded-lg border border-default-300 transition-colors",
-    size === "sm" ? "p-1.5" : "p-2"
+    "rounded-lg border border-default-300 transition-colors flex items-center justify-center",
+    size === "sm" ? "p-1.5 h-[34px]" : "p-2 h-[40px]"
   );
 
   const iconSize = size === "sm" ? 16 : 20;
 
   const displayClasses = clsx(
-    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors whitespace-nowrap",
-    size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"
+    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors whitespace-nowrap flex items-center justify-center",
+    size === "sm" ? "px-3 h-[34px] text-xs" : "px-4 h-[40px] text-sm"
   );
 
   // Determine if next button should be disabled
