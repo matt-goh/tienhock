@@ -62,7 +62,11 @@ export default function NavbarMenu({
     }, 150);
   };
 
-  const handleItemClick = (path: string) => {
+  const handleButtonClick = (name: string) => {
+    setOpenDropdown(openDropdown === name ? null : name);
+  };
+
+  const handleItemClick = () => {
     setOpenDropdown(null);
     if (onNavigate) {
       onNavigate();
@@ -97,9 +101,10 @@ export default function NavbarMenu({
         >
           <button
             ref={buttonRef}
+            onClick={() => handleButtonClick(item.name)}
             className={`
               flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium
-              transition-colors duration-150
+              transition-all duration-150 active:scale-[0.98]
               ${isActive
                 ? "bg-sky-100 text-sky-700"
                 : "text-default-700 hover:bg-default-100"
@@ -126,6 +131,8 @@ export default function NavbarMenu({
             bookmarkedItems={bookmarkedItems}
             onBookmarkUpdate={onBookmarkUpdate}
             showBookmarkIcon={showBookmarkIcon}
+            onMouseEnter={() => handleMouseEnter(item.name)}
+            onMouseLeave={handleMouseLeave}
           />
         </div>
       );

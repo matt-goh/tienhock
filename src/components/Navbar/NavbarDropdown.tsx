@@ -16,11 +16,13 @@ interface NavbarDropdownProps {
   isOpen: boolean;
   anchorRef: React.RefObject<HTMLElement>;
   onClose: () => void;
-  onItemClick: (path: string) => void;
+  onItemClick: () => void;
   categoryName: string;
   bookmarkedItems?: Set<string>;
   onBookmarkUpdate?: (name: string, isBookmarked: boolean) => void;
   showBookmarkIcon?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 // Determine if a category should use mega menu layout
@@ -64,8 +66,11 @@ export default function NavbarDropdown({
   bookmarkedItems = new Set(),
   onBookmarkUpdate,
   showBookmarkIcon = false,
+  onMouseEnter,
+  onMouseLeave,
 }: NavbarDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -97,12 +102,12 @@ export default function NavbarDropdown({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as Node;
+      const isInsideDropdown = dropdownRef.current?.contains(target);
+      const isInsidePopover = popoverRef.current?.contains(target);
+      const isInsideAnchor = anchorRef.current?.contains(target);
+
+      if (!isInsideDropdown && !isInsidePopover && !isInsideAnchor) {
         onClose();
       }
     };
@@ -203,7 +208,7 @@ export default function NavbarDropdown({
       >
         <Link
           to={item.path}
-          onClick={() => onItemClick(item.path!)}
+          onClick={onItemClick}
           className={`
             group flex items-center justify-between px-3 py-2 rounded-md text-sm
             transition-colors duration-150
@@ -266,7 +271,7 @@ export default function NavbarDropdown({
         ref={dropdownRef}
         className={`
           fixed z-[100] bg-white border border-default-200 rounded-lg shadow-lg -translate-x-1/2
-          ${isMegaMenu ? "p-4" : "p-2"}
+          ${isMegaMenu ? "p-3" : "p-2"}
         `}
         style={{
           top: position.top,
@@ -274,12 +279,9 @@ export default function NavbarDropdown({
           minWidth: isMegaMenu ? `${columns * 200}px` : "220px",
           maxWidth: isMegaMenu ? `${columns * 220}px` : "300px",
         }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
-        {/* Category Header */}
-        <div className="px-3 py-2 border-b border-default-200 mb-2">
-          <h3 className="font-semibold text-default-800">{categoryName}</h3>
-        </div>
-
         {/* Items Grid/List */}
         {isMegaMenu ? (
           <div
@@ -309,20 +311,27 @@ export default function NavbarDropdown({
       leaveTo="opacity-0 scale-95"
     >
       <div
+        ref={popoverRef}
         className="fixed z-[101] bg-white border border-default-200 rounded-lg shadow-lg py-1 min-w-[180px]"
         style={{
           top: popoverPosition.top,
           left: popoverPosition.left,
         }}
-        onMouseEnter={handlePopoverMouseEnter}
-        onMouseLeave={handlePopoverMouseLeave}
+        onMouseEnter={() => {
+          handlePopoverMouseEnter();
+          onMouseEnter?.();
+        }}
+        onMouseLeave={() => {
+          handlePopoverMouseLeave();
+          onMouseLeave?.();
+        }}
       >
         {currentPopoverOptions.map((option) => (
           <Link
             key={option.path}
             to={option.path}
             onClick={() => {
-              onItemClick(option.path);
+              onItemClick();
               setHoveredItem(null);
             }}
             className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 hover:bg-sky-50 transition-colors"
