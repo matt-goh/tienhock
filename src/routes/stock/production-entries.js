@@ -4,47 +4,6 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // Initialize tables on module load
-  const initializeTables = async () => {
-    try {
-      // Create production_entries table
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS production_entries (
-          id SERIAL PRIMARY KEY,
-          entry_date DATE NOT NULL,
-          product_id VARCHAR(50) NOT NULL,
-          worker_id VARCHAR(50) NOT NULL,
-          bags_packed INTEGER NOT NULL DEFAULT 0,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          created_by VARCHAR(50),
-          UNIQUE(entry_date, product_id, worker_id)
-        )
-      `);
-
-      // Create indexes if they don't exist
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_production_entries_date
-        ON production_entries(entry_date)
-      `);
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_production_entries_product
-        ON production_entries(product_id)
-      `);
-      await pool.query(`
-        CREATE INDEX IF NOT EXISTS idx_production_entries_worker
-        ON production_entries(worker_id)
-      `);
-
-      console.log("Production entries tables initialized successfully");
-    } catch (error) {
-      console.error("Error initializing production entries tables:", error);
-    }
-  };
-
-  // Initialize tables when module loads
-  initializeTables();
-
   // GET /api/production-entries - List entries with filters
   router.get("/", async (req, res) => {
     try {
