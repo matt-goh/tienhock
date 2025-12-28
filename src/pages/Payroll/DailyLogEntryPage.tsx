@@ -2718,9 +2718,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   return (
-    <div className="relative w-full mx-4 mb-4 md:mx-6">
+    <div className="space-y-4">
       <BackButton onClick={handleBack} />
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-4">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
           {mode === "edit"
             ? `Edit ${jobConfig?.name} Entry`

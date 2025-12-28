@@ -838,8 +838,8 @@ const InvoiceFormPage: React.FC = () => {
   );
 
   return (
-    <div className="container mx-auto px-4 pb-10">
-      <BackButton onClick={handleBackClick} className="ml-5" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
           {/* Header */}

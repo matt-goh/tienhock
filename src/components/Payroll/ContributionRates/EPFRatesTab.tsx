@@ -72,7 +72,7 @@ const EPFRatesTab: React.FC = () => {
   }
 
   return (
-    <div className="mt-6">
+    <div className="mt-4">
       <div className="space-y-6">
         {Object.entries(groupedRates)
           .reverse()

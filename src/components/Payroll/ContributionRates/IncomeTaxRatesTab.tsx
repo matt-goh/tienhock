@@ -70,7 +70,7 @@ const IncomeTaxRatesTab: React.FC = () => {
   }
 
   return (
-    <div className="mt-6">
+    <div className="mt-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium text-default-800">
           Income Tax Rates

@@ -157,9 +157,9 @@ const PaymentPage: React.FC = () => {
   };
 
   return (
-    <div className="pb-4 max-w-full mx-auto px-8">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <IconCash size={28} className="text-gray-700" />
           Payment Management

@@ -352,7 +352,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
   }, [entries, products]);
 
   return (
-    <div className="flex h-full w-full flex-col p-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-default-900">

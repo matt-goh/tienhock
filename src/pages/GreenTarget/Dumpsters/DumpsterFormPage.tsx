@@ -250,8 +250,8 @@ const DumpsterFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4">
-      <BackButton onClick={handleBackClick} className="ml-5" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg">
         <div className="pl-6">
           <h1 className="text-xl font-semibold text-default-900">

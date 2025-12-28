@@ -1593,9 +1593,9 @@ const InvoiceDetailsPage: React.FC = () => {
     : "Select Payment Method";
 
   return (
-    <div className="container mx-auto px-8 pb-8">
+    <div className="space-y-4">
       {/* Header with actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
           <button
             onClick={() => navigate("/greentarget/invoices")}

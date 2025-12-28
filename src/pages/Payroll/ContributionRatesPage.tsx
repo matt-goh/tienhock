@@ -13,14 +13,14 @@ const ContributionRatesPage: React.FC = () => {
   const defaultTab = tabParam ? parseInt(tabParam, 10) : 0;
 
   return (
-    <div className="relative w-full space-y-4 mx-4 md:mx-6">
+    <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           Contribution Rates
         </h1>
       </div>
 
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-4">
         <Tab
           labels={["EPF Rates", "SOCSO Rates", "SIP Rates", "Income Tax Rates"]}
           tabWidth="w-40"

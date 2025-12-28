@@ -1436,8 +1436,8 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="flex flex-col w-full h-full px-4 md:px-12">
-      <div className="space-y-3">
+    <div className="space-y-4">
+      <div className="space-y-4">
         {/* --- Combined Header and Filters --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
           {/* Title */}
@@ -1693,7 +1693,7 @@ const InvoiceListPage: React.FC = () => {
             selectedInvoiceIds.size > 0
               ? "bg-sky-50/95 border border-sky-200"
               : "bg-white/95 border border-default-200"
-          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky -top-4 z-20 shadow backdrop-blur-sm`}
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
           onClick={handleToggleSelectAll}
           title={
             selectionState.isAllSelectedOnPage
@@ -1925,7 +1925,7 @@ const InvoiceListPage: React.FC = () => {
           )}
         </div>
         {/* --- Pagination --- */}
-        <div className="flex-shrink-0 mt-auto pb-4">
+        <div className="flex-shrink-0 mt-auto">
           {/* Stick to bottom */}
           {!isLoading && totalItems > 0 && totalPages > 1 && (
             <Pagination

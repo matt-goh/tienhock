@@ -213,7 +213,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   );
 
   return (
-    <div className="relative w-full space-y-6 mb-4 mx-4 md:mx-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">

@@ -1258,30 +1258,6 @@ function Table<T extends Record<string, any>>({
           }}
         />
       )}
-      {!isEditing ? (
-        <div
-          className="absolute top-[-57px] right-0 px-3 py-2 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center transition-colors duration-200"
-          onClick={onToggleEditing}
-        >
-          <IconEdit className="mr-1.5" />
-          <span>Edit</span>
-        </div>
-      ) : (
-        <div className="absolute top-[-57px] right-0 flex border-default-300 space-x-2">
-          <div
-            className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
-            onClick={handleSave}
-          >
-            Save
-          </div>
-          <div
-            className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
-            onClick={handleCancel}
-          >
-            Cancel
-          </div>
-        </div>
-      )}
       {isEditing && isLastPage && (
         <>
           <ToolTip

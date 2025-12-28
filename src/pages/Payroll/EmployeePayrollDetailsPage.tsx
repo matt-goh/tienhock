@@ -169,7 +169,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   );
 
   return (
-    <div className="relative w-full mx-4 md:mx-6 mb-4">
+    <div className="space-y-4">
       <BackButton onClick={handleBack} />
 
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">

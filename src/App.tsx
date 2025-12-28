@@ -38,62 +38,64 @@ const Layout: React.FC = () => {
       {/* Show navbar if authenticated and not on PDF route */}
       {showNavbar && <Navbar />}
 
-      <main
-        className={`
-          flex-1 overflow-y-auto
-          flex justify-center w-full
-          ${!isPDFRoute && !isLoginRoute ? "pt-6" : ""}
-        `}
-      >
-        <Routes>
-          {/* Login route */}
-          <Route
-            path="/login"
-            element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-          />
-
-          {/* Home route */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Company-specific home routes */}
-          <Route
-            path="/greentarget"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/jellypolly"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* All routes from all companies */}
-          {routes.map((route) => (
+      <main className="flex-1 overflow-y-auto">
+        <div
+          className={
+            !isPDFRoute && !isLoginRoute
+              ? "w-full max-w-8xl mx-auto px-4 md:px-6 my-4"
+              : ""
+          }
+        >
+          <Routes>
+            {/* Login route */}
             <Route
-              key={route.path}
-              path={route.path}
+              path="/login"
+              element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+            />
+
+            {/* Home route */}
+            <Route
+              path="/"
               element={
                 <ProtectedRoute>
-                  {React.createElement(route.component)}
+                  <HomePage />
                 </ProtectedRoute>
               }
             />
-          ))}
-        </Routes>
+
+            {/* Company-specific home routes */}
+            <Route
+              path="/greentarget"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/jellypolly"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* All routes from all companies */}
+            {routes.map((route) => (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={
+                  <ProtectedRoute>
+                    {React.createElement(route.component)}
+                  </ProtectedRoute>
+                }
+              />
+            ))}
+          </Routes>
+        </div>
       </main>
     </div>
   );
