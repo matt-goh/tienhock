@@ -1,5 +1,5 @@
 // src/components/Navbar/NavbarMenu.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { IconChevronDown } from "@tabler/icons-react";
 import { SidebarItem } from "../../pages/pagesRoute";
@@ -24,6 +24,11 @@ export default function NavbarMenu({
   const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLButtonElement> }>({});
   const location = useLocation();
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Close dropdown when route changes
+  useEffect(() => {
+    setOpenDropdown(null);
+  }, [location.pathname]);
 
   // Filter out the Bookmarks category (handled separately)
   const menuItems = items.filter((item) => item.name !== "Bookmarks");

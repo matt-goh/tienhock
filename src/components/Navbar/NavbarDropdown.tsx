@@ -116,10 +116,12 @@ export default function NavbarDropdown({
     };
   }, [isOpen, onClose, anchorRef]);
 
-  // Close dropdown on route change
+  // Reset hovered item when dropdown closes
   useEffect(() => {
-    onClose();
-  }, [location.pathname]);
+    if (!isOpen) {
+      setHoveredItem(null);
+    }
+  }, [isOpen]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -295,8 +297,8 @@ export default function NavbarDropdown({
     </Transition>
   );
 
-  // Popover for quick actions
-  const popoverContent = hoveredItem && currentPopoverOptions.length > 0 && (
+  // Popover for quick actions (only show when main dropdown is open)
+  const popoverContent = isOpen && hoveredItem && currentPopoverOptions.length > 0 && (
     <Transition
       show={true}
       enter="transition ease-out duration-100"
