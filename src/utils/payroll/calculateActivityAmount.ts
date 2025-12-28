@@ -5,11 +5,22 @@ import {
   roundMoney,
 } from "./moneyUtils";
 
+// Helper function to get overtime threshold based on day of week
+// Saturday (day 6) has 5-hour threshold, other days have 8-hour threshold
+function getOvertimeThreshold(logDate?: string): number {
+  if (!logDate) return 8;
+  const date = new Date(logDate);
+  const dayOfWeek = date.getDay();
+  // Saturday = 6, use 5-hour threshold; other days use 8-hour threshold
+  return dayOfWeek === 6 ? 5 : 8;
+}
+
 export function calculateActivityAmount(
   activity: any,
   hours: number = 0,
   contextData: Record<string, any> = {},
-  locationType?: "Local" | "Outstation"
+  locationType?: "Local" | "Outstation",
+  logDate?: string
 ): number {
   if (!activity.isSelected) return 0;
 
@@ -19,14 +30,16 @@ export function calculateActivityAmount(
   switch (activity.rateUnit) {
     case "Hour":
       // For overtime pay codes, use hoursApplied if provided (for monthly entries)
-      // Otherwise calculate overtime as hours beyond 8 (for daily entries)
+      // Otherwise calculate overtime as hours beyond threshold (for daily entries)
+      // Saturday threshold: 5 hours, Other days: 8 hours
       if (activity.payType === "Overtime") {
         if (activity.hoursApplied !== undefined && activity.hoursApplied !== null) {
           // Monthly entry: use the explicitly provided overtime hours
           calculatedAmount = multiplyMoney(activity.rate, activity.hoursApplied);
         } else {
-          // Daily entry: calculate overtime as hours beyond 8
-          const overtimeHours = Math.max(0, hours - 8);
+          // Daily entry: calculate overtime based on day-specific threshold
+          const overtimeThreshold = getOvertimeThreshold(logDate);
+          const overtimeHours = Math.max(0, hours - overtimeThreshold);
           calculatedAmount = multiplyMoney(activity.rate, overtimeHours);
         }
       } else {
@@ -77,14 +90,16 @@ export function calculateActivitiesAmounts(
   activities: any[],
   hours: number = 0,
   contextData: Record<string, any> = {},
-  locationType?: "Local" | "Outstation"
+  locationType?: "Local" | "Outstation",
+  logDate?: string
 ): any[] {
   return activities.map((activity) => {
     const calculatedAmount = calculateActivityAmount(
       activity,
       hours,
       contextData,
-      locationType
+      locationType,
+      logDate
     );
 
     // Auto-deselect zero amount activities unless they are context-linked or special types

@@ -66,7 +66,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({ employee, onClick }) => {
   return (
     <button
       onClick={() => onClick(employee)}
-      className="block w-full p-4 border border-default-200 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white h-full min-h-[120px]"
+      className="block w-full p-4 border border-default-200 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white h-full min-h-[104px]"
     >
       <h3
         className="text-base font-semibold text-default-800 truncate mb-1"
@@ -842,7 +842,7 @@ const CutiReportPage: React.FC = () => {
           </div>
 
           {/* --- Employee Card Grid --- */}
-          <div className="max-h-[calc(100vh-260px)] overflow-y-auto border border-default-200 rounded-lg bg-white shadow-sm p-4">
+          <div className="max-h-[calc(100vh-300px)] overflow-y-auto border border-default-200 rounded-lg bg-white shadow-sm p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredEmployees.map((employee) => (
                 <EmployeeCard

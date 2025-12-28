@@ -1,9 +1,9 @@
 import React from "react";
 import { Icon } from "@tabler/icons-react";
 import { Company } from "../contexts/CompanyContext";
-import { TienHockSidebarData } from "./TienHockSidebarData";
-import { JellyPollySidebarData } from "./JellyPollySidebarData";
-import { GreenTargetSidebarData } from "./GreenTargetSidebarData";
+import { TienHockNavData } from "./TienHockNavData";
+import { JellyPollyNavData } from "./JellyPollyNavData";
+import { GreenTargetNavData } from "./GreenTargetNavData";
 
 export interface PopoverOption {
   name: string;
@@ -30,16 +30,16 @@ export interface RouteItem {
 
 // This function will generate routes with the correct prefix for a specific company
 export const getCompanyRoutes = (company: Company): SidebarItem[] => {
-  // Get company-specific sidebar data
-  const companySidebarData = getCompanySidebarData(company.id);
+  // Get company-specific nav data
+  const companyNavData = getCompanyNavData(company.id);
 
   // If Tien Hock (no prefix), return routes as is
   if (!company.routePrefix) {
-    return companySidebarData;
+    return companyNavData;
   }
 
   // For other companies, add the prefix to all routes
-  return companySidebarData.map((item) => {
+  return companyNavData.map((item) => {
     const newItem = { ...item, companyId: company.id };
 
     // Add prefix to the path if it exists
@@ -82,17 +82,17 @@ export const getCompanyRoutes = (company: Company): SidebarItem[] => {
   });
 };
 
-// Function to get the appropriate SidebarData based on company ID
-export const getCompanySidebarData = (companyId: string): SidebarItem[] => {
+// Function to get the appropriate NavData based on company ID
+export const getCompanyNavData = (companyId: string): SidebarItem[] => {
   switch (companyId) {
     case "tienhock":
-      return TienHockSidebarData;
+      return TienHockNavData;
     case "greentarget":
-      return GreenTargetSidebarData;
+      return GreenTargetNavData;
     case "jellypolly":
-      return JellyPollySidebarData;
+      return JellyPollyNavData;
     default:
-      return TienHockSidebarData; // Default to Tien Hock
+      return TienHockNavData; // Default to Tien Hock
   }
 };
 
@@ -125,7 +125,7 @@ export const flattenRoutes = (items: SidebarItem[]): RouteItem[] => {
 
 // Generate flattened routes for all companies for routing
 export const getAllRoutes = (): RouteItem[] => {
-  const tienhockRoutes = flattenRoutes(TienHockSidebarData);
+  const tienhockRoutes = flattenRoutes(TienHockNavData);
 
   // Generate prefixed routes for other companies
   const greentargetRoutes = flattenRoutes(

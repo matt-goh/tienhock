@@ -65,12 +65,12 @@ const HolidayCalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full -mt-2">
-      <div className="mb-2 flex flex-col md:flex-row justify-between items-center">
+    <div className="space-y-2">
+      <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           Holiday Calendar ({holidays.length})
         </h1>
-        <div className="mt-4 md:mt-0 flex items-center gap-4">
+        <div className="flex items-center gap-4">
           {/* Year Navigation */}
           <div className="flex items-center gap-2 border border-default-200 rounded-lg px-3 py-2">
             <button
@@ -114,7 +114,7 @@ const HolidayCalendarPage: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg border border-default-200 shadow-sm overflow-hidden">
           <div className="relative overflow-hidden">
-            <div className="max-h-[640px] overflow-y-auto">
+            <div className="max-h-[620px] overflow-y-auto">
               <table className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-100 sticky top-0 z-10">
                   <tr>

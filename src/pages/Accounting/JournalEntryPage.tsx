@@ -626,8 +626,8 @@ const JournalEntryPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-4">
-      <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
 
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         {/* Header */}
@@ -903,12 +903,12 @@ const JournalEntryPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-5 py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
                           {totals.totalDebit.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-5 py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
                           {totals.totalCredit.toFixed(2)}
                         </div>
                       </td>

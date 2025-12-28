@@ -11,9 +11,6 @@ import {
   StockProduct,
 } from "../../types/types";
 import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsRight,
   IconCalendar,
   IconPackage,
   IconEdit,
@@ -21,6 +18,7 @@ import {
   IconX,
   IconStarFilled,
 } from "@tabler/icons-react";
+import MonthNavigator from "../../components/MonthNavigator";
 import clsx from "clsx";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
@@ -157,26 +155,6 @@ const StockMovementPage: React.FC = () => {
     fetchMovements();
   }, [fetchMovements]);
 
-  // Navigate months
-  const navigateMonth = (direction: "prev" | "next") => {
-    setSelectedMonth((prev) => {
-      const newDate = new Date(prev);
-      if (direction === "prev") {
-        newDate.setMonth(newDate.getMonth() - 1);
-      } else {
-        newDate.setMonth(newDate.getMonth() + 1);
-      }
-      return newDate;
-    });
-  };
-
-  // Format month for display
-  const formatMonthDisplay = (date: Date) => {
-    return date.toLocaleDateString("en-MY", {
-      month: "long",
-      year: "numeric",
-    });
-  };
 
   // Handle initial balance edit
   const handleEditBalance = () => {
@@ -218,17 +196,8 @@ const StockMovementPage: React.FC = () => {
     }
   };
 
-  // Check if current month is the current calendar month (can't go beyond current month)
-  const isCurrentMonth = useMemo(() => {
-    const now = new Date();
-    return (
-      selectedMonth.getFullYear() === now.getFullYear() &&
-      selectedMonth.getMonth() === now.getMonth()
-    );
-  }, [selectedMonth]);
-
   return (
-    <div className="w-full space-y-4 p-4">
+    <div className="space-y-4">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-default-900">Stock Movement</h1>
@@ -307,42 +276,12 @@ const StockMovementPage: React.FC = () => {
               Date Range
             </label>
             {viewType === "month" ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigateMonth("prev")}
-                  className="rounded-lg border border-default-300 p-2 text-default-600 hover:bg-default-50 transition-colors"
-                >
-                  <IconChevronLeft size={20} />
-                </button>
-                <div className="flex-1 rounded-lg border border-default-300 bg-default-50 px-4 py-2 text-sm text-center font-medium text-default-900">
-                  {formatMonthDisplay(selectedMonth)}
-                </div>
-                <button
-                  onClick={() => navigateMonth("next")}
-                  disabled={isCurrentMonth}
-                  className={clsx(
-                    "rounded-lg border border-default-300 p-2 transition-colors",
-                    isCurrentMonth
-                      ? "cursor-not-allowed text-default-300"
-                      : "text-default-600 hover:bg-default-50"
-                  )}
-                >
-                  <IconChevronRight size={20} />
-                </button>
-                <button
-                  onClick={() => setSelectedMonth(new Date())}
-                  disabled={isCurrentMonth}
-                  title="Go to current month"
-                  className={clsx(
-                    "rounded-lg border border-default-300 p-2 transition-colors",
-                    isCurrentMonth
-                      ? "cursor-not-allowed text-default-300"
-                      : "text-default-600 hover:bg-default-50"
-                  )}
-                >
-                  <IconChevronsRight size={20} />
-                </button>
-              </div>
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={setSelectedMonth}
+                showGoToCurrentButton={false}
+                fixedHeight={false}
+              />
             ) : viewType === "rolling" ? (
               <div className="rounded-lg border border-default-300 bg-default-50 px-4 py-2 text-center text-sm text-default-600">
                 Last 31 days ({dateRange.start} to {dateRange.end})

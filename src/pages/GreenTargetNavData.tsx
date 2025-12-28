@@ -23,7 +23,7 @@ import GreenTargetDebtorsReportPage from "./GreenTarget/DebtorsReportPage";
 import GreenTargetDashboardPage from "./GreenTarget/GreenTargetDashboardPage";
 import GreenTargetPaymentPage from "./GreenTarget/Payments/GreenTargetPaymentPage";
 
-export const GreenTargetSidebarData: SidebarItem[] = [
+export const GreenTargetNavData: SidebarItem[] = [
   {
     name: "Dashboard",
     icon: IconDeviceDesktopAnalytics, // Make sure to import this icon

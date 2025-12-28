@@ -21,6 +21,8 @@ interface StyledListboxProps {
   className?: string;
   placeholder?: string;
   rounded?: "full" | "lg";
+  /** Size variant for the component */
+  size?: "sm" | "md";
 }
 
 const StyledListbox: React.FC<StyledListboxProps> = ({
@@ -30,16 +32,18 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
   className = "",
   placeholder = "Select...",
   rounded = "full",
+  size = "md",
 }) => {
   const selectedOption = options.find((option) => option.id === value);
   const displayValue = selectedOption?.name ?? placeholder;
   const roundedClass = rounded === "full" ? "rounded-full" : "rounded-lg";
+  const sizeClasses = size === "sm" ? "h-[34px] py-1.5 text-sm" : "py-2";
 
   return (
     <div className={className}>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <ListboxButton className={`w-full ${roundedClass} border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500`}>
+          <ListboxButton className={`w-full ${roundedClass} ${sizeClasses} border border-default-300 bg-white pl-3 pr-10 text-left focus:outline-none focus:border-default-500 h-[40px]`}>
             <span className="block truncate">{displayValue}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
               <IconChevronDown

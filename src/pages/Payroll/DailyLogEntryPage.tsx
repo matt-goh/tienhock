@@ -179,6 +179,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     return "Biasa";
   };
 
+  // Helper function to get default hours based on day of week
+  // Saturday (day 6) has 5-hour default, other days have 7-hour default
+  const getDefaultHours = (logDate: string): number => {
+    const date = new Date(logDate);
+    const dayOfWeek = date.getDay();
+    // Saturday = 6, use 5 hours; other days use 7 hours
+    return dayOfWeek === 6 ? 5 : 7;
+  };
+
   // Initialize form data with dynamic context fields
   const [formData, setFormData] = useState<DailyLogFormData>(() => {
     if (mode === "edit" && existingWorkLog) {
@@ -348,7 +357,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             updatedActivities[rowKey] = calculateActivitiesAmounts(
               updatedRowActivities,
               hours,
-              formData.contextData
+              formData.contextData,
+              undefined,
+              formData.logDate
             );
           });
 
@@ -503,16 +514,40 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     return followedMap;
   }, [salesmanIkutRelations, salesmanIkutEmployees]);
 
-  // Update day type when date changes
+  // Update day type and hours when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = new Date(e.target.value);
     const newDayType = determineDayType(newDate);
+    const newDefaultHours = getDefaultHours(e.target.value);
+    const oldDefaultHours = getDefaultHours(formData.logDate);
 
     setFormData({
       ...formData,
       logDate: e.target.value,
       dayType: newDayType,
     });
+
+    // Update hours for all selected employees if moving to/from Saturday
+    if (newDefaultHours !== oldDefaultHours) {
+      setEmployeeSelectionState((prev) => {
+        const newJobHours = { ...prev.jobHours };
+
+        // Update hours for each employee's jobs
+        Object.keys(newJobHours).forEach((employeeId) => {
+          Object.keys(newJobHours[employeeId]).forEach((jobType) => {
+            // Only update if the hours match the old default (user hasn't manually changed it)
+            if (newJobHours[employeeId][jobType] === oldDefaultHours) {
+              newJobHours[employeeId][jobType] = newDefaultHours;
+            }
+          });
+        });
+
+        return {
+          ...prev,
+          jobHours: newJobHours,
+        };
+      });
+    }
   };
 
   // Function to fetch leave balances for multiple employees in batch
@@ -944,7 +979,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     const recalculatedActivities = calculateActivitiesAmounts(
       activities,
-      hours
+      hours,
+      {},
+      undefined,
+      formData.logDate
     );
 
     setLeaveEmployeeActivities((prev) => ({
@@ -1142,7 +1180,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 const recalculatedIkutActivities = calculateActivitiesAmounts(
                   updatedIkutActivities,
                   0, // No hours needed for allowance paycodes
-                  formData.contextData
+                  formData.contextData,
+                  undefined,
+                  formData.logDate
                 );
 
                 // Individual setEmployeeActivities call for each employee - same as handleLocationTypeChange
@@ -1185,7 +1225,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         activities,
         0, // Hours don't matter for salesmen
         formData.contextData,
-        locationType
+        locationType,
+        formData.logDate
       );
 
       setEmployeeActivities((prev) => ({
@@ -1248,8 +1289,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             updatedIkutActivities,
             employeeSelectionState.jobHours[ikutEmployeeId]?.[
               "SALESMAN_IKUT"
-            ] || 7,
-            formData.contextData
+            ] || getDefaultHours(formData.logDate),
+            formData.contextData,
+            undefined,
+            formData.logDate
           );
 
           setEmployeeActivities((prev) => ({
@@ -1398,7 +1441,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             updatedActivities,
             0, // For salesmen, hours aren't used
             formData.contextData,
-            locationTypes[rowKey] || "Local"
+            locationTypes[rowKey] || "Local",
+            formData.logDate
           );
 
           return {
@@ -1630,8 +1674,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         // Add this job to the employee's selected jobs
         newSelectedJobs[employeeId].push(jobType);
 
-        // Set default hours (7 hours) for this job
-        newJobHours[employeeId][jobType] = 7;
+        // Set default hours based on day of week (5 for Saturday, 7 for other days)
+        newJobHours[employeeId][jobType] = getDefaultHours(formData.logDate);
       });
 
       // Update the state with all employees selected
@@ -1640,7 +1684,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         jobHours: newJobHours,
       });
     }
-  }, [expandedEmployees, loadingStaffs, loadingJobs]);
+  }, [expandedEmployees, loadingStaffs, loadingJobs, formData.logDate]);
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
@@ -1689,7 +1733,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           }
 
           if (!newJobHours[emp.id][emp.jobType]) {
-            newJobHours[emp.id][emp.jobType] = 7;
+            newJobHours[emp.id][emp.jobType] = getDefaultHours(formData.logDate);
           }
         });
 
@@ -1812,9 +1856,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             newSelectedJobs[ikutEmployee.id].push("SALESMAN_IKUT");
           }
 
-          // Set default hours if not already set
+          // Set default hours if not already set (5 for Saturday, 7 for other days)
           if (!newJobHours[ikutEmployee.id]["SALESMAN_IKUT"]) {
-            newJobHours[ikutEmployee.id]["SALESMAN_IKUT"] = 7;
+            newJobHours[ikutEmployee.id]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
           }
 
           return {
@@ -1991,6 +2035,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     employeeSelectionState.selectedJobs,
     employeeSelectionState.jobHours,
     formData.dayType,
+    formData.logDate,
     loadingPayCodeMappings,
     mode,
   ]);
@@ -2048,9 +2093,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const existingActivitiesForRow = employeeActivities[rowKey] || [];
 
           // For salesmen, we don't filter by hours since hours aren't applicable
+          // Use day-specific OT threshold (5 for Saturday, 8 for others)
+          const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
           const filteredPayCodes = isSalesmanJob
             ? mergedPayCodes
-            : hours > 8
+            : hours > otThreshold
             ? mergedPayCodes
             : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
 
@@ -2088,8 +2135,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
-                // Only auto-select OT codes if hours > 8
-                isSelected = !isSalesmanJob && hours > 8;
+                // Only auto-select OT codes if hours exceed threshold (5 for Saturday, 8 for others)
+                isSelected = !isSalesmanJob && hours > otThreshold;
               } else if (payCode.pay_type === "Base") {
                 // Base pay codes follow default settings
                 isSelected = payCode.is_default_setting;
@@ -2154,7 +2201,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   unitsProduced,
                 },
                 hours,
-                formData.contextData
+                formData.contextData,
+                undefined,
+                formData.logDate
               ),
             };
           });
@@ -2163,7 +2212,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const processedActivities = calculateActivitiesAmounts(
             activities,
             hours,
-            formData.contextData
+            formData.contextData,
+            undefined,
+            formData.logDate
           );
           newEmployeeActivities[rowKey] = processedActivities;
         });
@@ -2229,7 +2280,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const recalculatedIkutActivities = calculateActivitiesAmounts(
             updatedIkutActivities,
             0, // No hours needed for allowance paycodes
-            formData.contextData
+            formData.contextData,
+            undefined,
+            formData.logDate
           );
 
           // Update the activities immediately
@@ -2289,7 +2342,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               rateUnit: payCode.rate_unit,
               rate,
             },
-            hours
+            hours,
+            {},
+            undefined,
+            formData.logDate
           ),
         };
       });
@@ -2305,6 +2361,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       jobPayCodeDetails,
       employeeMappings,
       jobConfig?.defaultHours,
+      formData.logDate,
     ]
   );
 
@@ -2373,7 +2430,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               hoursApplied: payCode.rate_unit === "Hour" ? hours : null,
             },
             hours,
-            formData.contextData
+            formData.contextData,
+            undefined,
+            formData.logDate
           ),
           isContextLinked: false,
           source: payCode.source,
@@ -2392,6 +2451,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       employeeMappings,
       jobConfig?.defaultHours,
       formData.dayType,
+      formData.logDate,
     ]
   );
 
@@ -2638,7 +2698,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         activities,
         0, // Hours don't matter for salesmen and salesman ikut
         formData.contextData,
-        locationType
+        locationType,
+        formData.logDate
       );
 
       setEmployeeActivities((prev) => ({
@@ -2657,9 +2718,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   return (
-    <div className="relative w-full mx-4 mb-4 md:mx-6">
+    <div className="space-y-4">
       <BackButton onClick={handleBack} />
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-4">
         <h1 className="text-xl font-semibold text-default-800 mb-4">
           {mode === "edit"
             ? `Edit ${jobConfig?.name} Entry`
@@ -2684,14 +2745,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               </span>
               <span
                 className={`text-sm font-semibold ml-1 ${
-                  formData.dayType === "Biasa"
-                    ? "text-default-700"
+                  formData.dayType === "Umum"
+                    ? "text-red-600"
                     : formData.dayType === "Ahad"
                     ? "text-amber-600"
-                    : "text-red-600"
+                    : new Date(formData.logDate).getDay() === 6
+                    ? "text-sky-600"
+                    : "text-default-700"
                 }`}
               >
-                {formData.dayType}
+                {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
+                  ? "Sabtu"
+                  : formData.dayType}
                 {formData.dayType === "Umum" &&
                   getHolidayDescription(new Date(formData.logDate)) && (
                     <span className="ml-1 font-normal">
@@ -3110,7 +3175,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     onBlur={() => handleHoursBlur(row.rowKey)}
                                     onClick={(e) => e.stopPropagation()}
                                     className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
-                                      hours > 8 &&
+                                      hours > getDefaultHours(formData.logDate) &&
                                       jobConfig?.requiresOvertimeCalc
                                         ? "border-amber-400 bg-amber-50"
                                         : "border-default-300"
@@ -3143,6 +3208,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 }
                                 disabled={!isSelected}
                                 onClick={() => handleManageActivities(row)}
+                                logDate={formData.logDate}
                               />
                             </td>
                           </tr>
@@ -3531,6 +3597,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     onClick={() =>
                                       handleManageActivities(row)
                                     }
+                                    logDate={formData.logDate}
                                   />
                                 </td>
                               </tr>
@@ -3819,6 +3886,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             onClick={() =>
                               handleManageLeaveActivities(employee)
                             }
+                            logDate={formData.logDate}
                           />
                         </td>
                       </tr>
@@ -3878,6 +3946,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }
         hasUnsavedChanges={hasUnsavedChanges}
         onNavigateAttempt={safeNavigate}
+        logDate={formData.logDate}
       />
       <ManageActivitiesModal
         isOpen={showLeaveActivitiesModal}
@@ -3895,6 +3964,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         contextData={formData.contextData}
         hasUnsavedChanges={hasUnsavedChanges}
         onNavigateAttempt={safeNavigate}
+        logDate={formData.logDate}
       />
       {/* Confirmation Dialog for Unsaved Changes */}
       <ConfirmationDialog

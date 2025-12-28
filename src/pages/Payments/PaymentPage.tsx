@@ -1,22 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  IconCash,
-  IconPlus,
-  IconSearch,
-  IconChevronDown,
-  IconCheck,
-} from "@tabler/icons-react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-  Transition,
-} from "@headlessui/react";
+import { IconCash, IconPlus, IconSearch } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import DateRangePicker from "../../components/DateRangePicker";
+import MonthNavigator from "../../components/MonthNavigator";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { Payment } from "../../types/types";
@@ -34,26 +22,6 @@ interface PaymentFilters {
   searchTerm: string;
 }
 
-interface MonthOption {
-  id: number;
-  name: string;
-}
-
-const monthOptions: MonthOption[] = [
-  { id: 0, name: "January" },
-  { id: 1, name: "February" },
-  { id: 2, name: "March" },
-  { id: 3, name: "April" },
-  { id: 4, name: "May" },
-  { id: 5, name: "June" },
-  { id: 6, name: "July" },
-  { id: 7, name: "August" },
-  { id: 8, name: "September" },
-  { id: 9, name: "October" },
-  { id: 10, name: "November" },
-  { id: 11, name: "December" },
-];
-
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -61,9 +29,11 @@ const PaymentPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(() => {
+
+  // Use Date object for month navigation
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const now = new Date();
-    return monthOptions[now.getMonth()];
+    return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
   const [filters, setFilters] = useState<PaymentFilters>(() => {
@@ -152,19 +122,16 @@ const PaymentPage: React.FC = () => {
     []
   );
 
-  const handleMonthChange = useCallback((month: MonthOption) => {
-    setSelectedMonth(month);
+  // Handle month change from MonthNavigator
+  const handleMonthChange = useCallback((newDate: Date) => {
+    setSelectedMonth(newDate);
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonthIndex = now.getMonth();
-
-    const targetYear =
-      month.id > currentMonthIndex ? currentYear - 1 : currentYear;
-
-    const startDate = new Date(targetYear, month.id, 1);
+    // Create start date (1st of the selected month)
+    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(targetYear, month.id + 1, 0);
+
+    // Create end date (last day of the selected month)
+    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
     endDate.setHours(23, 59, 59, 999);
 
     setFilters((prev) => ({
@@ -190,9 +157,9 @@ const PaymentPage: React.FC = () => {
   };
 
   return (
-    <div className="pb-4 max-w-full mx-auto px-8">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <IconCash size={28} className="text-gray-700" />
           Payment Management
@@ -216,7 +183,7 @@ const PaymentPage: React.FC = () => {
                 type="text"
                 placeholder="Search"
                 title="Search payments by invoice, reference, or amount"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
                 value={filters.searchTerm}
                 onChange={(e) =>
                   setFilters((prev) => ({
@@ -228,116 +195,68 @@ const PaymentPage: React.FC = () => {
             </div>
 
             {/* Date Range Picker */}
-            <div className="w-full sm:w-auto">
-              <DateRangePicker
-                dateRange={{
-                  start: filters.dateRange.start || new Date(),
-                  end: filters.dateRange.end || new Date(),
-                }}
-                onDateChange={handleDateChange}
+            <DateRangePicker
+              dateRange={{
+                start: filters.dateRange.start || new Date(),
+                end: filters.dateRange.end || new Date(),
+              }}
+              onDateChange={handleDateChange}
+            />
+
+            {/* Month Navigator */}
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={handleMonthChange}
+              showGoToCurrentButton={false}
+              dateRange={{
+                start: filters.dateRange.start || new Date(),
+                end: filters.dateRange.end || new Date(),
+              }}
+            />
+
+            {/* Payment Method Filter */}
+            <div className="w-40">
+              <StyledListbox
+                value={filters.paymentMethod || ""}
+                onChange={(value) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    paymentMethod: value === "" ? null : String(value),
+                  }))
+                }
+                options={[
+                  { id: "", name: "All Methods" },
+                  { id: "cash", name: "Cash" },
+                  { id: "cheque", name: "Cheque" },
+                  { id: "bank_transfer", name: "Bank Transfer" },
+                  { id: "online", name: "Online" },
+                ]}
+                placeholder="All Methods"
+                rounded="lg"
               />
             </div>
 
-            {/* Month Selector */}
-            <div className="w-full sm:w-40">
-              <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                <div className="relative">
-                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                    <span className="block truncate pl-1">
-                      {selectedMonth.name}
-                    </span>
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <IconChevronDown
-                        className="h-5 w-5 text-default-400"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </ListboxButton>
-                  <Transition
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                      {monthOptions.map((month) => (
-                        <ListboxOption
-                          key={month.id}
-                          value={month}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                              active
-                                ? "bg-default-100 text-default-900"
-                                : "text-gray-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                {month.name}
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                    stroke={2.5}
-                                  />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                      ))}
-                    </ListboxOptions>
-                  </Transition>
-                </div>
-              </Listbox>
-            </div>
-
-            {/* Payment Method Filter */}
-            <StyledListbox
-              value={filters.paymentMethod || ""}
-              onChange={(value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  paymentMethod: value === "" ? null : String(value),
-                }))
-              }
-              options={[
-                { id: "", name: "All Methods" },
-                { id: "cash", name: "Cash" },
-                { id: "cheque", name: "Cheque" },
-                { id: "bank_transfer", name: "Bank Transfer" },
-                { id: "online", name: "Online" },
-              ]}
-              className="w-full sm:w-40"
-              placeholder="All Methods"
-            />
-
             {/* Status Filter */}
-            <StyledListbox
-              value={filters.status || ""}
-              onChange={(value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  status: value === "" ? null : String(value),
-                }))
-              }
-              options={[
-                { id: "", name: "All Status" },
-                { id: "active", name: "Active" },
-                { id: "pending", name: "Pending" },
-                { id: "overpaid", name: "Overpaid" },
-                { id: "cancelled", name: "Cancelled" },
-              ]}
-              className="w-full sm:w-40"
-              placeholder="All Status"
-            />
+            <div className="w-40">
+              <StyledListbox
+                value={filters.status || ""}
+                onChange={(value) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    status: value === "" ? null : String(value),
+                  }))
+                }
+                options={[
+                  { id: "", name: "All Status" },
+                  { id: "active", name: "Active" },
+                  { id: "pending", name: "Pending" },
+                  { id: "overpaid", name: "Overpaid" },
+                  { id: "cancelled", name: "Cancelled" },
+                ]}
+                placeholder="All Status"
+                rounded="lg"
+              />
+            </div>
           </div>
         </div>
       </div>

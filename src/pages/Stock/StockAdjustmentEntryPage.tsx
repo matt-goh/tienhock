@@ -9,8 +9,6 @@ import {
   StockProduct,
 } from "../../types/types";
 import {
-  IconChevronLeft,
-  IconChevronRight,
   IconPlus,
   IconTrash,
   IconDeviceFloppy,
@@ -20,6 +18,7 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../components/Button";
+import MonthNavigator from "../../components/MonthNavigator";
 
 type ProductTab = "BH" | "MEE";
 
@@ -72,14 +71,6 @@ const StockAdjustmentEntryPage: React.FC = () => {
     return `${year}-${month}`;
   }, [selectedMonth]);
 
-  // Format month for display
-  const formatMonthDisplay = (date: Date) => {
-    return date.toLocaleDateString("en-MY", {
-      month: "long",
-      year: "numeric",
-    });
-  };
-
   // Calculate if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
     const currentKeys = Object.keys(entries);
@@ -101,15 +92,6 @@ const StockAdjustmentEntryPage: React.FC = () => {
 
     return false;
   }, [entries, originalEntries]);
-
-  // Check if current month is the current calendar month
-  const isCurrentMonth = useMemo(() => {
-    const now = new Date();
-    return (
-      selectedMonth.getFullYear() === now.getFullYear() &&
-      selectedMonth.getMonth() === now.getMonth()
-    );
-  }, [selectedMonth]);
 
   // Fetch references for the selected month
   const fetchReferences = useCallback(async () => {
@@ -177,27 +159,15 @@ const StockAdjustmentEntryPage: React.FC = () => {
     }
   }, [selectedReference, isCreatingNew, fetchEntriesByReference]);
 
-  // Navigate months
-  const navigateMonth = (direction: "prev" | "next") => {
+  // beforeChange callback for MonthNavigator - checks for unsaved changes
+  const handleBeforeMonthChange = useCallback(() => {
     if (hasUnsavedChanges) {
-      if (
-        !window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        )
-      ) {
-        return;
-      }
+      return window.confirm(
+        "You have unsaved changes. Do you want to discard them?"
+      );
     }
-    setSelectedMonth((prev) => {
-      const newDate = new Date(prev);
-      if (direction === "prev") {
-        newDate.setMonth(newDate.getMonth() - 1);
-      } else {
-        newDate.setMonth(newDate.getMonth() + 1);
-      }
-      return newDate;
-    });
-  };
+    return true;
+  }, [hasUnsavedChanges]);
 
   // Handle reference selection
   const handleSelectReference = (reference: string) => {
@@ -382,7 +352,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
   }, [entries, products]);
 
   return (
-    <div className="flex h-full w-full flex-col p-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-default-900">
@@ -397,29 +367,13 @@ const StockAdjustmentEntryPage: React.FC = () => {
       <div className="mb-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-4">
           <label className="text-sm font-medium text-default-700">Month:</label>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigateMonth("prev")}
-              className="rounded-lg border border-default-300 p-2 text-default-600 transition-colors hover:bg-default-50"
-            >
-              <IconChevronLeft size={20} />
-            </button>
-            <div className="w-48 rounded-lg border border-default-300 bg-default-50 px-4 py-2 text-center text-sm font-medium text-default-900">
-              {formatMonthDisplay(selectedMonth)}
-            </div>
-            <button
-              onClick={() => navigateMonth("next")}
-              disabled={isCurrentMonth}
-              className={clsx(
-                "rounded-lg border border-default-300 p-2 transition-colors",
-                isCurrentMonth
-                  ? "cursor-not-allowed text-default-300"
-                  : "text-default-600 hover:bg-default-50"
-              )}
-            >
-              <IconChevronRight size={20} />
-            </button>
-          </div>
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={setSelectedMonth}
+            beforeChange={handleBeforeMonthChange}
+            showGoToCurrentButton={false}
+            className="w-56"
+          />
           {hasUnsavedChanges && (
             <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
               Unsaved changes

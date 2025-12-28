@@ -1,5 +1,6 @@
 // src/components/DateRangePicker.tsx
 import React, { useRef, useState } from "react";
+import clsx from "clsx";
 
 interface DateRange {
   start: Date;
@@ -10,18 +11,15 @@ interface DateRangePickerProps {
   dateRange: DateRange;
   onDateChange: (newDateRange: DateRange) => void;
   className?: string;
-  inputClassName?: string;
-  startInputWidth?: string;
-  endInputWidth?: string;
+  /** Size variant for the component */
+  size?: "sm" | "md";
 }
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({
   dateRange,
   onDateChange,
-  className = "",
-  inputClassName = "py-2 rounded-full bg-transparent outline-none",
-  startInputWidth = "flex-1",
-  endInputWidth = "flex-1",
+  className,
+  size = "md",
 }) => {
   const [isDateRangeFocused, setIsDateRangeFocused] = useState(false);
   const endDateInputRef = useRef<HTMLInputElement>(null);
@@ -122,32 +120,33 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     }
   };
 
+  // Size-based classes
+  const inputClasses = clsx(
+    "rounded-lg border bg-default-50 text-center font-medium text-default-900 transition-colors outline-none",
+    size === "sm" ? "pr-2 py-1.5 text-xs" : "pr-3 py-2 text-sm",
+    isDateRangeFocused ? "border-default-500" : "border-default-300"
+  );
+
   return (
-    <div
-      className={`flex items-center bg-white border ${
-        isDateRangeFocused ? "border-default-500" : "border-default-300"
-      } rounded-full pl-3 pr-2 ${className}`}
-    >
-      <div className="flex items-center gap-2 flex-1">
-        <input
-          type="date"
-          value={formatDateForInput(dateRange.start)}
-          onChange={(e) => handleDateChange("start", e.target.value)}
-          onFocus={() => setIsDateRangeFocused(true)}
-          onBlur={() => setIsDateRangeFocused(false)}
-          className={`${startInputWidth} ${inputClassName}`}
-        />
-        <span className="text-default-400">to</span>
-        <input
-          ref={endDateInputRef}
-          type="date"
-          value={formatDateForInput(dateRange.end)}
-          onChange={(e) => handleDateChange("end", e.target.value)}
-          onFocus={() => setIsDateRangeFocused(true)}
-          onBlur={() => setIsDateRangeFocused(false)}
-          className={`${endInputWidth} ${inputClassName}`}
-        />
-      </div>
+    <div className={clsx("flex items-center gap-2", className)}>
+      <input
+        type="date"
+        value={formatDateForInput(dateRange.start)}
+        onChange={(e) => handleDateChange("start", e.target.value)}
+        onFocus={() => setIsDateRangeFocused(true)}
+        onBlur={() => setIsDateRangeFocused(false)}
+        className={inputClasses}
+      />
+      <span className="text-default-400 text-sm">to</span>
+      <input
+        ref={endDateInputRef}
+        type="date"
+        value={formatDateForInput(dateRange.end)}
+        onChange={(e) => handleDateChange("end", e.target.value)}
+        onFocus={() => setIsDateRangeFocused(true)}
+        onBlur={() => setIsDateRangeFocused(false)}
+        className={inputClasses}
+      />
     </div>
   );
 };

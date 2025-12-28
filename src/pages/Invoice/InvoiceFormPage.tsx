@@ -747,11 +747,11 @@ const InvoiceFormPage: React.FC = () => {
 
   // --- JSX Output ---
   return (
-    <div className="px-4 md:px-6 pb-8 max-w-full">
+    <div className="space-y-4">
       <BackButton onClick={handleBackClick} disabled={isSaving} />
 
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
         <h1 className="flex space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4">
           New Invoice
         </h1>

@@ -446,7 +446,7 @@ const PayCodePage: React.FC = () => {
     if (totalPages <= 1) return null;
 
     return (
-      <div className="flex items-center justify-between py-3 border-t border-default-200 mt-4">
+      <div className="flex items-center justify-between pt-3 border-t border-default-200 mt-4">
         <div>
           <p className="text-sm text-default-600">
             Showing{" "}
@@ -539,9 +539,9 @@ const PayCodePage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className="relative w-full px-4 md:mx-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
+      <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
         <h1 className="text-xl font-semibold text-default-800">Pay Code</h1>
         <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
           {renderPayTypeFilter()}

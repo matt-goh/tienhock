@@ -9,8 +9,9 @@ import {
   IconUmbrella,
   IconAlertTriangle,
 } from "@tabler/icons-react";
-import StyledListbox from "../../components/StyledListbox";
 import toast from "react-hot-toast";
+import MonthNavigator from "../../components/MonthNavigator";
+import YearNavigator from "../../components/YearNavigator";
 import { api } from "../../routes/utils/api";
 import MissingEPFNumberDialog, {
   MissingEPFEmployee,
@@ -142,9 +143,21 @@ const formatIC = (ic: string): string => {
 };
 
 const ECarumanPage: React.FC = () => {
-  const currentDate = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  // Use Date object for month navigation
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+
+  // Derived values for API calls
+  const selectedMonth = selectedDate.getMonth() + 1;
+  const selectedYear = selectedDate.getFullYear();
+
+  // Handle year change from YearNavigator
+  const handleYearChange = (newYear: number) => {
+    setSelectedDate(new Date(newYear, selectedDate.getMonth(), 1));
+  };
+
   const [loadingType, setLoadingType] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<PreviewState>({
@@ -225,29 +238,7 @@ const ECarumanPage: React.FC = () => {
     };
 
     fetchPreviewData();
-  }, [selectedMonth, selectedYear]);
-
-  // Generate month options for StyledListbox
-  const monthOptions = [
-    { id: 1, name: "January" },
-    { id: 2, name: "February" },
-    { id: 3, name: "March" },
-    { id: 4, name: "April" },
-    { id: 5, name: "May" },
-    { id: 6, name: "June" },
-    { id: 7, name: "July" },
-    { id: 8, name: "August" },
-    { id: 9, name: "September" },
-    { id: 10, name: "October" },
-    { id: 11, name: "November" },
-    { id: 12, name: "December" },
-  ];
-
-  // Generate year options for StyledListbox (current year and 2 years back)
-  const yearOptions = Array.from({ length: 3 }, (_, i) => ({
-    id: currentDate.getFullYear() - i,
-    name: String(currentDate.getFullYear() - i),
-  }));
+  }, [selectedDate]);
 
   // Helper function to create nested directories
   const createNestedDirectory = async (
@@ -465,7 +456,7 @@ const ECarumanPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 w-full">
+    <div className="space-y-4">
       <div className="mb-4">
         <h1 className="text-2xl font-semibold text-gray-900">e-Caruman</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -476,31 +467,22 @@ const ECarumanPage: React.FC = () => {
       {/* Month/Year Selection */}
       <div className="mb-4 bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Select Period</h2>
-        <div className="flex gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Month
-            </label>
-            <StyledListbox
-              value={selectedMonth}
-              onChange={(value) => setSelectedMonth(Number(value))}
-              options={monthOptions}
-              className="w-44"
-              rounded="lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Year
-            </label>
-            <StyledListbox
-              value={selectedYear}
-              onChange={(value) => setSelectedYear(Number(value))}
-              options={yearOptions}
-              className="w-28"
-              rounded="lg"
-            />
-          </div>
+        <div className="flex flex-wrap items-end gap-4">
+          <YearNavigator
+            selectedYear={selectedYear}
+            onChange={handleYearChange}
+            showGoToCurrentButton={false}
+            label="Year"
+          />
+          <MonthNavigator
+            selectedMonth={selectedDate}
+            onChange={setSelectedDate}
+            showGoToCurrentButton={false}
+            label="Month"
+            formatDisplay={(date) =>
+              date.toLocaleDateString("en-MY", { month: "long" })
+            }
+          />
         </div>
       </div>
 
@@ -512,7 +494,7 @@ const ECarumanPage: React.FC = () => {
         <p className="text-sm text-gray-500 mb-4">
           Select the contribution type to generate and download the file for{" "}
           <span className="font-medium text-gray-700">
-            {monthOptions.find((m) => m.id === selectedMonth)?.name} {selectedYear}
+            {selectedDate.toLocaleDateString("en-MY", { month: "long", year: "numeric" })}
           </span>
         </p>
         {previewLoading ? (

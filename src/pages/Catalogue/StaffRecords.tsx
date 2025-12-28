@@ -206,8 +206,8 @@ const StaffRecords = () => {
   }
 
   return (
-    <div className="w-full max-w-full mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
             onClick={() => navigate("/catalogue/staff")}

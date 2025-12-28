@@ -60,6 +60,36 @@ export const getMonthlyPayrollDetails = async (id: number) => {
 };
 
 /**
+ * Fetches a monthly payroll by year and month
+ * @param year Year
+ * @param month Month (1-12)
+ * @returns Monthly payroll data with employee payrolls, or null if not found
+ */
+export const getMonthlyPayrollByYearMonth = async (
+  year: number,
+  month: number
+) => {
+  try {
+    const response = await api.get(
+      `/api/monthly-payrolls?year=${year}&month=${month}&include_employee_payrolls=true`
+    );
+    // Response is an array, return the first match or null
+    if (Array.isArray(response) && response.length > 0) {
+      const payroll = response[0];
+      // Normalize property name from snake_case to camelCase
+      return {
+        ...payroll,
+        employeePayrolls: payroll.employee_payrolls || [],
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching monthly payroll by year/month:", error);
+    throw error;
+  }
+};
+
+/**
  * Starts processing a monthly payroll
  * @param id Monthly payroll ID
  * @returns Processing result with work logs data

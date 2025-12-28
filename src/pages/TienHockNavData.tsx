@@ -1,4 +1,4 @@
-// src/pages/TienHockSidebarData.tsx
+// src/pages/TienHockNavData.tsx
 import {
   IconBookmark,
   IconFileInvoice,
@@ -42,7 +42,6 @@ import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
 import MonthlyLogEditPage from "./Payroll/MonthlyLogEditPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
-import MonthlyPayrollsPage from "./Payroll/MonthlyPayrollsPage";
 import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
@@ -80,18 +79,8 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   payrollSubItems.push({
     name: "Monthly Payrolls",
     path: "/payroll/monthly-payrolls",
-    component: MonthlyPayrollsPage,
+    component: MonthlyPayrollDetailsPage,
     subItems: [
-      {
-        name: "Payroll List",
-        path: "/payroll/monthly-payrolls/list",
-        component: MonthlyPayrollsPage,
-      },
-      {
-        name: "Payroll Details",
-        path: "/payroll/monthly-payrolls/:id",
-        component: MonthlyPayrollDetailsPage,
-      },
       {
         name: "Process Payroll",
         path: "/payroll/monthly-payrolls/:id/process",
@@ -212,7 +201,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   return payrollSubItems;
 };
 
-export const TienHockSidebarData: SidebarItem[] = [
+export const TienHockNavData: SidebarItem[] = [
   {
     name: "Bookmarks",
     icon: IconBookmark,
