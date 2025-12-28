@@ -117,11 +117,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (payroll) {
-      navigate(`/payroll/monthly-payrolls/${payroll.monthly_payroll_id}`);
-    } else {
-      navigate("/payroll/monthly-payrolls");
-    }
+    navigate("/payroll/monthly-payrolls");
   };
 
   const formatCurrency = (amount: number) => {

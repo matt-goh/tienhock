@@ -316,7 +316,7 @@ const PayrollProcessingPage: React.FC = () => {
   };
 
   const handleViewDetails = () => {
-    navigate(`/payroll/monthly-payrolls/${id}`);
+    navigate("/payroll/monthly-payrolls");
   };
 
   if (isLoading || loadingStaffs || loadingJobs) {
