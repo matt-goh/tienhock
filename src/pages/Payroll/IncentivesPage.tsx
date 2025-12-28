@@ -11,8 +11,9 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { FormListbox } from "../../components/FormComponents";
 import { getMonthName } from "../../utils/payroll/payrollUtils";
+import YearNavigator from "../../components/YearNavigator";
+import MonthNavigator from "../../components/MonthNavigator";
 import AddIncentiveModal from "../../components/Payroll/AddIncentiveModal";
 import EditIncentiveModal from "../../components/Payroll/EditIncentiveModal";
 import { api } from "../../routes/utils/api";
@@ -47,22 +48,10 @@ const IncentivesPage: React.FC = () => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
-  // Generate year and month options
-  const yearOptions = useMemo(() => {
-    const years = [];
-    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
-      years.push({ id: year, name: year.toString() });
-    }
-    return years;
-  }, [currentYear]);
-
-  const monthOptions = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i + 1,
-        name: getMonthName(i + 1),
-      })),
-    []
+  // Create Date object for MonthNavigator
+  const selectedMonth = useMemo(
+    () => new Date(currentYear, currentMonth - 1, 1),
+    [currentYear, currentMonth]
   );
 
   // Load incentives on mount and filter changes
@@ -160,29 +149,28 @@ const IncentivesPage: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <FormListbox
-            name="year"
-            label="Year"
-            value={currentYear.toString()}
-            onChange={(value) => setCurrentYear(Number(value))}
-            options={yearOptions}
-          />
-          <FormListbox
-            name="month"
-            label="Month"
-            value={currentMonth.toString()}
-            onChange={(value) => setCurrentMonth(Number(value))}
-            options={monthOptions}
-          />
-          <div className="flex items-end">
-            <div className="text-sm text-default-600">
-              <div className="font-medium">
-                Total: {incentives.length} records
-              </div>
-              <div className="font-medium">
-                Amount: {formatCurrency(totalAmount)}
-              </div>
+        <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
+          <div className="flex gap-4 items-end">
+            <YearNavigator
+              selectedYear={currentYear}
+              onChange={setCurrentYear}
+              showGoToCurrentButton={false}
+            />
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={(date) => {
+                setCurrentYear(date.getFullYear());
+                setCurrentMonth(date.getMonth() + 1);
+              }}
+              showGoToCurrentButton={false}
+            />
+          </div>
+          <div className="text-sm text-default-600">
+            <div className="font-medium">
+              Total: {incentives.length} records
+            </div>
+            <div className="font-medium">
+              Amount: {formatCurrency(totalAmount)}
             </div>
           </div>
         </div>

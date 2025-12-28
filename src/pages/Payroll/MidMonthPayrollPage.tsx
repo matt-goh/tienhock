@@ -11,13 +11,14 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { FormListbox } from "../../components/FormComponents";
 import {
   getMidMonthPayrolls,
   deleteMidMonthPayroll,
   getMonthName,
   MidMonthPayroll,
 } from "../../utils/payroll/midMonthPayrollUtils";
+import YearNavigator from "../../components/YearNavigator";
+import MonthNavigator from "../../components/MonthNavigator";
 import AddMidMonthPayrollModal from "../../components/Payroll/AddMidMonthPayrollModal";
 import EditMidMonthPayrollModal from "../../components/Payroll/EditMidMonthPayrollModal";
 import toast from "react-hot-toast";
@@ -38,22 +39,10 @@ const MidMonthPayrollPage: React.FC = () => {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
 
-  // Generate year and month options
-  const yearOptions = useMemo(() => {
-    const years = [];
-    for (let year = currentYear - 2; year <= currentYear + 1; year++) {
-      years.push({ id: year, name: year.toString() });
-    }
-    return years;
-  }, [currentYear]);
-
-  const monthOptions = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i + 1,
-        name: getMonthName(i + 1),
-      })),
-    []
+  // Create Date object for MonthNavigator
+  const selectedMonth = useMemo(
+    () => new Date(currentYear, currentMonth - 1, 1),
+    [currentYear, currentMonth]
   );
 
   // Load payrolls on mount and filter changes
@@ -139,29 +128,28 @@ const MidMonthPayrollPage: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <FormListbox
-            name="year"
-            label="Year"
-            value={currentYear.toString()}
-            onChange={(value) => setCurrentYear(Number(value))}
-            options={yearOptions}
-          />
-          <FormListbox
-            name="month"
-            label="Month"
-            value={currentMonth.toString()}
-            onChange={(value) => setCurrentMonth(Number(value))}
-            options={monthOptions}
-          />
-          <div className="flex items-end">
-            <div className="text-sm text-default-600">
-              <div className="font-medium">
-                Total: {payrolls.length} employees
-              </div>
-              <div className="font-medium">
-                Amount: {formatCurrency(totalAmount)}
-              </div>
+        <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
+          <div className="flex gap-4 items-end">
+            <YearNavigator
+              selectedYear={currentYear}
+              onChange={setCurrentYear}
+              showGoToCurrentButton={false}
+            />
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={(date) => {
+                setCurrentYear(date.getFullYear());
+                setCurrentMonth(date.getMonth() + 1);
+              }}
+              showGoToCurrentButton={false}
+            />
+          </div>
+          <div className="text-sm text-default-600">
+            <div className="font-medium">
+              Total: {payrolls.length} employees
+            </div>
+            <div className="font-medium">
+              Amount: {formatCurrency(totalAmount)}
             </div>
           </div>
         </div>

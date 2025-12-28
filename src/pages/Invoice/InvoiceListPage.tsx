@@ -30,8 +30,6 @@ import {
   IconPlus,
   IconRefresh,
   IconSearch,
-  IconChevronDown,
-  IconCheck,
   IconSquareMinusFilled,
   IconSend,
   IconFileDownload,
@@ -45,13 +43,6 @@ import {
   IconUser,
   IconFileExport,
 } from "@tabler/icons-react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-  Transition,
-} from "@headlessui/react";
 import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 // Import the specific utilities needed
 import {
@@ -65,16 +56,13 @@ import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoi
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
 import DateNavigator from "../../components/DateNavigator";
+import MonthNavigator from "../../components/MonthNavigator";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
 const SESSION_STORAGE_KEY = "invoiceListState"; // For complete state persistence
 const ITEMS_PER_PAGE = 50; // Number of items per page
 
-interface MonthOption {
-  id: number;
-  name: string;
-}
 
 declare global {
   interface Window {
@@ -383,19 +371,8 @@ const InvoiceListPage: React.FC = () => {
     });
   }, [filters, searchTerm]);
 
-  // Month Selector State
-  const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
-  const monthOptions: MonthOption[] = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i,
-        name: new Date(0, i).toLocaleString("en", { month: "long" }),
-      })),
-    []
-  );
-  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
-    monthOptions[currentMonthIndex]
-  );
+  // Month Selector State - used for MonthNavigator
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   // Data Hooks
   const { salesmen } = useSalesmanCache();
@@ -711,23 +688,13 @@ const InvoiceListPage: React.FC = () => {
 
   // Month Change Handler (Applies Immediately)
   const handleMonthChange = useCallback(
-    (month: MonthOption) => {
-      setSelectedMonth(month); // Update local state for the dropdown display
+    (newDate: Date) => {
+      setSelectedMonth(newDate); // Update local state for the navigator display
 
-      // --- Determine the target year ---
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonthIndex = now.getMonth(); // 0-11
-
-      // If selected month is *after* the current month, use the previous year.
-      // Otherwise, use the current year.
-      const targetYear =
-        month.id > currentMonthIndex ? currentYear - 1 : currentYear;
-
-      // Calculate start and end dates using the targetYear
-      const startDate = new Date(targetYear, month.id, 1); // Day 1 of selected month in targetYear
+      // Calculate start and end dates for the selected month
+      const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
       startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(targetYear, month.id + 1, 0); // Day 0 of *next* month = last day of selected month
+      const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
 
       // Construct the new *full* filter state
@@ -1500,66 +1467,16 @@ const InvoiceListPage: React.FC = () => {
                 showGoToTodayButton={false}
               />
 
-              {/* Month Selector */}
-              <div className="w-full xl:w-40">
-                <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                  <div className="relative">
-                    <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                      <span className="block truncate pl-1">
-                        {selectedMonth.name}
-                      </span>
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <IconChevronDown
-                          className="h-5 w-5 text-default-400"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    </ListboxButton>
-                    <Transition
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                        {monthOptions.map((month) => (
-                          <ListboxOption
-                            key={month.id}
-                            value={month}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                                active
-                                  ? "bg-default-100 text-default-900"
-                                  : "text-gray-900"
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {month.name}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                    <IconCheck
-                                      className="h-5 w-5"
-                                      aria-hidden="true"
-                                      stroke={2.5}
-                                    />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </ListboxOption>
-                        ))}
-                      </ListboxOptions>
-                    </Transition>
-                  </div>
-                </Listbox>
-              </div>
+              {/* Month Navigator */}
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={handleMonthChange}
+                showGoToCurrentButton={false}
+                dateRange={{
+                  start: filters.dateRange.start || new Date(),
+                  end: filters.dateRange.end || new Date(),
+                }}
+              />
             </div>
 
             {/* Right Group: Search and Main Filters */}
@@ -1576,7 +1493,7 @@ const InvoiceListPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full h-[42px] pl-11 pr-10 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                  className="w-full h-[40px] pl-11 pr-10 bg-white border border-default-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onBlur={handleSearchBlur}
@@ -1600,6 +1517,8 @@ const InvoiceListPage: React.FC = () => {
                   onChange={handleSalesmanChange}
                   options={salesmanOptions}
                   placeholder="All Salesmen"
+                  rounded="lg"
+                  className="h-[40px]"
                 />
               </div>
 
@@ -2032,8 +1951,8 @@ const InvoiceListPage: React.FC = () => {
       <ConsolidatedInvoiceModal
         isOpen={showConsolidatedModal}
         onClose={() => setShowConsolidatedModal(false)}
-        month={selectedMonth.id}
-        year={new Date().getFullYear()}
+        month={selectedMonth.getMonth()}
+        year={selectedMonth.getFullYear()}
       />
       {/* --- Submission Results Modal --- */}
       <SubmissionResultsModal

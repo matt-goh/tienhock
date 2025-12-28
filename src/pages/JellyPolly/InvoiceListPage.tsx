@@ -40,8 +40,6 @@ import {
   IconFileInvoice,
   IconUser,
   IconFileExport,
-  IconChevronLeft,
-  IconChevronRight,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -51,6 +49,7 @@ import {
   Transition,
 } from "@headlessui/react";
 import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
+import DateNavigator from "../../components/DateNavigator";
 // Import the specific utilities needed
 import {
   getInvoices,
@@ -62,16 +61,13 @@ import Pagination from "../../components/Invoice/Pagination";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/JellyPolly/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
+import MonthNavigator from "../../components/MonthNavigator";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFiltersJP_v2"; // Use a unique key
 const SESSION_STORAGE_KEY = "invoiceListStateJP"; // For complete state persistence
 const ITEMS_PER_PAGE = 50; // Number of items per page
 
-interface MonthOption {
-  id: number;
-  name: string;
-}
 
 // --- Helper Functions ---
 const getInitialDates = (): { start: Date; end: Date } => {
@@ -353,19 +349,8 @@ const InvoiceListPage: React.FC = () => {
     });
   }, [filters, searchTerm]);
 
-  // Month Selector State
-  const currentMonthIndex = useMemo(() => new Date().getMonth(), []);
-  const monthOptions: MonthOption[] = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i,
-        name: new Date(0, i).toLocaleString("en", { month: "long" }),
-      })),
-    []
-  );
-  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
-    monthOptions[currentMonthIndex]
-  );
+  // Month Selector State - used for MonthNavigator
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   // Data Hooks
   const { salesmen } = useSalesmanCache();
@@ -673,23 +658,13 @@ const InvoiceListPage: React.FC = () => {
 
   // Month Change Handler (Applies Immediately)
   const handleMonthChange = useCallback(
-    (month: MonthOption) => {
-      setSelectedMonth(month); // Update local state for the dropdown display
+    (newDate: Date) => {
+      setSelectedMonth(newDate); // Update local state for the navigator display
 
-      // --- Determine the target year ---
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonthIndex = now.getMonth(); // 0-11
-
-      // If selected month is *after* the current month, use the previous year.
-      // Otherwise, use the current year.
-      const targetYear =
-        month.id > currentMonthIndex ? currentYear - 1 : currentYear;
-
-      // Calculate start and end dates using the targetYear
-      const startDate = new Date(targetYear, month.id, 1); // Day 1 of selected month in targetYear
+      // Calculate start and end dates for the selected month
+      const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
       startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(targetYear, month.id + 1, 0); // Day 0 of *next* month = last day of selected month
+      const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
 
       // Construct the new *full* filter state
@@ -701,6 +676,26 @@ const InvoiceListPage: React.FC = () => {
       handleApplyFilters(updatedFilters);
     },
     [filters, handleApplyFilters] // Depends on current filters and the apply function
+  );
+
+  // DateNavigator Change Handler (Applies Immediately)
+  const handleDateNavigatorChange = useCallback(
+    (newDate: Date) => {
+      const startOfDay = new Date(newDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(newDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const updatedFilters: InvoiceFilters = {
+        ...filters,
+        dateRange: {
+          start: startOfDay,
+          end: endOfDay,
+        },
+      };
+      handleApplyFilters(updatedFilters);
+    },
+    [filters, handleApplyFilters]
   );
 
   // Search Handlers - Update state locally, trigger fetch on blur/enter
@@ -751,66 +746,6 @@ const InvoiceListPage: React.FC = () => {
       setSelectedInvoiceIds(new Set());
     }
   };
-
-  // Today Button Handler
-  const handleTodayClick = useCallback(() => {
-    const today = new Date();
-    const startOfToday = new Date(today);
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
-
-    const updatedFilters: InvoiceFilters = {
-      ...filters,
-      dateRange: {
-        start: startOfToday,
-        end: endOfToday,
-      },
-    };
-    handleApplyFilters(updatedFilters);
-  }, [filters, handleApplyFilters]);
-
-  // Backward one day handler
-  const handleBackwardOneDay = useCallback(() => {
-    const baseDate = filters.dateRange.start || new Date();
-    const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() - 1);
-
-    const startOfDay = new Date(newDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(newDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const updatedFilters: InvoiceFilters = {
-      ...filters,
-      dateRange: {
-        start: startOfDay,
-        end: endOfDay,
-      },
-    };
-    handleApplyFilters(updatedFilters);
-  }, [filters, handleApplyFilters]);
-
-  // Forward one day handler
-  const handleForwardOneDay = useCallback(() => {
-    const baseDate = filters.dateRange.start || new Date();
-    const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() + 1);
-
-    const startOfDay = new Date(newDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(newDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const updatedFilters: InvoiceFilters = {
-      ...filters,
-      dateRange: {
-        start: startOfDay,
-        end: endOfDay,
-      },
-    };
-    handleApplyFilters(updatedFilters);
-  }, [filters, handleApplyFilters]);
 
   // Single Salesman Selection Handler
   const handleSalesmanChange = useCallback((salesmanId: string | number) => {
@@ -1562,95 +1497,22 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
               {/* Date Navigation */}
-              <div className="flex w-full sm:w-auto items-center justify-center">
-                <div className="flex items-center gap-1 w-full">
-                  <button
-                    onClick={handleBackwardOneDay}
-                    title="Previous Day"
-                    aria-label="Previous Day"
-                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    <IconChevronLeft size={20} className="mr-[1px]" />
-                  </button>
-                  <Button
-                    onClick={handleTodayClick}
-                    variant="outline"
-                    size="sm"
-                    className="h-[42px] whitespace-nowrap px-3 sm:px-4 min-w-0 flex-grow"
-                  >
-                    Today
-                  </Button>
-                  <button
-                    onClick={handleForwardOneDay}
-                    title="Next Day"
-                    aria-label="Next Day"
-                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    <IconChevronRight size={20} className="ml-[1px]" />
-                  </button>
-                </div>
-              </div>
+              <DateNavigator
+                selectedDate={filters.dateRange.start || new Date()}
+                onChange={handleDateNavigatorChange}
+                showGoToTodayButton={false}
+              />
 
-              {/* Month Selector */}
-              <div className="w-full xl:w-40">
-                <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                  <div className="relative">
-                    <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
-                      <span className="block truncate pl-1">
-                        {selectedMonth.name}
-                      </span>
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <IconChevronDown
-                          className="h-5 w-5 text-default-400"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    </ListboxButton>
-                  <Transition
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                      {monthOptions.map((month) => (
-                        <ListboxOption
-                          key={month.id}
-                          value={month}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                              active
-                                ? "bg-default-100 text-default-900"
-                                : "text-gray-900"
-                            }`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span
-                                className={`block truncate ${
-                                  selected ? "font-medium" : "font-normal"
-                                }`}
-                              >
-                                {month.name}
-                              </span>
-                              {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
-                                  <IconCheck
-                                    className="h-5 w-5"
-                                    aria-hidden="true"
-                                    stroke={2.5}
-                                  />
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </ListboxOption>
-                      ))}
-                    </ListboxOptions>
-                  </Transition>
-                  </div>
-                </Listbox>
-              </div>
+              {/* Month Navigator */}
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={handleMonthChange}
+                showGoToCurrentButton={false}
+                dateRange={{
+                  start: filters.dateRange.start || new Date(),
+                  end: filters.dateRange.end || new Date(),
+                }}
+              />
             </div>
 
             {/* Right Group: Search and Main Filters */}
@@ -1667,7 +1529,7 @@ const InvoiceListPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full h-[42px] pl-11 pr-10 bg-white border border-default-300 rounded-full focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                  className="w-full h-[40px] pl-11 pr-10 bg-white border border-default-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onBlur={handleSearchBlur}
@@ -1691,6 +1553,7 @@ const InvoiceListPage: React.FC = () => {
                   onChange={handleSalesmanChange}
                   options={salesmanOptions}
                   placeholder="All Salesmen"
+                  rounded="lg"
                 />
               </div>
 
@@ -2123,8 +1986,8 @@ const InvoiceListPage: React.FC = () => {
       <JPConsolidatedInvoiceModal
         isOpen={showConsolidatedModal}
         onClose={() => setShowConsolidatedModal(false)}
-        month={selectedMonth.id}
-        year={new Date().getFullYear()}
+        month={selectedMonth.getMonth()}
+        year={selectedMonth.getFullYear()}
       />
       {/* --- Submission Results Modal --- */}
       <SubmissionResultsModal
