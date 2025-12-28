@@ -1,6 +1,16 @@
 // src/routes/payroll/daily-work-logs.js
 import { Router } from "express";
 
+// Helper function to get overtime threshold based on day of week
+// Saturday (day 6) has 5-hour threshold, other days have 8-hour threshold
+function getOvertimeThreshold(logDate) {
+  if (!logDate) return 8;
+  const date = new Date(logDate);
+  const dayOfWeek = date.getDay();
+  // Saturday = 6, use 5-hour threshold; other days use 8-hour threshold
+  return dayOfWeek === 6 ? 5 : 8;
+}
+
 export default function (pool) {
   const router = Router();
 
@@ -319,12 +329,15 @@ export default function (pool) {
 
           // Insert activities for this employee entry
           if (activities && activities.length > 0) {
+            // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
+            const overtimeThreshold = getOvertimeThreshold(logDate);
+
             for (const activity of activities) {
               if (activity.isSelected) {
                 let hoursApplied = null;
                 if (activity.rateUnit === "Hour") {
                   if (activity.payType === "Overtime") {
-                    hoursApplied = Math.max(0, hours - 8);
+                    hoursApplied = Math.max(0, hours - overtimeThreshold);
                   } else {
                     hoursApplied = hours;
                   }
@@ -332,7 +345,7 @@ export default function (pool) {
 
                 const activityQuery = `
                 INSERT INTO daily_work_log_activities (
-                  log_entry_id, pay_code_id, hours_applied, 
+                  log_entry_id, pay_code_id, hours_applied,
                   units_produced, rate_used, calculated_amount,
                   is_manually_added
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -583,12 +596,15 @@ export default function (pool) {
 
           // Insert activities for this employee entry
           if (activities && activities.length > 0) {
+            // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
+            const overtimeThreshold = getOvertimeThreshold(logDate);
+
             for (const activity of activities) {
               if (activity.isSelected) {
                 let hoursApplied = null;
                 if (activity.rateUnit === "Hour") {
                   if (activity.payType === "Overtime") {
-                    hoursApplied = Math.max(0, hours - 8);
+                    hoursApplied = Math.max(0, hours - overtimeThreshold);
                   } else {
                     hoursApplied = hours;
                   }
@@ -596,7 +612,7 @@ export default function (pool) {
 
                 const activityQuery = `
                 INSERT INTO daily_work_log_activities (
-                  log_entry_id, pay_code_id, hours_applied, 
+                  log_entry_id, pay_code_id, hours_applied,
                   units_produced, rate_used, calculated_amount,
                   is_manually_added
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
