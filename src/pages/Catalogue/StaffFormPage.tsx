@@ -646,18 +646,40 @@ const StaffFormPage: React.FC = () => {
     <div className="container mx-auto px-4 pb-10">
       <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
-        <div className="p-6 border-b border-default-200">
-          <h1 className="text-xl font-semibold text-default-900">
-            Edit {formData.name}'s Details
-          </h1>
-          <p className="mt-1 text-sm text-default-500">
-            {isEditMode
-              ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
-              : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
-          </p>
+        <div className="p-6 border-b border-default-200 flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-semibold text-default-900">
+              Edit {formData.name}'s Details
+            </h1>
+            <p className="mt-1 text-sm text-default-500">
+              {isEditMode
+                ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
+                : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            {isEditMode && (
+              <button
+                type="button"
+                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
+                onClick={handleDeleteClick}
+              >
+                Delete
+              </button>
+            )}
+            <Button
+              type="submit"
+              form="staff-form"
+              variant="boldOutline"
+              size="lg"
+              disabled={isSaving || !isFormChanged}
+            >
+              Save
+            </Button>
+          </div>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="p-6">
+        <form id="staff-form" onSubmit={handleSubmit}>
+          <div className="p-6 pb-8">
             <Tab
               labels={["Personal", "Work", "Documents", "Additional"]}
               tabWidth="w-[104px]"
@@ -1280,25 +1302,6 @@ const StaffFormPage: React.FC = () => {
                 </div>
               </div>
             </Tab>
-          </div>
-          <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200">
-            {isEditMode && (
-              <button
-                type="button"
-                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
-                onClick={handleDeleteClick}
-              >
-                Delete
-              </button>
-            )}
-            <Button
-              type="submit"
-              variant="boldOutline"
-              size="lg"
-              disabled={isSaving || !isFormChanged}
-            >
-              Save
-            </Button>
           </div>
         </form>
       </div>
