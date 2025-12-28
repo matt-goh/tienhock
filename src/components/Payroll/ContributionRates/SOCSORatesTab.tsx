@@ -49,7 +49,7 @@ const SOCSORatesTab: React.FC = () => {
   }
 
   return (
-    <div className="mt-6">
+    <div className="mt-4">
       <div className="border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-default-200">

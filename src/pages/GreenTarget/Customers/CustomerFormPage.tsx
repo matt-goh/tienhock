@@ -525,8 +525,8 @@ const CustomerFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4">
-      <BackButton onClick={handleBackClick} className="ml-5" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg">
         <div className="justify-between flex px-6">
           <div>

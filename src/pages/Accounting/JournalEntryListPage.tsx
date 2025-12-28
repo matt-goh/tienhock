@@ -183,7 +183,7 @@ const JournalEntryListPage: React.FC = () => {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="relative w-full py-4 px-4 md:mx-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>

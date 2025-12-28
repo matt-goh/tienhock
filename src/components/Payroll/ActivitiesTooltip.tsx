@@ -13,6 +13,7 @@ interface ActivitiesTooltipProps {
   onClick?: () => void;
   hasUnsavedChanges?: boolean;
   onNavigateAttempt?: (to: string) => void;
+  logDate?: string; // Log date for displaying correct OT threshold (5 for Saturday, 8 for others)
 }
 
 const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
@@ -23,6 +24,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   onClick,
   hasUnsavedChanges = false,
   onNavigateAttempt = () => {},
+  logDate,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -216,9 +218,9 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         activity.rateUnit === "Hour" && (
                           <span
                             className="text-amber-600 truncate"
-                            title={`(Hours > 8)`}
+                            title={`(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
                           >
-                            (Hours {">"} 8)
+                            (Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
                           </span>
                         )}
                     </div>

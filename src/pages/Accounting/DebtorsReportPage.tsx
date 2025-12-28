@@ -1,11 +1,5 @@
 // src/pages/Accounting/DebtorsReportPage.tsx
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -18,17 +12,9 @@ import {
   IconBuildingStore,
   IconRefresh,
   IconCalendarDollar,
-  IconCurrencyDollar,
   IconPhone,
-  IconCheck,
 } from "@tabler/icons-react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-  Transition,
-} from "@headlessui/react";
+import MonthNavigator from "../../components/MonthNavigator";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { api } from "../../routes/utils/api";
@@ -80,10 +66,6 @@ interface DebtorsData {
   report_date: string | number;
 }
 
-interface MonthOption {
-  id: number;
-  name: string;
-}
 
 const DebtorsReportPage: React.FC = () => {
   const navigate = useNavigate();
@@ -100,21 +82,12 @@ const DebtorsReportPage: React.FC = () => {
     new Set()
   );
 
-  const monthOptions: MonthOption[] = useMemo(
-    () => [
-      { id: -1, name: "All Time" },
-      ...Array.from({ length: 12 }, (_, i) => ({
-        id: i,
-        name: new Date(0, i).toLocaleString("en", { month: "long" }),
-      })),
-    ],
-    []
-  );
-
-  const currentMonthIndex = new Date().getMonth();
-  const [selectedMonth, setSelectedMonth] = useState<MonthOption>(
-    monthOptions[currentMonthIndex + 1] // +1 to skip "All Time"
-  );
+  // Month selection state
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [allTimeMode, setAllTimeMode] = useState(false);
 
   // Centralized data fetching function with manual URL construction
   const fetchDebtors = useCallback(
@@ -167,35 +140,39 @@ const DebtorsReportPage: React.FC = () => {
 
   // Initial data fetch for the default (current) month
   useEffect(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    const currentYear = now.getFullYear();
-    fetchDebtors({ month: currentMonth, year: currentYear });
-  }, [fetchDebtors]);
+    if (allTimeMode) {
+      fetchDebtors();
+    } else {
+      fetchDebtors({
+        month: selectedMonth.getMonth() + 1,
+        year: selectedMonth.getFullYear(),
+      });
+    }
+  }, [fetchDebtors, selectedMonth, allTimeMode]);
 
+  // Handle month selection change from MonthNavigator
   const handleMonthChange = useCallback(
-    (month: MonthOption) => {
-      setSelectedMonth(month);
-
-      if (month.id === -1) {
-        fetchDebtors();
-        return;
-      }
-
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonthIndex = now.getMonth();
-
-      const targetYear =
-        month.id > currentMonthIndex ? currentYear - 1 : currentYear;
-
-      fetchDebtors({ month: month.id + 1, year: targetYear });
+    (newDate: Date) => {
+      setAllTimeMode(false);
+      setSelectedMonth(newDate);
     },
-    [fetchDebtors]
+    []
   );
 
+  // Toggle all time mode
+  const handleAllTimeToggle = useCallback(() => {
+    setAllTimeMode((prev) => !prev);
+  }, []);
+
   const handleRefresh = () => {
-    handleMonthChange(selectedMonth);
+    if (allTimeMode) {
+      fetchDebtors();
+    } else {
+      fetchDebtors({
+        month: selectedMonth.getMonth() + 1,
+        year: selectedMonth.getFullYear(),
+      });
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -275,8 +252,12 @@ const DebtorsReportPage: React.FC = () => {
     if (!debtorsData) return;
     try {
       const loadingToast = toast.loading("Generating PDF...");
-      const filterName =
-        selectedMonth.id === -1 ? undefined : selectedMonth.name;
+      const filterName = allTimeMode
+        ? undefined
+        : selectedMonth.toLocaleDateString("en", {
+            month: "long",
+            year: "numeric",
+          });
       await generateDebtorsReportPDF(filteredData, "print", filterName);
       toast.dismiss(loadingToast);
       toast.success("Print dialog opened");
@@ -347,7 +328,7 @@ const DebtorsReportPage: React.FC = () => {
   const filteredData = filterData(debtorsData);
 
   return (
-    <div className="max-w-7xl w-full mx-6 mb-4">
+    <div className="space-y-4">
       {/* Header Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
         <div className="p-6 border-b border-gray-200">
@@ -419,101 +400,50 @@ const DebtorsReportPage: React.FC = () => {
                   </button>
                 )}
               </div>
-              {/* Month Selector */}
-              <div className="w-full sm:w-40">
-                <Listbox value={selectedMonth} onChange={handleMonthChange}>
-                  <div className="relative">
-                    <ListboxButton className="w-full h-[42px] rounded-full border border-gray-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-blue-500 text-sm">
-                      <span className="block truncate pl-1">
-                        {selectedMonth.name}
-                      </span>
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <IconChevronDown
-                          className="h-5 w-5 text-gray-400"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    </ListboxButton>
-                    <Transition
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
-                        {monthOptions.map((month) => (
-                          <ListboxOption
-                            key={month.id}
-                            value={month}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
-                                active
-                                  ? "bg-blue-50 text-blue-900"
-                                  : "text-gray-900"
-                              }`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span
-                                  className={`block truncate ${
-                                    selected ? "font-medium" : "font-normal"
-                                  }`}
-                                >
-                                  {month.name}
-                                </span>
-                                {selected && (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600">
-                                    <IconCheck
-                                      className="h-5 w-5"
-                                      aria-hidden="true"
-                                      stroke={2.5}
-                                    />
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </ListboxOption>
-                        ))}
-                      </ListboxOptions>
-                    </Transition>
-                  </div>
-                </Listbox>
-              </div>
+              {/* Month Navigator */}
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={handleMonthChange}
+                showGoToCurrentButton={false}
+              />
+
+              {/* All Time Toggle */}
+              <button
+                onClick={handleAllTimeToggle}
+                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${
+                  allTimeMode
+                    ? "bg-sky-100 border-sky-300 text-sky-700"
+                    : "bg-default-50 border-default-300 text-default-600 hover:bg-default-100"
+                }`}
+              >
+                All Time
+              </button>
             </div>
 
             {/* Summary Cards */}
             <div className="flex-grow grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex items-center p-4 rounded-lg border border-gray-200">
-                <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-                  <IconCurrencyDollar size={24} />
+              <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-sky-500">
+                <div className="text-sm text-default-500 font-medium">
+                  Total Amount
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm text-gray-600">Total Amount</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    RM {formatCurrency(filteredData.grand_total_amount)}
-                  </p>
+                <div className="text-xl font-bold text-default-800">
+                  RM {formatCurrency(filteredData.grand_total_amount)}
                 </div>
               </div>
-              <div className="flex items-center p-4 rounded-lg border border-gray-200">
-                <div className="p-3 rounded-full bg-green-100 text-green-600">
-                  <IconCurrencyDollar size={24} />
+              <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-green-500">
+                <div className="text-sm text-default-500 font-medium">
+                  Total Paid
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm text-gray-600">Total Paid</p>
-                  <p className="text-xl font-bold text-green-700">
-                    RM {formatCurrency(filteredData.grand_total_paid)}
-                  </p>
+                <div className="text-xl font-bold text-green-600">
+                  RM {formatCurrency(filteredData.grand_total_paid)}
                 </div>
               </div>
-              <div className="flex items-center p-4 rounded-lg border border-gray-200">
-                <div className="p-3 rounded-full bg-red-100 text-red-600">
-                  <IconCurrencyDollar size={24} />
+              <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-red-500">
+                <div className="text-sm text-default-500 font-medium">
+                  Total Outstanding
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm text-gray-600">Total Outstanding</p>
-                  <p className="text-xl font-bold text-red-700">
-                    RM {formatCurrency(filteredData.grand_total_balance)}
-                  </p>
+                <div className="text-xl font-bold text-red-600">
+                  RM {formatCurrency(filteredData.grand_total_balance)}
                 </div>
               </div>
             </div>
@@ -638,7 +568,7 @@ const DebtorsReportPage: React.FC = () => {
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-4">
                             <div className="text-right">
                               <p className="text-sm text-gray-600">Balance</p>
                               <p className="font-bold text-red-600">

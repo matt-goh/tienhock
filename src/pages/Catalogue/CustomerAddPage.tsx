@@ -365,10 +365,10 @@ const CustomerAddPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="container mx-auto px-4 pb-4">
-      <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
-        <div className="p-6 border-b border-default-200">
+        <div className="px-6 py-4 border-b border-default-200">
           <h1 className="text-xl font-semibold text-default-900">
             Add New Customer
           </h1>
@@ -570,7 +570,7 @@ const CustomerAddPage: React.FC = () => {
             </div>
 
             {/* --- Form Actions --- */}
-            <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200">
+            <div className="px-6 py-4 flex justify-end items-center space-x-3 border-t border-default-200">
               {/* No Delete button in Add mode */}
               <Button
                 type="button" // Go back button

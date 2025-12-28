@@ -639,8 +639,8 @@ const RentalListPage = () => {
   }
 
   return (
-    <div className="relative w-full mx-20 pb-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl text-default-700 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
           Rentals ({filteredRentals.length})
         </h1>

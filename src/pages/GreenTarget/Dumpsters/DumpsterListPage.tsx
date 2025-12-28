@@ -289,8 +289,8 @@ const DumpsterListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-20 mb-4">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl text-default-700 font-bold">
           Dumpsters ({filteredDumpsters.length})
         </h1>

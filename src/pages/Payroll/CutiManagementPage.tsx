@@ -11,7 +11,7 @@ const CutiManagementPage: React.FC = () => {
   ];
 
   return (
-    <div className="relative w-full space-y-4 mx-4 md:mx-6 mb-4">
+    <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <div>
           <h1 className="text-xl font-semibold text-default-800">
@@ -23,7 +23,7 @@ const CutiManagementPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-1">
+      <div>
         <Tab labels={tabLabels} tabWidth="w-36">
           <CutiReportPage />
           <HolidayCalendarPage />

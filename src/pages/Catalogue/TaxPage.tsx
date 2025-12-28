@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import _ from "lodash";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import { IconEdit } from "@tabler/icons-react";
 
 interface Tax {
   id: number;
@@ -149,27 +150,50 @@ const TaxPage: React.FC = () => {
   }
 
   return (
-    <div className={`relative`}>
-      <div className="flex flex-col items-center justify-center w-auto">
-        <div
-          className={`relative w-full text-left text-lg font-medium text-default-700 mb-6`}
-        >
-          Tax Catalogue
+    <div className="w-full flex flex-col items-center">
+      <div className="w-auto">
+        {/* Header row with title and Edit/Save/Cancel buttons */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-lg font-medium text-default-700">
+            Tax Catalogue
+          </div>
+          {!isEditing ? (
+            <div
+              className="px-3 py-2 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center transition-colors duration-200"
+              onClick={handleToggleEditing}
+            >
+              <IconEdit className="mr-1.5" size={18} />
+              <span>Edit</span>
+            </div>
+          ) : (
+            <div className="flex space-x-2">
+              <div
+                className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
+                onClick={handleSave}
+              >
+                Save
+              </div>
+              <div
+                className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
+                onClick={handleCancel}
+              >
+                Cancel
+              </div>
+            </div>
+          )}
         </div>
-        <div className="relative">
-          <Table
-            initialData={isEditing ? editedTaxes : taxes}
-            columns={isEditing ? editableTaxColumns : taxColumns}
-            onShowDeleteButton={() => {}}
-            onDelete={handleDeleteTaxes}
-            onChange={handleDataChange}
-            isEditing={isEditing}
-            onToggleEditing={handleToggleEditing}
-            onSave={handleSave}
-            onCancel={handleCancel}
-            tableKey="catalogueTax"
-          />
-        </div>
+        <Table
+          initialData={isEditing ? editedTaxes : taxes}
+          columns={isEditing ? editableTaxColumns : taxColumns}
+          onShowDeleteButton={() => {}}
+          onDelete={handleDeleteTaxes}
+          onChange={handleDataChange}
+          isEditing={isEditing}
+          onToggleEditing={handleToggleEditing}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          tableKey="catalogueTax"
+        />
       </div>
     </div>
   );

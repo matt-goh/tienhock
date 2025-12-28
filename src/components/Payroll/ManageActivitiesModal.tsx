@@ -53,6 +53,7 @@ interface ManageActivitiesModalProps {
   locationType?: "Local" | "Outstation"; // Location type for salesman
   hasUnsavedChanges?: boolean;
   onNavigateAttempt?: (to: string) => void;
+  logDate?: string; // Log date for calculating Saturday OT threshold
 }
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
@@ -71,6 +72,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   locationType = "Local",
   hasUnsavedChanges = false,
   onNavigateAttempt = () => {},
+  logDate,
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -162,7 +164,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             activitiesWithContext,
             (isSalesman || isSalesmanIkut) ? 0 : employeeHours,
             contextData,
-            locationType
+            locationType,
+            logDate
           );
 
           setActivities(calculatedActivities);
@@ -187,6 +190,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     locationType,
     jobConfig,
     salesmanProducts,
+    logDate,
   ]);
 
   useEffect(() => {
@@ -211,7 +215,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity,
         activity.hoursApplied || employeeHours,
         contextData,
-        locationType
+        locationType,
+        logDate
       )
     }));
     setActivities(recalculatedActivities);
@@ -229,7 +234,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity,
         activity.hoursApplied || employeeHours,
         contextData,
-        locationType
+        locationType,
+        logDate
       )
     }));
     setActivities(updatedActivities);
@@ -247,7 +253,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity,
         activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
         contextData,
-        locationType
+        locationType,
+        logDate
       )
     }));
     setActivities(updatedActivities);
@@ -626,7 +633,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     activity.rateUnit ===
                                                       "Hour" && (
                                                       <span className="ml-1 text-amber-600">
-                                                        (Hours {">"} 8)
+                                                        (Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
                                                       </span>
                                                     )}
                                                 </div>

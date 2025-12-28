@@ -221,9 +221,9 @@ const ProductPage: React.FC = () => {
   }
 
   return (
-    <div className="relative mb-4 w-full mx-6">
+    <div className="space-y-4">
       <div className="flex flex-col items-center justify-center w-full">
-        <div className="relative w-full text-center text-lg text-default-700 font-medium mb-2">
+        <div className="relative w-full text-center text-lg text-default-700 font-medium">
           Product Catalogue
         </div>
 
