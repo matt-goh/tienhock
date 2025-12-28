@@ -1,4 +1,4 @@
-// src/pages/JellyPollySidebarData.tsx
+// src/pages/JellyPollyNavData.tsx
 import {
   IconFileInvoice,
   IconReportMoney,
@@ -17,7 +17,7 @@ import PaymentPage from "./JellyPolly/PaymentPage";
 // Accounting related imports (to be created)
 import DebtorsReportPage from "./JellyPolly/DebtorsReportPage";
 
-export const JellyPollySidebarData: SidebarItem[] = [
+export const JellyPollyNavData: SidebarItem[] = [
   {
     name: "Accounting",
     icon: IconReportMoney,

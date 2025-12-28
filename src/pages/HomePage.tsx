@@ -12,9 +12,9 @@ import {
 } from "@tabler/icons-react";
 import TienHockLogo from "../utils/TienHockLogo";
 import GreenTargetLogo from "../utils/GreenTargetLogo";
-import { TienHockSidebarData } from "./TienHockSidebarData";
-import { GreenTargetSidebarData } from "./GreenTargetSidebarData";
-import { JellyPollySidebarData } from "./JellyPollySidebarData";
+import { TienHockNavData } from "./TienHockNavData";
+import { GreenTargetNavData } from "./GreenTargetNavData";
+import { JellyPollyNavData } from "./JellyPollyNavData";
 import { SidebarItem } from "./pagesRoute";
 
 interface NavigationItem {
@@ -71,7 +71,7 @@ const HomePage: React.FC = () => {
   const buildTienHockItems = (): NavigationItem[] => {
     const items: NavigationItem[] = [];
 
-    TienHockSidebarData.forEach((category) => {
+    TienHockNavData.forEach((category) => {
       // Exclude "Bookmarks" category
       if (category.name !== "Bookmarks" && category.subItems) {
         let icon: React.ElementType | undefined;
@@ -128,7 +128,7 @@ const HomePage: React.FC = () => {
 
   // Build Green Target items as simple navigation cards
   const buildGreenTargetItems = (): NavigationItem[] => {
-    return GreenTargetSidebarData.map((item) => ({
+    return GreenTargetNavData.map((item) => ({
       name: item.name,
       path: `/greentarget${item.path || ""}`,
       icon: item.icon,
@@ -152,7 +152,7 @@ const HomePage: React.FC = () => {
   const buildJellyPollyItems = (): NavigationItem[] => {
     const items: NavigationItem[] = [];
 
-    JellyPollySidebarData.forEach((category) => {
+    JellyPollyNavData.forEach((category) => {
       if (category.subItems) {
         category.subItems.forEach((subItem) => {
           if (

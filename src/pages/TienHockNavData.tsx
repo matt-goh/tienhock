@@ -1,4 +1,4 @@
-// src/pages/TienHockSidebarData.tsx
+// src/pages/TienHockNavData.tsx
 import {
   IconBookmark,
   IconFileInvoice,
@@ -201,7 +201,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   return payrollSubItems;
 };
 
-export const TienHockSidebarData: SidebarItem[] = [
+export const TienHockNavData: SidebarItem[] = [
   {
     name: "Bookmarks",
     icon: IconBookmark,
