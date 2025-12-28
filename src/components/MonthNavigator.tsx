@@ -91,7 +91,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   const iconSize = size === "sm" ? 16 : 20;
 
   const displayClasses = clsx(
-    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors",
+    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors whitespace-nowrap",
     size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"
   );
 
