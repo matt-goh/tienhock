@@ -11,8 +11,6 @@ import {
   IconCalendar,
   IconBuildingStore,
   IconRefresh,
-  IconCalendarDollar,
-  IconCurrencyDollar,
   IconPhone,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
@@ -320,40 +318,25 @@ const DebtorsReportPage: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Outstanding</p>
-              <p className="text-2xl font-bold text-red-600">
-                {formatCurrency(filteredData.grand_total_balance)}
-              </p>
-            </div>
-            <IconCurrencyDollar className="h-8 w-8 text-red-500" />
-          </div>
+        <div className="bg-white p-4 rounded-lg border-l-4 border-l-red-500 border border-gray-200 shadow-sm">
+          <p className="text-sm font-medium text-gray-600">Total Outstanding</p>
+          <p className="text-2xl font-bold text-red-600 mt-1">
+            {formatCurrency(filteredData.grand_total_balance)}
+          </p>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Invoiced</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {formatCurrency(filteredData.grand_total_amount)}
-              </p>
-            </div>
-            <IconCalendarDollar className="h-8 w-8 text-blue-500" />
-          </div>
+        <div className="bg-white p-4 rounded-lg border-l-4 border-l-blue-500 border border-gray-200 shadow-sm">
+          <p className="text-sm font-medium text-gray-600">Total Invoiced</p>
+          <p className="text-2xl font-bold text-blue-600 mt-1">
+            {formatCurrency(filteredData.grand_total_amount)}
+          </p>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Paid</p>
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(filteredData.grand_total_paid)}
-              </p>
-            </div>
-            <IconCurrencyDollar className="h-8 w-8 text-green-500" />
-          </div>
+        <div className="bg-white p-4 rounded-lg border-l-4 border-l-green-500 border border-gray-200 shadow-sm">
+          <p className="text-sm font-medium text-gray-600">Total Paid</p>
+          <p className="text-2xl font-bold text-green-600 mt-1">
+            {formatCurrency(filteredData.grand_total_paid)}
+          </p>
         </div>
       </div>
 
