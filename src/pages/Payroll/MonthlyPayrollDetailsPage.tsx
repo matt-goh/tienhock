@@ -1,6 +1,6 @@
 // src/pages/Payroll/MonthlyPayrollDetailsPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
   IconChevronDown,
@@ -19,15 +19,16 @@ import {
   IconX,
   IconFilter,
   IconSelectAll,
+  IconPlus,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
-import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import {
-  getMonthlyPayrollDetails,
+  getMonthlyPayrollByYearMonth,
   getMonthName,
   updateMonthlyPayrollStatus,
+  createMonthlyPayroll,
 } from "../../utils/payroll/payrollUtils";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
@@ -44,13 +45,16 @@ import {
   MidMonthPayroll,
 } from "../../utils/payroll/midMonthPayrollUtils";
 import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
+import MonthNavigator from "../../components/MonthNavigator";
 
 const MonthlyPayrollDetailsPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  // Initialize with current month
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
   const [payroll, setPayroll] = useState<MonthlyPayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [expandedJobs, setExpandedJobs] = useState<Record<string, boolean>>({});
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<"Processing" | "Finalized">(
@@ -70,20 +74,22 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   >({});
   const [isFetchingMidMonth, setIsFetchingMidMonth] = useState(false);
 
+  // Fetch payroll when selected month changes
   useEffect(() => {
     fetchPayrollDetails();
-  }, [id]);
+  }, [selectedMonth]);
 
   const fetchPayrollDetails = async () => {
-    if (!id) return;
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth() + 1; // JavaScript months are 0-indexed
 
     setIsLoading(true);
     try {
-      const response = await getMonthlyPayrollDetails(Number(id));
+      const response = await getMonthlyPayrollByYearMonth(year, month);
       setPayroll(response);
 
       // Initialize expandedJobs with all job types expanded
-      if (response.employeePayrolls) {
+      if (response?.employeePayrolls) {
         const jobTypes = new Set(
           response.employeePayrolls.map(
             (ep: { job_type: string }) => ep.job_type
@@ -192,8 +198,33 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     return grouped;
   };
 
-  const handleBack = () => {
-    navigate("/payroll/monthly-payrolls/list");
+  // Handle creating a new payroll for the selected month
+  const handleCreatePayroll = async () => {
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth() + 1;
+
+    setIsCreating(true);
+    try {
+      const response = await createMonthlyPayroll(year, month);
+      toast.success("Payroll created successfully");
+      // Fetch the newly created payroll
+      await fetchPayrollDetails();
+      // Navigate to processing page
+      if (response?.payroll?.id) {
+        navigate(`/payroll/monthly-payrolls/${response.payroll.id}/process`);
+      }
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 409) {
+        toast.error("A payroll already exists for this month");
+        // Refetch to get the existing payroll
+        await fetchPayrollDetails();
+      } else {
+        toast.error("Failed to create payroll");
+      }
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   // Get selected payrolls as array
@@ -311,11 +342,11 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   };
 
   const handleStatusChange = async () => {
-    if (!id || !payroll) return;
+    if (!payroll?.id) return;
 
     setIsUpdatingStatus(true);
     try {
-      await updateMonthlyPayrollStatus(Number(id), newStatus);
+      await updateMonthlyPayrollStatus(payroll.id, newStatus);
       toast.success(`Payroll status updated to ${newStatus}`);
       setIsStatusDialogOpen(false);
       await fetchPayrollDetails();
@@ -344,7 +375,8 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   };
 
   const handleProcessPayroll = () => {
-    navigate(`/payroll/monthly-payrolls/${id}/process`);
+    if (!payroll?.id) return;
+    navigate(`/payroll/monthly-payrolls/${payroll.id}/process`);
   };
 
   const formatCurrency = (amount: number) => {
@@ -392,12 +424,34 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   }
 
   if (!payroll) {
+    const displayYear = selectedMonth.getFullYear();
+    const displayMonth = selectedMonth.getMonth() + 1;
     return (
-      <div className="text-center py-12">
-        <p className="text-default-500">Payroll not found</p>
-        <Button onClick={handleBack} className="mt-4" variant="outline">
-          Back to List
-        </Button>
+      <div className="relative w-full space-y-4 mx-4 md:mx-6">
+        <div className="bg-white rounded-lg border border-default-200 p-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+            <div className="flex items-center gap-3">
+              <MonthNavigator
+                selectedMonth={selectedMonth}
+                onChange={setSelectedMonth}
+                showGoToCurrentButton={false}
+              />
+            </div>
+          </div>
+          <div className="text-center py-4">
+            <p className="text-default-500 mb-4">
+              No payroll found for {getMonthName(displayMonth)} {displayYear}
+            </p>
+            <Button
+              onClick={handleCreatePayroll}
+              icon={IconPlus}
+              color="sky"
+              disabled={isCreating}
+            >
+              {isCreating ? "Creating..." : "Create Payroll"}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -407,29 +461,27 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const totals = calculateTotals(payroll.employeePayrolls || []);
 
   return (
-    <div className="relative w-full mx-4 md:mx-6">
-      <BackButton onClick={handleBack} />
-
+    <div className="relative w-full space-y-4 mx-4 md:mx-6">
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <div>
-            <div className="flex items-center mb-1">
-              <h1 className="text-xl font-semibold text-default-800 mr-2">
-                Monthly Payroll: {getMonthName(payroll.month)} {payroll.year}
-              </h1>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                  payroll.status
-                )}`}
-              >
-                {payroll.status === "Processing" ? (
-                  <IconClockPlay size={12} className="mr-1" />
-                ) : (
-                  <IconLock size={12} className="mr-1" />
-                )}
-                {payroll.status}
-              </span>
-            </div>
+          <div className="flex items-center gap-3">
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={setSelectedMonth}
+              showGoToCurrentButton={false}
+            />
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                payroll.status
+              )}`}
+            >
+              {payroll.status === "Processing" ? (
+                <IconClockPlay size={12} className="mr-1" />
+              ) : (
+                <IconLock size={12} className="mr-1" />
+              )}
+              {payroll.status}
+            </span>
             <p className="text-sm text-default-500">
               Created on {format(new Date(payroll.created_at), "dd MMM yyyy")}
             </p>
@@ -1028,8 +1080,9 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
         isOpen={showFinalizeDialog}
         onClose={() => setShowFinalizeDialog(false)}
         onConfirm={async () => {
+          if (!payroll?.id) return;
           try {
-            await updateMonthlyPayrollStatus(Number(id), "Finalized");
+            await updateMonthlyPayrollStatus(payroll.id, "Finalized");
             setShowFinalizeDialog(false);
             toast.success("Payroll has been finalized successfully");
             await fetchPayrollDetails();
