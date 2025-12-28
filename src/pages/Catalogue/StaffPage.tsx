@@ -74,7 +74,7 @@ const EmployeeCard = ({
             {isCardHovered && (
               <button
                 onClick={handleDeleteClick}
-                className="p-1.5 rounded-full bg-white hover:bg-rose-50 text-default-500 hover:text-rose-600 transition-colors duration-150 shadow-sm"
+                className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-default-500 hover:text-rose-600 transition-colors duration-150 shadow-sm"
                 title="Delete employee"
               >
                 <IconTrash size={16} stroke={1.5} />
