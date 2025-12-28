@@ -14,6 +14,8 @@ import { api } from "../../routes/utils/api";
 import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
 import { getJobConfig, getJobIds, getContextLinkedPayCodes } from "../../configs/payrollJobConfigs";
 import StyledListbox from "../../components/StyledListbox";
+import MonthNavigator from "../../components/MonthNavigator";
+import YearNavigator from "../../components/YearNavigator";
 import { Link } from "react-router-dom";
 import ManageActivitiesModal, { ActivityItem } from "../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
@@ -117,7 +119,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   } | null>(null);
   const [bulkHolidaySelections, setBulkHolidaySelections] = useState<Record<string, boolean>>({});
 
-  // Month/Year options
+  // Month/Year options (kept for leave records display)
   const monthOptions = useMemo(() => [
     { id: 1, name: "January" },
     { id: 2, name: "February" },
@@ -133,13 +135,27 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     { id: 12, name: "December" },
   ], []);
 
-  const yearOptions = useMemo(() => {
-    const years = [];
-    for (let y = currentDate.getFullYear() + 1; y >= currentDate.getFullYear() - 5; y--) {
-      years.push({ id: y, name: y.toString() });
-    }
-    return years;
-  }, []);
+  // Computed date for MonthNavigator
+  const selectedMonthDate = useMemo(() => {
+    return new Date(formData.logYear, formData.logMonth - 1, 1);
+  }, [formData.logMonth, formData.logYear]);
+
+  // Handler for MonthNavigator
+  const handleMonthNavigatorChange = (date: Date) => {
+    setFormData({
+      ...formData,
+      logMonth: date.getMonth() + 1,
+      logYear: date.getFullYear(),
+    });
+  };
+
+  // Handler for YearNavigator
+  const handleYearNavigatorChange = (year: number) => {
+    setFormData({
+      ...formData,
+      logYear: year,
+    });
+  };
 
   // Filter employees by job type
   const eligibleEmployees = useMemo(() => {
@@ -773,34 +789,27 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       {/* Month/Year Selection */}
       <div className="bg-white p-4 rounded-lg border border-default-200">
         <h2 className="text-sm font-medium text-default-700 mb-3">Select Period</h2>
-        <div className="flex gap-4">
-          <div className="w-48">
-            {mode === "edit" ? (
-              <div className="px-3 py-2 bg-default-100 border border-default-200 rounded-lg text-sm text-default-700">
-                {monthOptions.find((m) => m.id === formData.logMonth)?.name}
-              </div>
-            ) : (
-              <StyledListbox
-                value={formData.logMonth}
-                onChange={(value) => setFormData({ ...formData, logMonth: Number(value) })}
-                options={monthOptions}
-              />
-            )}
+        {mode === "edit" ? (
+          <div className="flex gap-4">
+            <div className="px-4 py-2 bg-default-100 border border-default-200 rounded-lg text-sm font-medium text-default-700">
+              {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
+            </div>
           </div>
-          <div className="w-32">
-            {mode === "edit" ? (
-              <div className="px-3 py-2 bg-default-100 border border-default-200 rounded-lg text-sm text-default-700">
-                {formData.logYear}
-              </div>
-            ) : (
-              <StyledListbox
-                value={formData.logYear}
-                onChange={(value) => setFormData({ ...formData, logYear: Number(value) })}
-                options={yearOptions}
-              />
-            )}
+        ) : (
+          <div className="flex gap-4 items-end">
+            <MonthNavigator
+              selectedMonth={selectedMonthDate}
+              onChange={handleMonthNavigatorChange}
+              formatDisplay={(date) => date.toLocaleDateString("en-MY", { month: "long" })}
+              showGoToCurrentButton={false}
+            />
+            <YearNavigator
+              selectedYear={formData.logYear}
+              onChange={handleYearNavigatorChange}
+              showGoToCurrentButton={false}
+            />
           </div>
-        </div>
+        )}
       </div>
 
       {/* Employee Selection Table */}
