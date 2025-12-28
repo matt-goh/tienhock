@@ -671,6 +671,7 @@ const SalesByProductsPage: React.FC = () => {
               selectedMonth={selectedMonth}
               onChange={handleMonthChange}
               showGoToCurrentButton={false}
+              dateRange={dateRange}
             />
 
             {/* Date Navigation */}
