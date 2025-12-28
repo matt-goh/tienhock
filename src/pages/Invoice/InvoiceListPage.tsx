@@ -44,8 +44,6 @@ import {
   IconFileInvoice,
   IconUser,
   IconFileExport,
-  IconChevronLeft,
-  IconChevronRight,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -66,6 +64,7 @@ import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
 import StyledListbox from "../../components/StyledListbox";
+import DateNavigator from "../../components/DateNavigator";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -690,65 +689,25 @@ const InvoiceListPage: React.FC = () => {
     [filters, handleApplyFilters]
   ); // Depends on current filters and the apply function
 
-  // Today Button Handler
-  const handleTodayClick = useCallback(() => {
-    const today = new Date();
-    const startOfToday = new Date(today);
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
+  // Date Navigator change handler
+  const handleDateNavigatorChange = useCallback(
+    (newDate: Date) => {
+      const startOfDay = new Date(newDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(newDate);
+      endOfDay.setHours(23, 59, 59, 999);
 
-    const updatedFilters: InvoiceFilters = {
-      ...filters,
-      dateRange: {
-        start: startOfToday,
-        end: endOfToday,
-      },
-    };
-    handleApplyFilters(updatedFilters);
-  }, [filters, handleApplyFilters]);
-
-  // Backward one day handler
-  const handleBackwardOneDay = useCallback(() => {
-    const baseDate = filters.dateRange.start || new Date();
-    const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() - 1);
-
-    const startOfDay = new Date(newDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(newDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const updatedFilters: InvoiceFilters = {
-      ...filters,
-      dateRange: {
-        start: startOfDay,
-        end: endOfDay,
-      },
-    };
-    handleApplyFilters(updatedFilters);
-  }, [filters, handleApplyFilters]);
-
-  // Forward one day handler
-  const handleForwardOneDay = useCallback(() => {
-    const baseDate = filters.dateRange.start || new Date();
-    const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() + 1);
-
-    const startOfDay = new Date(newDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(newDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const updatedFilters: InvoiceFilters = {
-      ...filters,
-      dateRange: {
-        start: startOfDay,
-        end: endOfDay,
-      },
-    };
-    handleApplyFilters(updatedFilters);
-  }, [filters, handleApplyFilters]);
+      const updatedFilters: InvoiceFilters = {
+        ...filters,
+        dateRange: {
+          start: startOfDay,
+          end: endOfDay,
+        },
+      };
+      handleApplyFilters(updatedFilters);
+    },
+    [filters, handleApplyFilters]
+  );
 
   // Month Change Handler (Applies Immediately)
   const handleMonthChange = useCallback(
@@ -1535,34 +1494,11 @@ const InvoiceListPage: React.FC = () => {
               </div>
 
               {/* Date Navigation */}
-              <div className="flex w-full sm:w-auto items-center justify-center">
-                <div className="flex items-center gap-1 w-full">
-                  <button
-                    onClick={handleBackwardOneDay}
-                    title="Previous Day"
-                    aria-label="Previous Day"
-                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    <IconChevronLeft size={20} className="mr-[1px]" />
-                  </button>
-                  <Button
-                    onClick={handleTodayClick}
-                    variant="outline"
-                    size="sm"
-                    className="h-[42px] whitespace-nowrap px-3 sm:px-4 min-w-0 flex-grow"
-                  >
-                    Today
-                  </Button>
-                  <button
-                    onClick={handleForwardOneDay}
-                    title="Next Day"
-                    aria-label="Next Day"
-                    className="h-[42px] w-[43px] flex items-center justify-center rounded-full border border-default-300 text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    <IconChevronRight size={20} className="ml-[1px]" />
-                  </button>
-                </div>
-              </div>
+              <DateNavigator
+                selectedDate={filters.dateRange.start || new Date()}
+                onChange={handleDateNavigatorChange}
+                showGoToTodayButton={false}
+              />
 
               {/* Month Selector */}
               <div className="w-full xl:w-40">

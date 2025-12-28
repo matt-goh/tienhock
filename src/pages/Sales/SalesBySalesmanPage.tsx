@@ -8,6 +8,7 @@ import {
 } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
 import MonthNavigator from "../../components/MonthNavigator";
+import DateNavigator from "../../components/DateNavigator";
 import toast from "react-hot-toast";
 import {
   BarChart,
@@ -131,6 +132,20 @@ const SalesBySalesmanPage: React.FC = () => {
 
     // Create end date (last day of the selected month)
     const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Update date range
+    setDateRange({ start: startDate, end: endDate });
+  };
+
+  // Handle date selection change from DateNavigator
+  const handleDateChange = (newDate: Date) => {
+    // Create start date (beginning of the selected day)
+    const startDate = new Date(newDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Create end date (end of the selected day)
+    const endDate = new Date(newDate);
     endDate.setHours(23, 59, 59, 999);
 
     // Update date range
@@ -349,6 +364,13 @@ const SalesBySalesmanPage: React.FC = () => {
               selectedMonth={selectedMonth}
               onChange={handleMonthChange}
               showGoToCurrentButton={false}
+            />
+
+            {/* Date Navigation */}
+            <DateNavigator
+              selectedDate={dateRange.start}
+              onChange={handleDateChange}
+              showGoToTodayButton={false}
             />
           </div>
           <div className="text-lg text-right font-bold text-default-700">
