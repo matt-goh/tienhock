@@ -24,6 +24,8 @@ interface MonthNavigatorProps {
   label?: string;
   /** Size variant for the component */
   size?: "sm" | "md";
+  /** Optional callback before month changes. Return false to cancel navigation. */
+  beforeChange?: () => boolean;
 }
 
 const MonthNavigator: React.FC<MonthNavigatorProps> = ({
@@ -35,6 +37,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   allowFutureMonths = false,
   label,
   size = "md",
+  beforeChange,
 }) => {
   // Check if current month is the current calendar month
   const isCurrentMonth = useMemo(() => {
@@ -57,6 +60,10 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
 
   // Navigate months
   const navigateMonth = (direction: "prev" | "next") => {
+    // Check beforeChange callback if provided
+    if (beforeChange && !beforeChange()) {
+      return;
+    }
     const newDate = new Date(selectedMonth);
     if (direction === "prev") {
       newDate.setMonth(newDate.getMonth() - 1);
@@ -68,6 +75,10 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
 
   // Go to current month
   const goToCurrentMonth = () => {
+    // Check beforeChange callback if provided
+    if (beforeChange && !beforeChange()) {
+      return;
+    }
     onChange(new Date());
   };
 
