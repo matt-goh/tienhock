@@ -1693,7 +1693,7 @@ const InvoiceListPage: React.FC = () => {
             selectedInvoiceIds.size > 0
               ? "bg-sky-50/95 border border-sky-200"
               : "bg-white/95 border border-default-200"
-          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
+          } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky -top-4 z-20 shadow backdrop-blur-sm`}
           onClick={handleToggleSelectAll}
           title={
             selectionState.isAllSelectedOnPage
