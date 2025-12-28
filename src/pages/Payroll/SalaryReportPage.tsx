@@ -19,6 +19,8 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
 import Tab from "../../components/Tab";
+import MonthNavigator from "../../components/MonthNavigator";
+import YearNavigator from "../../components/YearNavigator";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
@@ -217,9 +219,15 @@ const SalaryReportPage: React.FC = () => {
     new Date().getMonth() + 1
   );
 
-  // Filters
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  // Filters - use Date for month navigation
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+
+  // Derived values for API calls and display
+  const currentYear = selectedMonth.getFullYear();
+  const currentMonth = selectedMonth.getMonth() + 1;
 
   // Tab state
   const [activeTab, setActiveTab] = useState(0); // 0 = Salary, 1 = Bank, 2 = Pinjam
@@ -253,10 +261,15 @@ const SalaryReportPage: React.FC = () => {
     []
   );
 
+  // Handle year change from YearNavigator
+  const handleYearChange = (newYear: number) => {
+    setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
+  };
+
   // Load salary report on mount and filter changes
   useEffect(() => {
     fetchSalaryReport();
-  }, [currentYear, currentMonth]);
+  }, [selectedMonth]);
 
   const fetchSalaryReport = async () => {
     setIsLoading(true);
@@ -1029,23 +1042,24 @@ const SalaryReportPage: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <FormListbox
-            name="year"
+        <div className="flex flex-wrap items-end gap-4">
+          <YearNavigator
+            selectedYear={currentYear}
+            onChange={handleYearChange}
+            showGoToCurrentButton={false}
             label="Year"
-            value={currentYear.toString()}
-            onChange={(value) => setCurrentYear(Number(value))}
-            options={yearOptions}
           />
-          <FormListbox
-            name="month"
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={setSelectedMonth}
+            showGoToCurrentButton={false}
             label="Month"
-            value={currentMonth.toString()}
-            onChange={(value) => setCurrentMonth(Number(value))}
-            options={monthOptions}
+            formatDisplay={(date) =>
+              date.toLocaleDateString("en-MY", { month: "long" })
+            }
           />
           {reportData && (
-            <div className="flex items-end">
+            <div className="flex items-end pb-2">
               <div className="text-sm text-default-600">
                 <div className="font-medium">
                   Total: {reportData.total_records} employees

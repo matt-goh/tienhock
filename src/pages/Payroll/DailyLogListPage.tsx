@@ -1,15 +1,16 @@
 // src/pages/Payroll/ProductionListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconPlus, IconPencil, IconTrash, IconEye } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import DateRangePicker from "../../components/DateRangePicker";
+import MonthNavigator from "../../components/MonthNavigator";
+import StyledListbox from "../../components/StyledListbox";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
-import StyledListbox from "../../components/StyledListbox";
 import { getJobConfig } from "../../configs/payrollJobConfigs";
 
 interface DailyLogListPageProps {
@@ -56,29 +57,11 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   const [totalLogs, setTotalLogs] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<WorkLog | null>(null);
-  const monthOptions = useMemo(() => {
-    return [
-      { id: 0, name: "January" },
-      { id: 1, name: "February" },
-      { id: 2, name: "March" },
-      { id: 3, name: "April" },
-      { id: 4, name: "May" },
-      { id: 5, name: "June" },
-      { id: 6, name: "July" },
-      { id: 7, name: "August" },
-      { id: 8, name: "September" },
-      { id: 9, name: "October" },
-      { id: 10, name: "November" },
-      { id: 11, name: "December" },
-    ];
-  }, []);
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const [selectedMonth, setSelectedMonth] = useState<{
-    id: number;
-    name: string;
-  }>(() => {
-    return monthOptions[currentMonth];
+
+  // Use Date object for month navigation
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
   const shiftOptions = [
@@ -137,18 +120,16 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
     fetchWorkLogs();
   }, [filters, currentPage, jobConfig]);
 
-  const handleMonthChange = (monthId: string | number) => {
-    const month = monthOptions.find((m) => m.id === Number(monthId));
-    if (!month) return;
-
-    setSelectedMonth(month);
+  // Handle month change from MonthNavigator
+  const handleMonthChange = (newDate: Date) => {
+    setSelectedMonth(newDate);
 
     // Create start date (1st of the selected month)
-    const startDate = new Date(currentDate.getFullYear(), month.id, 1);
+    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
 
     // Create end date (last day of the selected month)
-    const endDate = new Date(currentDate.getFullYear(), month.id + 1, 0);
+    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
     endDate.setHours(23, 59, 59, 999);
 
     // Update date range
@@ -232,14 +213,13 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
               setFilters({ ...filters, dateRange: newRange })
             }
           />
-          {/* Month Listbox */}
-          <div className="w-40">
-            <StyledListbox
-              value={selectedMonth.id}
-              onChange={handleMonthChange}
-              options={monthOptions}
-            />
-          </div>
+          {/* Month Navigator */}
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={handleMonthChange}
+            showGoToCurrentButton={false}
+            dateRange={filters.dateRange}
+          />
           {/* Shift Listbox */}
           <div className="w-40">
             <StyledListbox
