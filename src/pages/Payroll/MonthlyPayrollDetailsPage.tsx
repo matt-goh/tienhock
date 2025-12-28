@@ -427,7 +427,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     const displayYear = selectedMonth.getFullYear();
     const displayMonth = selectedMonth.getMonth() + 1;
     return (
-      <div className="relative w-full space-y-4 mx-4 md:mx-6">
+      <div className="space-y-4">
         <div className="bg-white rounded-lg border border-default-200 p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div className="flex items-center gap-3">
@@ -461,7 +461,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const totals = calculateTotals(payroll.employeePayrolls || []);
 
   return (
-    <div className="relative w-full space-y-4 mx-4 md:mx-6">
+    <div className="space-y-4">
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
           <div className="flex items-center gap-3">

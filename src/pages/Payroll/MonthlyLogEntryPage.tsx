@@ -777,7 +777,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   }
 
   return (
-    <div className="relative w-full space-y-4 mb-4 mx-4 md:mx-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
         <BackButton onClick={handleCancel} />
@@ -1066,7 +1066,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       </div>
 
       {/* Footer Actions */}
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
           Cancel
         </Button>

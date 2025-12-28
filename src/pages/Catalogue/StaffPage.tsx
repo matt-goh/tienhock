@@ -371,8 +371,8 @@ const StaffPage = () => {
   }
 
   return (
-    <div className="w-full max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
           <IconBriefcase size={28} stroke={2.5} className="text-default-700" />
           Staff Directory ({filteredEmployees.length})

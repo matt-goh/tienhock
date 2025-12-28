@@ -1751,9 +1751,9 @@ const InvoiceListPage: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full mx-auto max-w-[95rem] pb-4 px-4 sm:px-6 lg:px-8">
+    <div className="space-y-4">
       {/* Revised Header Layout - 2 rows total on desktop */}
-      <div className="space-y-4">
+      <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 md:-mx-6 md:px-6 pt-1 -mt-1">
         {/* Row 1: Header with title, filters, search and action buttons */}
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
           {/* Title */}

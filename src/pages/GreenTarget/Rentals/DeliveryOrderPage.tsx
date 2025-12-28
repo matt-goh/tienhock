@@ -100,9 +100,9 @@ const DeliveryOrderPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4">
-      <div className="mb-4 flex justify-between items-center">
-        <BackButton onClick={handleBackClick} className="ml-5" />
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <BackButton onClick={handleBackClick} />
         <div className="space-x-3">
           <Button onClick={handlePrint} icon={IconPrinter} variant="outline">
             Print

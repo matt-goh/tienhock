@@ -197,7 +197,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   };
 
   return (
-    <div className="relative w-full space-y-4 mb-4 mx-4 md:mx-6">
+    <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
           {jobConfig?.name} Records

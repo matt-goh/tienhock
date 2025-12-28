@@ -328,7 +328,7 @@ const DebtorsReportPage: React.FC = () => {
   const filteredData = filterData(debtorsData);
 
   return (
-    <div className="max-w-7xl w-full mx-6 mb-4">
+    <div className="space-y-4">
       {/* Header Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
         <div className="p-6 border-b border-gray-200">

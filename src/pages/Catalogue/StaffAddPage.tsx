@@ -366,8 +366,8 @@ const StaffAddPage: React.FC = () => {
   );
 
   return (
-    <div className="container mx-auto px-4 pb-10">
-      <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         <div className="p-6 border-b border-default-200">
           <h1 className="text-xl font-semibold text-default-900">

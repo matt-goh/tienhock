@@ -651,7 +651,7 @@ const SalesByProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full pt-0 mt-4 space-y-4">
+    <div className="space-y-4">
       {/* Summary section */}
       <div className="bg-white rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">

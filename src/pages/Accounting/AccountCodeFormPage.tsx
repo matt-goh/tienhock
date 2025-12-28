@@ -363,8 +363,8 @@ const AccountCodeFormPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 pb-4">
-      <BackButton onClick={handleBackClick} className="mt-3 mb-2" />
+    <div className="space-y-4">
+      <BackButton onClick={handleBackClick} />
 
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         {/* Header */}

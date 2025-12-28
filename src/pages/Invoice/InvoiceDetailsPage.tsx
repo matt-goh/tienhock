@@ -1369,7 +1369,7 @@ const InvoiceDetailsPage: React.FC = () => {
       : {};
 
   return (
-    <div className="px-4 md:px-12 pb-8 w-full relative">
+    <div className="space-y-4 relative">
       {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-30">

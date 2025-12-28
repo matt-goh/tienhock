@@ -197,7 +197,7 @@ const StockMovementPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full space-y-4 p-4">
+    <div className="space-y-4">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-default-900">Stock Movement</h1>

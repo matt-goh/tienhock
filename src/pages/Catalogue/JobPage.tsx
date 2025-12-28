@@ -472,8 +472,8 @@ const JobPage: React.FC = () => {
 
   // --- Main Render ---
   return (
-    <div className={`relative w-full px-4 mb-2 md:mx-6`}>
-      <h1 className="mb-4 text-center text-xl font-semibold text-default-800">
+    <div className="space-y-4">
+      <h1 className="text-center text-xl font-semibold text-default-800">
         Job & Pay Codes
       </h1>
 
