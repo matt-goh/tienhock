@@ -434,11 +434,13 @@ export default function (pool) {
       // Get all items for these payrolls in a single query (more efficient)
       const itemsQuery = `
       SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
-            pi.quantity, pi.amount, pi.is_manual, pi.job_type, pc.pay_type
+            pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
+            pi.source_date, pi.work_log_id, pi.work_log_type,
+            pc.pay_type
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
       WHERE pi.employee_payroll_id = ANY($1)
-      ORDER BY pi.id
+      ORDER BY pi.source_date ASC NULLS LAST, pi.id
     `;
 
       const itemsResult = await pool.query(itemsQuery, [payrollIds]);
@@ -673,14 +675,16 @@ export default function (pool) {
 
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
-        // Get payroll items (including job_type for proper splitting in combined payrolls)
+        // Get payroll items (including job_type, source_employee_id and source tracking for traceability)
         pool.query(`
           SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
-                pi.quantity, pi.amount, pi.is_manual, pi.job_type, pc.pay_type
+                pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
+                pi.source_date, pi.work_log_id, pi.work_log_type,
+                pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE pi.employee_payroll_id = $1
-          ORDER BY pi.id
+          ORDER BY pi.source_date ASC NULLS LAST, pi.id
         `, [id]),
 
         // Get payroll deductions
@@ -820,14 +824,16 @@ export default function (pool) {
 
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
-        // Get payroll items (including job_type for proper splitting in combined payrolls)
+        // Get payroll items (including job_type, source_employee_id and source tracking for traceability)
         pool.query(`
           SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
-                pi.quantity, pi.amount, pi.is_manual, pi.job_type, pc.pay_type
+                pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
+                pi.source_date, pi.work_log_id, pi.work_log_type,
+                pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE pi.employee_payroll_id = $1
-          ORDER BY pi.id
+          ORDER BY pi.source_date ASC NULLS LAST, pi.id
         `, [id]),
 
         // Get payroll deductions

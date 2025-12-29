@@ -142,11 +142,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#e8e8e8",
     borderTopWidth: 0.5,
     borderTopColor: "#000",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#ccc",
   },
   jobCategoryText: {
     fontFamily: "Helvetica-Bold",
     fontSize: 8,
     paddingVertical: 2,
+    paddingLeft: 2,
+  },
+  jobCategoryTotal: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 8,
+    paddingVertical: 2,
+    textAlign: "right",
+    paddingRight: 2,
   },
 });
 
@@ -274,6 +284,22 @@ const IndividualJobPage: React.FC<{
   totalJobs,
 }) => {
   const groupedItems = groupItemsByType(individualJob.items || []) || { Base: [], Tambahan: [], Overtime: [] };
+
+  // Get employee-job mapping for displaying which staff ID worked this job
+  const employeeJobMapping = payroll.employee_job_mapping || {};
+
+  // Helper function to get employee ID for a given job type (reverse lookup from mapping)
+  const getEmployeeIdForJob = (jobType: string): string | null => {
+    for (const [employeeId, job] of Object.entries(employeeJobMapping)) {
+      if (job === jobType) {
+        return employeeId;
+      }
+    }
+    return null;
+  };
+
+  // Get the employee ID for this individual job
+  const jobEmployeeId = getEmployeeIdForJob(individualJob.job_type);
 
   // Helper function to group items by hours and maintain order
   const groupItemsByHours = (items: any[]) => {
@@ -428,11 +454,11 @@ const IndividualJobPage: React.FC<{
               <Text style={styles.employeeInfoLabel}>Employee</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
-                {staffDetails?.name || payroll.employee_name} ({payroll.employee_id})
+                {staffDetails?.name || payroll.employee_name}{jobEmployeeId ? ` (${jobEmployeeId})` : ''}
               </Text>
             </View>
             <View style={styles.employeeInfoRow}>
-              <Text style={styles.employeeInfoLabel}>IC no</Text>
+              <Text style={styles.employeeInfoLabel}>IC No.</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
                 {staffDetails?.icNo || "N/A"}
@@ -445,7 +471,7 @@ const IndividualJobPage: React.FC<{
                 {individualJob.job_type}
               </Text>
             </View>
-            <View style={styles.employeeInfoRow}>
+            <View style={[styles.employeeInfoRow, { marginBottom: 0 }]}>
               <Text style={styles.employeeInfoLabel}>Bahagian</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
@@ -458,7 +484,7 @@ const IndividualJobPage: React.FC<{
 
       {/* Pay Slip Title */}
       <Text style={styles.payslipTitle}>
-        Slip Gaji Pajak ({individualJob.job_type}) Untuk Bulan {monthName} {year}
+        Slip Gaji Pajak {jobEmployeeId ? ` - ${jobEmployeeId}` : ''} Untuk Bulan {monthName} {year}
         {isGrouped && ` - Kerja ${jobIndex + 1} of ${totalJobs} (Individual Breakdown)`}
       </Text>
 
@@ -750,7 +776,7 @@ const IndividualJobPage: React.FC<{
           </View>
           <View style={[styles.tableCol, styles.descriptionNoteCol]}>
             <Text style={styles.totalText}>
-              {isGrouped ? `${individualJob.job_type} Gross Pay` : "Jumlah Gaji Kasar"}
+              {isGrouped ? `${jobEmployeeId} Gross Pay` : "Jumlah Gaji Kasar"}
             </Text>
           </View>
           <View
@@ -897,8 +923,28 @@ const MainPayrollPage: React.FC<{
   const isGroupedPayroll = payroll.job_type && payroll.job_type.includes(", ");
   const jobTypes = isGroupedPayroll ? payroll.job_type.split(", ").map(job => job.trim()) : [payroll.job_type];
 
+  // Get employee-job mapping for accurate item attribution
+  const employeeJobMapping = payroll.employee_job_mapping || {};
+
   // Helper function to determine which job an item belongs to
   const getItemJobType = (item: any): string | null => {
+    // First priority: use source_employee_id with employee_job_mapping for most accurate tracking
+    if (item.source_employee_id && employeeJobMapping[item.source_employee_id]) {
+      const mappedJobType = employeeJobMapping[item.source_employee_id];
+      if (jobTypes.includes(mappedJobType)) {
+        return mappedJobType;
+      }
+    }
+
+    // Second priority: check if item has job_type field (set by backend)
+    if (item.job_type) {
+      // Verify it's one of the valid job types for this payroll
+      if (jobTypes.includes(item.job_type)) {
+        return item.job_type;
+      }
+    }
+
+    // Fallback: check description/pay_code for job name (legacy items)
     const descLower = (item.description || '').toLowerCase();
     const payCodeLower = (item.pay_code_id || '').toLowerCase();
 
@@ -909,6 +955,16 @@ const MainPayrollPage: React.FC<{
       }
     }
     return null; // Shared/unassigned item
+  };
+
+  // Helper function to get employee ID for a given job type (reverse lookup from mapping)
+  const getEmployeeIdForJob = (jobType: string): string | null => {
+    for (const [employeeId, job] of Object.entries(employeeJobMapping)) {
+      if (job === jobType) {
+        return employeeId;
+      }
+    }
+    return null;
   };
 
   // Group items by job type for display with category headers
@@ -1110,6 +1166,16 @@ const MainPayrollPage: React.FC<{
     }
   };
 
+  // Helper function to format employee job mapping display
+  const formatEmployeeJobMapping = () => {
+    if (payroll.employee_job_mapping && Object.keys(payroll.employee_job_mapping).length > 0) {
+      return ` (${Object.entries(payroll.employee_job_mapping)
+        .map(([empId, jobType]) => `${empId} - ${jobType}`)
+        .join(', ')})`;
+    }
+    return ` (${payroll.employee_id})`;
+  };
+
   return (
     <Page size="A4" style={styles.page}>
       {/* Header */}
@@ -1122,11 +1188,11 @@ const MainPayrollPage: React.FC<{
               <Text style={styles.employeeInfoLabel}>Employee</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
-                {staffDetails?.name || payroll.employee_name} ({payroll.employee_id})
+                {staffDetails?.name || payroll.employee_name}
               </Text>
             </View>
             <View style={styles.employeeInfoRow}>
-              <Text style={styles.employeeInfoLabel}>IC no</Text>
+              <Text style={styles.employeeInfoLabel}>IC No.</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
                 {staffDetails?.icNo || "N/A"}
@@ -1139,7 +1205,7 @@ const MainPayrollPage: React.FC<{
                 {staffDetails?.jobName || payroll.job_type}
               </Text>
             </View>
-            <View style={styles.employeeInfoRow}>
+            <View style={[styles.employeeInfoRow, { marginBottom: 0 }]}>
               <Text style={styles.employeeInfoLabel}>Bahagian</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
@@ -1186,15 +1252,21 @@ const MainPayrollPage: React.FC<{
         {baseItemsByJob.map((jobGroup, jobGroupIndex) => {
           const jobItems = jobGroup.items;
           const jobGroupedByHours = groupItemsByHours(jobItems);
+          const jobTotal = jobItems.reduce((sum, item) => sum + (item.amount || 0), 0);
 
           return (
             <React.Fragment key={`base-job-${jobGroupIndex}`}>
               {/* Job Category Header - only show for grouped payrolls */}
               {isGroupedPayroll && jobGroup.jobType && (
                 <View style={styles.jobCategoryRow}>
-                  <View style={[styles.tableCol, { flex: 6.5, borderRightWidth: 0 }]}>
+                  <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                     <Text style={styles.jobCategoryText}>
-                      [ {jobGroup.jobType} ]
+                      [ {jobGroup.jobType}{getEmployeeIdForJob(jobGroup.jobType) ? ` (${getEmployeeIdForJob(jobGroup.jobType)})` : ''} ]
+                    </Text>
+                  </View>
+                  <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
+                    <Text style={styles.jobCategoryTotal}>
+                      {formatCurrency(jobTotal)}
                     </Text>
                   </View>
                 </View>
@@ -1202,9 +1274,14 @@ const MainPayrollPage: React.FC<{
               {/* Shared items header */}
               {isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0 && (
                 <View style={styles.jobCategoryRow}>
-                  <View style={[styles.tableCol, { flex: 6.5, borderRightWidth: 0 }]}>
+                  <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                     <Text style={styles.jobCategoryText}>
                       [ Shared ]
+                    </Text>
+                  </View>
+                  <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
+                    <Text style={styles.jobCategoryTotal}>
+                      {formatCurrency(jobTotal)}
                     </Text>
                   </View>
                 </View>
@@ -1283,14 +1360,21 @@ const MainPayrollPage: React.FC<{
           commissionRecords.length > 0) && (
           <>
             {/* Tambahan Items - Grouped by job type */}
-            {tambahanItemsByJob.map((jobGroup, jobGroupIndex) => (
+            {tambahanItemsByJob.map((jobGroup, jobGroupIndex) => {
+              const tambahanJobTotal = jobGroup.items.reduce((sum, item) => sum + (item.amount || 0), 0);
+              return (
               <React.Fragment key={`tambahan-job-${jobGroupIndex}`}>
                 {/* Job Category Header - only show for grouped payrolls with items */}
                 {isGroupedPayroll && jobGroup.jobType && jobGroup.items.length > 0 && (
                   <View style={styles.jobCategoryRow}>
-                    <View style={[styles.tableCol, { flex: 6.5, borderRightWidth: 0 }]}>
+                    <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                       <Text style={styles.jobCategoryText}>
-                        [ {jobGroup.jobType} - Tambahan ]
+                        [ {jobGroup.jobType}{getEmployeeIdForJob(jobGroup.jobType) ? ` (${getEmployeeIdForJob(jobGroup.jobType)})` : ''} - Tambahan ]
+                      </Text>
+                    </View>
+                    <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
+                      <Text style={styles.jobCategoryTotal}>
+                        {formatCurrency(tambahanJobTotal)}
                       </Text>
                     </View>
                   </View>
@@ -1298,9 +1382,14 @@ const MainPayrollPage: React.FC<{
                 {/* Shared items header */}
                 {isGroupedPayroll && !jobGroup.jobType && jobGroup.items.length > 0 && (
                   <View style={styles.jobCategoryRow}>
-                    <View style={[styles.tableCol, { flex: 6.5, borderRightWidth: 0 }]}>
+                    <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                       <Text style={styles.jobCategoryText}>
                         [ Shared - Tambahan ]
+                      </Text>
+                    </View>
+                    <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
+                      <Text style={styles.jobCategoryTotal}>
+                        {formatCurrency(tambahanJobTotal)}
                       </Text>
                     </View>
                   </View>
@@ -1335,7 +1424,8 @@ const MainPayrollPage: React.FC<{
                   </View>
                 ))}
               </React.Fragment>
-            ))}
+            );
+            })}
 
             {/* Commission Records in Tambahan Section */}
             {commissionRecords.map((commission, index) => (
@@ -1423,15 +1513,21 @@ const MainPayrollPage: React.FC<{
           <>
             {overtimeItemsByJob.map((jobGroup, jobGroupIndex) => {
               const jobOvertimeGroupedByHours = groupItemsByHours(jobGroup.items);
+              const overtimeJobTotal = jobGroup.items.reduce((sum, item) => sum + (item.amount || 0), 0);
 
               return (
                 <React.Fragment key={`overtime-job-${jobGroupIndex}`}>
                   {/* Job Category Header - only show for grouped payrolls with items */}
                   {isGroupedPayroll && jobGroup.jobType && jobGroup.items.length > 0 && (
                     <View style={styles.jobCategoryRow}>
-                      <View style={[styles.tableCol, { flex: 6.5, borderRightWidth: 0 }]}>
+                      <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                         <Text style={styles.jobCategoryText}>
-                          [ {jobGroup.jobType} - OT ]
+                          [ {jobGroup.jobType}{getEmployeeIdForJob(jobGroup.jobType) ? ` (${getEmployeeIdForJob(jobGroup.jobType)})` : ''} - OT ]
+                        </Text>
+                      </View>
+                      <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
+                        <Text style={styles.jobCategoryTotal}>
+                          {formatCurrency(overtimeJobTotal)}
                         </Text>
                       </View>
                     </View>
@@ -1439,9 +1535,14 @@ const MainPayrollPage: React.FC<{
                   {/* Shared items header */}
                   {isGroupedPayroll && !jobGroup.jobType && jobGroup.items.length > 0 && (
                     <View style={styles.jobCategoryRow}>
-                      <View style={[styles.tableCol, { flex: 6.5, borderRightWidth: 0 }]}>
+                      <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                         <Text style={styles.jobCategoryText}>
                           [ Shared - OT ]
+                        </Text>
+                      </View>
+                      <View style={[styles.tableCol, { flex: 1.5, borderRightWidth: 0 }]}>
+                        <Text style={styles.jobCategoryTotal}>
+                          {formatCurrency(overtimeJobTotal)}
                         </Text>
                       </View>
                     </View>

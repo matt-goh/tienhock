@@ -32,7 +32,7 @@ import {
 } from "../../utils/payroll/PayslipButtons";
 
 interface PayrollItem {
-  id: number;
+  id?: number;
   pay_code_id: string;
   description: string;
   rate: number;
@@ -41,6 +41,10 @@ interface PayrollItem {
   amount: number;
   is_manual: boolean;
   pay_type?: string;
+  job_type?: string;
+  source_date?: string | null;
+  work_log_id?: number | null;
+  work_log_type?: "daily" | "monthly" | null;
 }
 
 interface MonthlyLeaveRecord {
@@ -99,7 +103,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   const handleDeleteItem = async () => {
-    if (!itemToDelete) return;
+    if (!itemToDelete || !itemToDelete.id) return;
 
     setIsDeleting(true);
     try {
@@ -125,6 +129,53 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       style: "currency",
       currency: "MYR",
     }).format(amount);
+  };
+
+  // Helper to format source date for display
+  const formatSourceDate = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "-";
+    try {
+      return format(new Date(dateStr), "dd MMM");
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Helper to generate work log URL for navigation
+  const getWorkLogUrl = (item: PayrollItem): string | null => {
+    if (!item.work_log_id || !item.work_log_type) return null;
+
+    const jobType = item.job_type || "";
+
+    // Map job_type to route path based on payrollJobConfigs
+    // Handle both config keys (MEE, BIHUN) and specific job IDs (MEE_FOREMAN, BH_BERAS)
+    const getRoutePath = (jt: string): string | null => {
+      // Direct mapping for config keys
+      const directMap: Record<string, string> = {
+        MEE: "mee-production",
+        BIHUN: "bihun-production",
+        BOILER: "boiler-production",
+        SALESMAN: "salesman-production",
+        MAINTEN: "maintenance-monthly",
+        OFFICE: "office-monthly",
+        SAPU: "tukang-sapu-monthly",
+      };
+
+      if (directMap[jt]) return directMap[jt];
+
+      // Match by prefix for specific job IDs (e.g., MEE_FOREMAN → mee-production)
+      if (jt.startsWith("MEE")) return "mee-production";
+      if (jt.startsWith("BH_") || jt.startsWith("BIHUN")) return "bihun-production";
+      if (jt.startsWith("BOILER")) return "boiler-production";
+      if (jt.startsWith("SALESMAN")) return "salesman-production";
+
+      return null;
+    };
+
+    const routePath = getRoutePath(jobType);
+    if (!routePath) return null;
+
+    return `/payroll/${routePath}/${item.work_log_id}`;
   };
 
   if (isLoading) {
@@ -154,6 +205,24 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }))
   );
 
+  // Detect if this is a combined job payroll (multiple job types)
+  const uniqueJobTypes = [...new Set(payroll.items.map((item) => item.job_type).filter(Boolean))];
+  const isCombinedPayroll = uniqueJobTypes.length > 1;
+
+  // Group items by job type first, then by pay type for combined payrolls
+  const itemsByJob = isCombinedPayroll
+    ? uniqueJobTypes.reduce((acc, jobType) => {
+        const jobItems = payroll.items.filter((item) => item.job_type === jobType);
+        acc[jobType as string] = groupItemsByType(
+          jobItems.map((item) => ({
+            ...item,
+            id: item.id || 0,
+          }))
+        );
+        return acc;
+      }, {} as Record<string, ReturnType<typeof groupItemsByType>>)
+    : null;
+
   // Calculate totals for each group
   const baseTotal = groupedItems["Base"].reduce(
     (sum, item) => sum + item.amount,
@@ -167,6 +236,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     (sum, item) => sum + item.amount,
     0
   );
+
+  // Helper to format job type for display
+  const formatJobType = (jobType: string): string => {
+    const jobTypeMap: Record<string, string> = {
+      MEE: "Mee",
+      BIHUN: "Bihun",
+      MAINTEN: "Maintenance",
+    };
+    return jobTypeMap[jobType] || jobType;
+  };
 
   return (
     <div className="space-y-4">
@@ -211,28 +290,65 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         </div>
 
         {/* Employee Information */}
-        <div className="mb-4 border rounded-lg p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-default-500 mb-1">Employee</p>
-              <p className="font-medium">
-                <Link
-                  to={`/catalogue/staff/${payroll.employee_id}`}
-                  className="text-sky-600 hover:underline"
-                >
-                  {payroll.employee_name || "Unknown"}{" "}
-                  <span className="text-default-500 font-normal">({payroll.employee_id})</span>
-                </Link>
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-default-500 mb-1">Job Type</p>
-              <p className="font-medium">{payroll.job_type}</p>
-              <p className="text-sm text-default-500">{payroll.section}</p>
-            </div>
-            <div>
-              <p className="text-sm text-default-500 mb-1">Status</p>
-              <p className="font-medium">{payroll.payroll_status}</p>
+        <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+          <div className="bg-default-100 px-4 py-2 border-b">
+            <h2 className="text-md font-semibold text-default-700">Employee Information</h2>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Employee</p>
+                {payroll.employee_job_mapping && Object.keys(payroll.employee_job_mapping).length > 1 ? (
+                  <>
+                    <p className="font-semibold text-default-800">
+                      {payroll.employee_name || "Unknown"}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {Object.entries(payroll.employee_job_mapping).map(([empId, jobType]) => (
+                        <div key={empId} className="flex items-center text-sm">
+                          <Link
+                            to={`/catalogue/staff/${empId}`}
+                            className="text-sky-600 hover:underline font-medium"
+                          >
+                            {empId}
+                          </Link>
+                          <span className="mx-2 text-default-300">→</span>
+                          <span className="text-default-600">{jobType as string}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-default-800">
+                      <Link
+                        to={`/catalogue/staff/${payroll.employee_id}`}
+                        className="text-sky-600 hover:underline"
+                      >
+                        {payroll.employee_name || "Unknown"}
+                      </Link>
+                    </p>
+                    <p className="text-sm text-default-500 mt-1">{payroll.employee_id}</p>
+                  </>
+                )}
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Job Type</p>
+                <p className="font-semibold text-default-800">{payroll.job_type}</p>
+                <p className="text-sm text-default-500 mt-1">{payroll.section}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Status</p>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
+                  payroll.payroll_status === 'CONFIRMED'
+                    ? 'bg-green-100 text-green-800'
+                    : payroll.payroll_status === 'PENDING'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-default-100 text-default-800'
+                }`}>
+                  {payroll.payroll_status}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -680,482 +796,408 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               Payroll Items
             </h2>
 
-            {/* Base Pay Items */}
-            {groupedItems["Base"].length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-default-700 mb-2">
-                  Base Pay
-                </h3>
-                <div className="border rounded-lg overflow-x-auto">
-                  <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Description
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Rate
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-default-200">
-                      {groupedItems["Base"].map((item) => (
-                        <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-6 py-3 max-w-xs">
-                            <div
-                              className="text-sm font-medium text-default-900 truncate"
-                              title={item.description}
-                            >
-                              {item.description}
-                            </div>
-                            <div className="text-xs text-default-500">
-                              {item.pay_code_id}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="text-sm text-default-900">
-                              {item.rate_unit === "Percent" ? (
-                                <>{item.rate}%</>
-                              ) : (
-                                <>
-                                  {formatCurrency(item.rate)}
-                                  <span className="text-xs text-default-500 ml-1">
-                                    /{item.rate_unit}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="text-sm text-default-900">
-                              {item.quantity}
-                              <span className="text-xs text-default-500 ml-1">
-                                {item.rate_unit === "Hour"
-                                  ? "hours"
-                                  : item.rate_unit === "Day"
-                                  ? "days"
-                                  : item.rate_unit === "Fixed"
-                                  ? ""
-                                  : item.rate_unit === "Percent"
-                                  ? "units"
-                                  : item.rate_unit.toLowerCase()}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right">
-                            <div className="text-sm font-medium text-default-900">
-                              {formatCurrency(item.amount)}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-default-50 border-t-2 border-default-200">
-                      <tr>
-                        <td
-                          colSpan={3}
-                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
-                        >
-                          Total Base Pay
-                          {(() => {
-                            // Group base items by hours to find average rate
-                            const baseGroupedByHours = groupedItems["Base"]
-                              .filter((item) => item.rate_unit === "Hour")
-                              .reduce((acc, item) => {
-                                const existing = acc.find(
-                                  (group) => group.hours === item.quantity
-                                );
-                                if (existing) {
-                                  existing.amount += item.amount;
-                                } else {
-                                  acc.push({
-                                    hours: item.quantity,
-                                    amount: item.amount,
-                                  });
-                                }
-                                return acc;
-                              }, [] as { hours: number; amount: number }[]);
+            {/* Payroll Items - Grouped by Job Type for Combined Payrolls */}
+            {isCombinedPayroll && itemsByJob ? (
+              // Combined Payroll: Group by Job Type first
+              uniqueJobTypes.map((jobType) => {
+                const jobGroupedItems = itemsByJob[jobType as string];
+                const jobBaseTotal = jobGroupedItems["Base"].reduce((sum, item) => sum + item.amount, 0);
+                const jobTambahanTotal = jobGroupedItems["Tambahan"].reduce((sum, item) => sum + item.amount, 0);
+                const jobOvertimeTotal = jobGroupedItems["Overtime"].reduce((sum, item) => sum + item.amount, 0);
+                const jobTotal = jobBaseTotal + jobTambahanTotal + jobOvertimeTotal;
 
-                            if (baseGroupedByHours.length > 0) {
-                              // Find the hour group with the maximum hours (latest/most hours)
-                              const maxHoursGroup = baseGroupedByHours.reduce(
-                                (maxGroup, currentGroup) => {
-                                  return currentGroup.hours > maxGroup.hours
-                                    ? currentGroup
-                                    : maxGroup;
-                                },
-                                baseGroupedByHours[0]
-                              );
+                return (
+                  <div key={jobType} className="mb-6">
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-default-300">
+                      <h3 className="text-lg font-semibold text-default-800">
+                        {formatJobType(jobType as string)} Section
+                      </h3>
+                      <span className="text-sm font-medium text-default-600">
+                        Subtotal: {formatCurrency(jobTotal)}
+                      </span>
+                    </div>
 
-                              // Calculate rate using the maximum hours group
-                              const averageBaseRate =
-                                maxHoursGroup && maxHoursGroup.hours > 0
-                                  ? baseTotal / maxHoursGroup.hours
-                                  : 0;
+                    {/* Base Pay for this job */}
+                    {jobGroupedItems["Base"].length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-default-600 mb-2">Base Pay</h4>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <table className="min-w-full divide-y divide-default-200">
+                            <thead className="bg-default-50">
+                              <tr>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Date</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Rate</th>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Qty</th>
+                                <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-default-200">
+                              {jobGroupedItems["Base"].map((item) => (
+                                <tr key={item.id} className="hover:bg-default-50">
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                    {item.source_date ? (
+                                      getWorkLogUrl(item) ? (
+                                        <Link to={getWorkLogUrl(item)!} className="text-sky-600 hover:underline">
+                                          {formatSourceDate(item.source_date)}
+                                        </Link>
+                                      ) : formatSourceDate(item.source_date)
+                                    ) : "-"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className="text-sm text-default-900" title={`${item.description} (${item.pay_code_id})`}>
+                                      {item.description} <span className="text-default-500">({item.pay_code_id})</span>
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                    {item.rate_unit === "Percent" ? `${item.rate}%` : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">{item.quantity}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(item.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-default-50">
+                              <tr>
+                                <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-default-600">Total Base</td>
+                                <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(jobBaseTotal)}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
-                              return (
-                                <div className="text-xs text-default-500 mt-1">
-                                  Avg Rate: {formatCurrency(averageBaseRate)}
-                                  /hour
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </td>
-                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
-                          {formatCurrency(baseTotal)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
+                    {/* Tambahan Pay for this job */}
+                    {jobGroupedItems["Tambahan"].length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-default-600 mb-2">Tambahan Pay</h4>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <table className="min-w-full divide-y divide-default-200">
+                            <thead className="bg-default-50">
+                              <tr>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Date</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Rate</th>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Qty</th>
+                                <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
+                                {isEditable && <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-12"></th>}
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-default-200">
+                              {jobGroupedItems["Tambahan"].map((item) => (
+                                <tr key={item.id} className="hover:bg-default-50">
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                    {item.source_date ? (
+                                      getWorkLogUrl(item) ? (
+                                        <Link to={getWorkLogUrl(item)!} className="text-sky-600 hover:underline">
+                                          {formatSourceDate(item.source_date)}
+                                        </Link>
+                                      ) : formatSourceDate(item.source_date)
+                                    ) : "-"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className="text-sm text-default-900" title={`${item.description} (${item.pay_code_id})`}>
+                                      {item.description} <span className="text-default-500">({item.pay_code_id})</span>
+                                      {item.is_manual && <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-600">Manual</span>}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                    {item.rate_unit === "Percent" ? `${item.rate}%` : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">{item.quantity}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(item.amount)}</td>
+                                  {isEditable && (
+                                    <td className="px-3 py-2 whitespace-nowrap text-center">
+                                      <button onClick={() => { setItemToDelete({ ...item, id: item.id || 0 }); setShowDeleteDialog(true); }} className="text-rose-600 hover:text-rose-800">
+                                        <IconTrash size={16} />
+                                      </button>
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-default-50">
+                              <tr>
+                                <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-default-600">Total Tambahan</td>
+                                <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(jobTambahanTotal)}</td>
+                                {isEditable && <td></td>}
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
-            {/* Tambahan Pay Items */}
-            {groupedItems["Tambahan"].length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-default-700 mb-2">
-                  Tambahan Pay
-                </h3>
-                <div className="border rounded-lg overflow-x-auto">
-                  <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Description
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Rate
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Amount
-                        </th>
-                        {isEditable && (
-                          <th
-                            scope="col"
-                            className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                          >
-                            Actions
-                          </th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-default-200">
-                      {groupedItems["Tambahan"].map((item) => (
-                        <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-6 py-3 max-w-xs">
-                            <div
-                              className="text-sm font-medium text-default-900 truncate flex items-center"
-                              title={item.description}
-                            >
-                              <span className="truncate">
-                                {item.description}
-                              </span>
-                              {item.is_manual && (
-                                <span className="ml-2 px-1.5 py-0.5 text-xs rounded bg-default-100 text-default-600 flex-shrink-0">
-                                  Manual
+                    {/* Overtime Pay for this job */}
+                    {jobGroupedItems["Overtime"].length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-default-600 mb-2">Overtime Pay</h4>
+                        <div className="border rounded-lg overflow-x-auto">
+                          <table className="min-w-full divide-y divide-default-200">
+                            <thead className="bg-default-50">
+                              <tr>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Date</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Rate</th>
+                                <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Qty</th>
+                                <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-default-200">
+                              {jobGroupedItems["Overtime"].map((item) => (
+                                <tr key={item.id} className="hover:bg-default-50">
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                    {item.source_date ? (
+                                      getWorkLogUrl(item) ? (
+                                        <Link to={getWorkLogUrl(item)!} className="text-sky-600 hover:underline">
+                                          {formatSourceDate(item.source_date)}
+                                        </Link>
+                                      ) : formatSourceDate(item.source_date)
+                                    ) : "-"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className="text-sm text-default-900" title={`${item.description} (${item.pay_code_id})`}>
+                                      {item.description} <span className="text-default-500">({item.pay_code_id})</span>
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                    {item.rate_unit === "Percent" ? `${item.rate}%` : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-center text-sm">{item.quantity}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(item.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-default-50">
+                              <tr>
+                                <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-default-600">Total Overtime</td>
+                                <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(jobOvertimeTotal)}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              // Single Job Payroll: Original layout with compact tables
+              <>
+                {/* Base Pay Items */}
+                {groupedItems["Base"].length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-md font-medium text-default-700 mb-2">Base Pay</h3>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <table className="min-w-full divide-y divide-default-200">
+                        <thead className="bg-default-50">
+                          <tr>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Date</th>
+                            <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Rate</th>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Qty</th>
+                            <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-default-200">
+                          {groupedItems["Base"].map((item) => (
+                            <tr key={item.id} className="hover:bg-default-50">
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                {item.source_date ? (
+                                  getWorkLogUrl(item) ? (
+                                    <Link to={getWorkLogUrl(item)!} className="text-sky-600 hover:underline">
+                                      {formatSourceDate(item.source_date)}
+                                    </Link>
+                                  ) : formatSourceDate(item.source_date)
+                                ) : "-"}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="text-sm text-default-900" title={`${item.description} (${item.pay_code_id})`}>
+                                  {item.description} <span className="text-default-500">({item.pay_code_id})</span>
                                 </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-default-500">
-                              {item.pay_code_id}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="text-sm text-default-900">
-                              {item.rate_unit === "Percent" ? (
-                                <>{item.rate}%</>
-                              ) : (
-                                <>
-                                  {formatCurrency(item.rate)}
-                                  <span className="text-xs text-default-500 ml-1">
-                                    /{item.rate_unit}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="text-sm text-default-900">
-                              {item.quantity}
-                              <span className="text-xs text-default-500 ml-1">
-                                {item.rate_unit === "Hour"
-                                  ? "hours"
-                                  : item.rate_unit === "Day"
-                                  ? "days"
-                                  : item.rate_unit === "Fixed"
-                                  ? ""
-                                  : item.rate_unit === "Percent"
-                                  ? "units"
-                                  : item.rate_unit.toLowerCase()}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right">
-                            <div className="text-sm font-medium text-default-900">
-                              {formatCurrency(item.amount)}
-                            </div>
-                          </td>
-                          {isEditable && (
-                            <td className="px-6 py-3 whitespace-nowrap text-center">
-                              <button
-                                onClick={() => {
-                                  setItemToDelete({
-                                    ...item,
-                                    id: item.id || 0,
-                                  });
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-rose-600 hover:text-rose-800"
-                                title="Delete Item"
-                              >
-                                <IconTrash size={18} />
-                              </button>
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                {item.rate_unit === "Percent" ? `${item.rate}%` : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">{item.quantity}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(item.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-default-50">
+                          <tr>
+                            <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-default-600">
+                              Total Base Pay
+                              {(() => {
+                                const baseGroupedByHours = groupedItems["Base"]
+                                  .filter((item) => item.rate_unit === "Hour")
+                                  .reduce((acc, item) => {
+                                    const existing = acc.find((group) => group.hours === item.quantity);
+                                    if (existing) existing.amount += item.amount;
+                                    else acc.push({ hours: item.quantity, amount: item.amount });
+                                    return acc;
+                                  }, [] as { hours: number; amount: number }[]);
+                                if (baseGroupedByHours.length > 0) {
+                                  const maxHoursGroup = baseGroupedByHours.reduce((max, curr) => curr.hours > max.hours ? curr : max, baseGroupedByHours[0]);
+                                  const avgRate = maxHoursGroup?.hours > 0 ? baseTotal / maxHoursGroup.hours : 0;
+                                  return <div className="text-xs text-default-500">Avg: {formatCurrency(avgRate)}/hr</div>;
+                                }
+                                return null;
+                              })()}
                             </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-default-50 border-t-2 border-default-200">
-                      <tr>
-                        <td
-                          colSpan={3}
-                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
-                        >
-                          Total Tambahan Pay
-                        </td>
-                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
-                          {formatCurrency(tambahanTotal)}
-                        </td>
-                        {isEditable && <td className="px-6 py-3"></td>}
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
+                            <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(baseTotal)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-            {/* Overtime Pay Items */}
-            {groupedItems["Overtime"].length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-default-700 mb-2">
-                  Overtime Pay
-                </h3>
-                <div className="border rounded-lg overflow-x-auto">
-                  <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Description
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Rate
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-default-200">
-                      {groupedItems["Overtime"].map((item) => (
-                        <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-6 py-3 max-w-xs">
-                            <div
-                              className="text-sm font-medium text-default-900 truncate"
-                              title={item.description}
-                            >
-                              {item.description}
-                            </div>
-                            <div className="text-xs text-default-500">
-                              {item.pay_code_id}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="text-sm text-default-900">
-                              {item.rate_unit === "Percent" ? (
-                                <>{item.rate}%</>
-                              ) : (
-                                <>
-                                  {formatCurrency(item.rate)}
-                                  <span className="text-xs text-default-500 ml-1">
-                                    /{item.rate_unit}
-                                  </span>
-                                </>
+                {/* Tambahan Pay Items */}
+                {groupedItems["Tambahan"].length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-md font-medium text-default-700 mb-2">Tambahan Pay</h3>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <table className="min-w-full divide-y divide-default-200">
+                        <thead className="bg-default-50">
+                          <tr>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Date</th>
+                            <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Rate</th>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Qty</th>
+                            <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
+                            {isEditable && <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-12"></th>}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-default-200">
+                          {groupedItems["Tambahan"].map((item) => (
+                            <tr key={item.id} className="hover:bg-default-50">
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                {item.source_date ? (
+                                  getWorkLogUrl(item) ? (
+                                    <Link to={getWorkLogUrl(item)!} className="text-sky-600 hover:underline">
+                                      {formatSourceDate(item.source_date)}
+                                    </Link>
+                                  ) : formatSourceDate(item.source_date)
+                                ) : "-"}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="text-sm text-default-900" title={`${item.description} (${item.pay_code_id})`}>
+                                  {item.description} <span className="text-default-500">({item.pay_code_id})</span>
+                                  {item.is_manual && <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-600">Manual</span>}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                {item.rate_unit === "Percent" ? `${item.rate}%` : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">{item.quantity}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(item.amount)}</td>
+                              {isEditable && (
+                                <td className="px-3 py-2 whitespace-nowrap text-center">
+                                  <button onClick={() => { setItemToDelete({ ...item, id: item.id || 0 }); setShowDeleteDialog(true); }} className="text-rose-600 hover:text-rose-800">
+                                    <IconTrash size={16} />
+                                  </button>
+                                </td>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
-                            <div className="text-sm text-default-900">
-                              {item.quantity}
-                              <span className="text-xs text-default-500 ml-1">
-                                {item.rate_unit === "Hour"
-                                  ? "hours"
-                                  : item.rate_unit === "Day"
-                                  ? "days"
-                                  : item.rate_unit === "Fixed"
-                                  ? ""
-                                  : item.rate_unit === "Percent"
-                                  ? "units"
-                                  : item.rate_unit.toLowerCase()}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right">
-                            <div className="text-sm font-medium text-default-900">
-                              {formatCurrency(item.amount)}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-default-50 border-t-2 border-default-200">
-                      <tr>
-                        <td
-                          colSpan={3}
-                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
-                        >
-                          Total Overtime Pay
-                        </td>
-                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
-                          {formatCurrency(overtimeTotal)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-default-50">
+                          <tr>
+                            <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-default-600">Total Tambahan Pay</td>
+                            <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(tambahanTotal)}</td>
+                            {isEditable && <td></td>}
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Overtime Pay Items */}
+                {groupedItems["Overtime"].length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-md font-medium text-default-700 mb-2">Overtime Pay</h3>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <table className="min-w-full divide-y divide-default-200">
+                        <thead className="bg-default-50">
+                          <tr>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Date</th>
+                            <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Rate</th>
+                            <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Qty</th>
+                            <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-default-200">
+                          {groupedItems["Overtime"].map((item) => (
+                            <tr key={item.id} className="hover:bg-default-50">
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                {item.source_date ? (
+                                  getWorkLogUrl(item) ? (
+                                    <Link to={getWorkLogUrl(item)!} className="text-sky-600 hover:underline">
+                                      {formatSourceDate(item.source_date)}
+                                    </Link>
+                                  ) : formatSourceDate(item.source_date)
+                                ) : "-"}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="text-sm text-default-900" title={`${item.description} (${item.pay_code_id})`}>
+                                  {item.description} <span className="text-default-500">({item.pay_code_id})</span>
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+                                {item.rate_unit === "Percent" ? `${item.rate}%` : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">{item.quantity}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(item.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-default-50">
+                          <tr>
+                            <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-default-600">Total Overtime Pay</td>
+                            <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(overtimeTotal)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Commission Records */}
             {commissionRecords.length > 0 && (
-              <div className="mb-6">
+              <div className="mb-4">
                 <h3 className="text-md font-medium text-default-700 mb-2">
-                  {commissionRecords.length > 0
-                    ? commissionRecords
-                        .map((record) => record.description)
-                        .join(" + ")
-                    : "Commission"}
+                  {commissionRecords.map((record) => record.description).join(" + ")}
                 </h3>
                 <div className="border rounded-lg overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Date
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Description
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                        >
-                          Amount
-                        </th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Date</th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Description</th>
+                        <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-default-200">
                       {commissionRecords.map((record) => (
                         <tr key={record.id} className="hover:bg-default-50">
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-default-900">
-                            {format(
-                              new Date(record.commission_date),
-                              "dd MMM yyyy"
-                            )}
-                          </td>
-                          <td className="px-6 py-3 max-w-xs">
-                            <div
-                              className="text-sm font-medium text-default-900 truncate"
-                              title={record.description}
-                            >
-                              {record.description}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right">
-                            <div className="text-sm font-medium text-default-900">
-                              {formatCurrency(record.amount)}
-                            </div>
-                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm">{format(new Date(record.commission_date), "dd MMM yyyy")}</td>
+                          <td className="px-3 py-2 text-sm" title={record.description}>{record.description}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">{formatCurrency(record.amount)}</td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-default-50 border-t-2 border-default-200">
+                    <tfoot className="bg-default-50">
                       <tr>
-                        <td
-                          colSpan={2}
-                          className="px-6 py-3 text-right text-sm font-medium text-default-600"
-                        >
-                          Total{" "}
-                          {commissionRecords.length > 0
-                            ? commissionRecords
-                                .map((record) => record.description)
-                                .join(" + ")
-                            : "Commission"}
+                        <td colSpan={2} className="px-3 py-2 text-right text-sm font-medium text-default-600">
+                          Total {commissionRecords.map((record) => record.description).join(" + ")}
                         </td>
-                        <td className="px-6 py-3 text-right text-sm font-semibold text-default-900">
-                          {formatCurrency(
-                            commissionRecords.reduce(
-                              (sum, record) => sum + Number(record.amount),
-                              0
-                            )
-                          )}
-                        </td>
+                        <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(commissionRecords.reduce((sum, record) => sum + Number(record.amount), 0))}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -1165,113 +1207,56 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Monthly Leave Summary */}
             {monthlyLeaveRecords.length > 0 && (
-              <div>
-                <h2 className="text-lg font-medium text-default-800 mb-2">
-                  Leave Records This Month
-                </h2>
+              <div className="mb-4">
+                <h3 className="text-md font-medium text-default-700 mb-2">Leave Records This Month</h3>
                 <div className="border rounded-lg overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                          Date
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                          Leave Type
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                          Days
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
-                          Amount Paid
-                        </th>
+                        <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">Date</th>
+                        <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Leave Type</th>
+                        <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase">Days</th>
+                        <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-default-200">
+                    <tbody className="bg-white divide-y divide-default-200">
                       {monthlyLeaveRecords.map((record, index) => {
                         const getLeaveTypeDisplay = (leaveType: string) => {
                           switch (leaveType) {
-                            case "cuti_umum":
-                              return "Cuti Umum";
-                            case "cuti_sakit":
-                              return "Cuti Sakit";
-                            case "cuti_tahunan":
-                              return "Cuti Tahunan";
-                            default:
-                              return leaveType;
+                            case "cuti_umum": return "Cuti Umum";
+                            case "cuti_sakit": return "Cuti Sakit";
+                            case "cuti_tahunan": return "Cuti Tahunan";
+                            default: return leaveType;
                           }
                         };
-
                         const getLeaveTypeColor = (leaveType: string) => {
                           switch (leaveType) {
-                            case "cuti_umum":
-                              return "bg-red-100 text-red-700";
-                            case "cuti_sakit":
-                              return "bg-amber-100 text-amber-700";
-                            case "cuti_tahunan":
-                              return "bg-green-100 text-green-700";
-                            default:
-                              return "bg-default-100 text-default-700";
+                            case "cuti_umum": return "bg-red-100 text-red-700";
+                            case "cuti_sakit": return "bg-amber-100 text-amber-700";
+                            case "cuti_tahunan": return "bg-green-100 text-green-700";
+                            default: return "bg-default-100 text-default-700";
                           }
                         };
                         return (
                           <tr key={index} className="hover:bg-default-50">
-                            <td className="px-4 py-3 text-sm text-default-900">
-                              {format(
-                                new Date(record.date.replace(/-/g, "/")),
-                                "dd MMM yyyy"
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(
-                                  record.leave_type
-                                )}`}
-                              >
+                            <td className="px-3 py-2 text-sm">{format(new Date(record.date.replace(/-/g, "/")), "dd MMM yyyy")}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(record.leave_type)}`}>
                                 {getLeaveTypeDisplay(record.leave_type)}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-center text-sm text-default-900">
-                              {Math.round(record.days_taken)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm font-medium text-default-900">
-                              {formatCurrency(record.amount_paid)}
-                            </td>
+                            <td className="px-3 py-2 text-center text-sm">{Math.round(record.days_taken)}</td>
+                            <td className="px-3 py-2 text-right text-sm font-medium">{formatCurrency(record.amount_paid)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
-                    <tfoot className="bg-default-50 border-t-2 border-default-200">
+                    <tfoot className="bg-default-50">
                       <tr>
-                        <td
-                          colSpan={3}
-                          className="px-4 py-3 text-right text-sm font-medium text-default-600"
-                        >
-                          Total leave this month (
-                          {monthlyLeaveRecords.reduce(
-                            (sum, record) =>
-                              sum + (Number(record.days_taken) || 0),
-                            0
-                          )}{" "}
-                          day
-                          {monthlyLeaveRecords.reduce(
-                            (sum, record) =>
-                              sum + (Number(record.days_taken) || 0),
-                            0
-                          ) !== 1
-                            ? "s"
-                            : ""}
-                          )
+                        <td colSpan={3} className="px-3 py-2 text-right text-sm font-medium text-default-600">
+                          Total ({monthlyLeaveRecords.reduce((sum, r) => sum + (Number(r.days_taken) || 0), 0)} day{monthlyLeaveRecords.reduce((sum, r) => sum + (Number(r.days_taken) || 0), 0) !== 1 ? "s" : ""})
                         </td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-default-900">
-                          {formatCurrency(
-                            monthlyLeaveRecords.reduce(
-                              (sum, record) =>
-                                sum + (Number(record.amount_paid) || 0),
-                              0
-                            )
-                          )}
-                        </td>
+                        <td className="px-3 py-2 text-right text-sm font-semibold">{formatCurrency(monthlyLeaveRecords.reduce((sum, r) => sum + (Number(r.amount_paid) || 0), 0))}</td>
                       </tr>
                     </tfoot>
                   </table>
