@@ -164,10 +164,8 @@ const EmployeeSelectionTooltip: React.FC<EmployeeSelectionTooltipProps> = ({
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-default-700 truncate">
-                          {employee.name}
-                        </div>
-                        <div className="text-xs text-default-500">
-                          ID: {employee.id}
+                          {employee.name}{" "}
+                          <span className="text-default-500 font-normal">({employee.id})</span>
                         </div>
                       </div>
                       <Checkbox

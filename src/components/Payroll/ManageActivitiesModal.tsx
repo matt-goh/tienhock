@@ -374,7 +374,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       <LoadingSpinner />
                     </div>
                   ) : error ? (
-                    <div className="text-center py-4 text-red-600">{error}</div>
+                    <div className="text-center py-3 text-red-600">{error}</div>
                   ) : (
                     <>
                       <div className="mt-4">
@@ -409,7 +409,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                   <tr>
                                     <td
                                       colSpan={4}
-                                      className="px-3 py-4 text-center text-sm text-gray-500"
+                                      className="px-3 py-3 text-center text-sm text-gray-500"
                                     >
                                       No pay codes available for this job.
                                     </td>
@@ -435,7 +435,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         <tr>
                                           <td
                                             colSpan={4}
-                                            className="px-3 py-4 text-center text-sm text-gray-500"
+                                            className="px-3 py-3 text-center text-sm text-gray-500"
                                           >
                                             No results found for "{searchTerm}".
                                           </td>
@@ -471,7 +471,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                               );
                                             }}
                                           >
-                                            <td className="px-3 py-4">
+                                            <td className="px-3 py-3">
                                               <Checkbox
                                                 checked={activity.isSelected}
                                                 onChange={() =>
@@ -484,7 +484,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 className="align-middle"
                                               />
                                             </td>
-                                            <td className="px-3 py-4 truncate">
+                                            <td className="px-3 py-3 truncate">
                                               <div className="flex flex-col">
                                                 <span
                                                   className="text-sm font-medium text-gray-900 w-fit"
@@ -639,7 +639,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 </div>
                                               </div>
                                             </td>
-                                            <td className="px-3 py-4 text-center">
+                                            <td className="px-3 py-3 text-center">
                                               {activity.rateUnit === "Bag" ||
                                               activity.rateUnit === "Trip" ||
                                               activity.rateUnit === "Day" ||
@@ -725,7 +725,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 </span>
                                               )}
                                             </td>
-                                            <td className="px-3 py-4 text-right">
+                                            <td className="px-3 py-3 text-right">
                                               {activity.isSelected ? (
                                                 <span className="text-sm font-medium text-gray-900">
                                                   RM

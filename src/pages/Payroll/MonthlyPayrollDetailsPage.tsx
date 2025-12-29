@@ -948,7 +948,8 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-default-900">
-                                    {employeePayroll.employee_name || "Unknown"}
+                                    {employeePayroll.employee_name || "Unknown"}{" "}
+                                    <span className="text-default-500">({employeePayroll.employee_id})</span>
                                     {/* Show grouped indicator if multiple job types */}
                                     {employeePayroll.job_type &&
                                       employeePayroll.job_type.includes(
@@ -959,18 +960,13 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                                         </span>
                                       )}
                                   </div>
-                                  <div className="text-xs text-default-500">
-                                    {employeePayroll.employee_id}
-                                    {/* Show all job types if grouped */}
-                                    {employeePayroll.job_type &&
-                                      employeePayroll.job_type.includes(
-                                        ", "
-                                      ) && (
-                                        <div className="text-xs text-sky-600 mt-0.5">
-                                          Jobs: {employeePayroll.job_type}
-                                        </div>
-                                      )}
-                                  </div>
+                                  {/* Show all job types if grouped */}
+                                  {employeePayroll.job_type &&
+                                    employeePayroll.job_type.includes(", ") && (
+                                      <div className="text-xs text-sky-600 mt-0.5">
+                                        Jobs: {employeePayroll.job_type}
+                                      </div>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm text-default-600">

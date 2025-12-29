@@ -408,7 +408,7 @@ const IndividualJobPage: React.FC<{
               <Text style={styles.employeeInfoLabel}>Employee</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
-                {staffDetails?.name || payroll.employee_name}
+                {staffDetails?.name || payroll.employee_name} ({payroll.employee_id})
               </Text>
             </View>
             <View style={styles.employeeInfoRow}>
@@ -1040,7 +1040,7 @@ const MainPayrollPage: React.FC<{
               <Text style={styles.employeeInfoLabel}>Employee</Text>
               <Text style={styles.employeeInfoColon}>:</Text>
               <Text style={styles.employeeInfoValue}>
-                {staffDetails?.name || payroll.employee_name}
+                {staffDetails?.name || payroll.employee_name} ({payroll.employee_id})
               </Text>
             </View>
             <View style={styles.employeeInfoRow}>
