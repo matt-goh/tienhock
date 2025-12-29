@@ -654,6 +654,8 @@ export interface EmployeePayroll {
   leave_records?: LeaveRecord[];
   mid_month_payroll?: MidMonthPayroll | null;
   commission_records?: CommissionRecord[];
+  // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
+  employee_job_mapping?: Record<string, string>;
 }
 
 export interface CommissionRecord {
@@ -685,6 +687,11 @@ export interface PayrollItem {
   amount: number;
   is_manual: boolean;
   job_type?: string; // Job type for accurate splitting in combined payrolls
+  source_employee_id?: string | null; // Original employee ID who worked this item
+  // Source tracking fields for traceability to work logs
+  source_date?: string | null; // ISO date string (YYYY-MM-DD)
+  work_log_id?: number | null; // Reference to work log
+  work_log_type?: "daily" | "monthly" | null; // Type of work log
 }
 
 export interface MonthlyPayroll {
