@@ -8,6 +8,9 @@ import { useJournalEntryTypesCache } from "../../utils/accounting/useAccountingC
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import DateRangePicker from "../../components/DateRangePicker";
+import DateNavigator from "../../components/DateNavigator";
+import MonthNavigator from "../../components/MonthNavigator";
 import {
   IconPlus,
   IconSearch,
@@ -45,9 +48,10 @@ const JournalEntryListPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [dateRange, setDateRange] = useState({
-    start: "",
-    end: "",
+    start: new Date(),
+    end: new Date(),
   });
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -57,6 +61,36 @@ const JournalEntryListPage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<JournalEntryListItem | null>(null);
 
+  // Helper function to format a Date object into 'YYYY-MM-DD' string in local time
+  const formatDateForAPI = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Handle month selection
+  const handleMonthChange = (newDate: Date) => {
+    setSelectedMonth(newDate);
+    // Create start date (1st of the selected month)
+    const startDate = new Date(newDate.getFullYear(), newDate.getMonth(), 1);
+    startDate.setHours(0, 0, 0, 0);
+    // Create end date (last day of the selected month)
+    const endDate = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+    setDateRange({ start: startDate, end: endDate });
+    setPage(1);
+  };
+
+  // Handle date navigator change (single day selection)
+  const handleDateNavigatorChange = (newDate: Date) => {
+    const startOfDay = new Date(newDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(newDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    setDateRange({ start: startOfDay, end: endOfDay });
+    setPage(1);
+  };
 
   // Fetch entries
   const fetchEntries = useCallback(async () => {
@@ -69,8 +103,8 @@ const JournalEntryListPage: React.FC = () => {
       if (searchTerm) params.append("search", searchTerm);
       if (selectedType !== "All") params.append("entry_type", selectedType);
       if (selectedStatus !== "All") params.append("status", selectedStatus.toLowerCase());
-      if (dateRange.start) params.append("start_date", dateRange.start);
-      if (dateRange.end) params.append("end_date", dateRange.end);
+      if (dateRange.start) params.append("start_date", formatDateForAPI(dateRange.start));
+      if (dateRange.end) params.append("end_date", formatDateForAPI(dateRange.end));
 
       const response = await api.get(`/api/journal-entries?${params.toString()}`);
       const data = response as {
@@ -140,7 +174,9 @@ const JournalEntryListPage: React.FC = () => {
     setSearchTerm("");
     setSelectedType("All");
     setSelectedStatus("All");
-    setDateRange({ start: "", end: "" });
+    const today = new Date();
+    setDateRange({ start: today, end: today });
+    setSelectedMonth(today);
   };
 
   // Format date for display
@@ -185,23 +221,55 @@ const JournalEntryListPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
+        {/* Title */}
         <div>
           <h1 className="text-xl font-semibold text-default-800">Journal Entries</h1>
           <p className="text-sm text-default-500 mt-1">
             Manage accounting journal entries
           </p>
         </div>
-        <Button
-          onClick={handleCreateNew}
-          color="sky"
-          variant="filled"
-          icon={IconPlus}
-          iconPosition="left"
-          size="md"
-        >
-          New Entry
-        </Button>
+
+        {/* Date Controls and Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Date Range Picker */}
+          <div className="w-full sm:w-auto">
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateChange={(newDateRange) => {
+                setDateRange(newDateRange);
+                setPage(1);
+              }}
+              className="w-full"
+            />
+          </div>
+
+          {/* Date Navigator */}
+          <DateNavigator
+            selectedDate={dateRange.start || new Date()}
+            onChange={handleDateNavigatorChange}
+            showGoToTodayButton={false}
+          />
+
+          {/* Month Navigator */}
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={handleMonthChange}
+            showGoToCurrentButton={false}
+            dateRange={dateRange}
+          />
+
+          <Button
+            onClick={handleCreateNew}
+            color="sky"
+            variant="filled"
+            icon={IconPlus}
+            iconPosition="left"
+            size="md"
+          >
+            New Entry
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -323,24 +391,6 @@ const JournalEntryListPage: React.FC = () => {
                 </ListboxOptions>
               </div>
             </Listbox>
-          </div>
-
-          {/* Date Range */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-default-600">Date:</span>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-              className="rounded-lg border border-default-300 py-1.5 px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            />
-            <span className="text-default-400">to</span>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-              className="rounded-lg border border-default-300 py-1.5 px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            />
           </div>
 
           {/* Clear Filters */}

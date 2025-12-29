@@ -600,10 +600,11 @@ export default function (pool) {
         return res.status(404).json({ message: "Journal entry not found" });
       }
 
-      if (checkResult.rows[0].status !== "draft") {
+      const status = checkResult.rows[0].status;
+      if (status === "posted" || status === "cancelled") {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: "Only draft entries can be deleted",
+          message: `Cannot delete ${status} entries`,
         });
       }
 
