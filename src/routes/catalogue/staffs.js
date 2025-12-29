@@ -446,17 +446,40 @@ export default function (pool) {
     const { id } = req.params;
 
     try {
-      const query = "DELETE FROM staffs WHERE id = $1 RETURNING *";
-      const result = await pool.query(query, [id]);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Staff member not found" });
+        // Delete related records from dependent tables first
+        await client.query(
+          "DELETE FROM employee_leave_balances WHERE employee_id = $1",
+          [id]
+        );
+        await client.query(
+          "DELETE FROM employee_pay_codes WHERE employee_id = $1",
+          [id]
+        );
+
+        // Now delete the staff member
+        const query = "DELETE FROM staffs WHERE id = $1 RETURNING *";
+        const result = await client.query(query, [id]);
+
+        if (result.rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(404).json({ message: "Staff member not found" });
+        }
+
+        await client.query("COMMIT");
+        res.json({
+          message: "Staff member deleted successfully",
+          staff: result.rows[0],
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
       }
-
-      res.json({
-        message: "Staff member deleted successfully",
-        staff: result.rows[0],
-      });
     } catch (error) {
       console.error("Error deleting staff member:", error);
       res
