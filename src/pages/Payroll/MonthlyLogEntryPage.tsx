@@ -272,7 +272,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             if (payCode.pay_type === "Tambahan") {
               isSelected = false;
             } else if (payCode.pay_type === "Overtime") {
-              isSelected = hasOvertimeHours;
+              // Only auto-select OT codes if overtime hours exist AND is_default_setting is true
+              isSelected = hasOvertimeHours && payCode.is_default_setting;
             } else if (payCode.pay_type === "Base") {
               isSelected = payCode.is_default_setting;
             } else {

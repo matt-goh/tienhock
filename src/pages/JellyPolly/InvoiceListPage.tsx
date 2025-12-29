@@ -26,8 +26,6 @@ import {
   IconPlus,
   IconRefresh,
   IconSearch,
-  IconChevronDown,
-  IconCheck,
   IconSquareMinusFilled,
   IconSend,
   IconFileDownload,
@@ -41,13 +39,6 @@ import {
   IconUser,
   IconFileExport,
 } from "@tabler/icons-react";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-  Transition,
-} from "@headlessui/react";
 import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 import DateNavigator from "../../components/DateNavigator";
 // Import the specific utilities needed
