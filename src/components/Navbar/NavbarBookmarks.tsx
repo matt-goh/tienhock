@@ -222,14 +222,21 @@ export default function NavbarBookmarks({
             </div>
           ) : (
             <div className="space-y-0.5">
-              {bookmarks.map((bookmark) => {
-                const itemData = findNavItem(navData, bookmark.name);
-                if (!itemData || !itemData.path) return null;
+              {(() => {
+                // Check if any bookmark has a popover
+                const anyHasPopover = bookmarks.some((b) => {
+                  const data = findNavItem(navData, b.name);
+                  return data && getPopoverOptions(data).length > 0;
+                });
 
-                const isActive = isItemActive(itemData.path);
-                const popoverOptions = getPopoverOptions(itemData);
-                const hasPopover = popoverOptions.length > 0;
-                const isHovered = hoveredItem === bookmark.name;
+                return bookmarks.map((bookmark) => {
+                  const itemData = findNavItem(navData, bookmark.name);
+                  if (!itemData || !itemData.path) return null;
+
+                  const isActive = isItemActive(itemData.path);
+                  const popoverOptions = getPopoverOptions(itemData);
+                  const hasPopover = popoverOptions.length > 0;
+                  const isHovered = hoveredItem === bookmark.name;
 
                 return (
                   <div
@@ -254,11 +261,15 @@ export default function NavbarBookmarks({
                       `}
                     >
                       <div className="flex items-center gap-2">
-                        {hasPopover && (
-                          <IconChevronLeft
-                            size={14}
-                            className={`transition-colors ${isHovered ? "text-sky-500" : "text-default-400"}`}
-                          />
+                        {anyHasPopover && (
+                          hasPopover ? (
+                            <IconChevronLeft
+                              size={14}
+                              className={`transition-colors ${isHovered ? "text-sky-500" : "text-default-400"}`}
+                            />
+                          ) : (
+                            <span className="w-3.5" />
+                          )
                         )}
                         <span className="truncate">{bookmark.name}</span>
                       </div>
@@ -276,8 +287,9 @@ export default function NavbarBookmarks({
                       </button>
                     </Link>
                   </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
