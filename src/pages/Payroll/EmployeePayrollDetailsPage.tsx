@@ -220,10 +220,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   to={`/catalogue/staff/${payroll.employee_id}`}
                   className="text-sky-600 hover:underline"
                 >
-                  {payroll.employee_name || "Unknown"}
+                  {payroll.employee_name || "Unknown"}{" "}
+                  <span className="text-default-500 font-normal">({payroll.employee_id})</span>
                 </Link>
               </p>
-              <p className="text-sm text-default-500">{payroll.employee_id}</p>
             </div>
             <div>
               <p className="text-sm text-default-500 mb-1">Job Type</p>
