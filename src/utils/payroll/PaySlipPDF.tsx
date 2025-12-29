@@ -159,6 +159,16 @@ interface IndividualJobPayroll {
   gross_pay_portion: number;
 }
 
+// Helper function to check if an item belongs to a specific job
+const itemBelongsToJob = (description: string, payCode: string, jobType: string): boolean => {
+  const descLower = (description || '').toLowerCase();
+  const payCodeLower = (payCode || '').toLowerCase();
+  const jobLower = jobType.toLowerCase();
+
+  // Check if description or pay_code contains the job name
+  return descLower.includes(jobLower) || payCodeLower.includes(jobLower);
+};
+
 // Helper function to split grouped payroll into individual job payrolls
 const splitGroupedPayroll = (payroll: EmployeePayroll): IndividualJobPayroll[] => {
   // Check if this is a grouped payroll (contains comma-separated job types)
@@ -182,34 +192,44 @@ const splitGroupedPayroll = (payroll: EmployeePayroll): IndividualJobPayroll[] =
   const allLeaveRecords = payroll.leave_records || [];
   const allCommissionRecords = payroll.commission_records || [];
 
-  // For each job type, collect relevant items
+  // First pass: identify which items can be assigned to specific jobs
+  // Items that match multiple jobs or no jobs will be handled specially
+  const itemJobAssignments = new Map<number, string[]>();
+
+  allItems.forEach((item, index) => {
+    const matchingJobs: string[] = [];
+    jobTypes.forEach(jobType => {
+      if (itemBelongsToJob(item.description, item.pay_code_id, jobType)) {
+        matchingJobs.push(jobType);
+      }
+    });
+    itemJobAssignments.set(index, matchingJobs);
+  });
+
+  // For each job type, collect items that belong ONLY to that job
+  // Items that match multiple jobs or no jobs are excluded from individual pages
+  // (they will only appear on the main combined page)
   jobTypes.forEach(jobType => {
-    // Filter items that belong to this specific job
-    // This is a simplified approach - you may need to enhance this based on your pay_code patterns
-    const jobItems = allItems.filter(item => {
-      // Check if the pay_code or description contains job-specific identifiers
-      const description = item.description?.toLowerCase() || '';
-      const payCode = item.pay_code_id?.toLowerCase() || '';
-      const jobLower = jobType.toLowerCase();
-      
-      // Simple heuristic: items that contain the job type in description or pay_code
-      return description.includes(jobLower) || payCode.includes(jobLower) || 
-             // If no specific job identifiers, distribute evenly (fallback)
-             allItems.indexOf(item) % jobTypes.length === jobTypes.indexOf(jobType);
+    // Filter items that belong ONLY to this specific job
+    const jobItems = allItems.filter((item, index) => {
+      const matchingJobs = itemJobAssignments.get(index) || [];
+      // Include item only if it matches this job exclusively
+      // or if it matches this job and the match is unambiguous
+      return matchingJobs.length === 1 && matchingJobs[0] === jobType;
     });
 
-    // Filter leave records for this job (distribute evenly for now)
-    const jobLeaveRecords = allLeaveRecords.filter((record, index) => 
-      index % jobTypes.length === jobTypes.indexOf(jobType)
-    );
-
-    // Filter commission records for this job
-    const jobCommissionRecords = allCommissionRecords.filter(record => {
-      const description = record.description?.toLowerCase() || '';
+    // Filter leave records - only include if they clearly belong to this job
+    // Leave records typically don't have job-specific identifiers,
+    // so we check the leave_type for job keywords
+    const jobLeaveRecords = allLeaveRecords.filter(record => {
+      const leaveType = (record.leave_type || '').toLowerCase();
       const jobLower = jobType.toLowerCase();
-      return description.includes(jobLower) || 
-             // Fallback: distribute evenly if no specific identifiers
-             allCommissionRecords.indexOf(record) % jobTypes.length === jobTypes.indexOf(jobType);
+      return leaveType.includes(jobLower);
+    });
+
+    // Filter commission records - only include if they clearly belong to this job
+    const jobCommissionRecords = allCommissionRecords.filter(record => {
+      return itemBelongsToJob(record.description, '', jobType);
     });
 
     // Calculate gross pay portion for this job
@@ -802,22 +822,28 @@ const PaySlipPDF: React.FC<PaySlipPDFProps> = ({
             monthName={monthName}
           />
           
-          {/* Individual job pages (without deductions) */}
-          {individualJobs.map((individualJob, index) => (
-            <IndividualJobPage
-              key={`individual-job-${index}`}
-              individualJob={individualJob}
-              payroll={payroll}
-              companyName={companyName}
-              staffDetails={staffDetails}
-              year={year}
-              month={month}
-              monthName={monthName}
-              isGrouped={true}
-              jobIndex={index}
-              totalJobs={individualJobs.length}
-            />
-          ))}
+          {/* Individual job pages (without deductions) - only render if job has items */}
+          {individualJobs
+            .filter(job =>
+              job.items.length > 0 ||
+              (job.leave_records?.length || 0) > 0 ||
+              (job.commission_records?.length || 0) > 0
+            )
+            .map((individualJob, index) => (
+              <IndividualJobPage
+                key={`individual-job-${index}`}
+                individualJob={individualJob}
+                payroll={payroll}
+                companyName={companyName}
+                staffDetails={staffDetails}
+                year={year}
+                month={month}
+                monthName={monthName}
+                isGrouped={true}
+                jobIndex={index}
+                totalJobs={individualJobs.length}
+              />
+            ))}
         </>
       );
     } else {
