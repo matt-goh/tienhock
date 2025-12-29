@@ -433,8 +433,8 @@ export default function (pool) {
 
       // Get all items for these payrolls in a single query (more efficient)
       const itemsQuery = `
-      SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
-            pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+      SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
+            pi.quantity, pi.amount, pi.is_manual, pi.job_type, pc.pay_type
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
       WHERE pi.employee_payroll_id = ANY($1)
@@ -673,10 +673,10 @@ export default function (pool) {
 
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
-        // Get payroll items
+        // Get payroll items (including job_type for proper splitting in combined payrolls)
         pool.query(`
-          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
-                pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
+                pi.quantity, pi.amount, pi.is_manual, pi.job_type, pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE pi.employee_payroll_id = $1
@@ -820,10 +820,10 @@ export default function (pool) {
 
       // Get all data in parallel for efficiency
       const [itemsResult, deductionsResult, leaveRecordsResult, midMonthResult, commissionsResult] = await Promise.all([
-        // Get payroll items
+        // Get payroll items (including job_type for proper splitting in combined payrolls)
         pool.query(`
-          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit, 
-                pi.quantity, pi.amount, pi.is_manual, pc.pay_type
+          SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
+                pi.quantity, pi.amount, pi.is_manual, pi.job_type, pc.pay_type
           FROM payroll_items pi
           LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
           WHERE pi.employee_payroll_id = $1
