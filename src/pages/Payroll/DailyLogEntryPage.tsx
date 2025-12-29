@@ -2135,8 +2135,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
-                // Only auto-select OT codes if hours exceed threshold (5 for Saturday, 8 for others)
-                isSelected = !isSalesmanJob && hours > otThreshold;
+                // Only auto-select OT codes if hours exceed threshold AND is_default_setting is true
+                isSelected = !isSalesmanJob && hours > otThreshold && payCode.is_default_setting;
               } else if (payCode.pay_type === "Base") {
                 // Base pay codes follow default settings
                 isSelected = payCode.is_default_setting;
