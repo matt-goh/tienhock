@@ -113,9 +113,6 @@ const App: React.FC = () => {
         <CompanyProvider>
           <Toaster
             position="top-right"
-            containerStyle={{
-              top: 80, // Offset for navbar height (64px) + margin
-            }}
             toastOptions={{
               style: {
                 padding: "12px",
