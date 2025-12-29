@@ -16,6 +16,8 @@ import AccountCodeListPage from "./Accounting/AccountCodeListPage";
 import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
 import JournalEntryListPage from "./Accounting/JournalEntryListPage";
 import JournalEntryPage from "./Accounting/JournalEntryPage";
+import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPage";
+import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -252,6 +254,16 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Debtors",
         path: "/sales/debtors",
         component: DebtorsReportPage,
+      },
+      {
+        name: "Voucher Generator",
+        path: "/accounting/voucher-generator",
+        component: VoucherGeneratorPage,
+      },
+      {
+        name: "Location Mappings",
+        path: "/accounting/location-account-mappings",
+        component: LocationAccountMappingsPage,
       },
     ],
   },

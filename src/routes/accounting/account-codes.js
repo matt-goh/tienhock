@@ -461,6 +461,21 @@ export default function (pool) {
         });
       }
 
+      // Check if account is used in location_account_mappings (for payroll voucher generation)
+      const mappingsQuery =
+        "SELECT location_id, location_name, mapping_type FROM location_account_mappings WHERE account_code = $1 AND is_active = true";
+      const mappingsResult = await client.query(mappingsQuery, [code]);
+
+      if (mappingsResult.rows.length > 0) {
+        const mappings = mappingsResult.rows;
+        const locationList = [...new Set(mappings.map(m => `${m.location_id} (${m.location_name})`))].join(", ");
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot delete account that is linked to payroll voucher mappings. This account is used in location(s): ${locationList}. Remove the mapping first or deactivate the account instead.`,
+          linkedMappings: mappings,
+        });
+      }
+
       // Delete the account
       const deleteQuery =
         "DELETE FROM account_codes WHERE code = $1 RETURNING code";
