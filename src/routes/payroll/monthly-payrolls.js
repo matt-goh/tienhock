@@ -1,6 +1,23 @@
 // src/routes/payroll/monthly-payrolls.js
 import { Router } from "express";
 
+// Helper function to format date to YYYY-MM-DD string
+const formatDateToYMD = (date) => {
+  if (!date) return null;
+  if (typeof date === 'string') {
+    // If already a string, extract just the date part
+    return date.split('T')[0].split(' ')[0];
+  }
+  if (date instanceof Date) {
+    // Format as YYYY-MM-DD using local timezone
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return null;
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -478,60 +495,58 @@ export default function (pool) {
         });
       });
 
-      // 3. Aggregate work logs into payroll items per employee-job
+      // 3. Process work logs into payroll items per employee-job (preserving date info for traceability)
       const workLogsByEmployeeJob = {};
 
-      // Process daily logs
+      // Process daily logs - preserve individual entries with source date
       dailyLogsResult.rows.forEach(log => {
         const key = `${log.employee_id}-${log.job_id}`;
         if (!workLogsByEmployeeJob[key]) {
-          workLogsByEmployeeJob[key] = { employeeId: log.employee_id, jobType: log.job_id, activities: {} };
+          workLogsByEmployeeJob[key] = { employeeId: log.employee_id, jobType: log.job_id, items: [] };
         }
         (log.activities || []).filter(a => a.pay_code_id).forEach(activity => {
-          const payCodeId = activity.pay_code_id;
-          if (!workLogsByEmployeeJob[key].activities[payCodeId]) {
-            workLogsByEmployeeJob[key].activities[payCodeId] = {
-              pay_code_id: payCodeId,
-              description: activity.description || "",
-              pay_type: activity.pay_type || "Tambahan",
-              rate: parseFloat(activity.rate_used) || 0,
-              rate_unit: activity.rate_unit || "Fixed",
-              quantity: 0,
-              amount: 0,
-            };
-          }
           const qty = activity.rate_unit === "Hour"
             ? parseFloat(activity.hours_applied) || 0
             : parseFloat(activity.units_produced) || 1;
-          workLogsByEmployeeJob[key].activities[payCodeId].quantity += qty;
-          workLogsByEmployeeJob[key].activities[payCodeId].amount += parseFloat(activity.calculated_amount) || 0;
+          // Each activity becomes a separate item with source tracking
+          workLogsByEmployeeJob[key].items.push({
+            pay_code_id: activity.pay_code_id,
+            description: activity.description || "",
+            pay_type: activity.pay_type || "Tambahan",
+            rate: parseFloat(activity.rate_used) || 0,
+            rate_unit: activity.rate_unit || "Fixed",
+            quantity: qty,
+            amount: parseFloat(activity.calculated_amount) || 0,
+            source_date: formatDateToYMD(log.log_date), // Format as YYYY-MM-DD
+            work_log_id: log.id,       // daily_work_logs.id
+            work_log_type: 'daily',
+          });
         });
       });
 
-      // Process monthly logs
+      // Process monthly logs - preserve individual entries (no specific date for monthly)
       monthlyLogsResult.rows.forEach(log => {
         const key = `${log.employee_id}-${log.job_id}`;
         if (!workLogsByEmployeeJob[key]) {
-          workLogsByEmployeeJob[key] = { employeeId: log.employee_id, jobType: log.job_id, activities: {} };
+          workLogsByEmployeeJob[key] = { employeeId: log.employee_id, jobType: log.job_id, items: [] };
         }
         (log.activities || []).filter(a => a.pay_code_id).forEach(activity => {
-          const payCodeId = activity.pay_code_id;
-          if (!workLogsByEmployeeJob[key].activities[payCodeId]) {
-            workLogsByEmployeeJob[key].activities[payCodeId] = {
-              pay_code_id: payCodeId,
-              description: activity.description || "",
-              pay_type: activity.pay_type || "Tambahan",
-              rate: parseFloat(activity.rate_used) || 0,
-              rate_unit: activity.rate_unit || "Fixed",
-              quantity: 0,
-              amount: 0,
-            };
-          }
           const qty = activity.rate_unit === "Hour"
             ? parseFloat(activity.hours_applied) || 0
             : 1;
-          workLogsByEmployeeJob[key].activities[payCodeId].quantity += qty;
-          workLogsByEmployeeJob[key].activities[payCodeId].amount += parseFloat(activity.calculated_amount) || 0;
+          // Each activity becomes a separate item with source tracking
+          workLogsByEmployeeJob[key].items.push({
+            pay_code_id: activity.pay_code_id,
+            description: activity.description || "",
+            pay_type: activity.pay_type || "Tambahan",
+            rate: parseFloat(activity.rate_used) || 0,
+            rate_unit: activity.rate_unit || "Fixed",
+            quantity: qty,
+            amount: parseFloat(activity.calculated_amount) || 0,
+            source_date: null,         // Monthly logs don't have a specific date
+            work_log_id: log.id,       // monthly_work_logs.id
+            work_log_type: 'monthly',
+          });
         });
       });
 
@@ -591,34 +606,32 @@ export default function (pool) {
             continue;
           }
 
-          // Combine all payroll items from all jobs (preserving job_type for each item)
+          // Combine all payroll items from all jobs (preserving individual items with source tracking)
           const combinedItems = [];
-          const itemsByPayCodeAndJob = {};
+
+          // Build employee-job mapping for traceability
+          const employeeJobMapping = {};
 
           employeeJobCombos.forEach(({ employeeId, jobType }) => {
             const key = `${employeeId}-${jobType}`;
             const workData = workLogsByEmployeeJob[key];
-            if (workData) {
-              Object.values(workData.activities).forEach(activity => {
-                // Use pay_code_id + job_type as key to keep items separate per job
-                const itemKey = `${activity.pay_code_id}-${jobType}`;
-                if (!itemsByPayCodeAndJob[itemKey]) {
-                  itemsByPayCodeAndJob[itemKey] = { ...activity, job_type: jobType, is_manual: false };
-                } else {
-                  itemsByPayCodeAndJob[itemKey].quantity += activity.quantity;
-                  itemsByPayCodeAndJob[itemKey].amount += activity.amount;
-                }
+
+            // Track which employee worked on which job
+            employeeJobMapping[employeeId] = jobType;
+
+            if (workData && workData.items) {
+              // Add each item with job_type and source_employee_id for full traceability
+              workData.items.forEach(item => {
+                combinedItems.push({
+                  ...item,
+                  job_type: jobType,
+                  source_employee_id: employeeId,
+                  is_manual: false,
+                  amount: Math.round(item.amount * 100) / 100,
+                  quantity: Math.round(item.quantity * 100) / 100,
+                });
               });
             }
-          });
-
-          // Convert to array
-          Object.values(itemsByPayCodeAndJob).forEach(item => {
-            combinedItems.push({
-              ...item,
-              amount: Math.round(item.amount * 100) / 100,
-              quantity: Math.round(item.quantity * 100) / 100,
-            });
           });
 
           // Add preserved manual items
@@ -823,10 +836,10 @@ export default function (pool) {
               );
             }
 
-            // Update existing - also update job_type and employee_id to ensure consistency
+            // Update existing - also update job_type, employee_id, and employee_job_mapping for traceability
             await client.query(
-              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5 WHERE id = $6`,
-              [grossPay.toFixed(2), netPay.toFixed(2), section, jobTypes, primaryEmployee.employeeId, employeePayrollId]
+              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5, employee_job_mapping = $6 WHERE id = $7`,
+              [grossPay.toFixed(2), netPay.toFixed(2), section, jobTypes, primaryEmployee.employeeId, JSON.stringify(employeeJobMapping), employeePayrollId]
             );
             // Delete non-manual items
             await client.query(
@@ -839,24 +852,29 @@ export default function (pool) {
               [employeePayrollId]
             );
           } else {
-            // Create new
+            // Create new - include employee_job_mapping for traceability
             const insertResult = await client.query(
-              `INSERT INTO employee_payrolls (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay)
-               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-              [id, primaryEmployee.employeeId, jobTypes, section, grossPay.toFixed(2), netPay.toFixed(2)]
+              `INSERT INTO employee_payrolls (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, employee_job_mapping)
+               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+              [id, primaryEmployee.employeeId, jobTypes, section, grossPay.toFixed(2), netPay.toFixed(2), JSON.stringify(employeeJobMapping)]
             );
             employeePayrollId = insertResult.rows[0].id;
           }
 
-          // Insert non-manual payroll items (with job_type for proper splitting)
+          // Insert non-manual payroll items (with job_type, source_employee_id and source tracking for traceability)
           const nonManualItems = combinedItems.filter(item => !item.is_manual);
           if (nonManualItems.length > 0) {
             const itemValues = nonManualItems.map(item =>
               `(${employeePayrollId}, '${item.pay_code_id}', '${(item.description || "").replace(/'/g, "''")}',
-                ${item.rate}, '${item.rate_unit}', ${item.quantity}, ${item.amount}, false, ${item.job_type ? `'${item.job_type}'` : 'NULL'})`
+                ${item.rate}, '${item.rate_unit}', ${item.quantity}, ${item.amount}, false,
+                ${item.job_type ? `'${item.job_type}'` : 'NULL'},
+                ${item.source_employee_id ? `'${item.source_employee_id}'` : 'NULL'},
+                ${item.source_date ? `'${item.source_date}'` : 'NULL'},
+                ${item.work_log_id || 'NULL'},
+                ${item.work_log_type ? `'${item.work_log_type}'` : 'NULL'})`
             ).join(", ");
             await client.query(`
-              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type)
+              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type, source_employee_id, source_date, work_log_id, work_log_type)
               VALUES ${itemValues}
             `);
           }
