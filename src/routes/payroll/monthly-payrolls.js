@@ -591,27 +591,29 @@ export default function (pool) {
             continue;
           }
 
-          // Combine all payroll items from all jobs
+          // Combine all payroll items from all jobs (preserving job_type for each item)
           const combinedItems = [];
-          const itemsByPayCode = {};
+          const itemsByPayCodeAndJob = {};
 
           employeeJobCombos.forEach(({ employeeId, jobType }) => {
             const key = `${employeeId}-${jobType}`;
             const workData = workLogsByEmployeeJob[key];
             if (workData) {
               Object.values(workData.activities).forEach(activity => {
-                if (!itemsByPayCode[activity.pay_code_id]) {
-                  itemsByPayCode[activity.pay_code_id] = { ...activity, is_manual: false };
+                // Use pay_code_id + job_type as key to keep items separate per job
+                const itemKey = `${activity.pay_code_id}-${jobType}`;
+                if (!itemsByPayCodeAndJob[itemKey]) {
+                  itemsByPayCodeAndJob[itemKey] = { ...activity, job_type: jobType, is_manual: false };
                 } else {
-                  itemsByPayCode[activity.pay_code_id].quantity += activity.quantity;
-                  itemsByPayCode[activity.pay_code_id].amount += activity.amount;
+                  itemsByPayCodeAndJob[itemKey].quantity += activity.quantity;
+                  itemsByPayCodeAndJob[itemKey].amount += activity.amount;
                 }
               });
             }
           });
 
           // Convert to array
-          Object.values(itemsByPayCode).forEach(item => {
+          Object.values(itemsByPayCodeAndJob).forEach(item => {
             combinedItems.push({
               ...item,
               amount: Math.round(item.amount * 100) / 100,
@@ -782,22 +784,49 @@ export default function (pool) {
           // Get job section
           const job = jobsMap.get(primaryEmployee.jobType);
           const section = Array.isArray(job?.section) ? job.section[0] : (job?.section || "Unknown");
-          const jobTypes = employeeJobCombos.map(c => c.jobType).join(", ");
+          // Get unique job types and sort alphabetically to ensure consistent ordering
+          const uniqueJobTypes = [...new Set(employeeJobCombos.map(c => c.jobType))].sort();
+          const jobTypes = uniqueJobTypes.join(", ");
 
-          // 6. Save to database - Check if payroll exists
-          const existingPayroll = await client.query(
-            `SELECT id FROM employee_payrolls WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3`,
-            [id, primaryEmployee.employeeId, jobTypes]
+          // 6. Save to database - Check if payroll exists by employee NAME (not just ID)
+          // This ensures employees with same name but different IDs are properly combined
+          const existingPayrolls = await client.query(
+            `SELECT ep.id FROM employee_payrolls ep
+             JOIN staffs s ON ep.employee_id = s.id
+             WHERE ep.monthly_payroll_id = $1 AND s.name = $2
+             ORDER BY ep.id`,
+            [id, employeeName]
           );
 
           let employeePayrollId;
 
-          if (existingPayroll.rows.length > 0) {
-            employeePayrollId = existingPayroll.rows[0].id;
-            // Update existing
+          if (existingPayrolls.rows.length > 0) {
+            // Keep the first one, delete any duplicates
+            employeePayrollId = existingPayrolls.rows[0].id;
+
+            // Delete duplicate payrolls (keep only the first one)
+            if (existingPayrolls.rows.length > 1) {
+              const duplicateIds = existingPayrolls.rows.slice(1).map(r => r.id);
+              // Delete items and deductions for duplicates first
+              await client.query(
+                `DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)`,
+                [duplicateIds]
+              );
+              await client.query(
+                `DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)`,
+                [duplicateIds]
+              );
+              // Then delete the duplicate payroll records
+              await client.query(
+                `DELETE FROM employee_payrolls WHERE id = ANY($1)`,
+                [duplicateIds]
+              );
+            }
+
+            // Update existing - also update job_type and employee_id to ensure consistency
             await client.query(
-              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3 WHERE id = $4`,
-              [grossPay.toFixed(2), netPay.toFixed(2), section, employeePayrollId]
+              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5 WHERE id = $6`,
+              [grossPay.toFixed(2), netPay.toFixed(2), section, jobTypes, primaryEmployee.employeeId, employeePayrollId]
             );
             // Delete non-manual items
             await client.query(
@@ -819,15 +848,15 @@ export default function (pool) {
             employeePayrollId = insertResult.rows[0].id;
           }
 
-          // Insert non-manual payroll items
+          // Insert non-manual payroll items (with job_type for proper splitting)
           const nonManualItems = combinedItems.filter(item => !item.is_manual);
           if (nonManualItems.length > 0) {
             const itemValues = nonManualItems.map(item =>
               `(${employeePayrollId}, '${item.pay_code_id}', '${(item.description || "").replace(/'/g, "''")}',
-                ${item.rate}, '${item.rate_unit}', ${item.quantity}, ${item.amount}, false)`
+                ${item.rate}, '${item.rate_unit}', ${item.quantity}, ${item.amount}, false, ${item.job_type ? `'${item.job_type}'` : 'NULL'})`
             ).join(", ");
             await client.query(`
-              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual)
+              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type)
               VALUES ${itemValues}
             `);
           }
