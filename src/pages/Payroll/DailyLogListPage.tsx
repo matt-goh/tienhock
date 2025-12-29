@@ -44,13 +44,36 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const jobConfig = getJobConfig(jobType);
-  const [filters, setFilters] = useState<WorkLogFilters>({
-    dateRange: {
-      start: new Date(new Date().setDate(new Date().getDate() - 7)),
-      end: new Date(),
-    },
-    shift: null,
-    status: null,
+
+  // Cache key for storing date range in localStorage
+  const dateRangeCacheKey = `dailyLogListPage_dateRange_${jobType}`;
+
+  // Initialize filters with cached date range if available
+  const [filters, setFilters] = useState<WorkLogFilters>(() => {
+    const cached = localStorage.getItem(dateRangeCacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        return {
+          dateRange: {
+            start: new Date(parsed.start),
+            end: new Date(parsed.end),
+          },
+          shift: null,
+          status: null,
+        };
+      } catch {
+        // Fall back to default if parsing fails
+      }
+    }
+    return {
+      dateRange: {
+        start: new Date(new Date().setDate(new Date().getDate() - 7)),
+        end: new Date(),
+      },
+      shift: null,
+      status: null,
+    };
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,11 +81,32 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<WorkLog | null>(null);
 
-  // Use Date object for month navigation
+  // Use Date object for month navigation - initialize based on cached date range
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const cached = localStorage.getItem(dateRangeCacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        const startDate = new Date(parsed.start);
+        return new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      } catch {
+        // Fall back to default
+      }
+    }
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  // Cache date range whenever it changes
+  useEffect(() => {
+    localStorage.setItem(
+      dateRangeCacheKey,
+      JSON.stringify({
+        start: filters.dateRange.start.toISOString(),
+        end: filters.dateRange.end.toISOString(),
+      })
+    );
+  }, [filters.dateRange, dateRangeCacheKey]);
 
   const shiftOptions = [
     { id: "all", name: "All Shifts" },
