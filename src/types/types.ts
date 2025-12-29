@@ -684,6 +684,7 @@ export interface PayrollItem {
   quantity: number;
   amount: number;
   is_manual: boolean;
+  job_type?: string; // Job type for accurate splitting in combined payrolls
 }
 
 export interface MonthlyPayroll {
