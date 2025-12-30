@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
-import { FormInput, FormListbox } from "../../../components/FormComponents";
+import { FormListbox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
 import { format } from "date-fns";
@@ -2780,15 +2780,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     <div className="space-y-4">
       <BackButton onClick={handleBack} />
       <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-3">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-semibold text-default-800">
+        <div className="flex justify-between items-center pb-3 mb-4 border-b border-default-200">
+          <h1 className="text-lg font-semibold text-default-800">
             {mode === "edit"
               ? `Edit ${jobConfig?.name} Entry`
               : `${jobConfig?.name} Entry`}
           </h1>
-          <div className="flex space-x-3">
+          <div className="flex space-x-2">
             <Button
               variant="outline"
+              size="sm"
               onClick={mode === "edit" && onCancel ? onCancel : handleBack}
               disabled={isSaving}
             >
@@ -2796,7 +2797,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </Button>
             <Button
               color="sky"
-              variant="boldOutline"
+              size="sm"
               onClick={() => handleSaveForm()}
               disabled={isSaving}
             >
@@ -2805,71 +2806,72 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           </div>
         </div>
 
-        {/* Header Section */}
-        <div className="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Date & Day Type */}
+        {/* Form Fields */}
+        <div className="mb-4 flex flex-wrap items-end gap-4">
+          {/* Date */}
           <div>
-            <FormInput
+            <label htmlFor="logDate" className="block text-sm font-medium text-default-700 mb-1">
+              Date
+            </label>
+            <input
+              id="logDate"
               name="logDate"
-              label="Date"
               type="date"
               value={formData.logDate}
               onChange={handleDateChange}
               required
+              className="px-3 py-2 text-sm border border-default-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
             />
-            <div className="mt-2">
-              <span className="text-sm font-medium text-default-700">
-                Day Type:{" "}
-              </span>
-              <span
-                className={`text-sm font-semibold ml-1 ${
-                  formData.dayType === "Umum"
-                    ? "text-red-600"
-                    : formData.dayType === "Ahad"
-                    ? "text-amber-600"
-                    : new Date(formData.logDate).getDay() === 6
-                    ? "text-sky-600"
-                    : "text-default-700"
-                }`}
-              >
-                {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
-                  ? "Sabtu"
-                  : formData.dayType}
-                {formData.dayType === "Umum" &&
-                  getHolidayDescription(new Date(formData.logDate)) && (
-                    <span className="ml-1 font-normal">
-                      ({getHolidayDescription(new Date(formData.logDate))})
-                    </span>
-                  )}
-              </span>
-            </div>
           </div>
+
+          {/* Day Type Badge */}
+          <span
+            className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
+              formData.dayType === "Umum"
+                ? "bg-red-100 text-red-700 border border-red-200"
+                : formData.dayType === "Ahad"
+                ? "bg-amber-100 text-amber-700 border border-amber-200"
+                : new Date(formData.logDate).getDay() === 6
+                ? "bg-sky-100 text-sky-700 border border-sky-200"
+                : "bg-default-100 text-default-700 border border-default-200"
+            }`}
+          >
+            {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
+              ? "Sabtu"
+              : formData.dayType}
+            {formData.dayType === "Umum" &&
+              getHolidayDescription(new Date(formData.logDate)) && (
+                <span className="ml-1 text-xs font-normal">
+                  ({getHolidayDescription(new Date(formData.logDate))})
+                </span>
+              )}
+          </span>
 
           {/* Shift - Hidden for Salesman */}
           {jobConfig?.id !== "SALESMAN" && (
-            <FormListbox
-              name="shift"
-              label="Shift"
-              value={formData.shift}
-              onChange={(value) => setFormData({ ...formData, shift: value })}
-              options={[
-                { id: "1", name: "Day Shift" },
-                { id: "2", name: "Night Shift" },
-              ]}
-              required
-            />
+            <div className="w-32">
+              <FormListbox
+                name="shift"
+                label="Shift"
+                value={formData.shift}
+                onChange={(value) => setFormData({ ...formData, shift: value })}
+                options={[
+                  { id: "1", name: "Day Shift" },
+                  { id: "2", name: "Night Shift" },
+                ]}
+                required
+              />
+            </div>
           )}
 
           {/* Show Context Form here only if 3 or fewer fields */}
           {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
-            <div>
-              <DynamicContextForm
-                contextFields={jobConfig?.contextFields || []}
-                contextData={formData.contextData}
-                onChange={handleContextChange}
-                disabled={isSaving}
-              />
-            </div>
+            <DynamicContextForm
+              contextFields={jobConfig?.contextFields || []}
+              contextData={formData.contextData}
+              onChange={handleContextChange}
+              disabled={isSaving}
+            />
           )}
         </div>
 
@@ -3290,7 +3292,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               {/* SALESMAN_IKUT Table - Only show for SALESMAN job type */}
               {jobConfig?.id === "SALESMAN" &&
                 salesmanIkutEmployees.length > 0 && (
-                  <div className="bg-white rounded-lg border shadow-sm mt-6">
+                  <div className="bg-white rounded-lg border shadow-sm mt-4">
                     <div>
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
@@ -3680,19 +3682,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           )}
         </div>
 
-        <div className="border-t border-default-200 pt-6 mt-8">
+        <div className="border-t border-default-200 pt-2 mt-4">
           <h2 className="text-lg font-semibold text-default-700 mb-2">
             Leave & Absence Recording
           </h2>
-          <p className="text-sm text-default-500 mb-4">
-            Select employees on paid leave.{" "}
-            {formData.dayType === "Umum"
-              ? "Cuti Umum is available on public holidays, "
-              : ""}
-            Cuti Sakit and Cuti Tahunan is available any day. Pay is based on
-            regular day rates.
-          </p>
-
           <div className="bg-white rounded-lg border shadow-sm">
             {availableForLeave.length === 0 ? (
               <div className="text-center py-10 px-6">
@@ -3885,7 +3878,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 >
                                   <ListboxOptions
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                                    className="absolute z-50 w-full py-1 bottom-full mb-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
                                     {leaveOptions.map((option) => (
                                       <ListboxOption
                                         key={option.id}
