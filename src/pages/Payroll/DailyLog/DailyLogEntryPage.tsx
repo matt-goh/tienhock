@@ -8,31 +8,31 @@ import React, {
   Fragment,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import Button from "../../components/Button";
-import { FormInput, FormListbox } from "../../components/FormComponents";
-import { Employee } from "../../types/types";
-import BackButton from "../../components/BackButton";
+import Button from "../../../components/Button";
+import { FormListbox } from "../../../components/FormComponents";
+import { Employee } from "../../../types/types";
+import BackButton from "../../../components/BackButton";
 import { format } from "date-fns";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import Checkbox from "../../components/Checkbox";
-import ManageActivitiesModal from "../../components/Payroll/ManageActivitiesModal";
-import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Checkbox from "../../../components/Checkbox";
+import ManageActivitiesModal from "../../../components/Payroll/ManageActivitiesModal";
+import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
-import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import { api } from "../../routes/utils/api";
-import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
+import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { api } from "../../../routes/utils/api";
+import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
   getJobConfig,
   getContextLinkedPayCodes,
   getJobIds,
-} from "../../configs/payrollJobConfigs";
-import DynamicContextForm from "../../components/Payroll/DynamicContextForm";
+} from "../../../configs/payrollJobConfigs";
+import DynamicContextForm from "../../../components/Payroll/DynamicContextForm";
 import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
-} from "../../utils/payroll/calculateActivityAmount";
+} from "../../../utils/payroll/calculateActivityAmount";
 import {
   Listbox,
   ListboxButton,
@@ -46,9 +46,9 @@ import {
   IconMapPin,
   IconMapPinOff,
 } from "@tabler/icons-react";
-import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
-import SafeLink from "../../components/SafeLink";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
+import SafeLink from "../../../components/SafeLink";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -240,6 +240,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Ref to track which work log's formData has been initialized
   const formDataInitializedForRef = useRef<number | null>(null);
+  // Ref to track which employee row keys were originally saved in the work log
+  // Used to determine whether to use CREATE mode or EDIT mode activity selection logic
+  const savedEmployeeRowKeysRef = useRef<Set<string>>(new Set());
+  // Ref to store the original saved activities from the work log
+  // This preserves the original state even if the employee is deselected and re-selected
+  const savedEmployeeActivitiesRef = useRef<Record<string, any[]>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -1129,6 +1135,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           : [...currentSelectedJobs, jobType],
       };
 
+      // Initialize hours when selecting (if not already set)
+      let updatedJobHours = { ...prev.jobHours };
+      if (!wasSelected) {
+        // Selecting - ensure hours are initialized
+        if (!updatedJobHours[employeeId]) {
+          updatedJobHours[employeeId] = {};
+        }
+        if (!updatedJobHours[employeeId][jobType]) {
+          updatedJobHours[employeeId][jobType] = getDefaultHours(formData.logDate);
+        }
+      }
+
       // Handle SALESMAN selection/deselection cascading to SALESMAN_IKUT employees
       if (jobType === "SALESMAN") {
         const followedEmployees = followedBySalesman[employeeId] || [];
@@ -1148,6 +1166,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 ...ikutCurrentSelectedJobs,
                 "SALESMAN_IKUT",
               ];
+            }
+            // Initialize hours for auto-selected SALESMAN_IKUT employees
+            if (!updatedJobHours[ikutEmployeeId]) {
+              updatedJobHours[ikutEmployeeId] = {};
+            }
+            if (!updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"]) {
+              updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
             }
           }
         });
@@ -1228,8 +1253,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
 
       return {
-        ...prev,
         selectedJobs: updatedSelectedJobs,
+        jobHours: updatedJobHours,
       };
     });
   };
@@ -2134,8 +2159,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Convert map back to array
           const mergedPayCodes = Array.from(allPayCodes.values());
 
+          // Check if this employee was originally saved in the work log
+          const wasOriginallySaved = savedEmployeeRowKeysRef.current.has(rowKey);
+
           // Get existing activities for this employee/job if in edit mode
-          const existingActivitiesForRow = employeeActivities[rowKey] || [];
+          // For originally saved employees, use the preserved ref to handle deselect/re-select cycles
+          const existingActivitiesForRow = wasOriginallySaved
+            ? savedEmployeeActivitiesRef.current[rowKey] || []
+            : employeeActivities[rowKey] || [];
 
           // For salesmen, we don't filter by hours since hours aren't applicable
           // Use day-specific OT threshold (5 for Saturday, 8 for others)
@@ -2171,8 +2202,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             // Determine if selected based on specific rules
             let isSelected = false;
 
-            if (mode === "edit") {
-              // In edit mode: only select activities that were explicitly saved
+            // wasOriginallySaved is already defined above for existingActivitiesForRow lookup
+
+            if (mode === "edit" && wasOriginallySaved) {
+              // EDIT mode for originally saved employees:
+              // Only select activities that were explicitly saved
               // If existingActivity exists, it was saved (and is selected)
               // If existingActivity doesn't exist, it was NOT saved (meaning it was deselected or new)
               if (existingActivity) {
@@ -2185,7 +2219,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 isSelected = false;
               }
             } else {
-              // CREATE mode: Apply auto-selection rules for new entries
+              // CREATE mode OR employee wasn't in original work log:
+              // Apply auto-selection rules for new entries
               if (payCode.pay_type === "Tambahan") {
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
@@ -2531,8 +2566,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         { muatMee: number; muatBihun: number }
       > = {};
 
+      // Clear and populate the saved employee row keys ref
+      // This tracks which employees were originally in the work log
+      savedEmployeeRowKeysRef.current = new Set();
+      // Clear and populate the saved employee activities ref
+      // This preserves original activities even after deselect/re-select cycles
+      savedEmployeeActivitiesRef.current = {};
+
       existingWorkLog.employeeEntries.forEach((entry: any) => {
         const rowKey = `${entry.employee_id}-${entry.job_id}`;
+
+        // Track this row key as originally saved
+        savedEmployeeRowKeysRef.current.add(rowKey);
 
         // Restore employee selection and hours
         if (!newSelectedJobs[entry.employee_id]) {
@@ -2549,7 +2594,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
         // Restore activities
         if (entry.activities && entry.activities.length > 0) {
-          newEmployeeActivities[rowKey] = entry.activities.map(
+          const restoredActivities = entry.activities.map(
             (activity: any) => ({
               payCodeId: activity.pay_code_id,
               description: activity.description,
@@ -2567,6 +2612,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               isContextLinked: false,
             })
           );
+          newEmployeeActivities[rowKey] = restoredActivities;
+          // Also store in ref to preserve original state for deselect/re-select cycles
+          savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
         }
 
         // Restore SALESMAN_IKUT specific data
@@ -2778,85 +2826,109 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBack} />
       <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-3">
-        <h1 className="text-xl font-semibold text-default-800 mb-4">
-          {mode === "edit"
-            ? `Edit ${jobConfig?.name} Entry`
-            : `New ${jobConfig?.name} Entry`}
-        </h1>
+        <div className="flex justify-between items-center pb-3 mb-4 border-b border-default-200">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBack} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <h1 className="text-lg font-semibold text-default-800">
+              {mode === "edit"
+                ? `Edit ${jobConfig?.name} Entry`
+                : `${jobConfig?.name} Entry`}
+            </h1>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={mode === "edit" && onCancel ? onCancel : handleBack}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="sky"
+              size="sm"
+              onClick={() => handleSaveForm()}
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
+            </Button>
+          </div>
+        </div>
 
-        {/* Header Section */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Date & Day Type */}
+        {/* Form Fields */}
+        <div className="mb-4 flex flex-wrap items-end gap-4">
+          {/* Date */}
           <div>
-            <FormInput
+            <label htmlFor="logDate" className="block text-sm font-medium text-default-700 mb-1">
+              Date
+            </label>
+            <input
+              id="logDate"
               name="logDate"
-              label="Date"
               type="date"
               value={formData.logDate}
               onChange={handleDateChange}
               required
+              className="px-3 py-2 text-sm border border-default-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
             />
-            <div className="mt-2">
-              <span className="text-sm font-medium text-default-700">
-                Day Type:{" "}
-              </span>
-              <span
-                className={`text-sm font-semibold ml-1 ${
-                  formData.dayType === "Umum"
-                    ? "text-red-600"
-                    : formData.dayType === "Ahad"
-                    ? "text-amber-600"
-                    : new Date(formData.logDate).getDay() === 6
-                    ? "text-sky-600"
-                    : "text-default-700"
-                }`}
-              >
-                {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
-                  ? "Sabtu"
-                  : formData.dayType}
-                {formData.dayType === "Umum" &&
-                  getHolidayDescription(new Date(formData.logDate)) && (
-                    <span className="ml-1 font-normal">
-                      ({getHolidayDescription(new Date(formData.logDate))})
-                    </span>
-                  )}
-              </span>
-            </div>
           </div>
+
+          {/* Day Type Badge */}
+          <span
+            className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
+              formData.dayType === "Umum"
+                ? "bg-red-100 text-red-700 border border-red-200"
+                : formData.dayType === "Ahad"
+                ? "bg-amber-100 text-amber-700 border border-amber-200"
+                : new Date(formData.logDate).getDay() === 6
+                ? "bg-sky-100 text-sky-700 border border-sky-200"
+                : "bg-default-100 text-default-700 border border-default-200"
+            }`}
+          >
+            {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
+              ? "Sabtu"
+              : formData.dayType}
+            {formData.dayType === "Umum" &&
+              getHolidayDescription(new Date(formData.logDate)) && (
+                <span className="ml-1 text-xs font-normal">
+                  ({getHolidayDescription(new Date(formData.logDate))})
+                </span>
+              )}
+          </span>
 
           {/* Shift - Hidden for Salesman */}
           {jobConfig?.id !== "SALESMAN" && (
-            <FormListbox
-              name="shift"
-              label="Shift"
-              value={formData.shift}
-              onChange={(value) => setFormData({ ...formData, shift: value })}
-              options={[
-                { id: "1", name: "Day Shift" },
-                { id: "2", name: "Night Shift" },
-              ]}
-              required
-            />
+            <div className="w-32">
+              <FormListbox
+                name="shift"
+                label="Shift"
+                value={formData.shift}
+                onChange={(value) => setFormData({ ...formData, shift: value })}
+                options={[
+                  { id: "1", name: "Day Shift" },
+                  { id: "2", name: "Night Shift" },
+                ]}
+                required
+              />
+            </div>
           )}
 
           {/* Show Context Form here only if 3 or fewer fields */}
           {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
-            <div>
-              <DynamicContextForm
-                contextFields={jobConfig?.contextFields || []}
-                contextData={formData.contextData}
-                onChange={handleContextChange}
-                disabled={isSaving}
-              />
-            </div>
+            <DynamicContextForm
+              contextFields={jobConfig?.contextFields || []}
+              contextData={formData.contextData}
+              onChange={handleContextChange}
+              disabled={isSaving}
+            />
           )}
         </div>
 
         {/* Show Context Form below if more than 3 fields */}
         {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
-          <div className="mb-6">
+          <div className="mb-4">
             <span className="text-sm font-medium text-default-700 mb-3">
               Production Details
             </span>
@@ -2870,17 +2942,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         )}
 
         {/* Employees Section */}
-        <div className="border-t border-default-200 pt-4 mt-4">
-          <h2 className="text-lg font-semibold text-default-700 mb-3">
-            Employees & Work Hours
-          </h2>
-
-          <div className="mb-4 flex justify-between items-center">
-            <p className="text-sm text-default-500">
-              Select employees and assign hours worked for this job.
-            </p>
-          </div>
-
+        <div className="border-t border-default-200 pt-4">
           {/* Employee Selection Table */}
           {loadingStaffs || loadingJobs ? (
             <div className="flex justify-center items-center h-48">
@@ -2894,7 +2956,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left">
+                        <th scope="col" className="px-6 py-1 text-left">
                           <Checkbox
                             checked={selectAll}
                             onChange={handleSelectAll}
@@ -2910,40 +2972,40 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                         >
                           ID
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                         >
                           Name
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                         >
                           Job
                         </th>
                         {jobConfig?.id === "SALESMAN" ? (
                           <th
                             scope="col"
-                            className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                            className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
                           >
                             Location
                           </th>
                         ) : (
                           <th
                             scope="col"
-                            className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                            className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                           >
                             Hours
                           </th>
                         )}
                         <th
                           scope="col"
-                          className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                         >
                           Actions
                         </th>
@@ -2984,7 +3046,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             }`}
                           >
                             <td
-                              className="px-6 py-3 whitespace-nowrap align-middle cursor-pointer"
+                              className="px-6 py-2 whitespace-nowrap align-middle cursor-pointer"
                               onClickCapture={(e) => {
                                 e.stopPropagation();
                                 if (
@@ -3007,7 +3069,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 }
                               />
                             </td>
-                            <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-default-700">
+                            <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700">
                               <SafeLink
                                 to={`/catalogue/staff/${row.id}`}
                                 hasUnsavedChanges={hasUnsavedChanges}
@@ -3018,7 +3080,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 {row.id}
                               </SafeLink>
                             </td>
-                            <td className="px-6 py-3 whitespace-nowrap text-sm text-default-900">
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900">
                               <span className="font-medium">{row.name}</span>
                               {(() => {
                                 // Only show followed employees that are actually selected
@@ -3050,7 +3112,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 return null;
                               })()}
                             </td>
-                            <td className="px-6 py-3 whitespace-nowrap text-sm text-default-700">
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700">
                               <SafeLink
                                 to={`/catalogue/job?id=${row.jobType}`}
                                 hasUnsavedChanges={hasUnsavedChanges}
@@ -3062,7 +3124,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </SafeLink>
                             </td>
                             {jobConfig?.id === "SALESMAN" ? (
-                              <td className="px-6 py-3 whitespace-nowrap text-left">
+                              <td className="px-6 py-2 whitespace-nowrap text-left">
                                 <div className="relative w-40 mx-auto">
                                   <Listbox
                                     value={
@@ -3220,7 +3282,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 </div>
                               </td>
                             ) : (
-                              <td className="px-6 py-3 whitespace-nowrap text-right">
+                              <td className="px-6 py-2 whitespace-nowrap text-right">
                                 <div className="flex justify-end">
                                   <input
                                     type="number"
@@ -3252,7 +3314,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 </div>
                               </td>
                             )}
-                            <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                            <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(
                                   employeeActivities[row.rowKey || ""] || []
@@ -3281,12 +3343,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               {/* SALESMAN_IKUT Table - Only show for SALESMAN job type */}
               {jobConfig?.id === "SALESMAN" &&
                 salesmanIkutEmployees.length > 0 && (
-                  <div className="bg-white rounded-lg border shadow-sm mt-6">
+                  <div className="bg-white rounded-lg border shadow-sm mt-4">
                     <div>
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
-                            <th scope="col" className="px-6 py-3 text-left">
+                            <th scope="col" className="px-6 py-1 text-left">
                               <Checkbox
                                 checked={salesmanIkutAvailableForWork.every(
                                   (emp) =>
@@ -3345,43 +3407,43 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               ID
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               Name
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               Job
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               Muat Mee (Bag)
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               Muat Bihun (Bag)
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               Ikut
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                             >
                               Actions
                             </th>
@@ -3423,7 +3485,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 }`}
                               >
                                 <td
-                                  className="px-6 py-3 whitespace-nowrap align-middle cursor-pointer"
+                                  className="px-6 py-2 whitespace-nowrap align-middle cursor-pointer"
                                   onClickCapture={(e) => {
                                     e.stopPropagation();
                                     if (
@@ -3447,7 +3509,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     }
                                   />
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-default-700">
+                                <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700">
                                   <SafeLink
                                     to={`/catalogue/staff/${row.id}`}
                                     hasUnsavedChanges={hasUnsavedChanges}
@@ -3458,10 +3520,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     {row.id}
                                   </SafeLink>
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-sm text-default-700">
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700">
                                   {row.name}
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-sm text-default-700">
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700">
                                   <SafeLink
                                     to={`/catalogue/job?id=${row.jobType}`}
                                     hasUnsavedChanges={hasUnsavedChanges}
@@ -3472,7 +3534,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     {row.jobName}
                                   </SafeLink>
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-center">
+                                <td className="px-6 py-2 whitespace-nowrap text-center">
                                   <div>
                                     <input
                                       type="number"
@@ -3496,7 +3558,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     />
                                   </div>
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-center">
+                                <td className="px-6 py-2 whitespace-nowrap text-center">
                                   <div>
                                     <input
                                       type="number"
@@ -3522,7 +3584,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     />
                                   </div>
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-center">
+                                <td className="px-6 py-2 whitespace-nowrap text-center">
                                   <div className="relative w-48 mx-auto">
                                     <Listbox
                                       value={selectedSalesman}
@@ -3560,6 +3622,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           leaveTo="opacity-0"
                                         >
                                           <ListboxOptions
+                                            onClick={(e) => e.stopPropagation()}
                                             className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
                                               isLastRow
                                                 ? "bottom-full mb-1"
@@ -3633,7 +3696,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     </Listbox>
                                   </div>
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                                   <ActivitiesTooltip
                                     activities={(
                                       employeeActivities[row.rowKey || ""] ||
@@ -3671,19 +3734,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           )}
         </div>
 
-        <div className="border-t border-default-200 pt-6 mt-8">
+        <div className="border-t border-default-200 pt-2 mt-4">
           <h2 className="text-lg font-semibold text-default-700 mb-2">
             Leave & Absence Recording
           </h2>
-          <p className="text-sm text-default-500 mb-4">
-            Select employees on paid leave.{" "}
-            {formData.dayType === "Umum"
-              ? "Cuti Umum is available on public holidays, "
-              : ""}
-            Cuti Sakit and Cuti Tahunan is available any day. Pay is based on
-            regular day rates.
-          </p>
-
           <div className="bg-white rounded-lg border shadow-sm">
             {availableForLeave.length === 0 ? (
               <div className="text-center py-10 px-6">
@@ -3698,7 +3752,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               <table className="min-w-full divide-y divide-default-200 table-fixed">
                 <thead className="bg-default-50">
                   <tr>
-                    <th scope="col" className="w-16 px-6 py-3 text-left">
+                    <th scope="col" className="w-16 px-6 py-2 text-left">
                       <Checkbox
                         checked={leaveSelectAll}
                         onChange={handleLeaveSelectAll}
@@ -3711,19 +3765,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     </th>
                     <th
                       scope="col"
-                      className="w-1/3 px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-1/3 px-6 py-2 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Employee
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="px-6 py-2 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Leave Type
                     </th>
                     <th
                       scope="col"
-                      className="w-48 px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-48 px-6 py-2 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
                     >
                       Actions
                     </th>
@@ -3768,7 +3822,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         }}
                       >
                         <td
-                          className="w-16 px-6 py-3 whitespace-nowrap align-middle cursor-pointer"
+                          className="w-16 px-6 py-2 whitespace-nowrap align-middle cursor-pointer"
                           onClickCapture={(e) => {
                             e.stopPropagation();
                             if (!isSaving) {
@@ -3786,7 +3840,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             disabled={isSaving}
                           />
                         </td>
-                        <td className="w-1/3 px-6 py-3 whitespace-nowrap">
+                        <td className="w-1/3 px-6 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div>
                               <div className="text-sm font-medium text-default-900 truncate">
@@ -3832,7 +3886,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
+                        <td className="px-6 py-2 whitespace-nowrap">
                           <div className="w-full max-w-[180px]">
                             <Listbox
                               value={currentLeaveType}
@@ -3876,7 +3930,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 >
                                   <ListboxOptions
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                                    className="absolute z-50 w-full py-1 bottom-full mb-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
                                     {leaveOptions.map((option) => (
                                       <ListboxOption
                                         key={option.id}
@@ -3924,7 +3978,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </Listbox>
                           </div>
                         </td>
-                        <td className="w-48 px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        <td className="w-48 px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                           <ActivitiesTooltip
                             activities={
                               isSelected && !isSaving
@@ -3957,24 +4011,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="border-t border-default-200 pt-4 mt-4 flex justify-end space-x-3">
-          <Button
-            variant="outline"
-            onClick={mode === "edit" && onCancel ? onCancel : handleBack}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            color="sky"
-            variant="boldOutline"
-            onClick={() => handleSaveForm()}
-            disabled={isSaving}
-          >
-            {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
-          </Button>
-        </div>
       </div>
       {/* Manage Activities Modal */}
       <ManageActivitiesModal

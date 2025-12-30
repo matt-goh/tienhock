@@ -364,12 +364,12 @@ const AccountCodeFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBackClick} />
-
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
         {/* Header */}
-        <div className="p-6 border-b border-default-200">
-          <div className="flex items-center gap-3">
+        <div className="px-6 py-3 border-b border-default-200">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBackClick} />
+            <div className="h-6 w-px bg-default-300"></div>
             <IconFolder size={24} className="text-amber-500" />
             <div>
               <h1 className="text-xl font-semibold text-default-900">

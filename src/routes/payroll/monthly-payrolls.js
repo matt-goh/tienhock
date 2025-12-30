@@ -899,6 +899,16 @@ export default function (pool) {
         }
       }
 
+      // Update the monthly payroll's updated_at timestamp using Node.js time
+      // (PostgreSQL Docker container time may be out of sync)
+      const payrollId = parseInt(id);
+      const serverTimestamp = new Date().toISOString();
+
+      await client.query(
+        "UPDATE monthly_payrolls SET updated_at = $1 WHERE id = $2",
+        [serverTimestamp, payrollId]
+      );
+
       await client.query("COMMIT");
 
       res.json({
@@ -906,6 +916,7 @@ export default function (pool) {
         processed_count: processedPayrolls.length,
         missing_income_tax_employees: missingIncomeTaxEmployees,
         errors,
+        updated_at: serverTimestamp,
       });
 
     } catch (error) {
@@ -933,14 +944,16 @@ export default function (pool) {
     }
 
     try {
+      // Use Node.js server time to avoid Docker container clock sync issues
+      const serverTimestamp = new Date().toISOString();
       const query = `
       UPDATE monthly_payrolls
-      SET status = $1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
+      SET status = $1, updated_at = $2
+      WHERE id = $3
       RETURNING *
     `;
 
-      const result = await pool.query(query, [status, id]);
+      const result = await pool.query(query, [status, serverTimestamp, id]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Monthly payroll not found" });

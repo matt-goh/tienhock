@@ -572,7 +572,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                 {/* Full Modal Loading Overlay */}
                 {restoring && (
                   <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="flex flex-col items-center space-y-4 p-6 rounded-lg text-center">
+                    <div className="flex flex-col items-center space-y-3 p-6 rounded-lg text-center">
                       <LoadingSpinner size="lg" hideText />
                       <div className="space-y-2">
                         <h3 className="text-lg font-medium text-default-900">

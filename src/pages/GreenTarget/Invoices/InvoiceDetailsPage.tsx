@@ -25,6 +25,7 @@ import {
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
+import BackButton from "../../../components/BackButton";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import { api } from "../../../routes/utils/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -1596,14 +1597,9 @@ const InvoiceDetailsPage: React.FC = () => {
     <div className="space-y-4">
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-        <div>
-          <button
-            onClick={() => navigate("/greentarget/invoices")}
-            className="mb-4 flex items-center font-medium text-default-600 hover:text-default-900"
-          >
-            <IconChevronLeft size={18} className="mr-1" />
-            Back to Invoices
-          </button>
+        <div className="flex items-center gap-4">
+          <BackButton onClick={() => navigate("/greentarget/invoices")} />
+          <div className="h-6 w-px bg-default-300"></div>
           <h1 className="text-2xl font-bold text-default-900 flex items-center">
             <IconFileInvoice size={28} className="mr-2 text-default-600" />
             Invoice

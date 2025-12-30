@@ -725,23 +725,26 @@ const RentalFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg shadow border border-default-200">
         <div className="p-6 border-b border-default-200">
-          {" "}
-          {/* Header */}
-          <h1 className="text-xl font-semibold text-default-900">
-            {isEditMode
-              ? `Edit Rental #${formData.rental_id}`
-              : "Create New Rental"}
-          </h1>
-          <p className="mt-1 text-sm text-default-500">
-            {isEditMode
-              ? `Update details for the rental placed on ${formatDateForInput(
-                  initialFormData?.date_placed ?? null
-                )}.`
-              : "Fill in the details."}
-          </p>
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBackClick} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <div>
+              <h1 className="text-xl font-semibold text-default-900">
+                {isEditMode
+                  ? `Edit Rental #${formData.rental_id}`
+                  : "Create New Rental"}
+              </h1>
+              <p className="mt-1 text-sm text-default-500">
+                {isEditMode
+                  ? `Update details for the rental placed on ${formatDateForInput(
+                      initialFormData?.date_placed ?? null
+                    )}.`
+                  : "Fill in the details."}
+              </p>
+            </div>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
