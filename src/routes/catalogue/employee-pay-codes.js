@@ -341,6 +341,66 @@ export default function (pool) {
     }
   });
 
+  // Batch update is_default for multiple employee-pay code associations
+  router.put("/batch-default", async (req, res) => {
+    const { employee_id, pay_code_ids, is_default } = req.body;
+
+    if (!employee_id) {
+      return res.status(400).json({ message: "Employee ID is required" });
+    }
+
+    if (!Array.isArray(pay_code_ids) || pay_code_ids.length === 0) {
+      return res.status(400).json({ message: "Pay code IDs array is required and must not be empty" });
+    }
+
+    if (typeof is_default !== "boolean") {
+      return res.status(400).json({ message: "is_default must be a boolean value" });
+    }
+
+    try {
+      await pool.query("BEGIN");
+
+      // Update is_default for all specified pay codes
+      const updateQuery = `
+        UPDATE employee_pay_codes
+        SET is_default = $1
+        WHERE employee_id = $2 AND pay_code_id = ANY($3::text[])
+        RETURNING pay_code_id
+      `;
+      const result = await pool.query(updateQuery, [is_default, employee_id, pay_code_ids]);
+
+      // Update the staff's updated_at timestamp
+      const updateStaffQuery = `
+        UPDATE staffs
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `;
+      await pool.query(updateStaffQuery, [employee_id]);
+
+      // Update pay codes' updated_at timestamps
+      const updatePayCodesQuery = `
+        UPDATE pay_codes
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = ANY($1::text[])
+      `;
+      await pool.query(updatePayCodesQuery, [pay_code_ids]);
+
+      await pool.query("COMMIT");
+
+      res.json({
+        message: `Successfully updated ${result.rowCount} pay code(s)`,
+        updated_count: result.rowCount,
+      });
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error in batch default update:", error);
+      res.status(500).json({
+        message: "Error processing batch default update",
+        error: error.message,
+      });
+    }
+  });
+
   // Remove a pay code association from an employee
   router.delete("/:employeeId/:payCodeId", async (req, res) => {
     const { employeeId, payCodeId } = req.params;

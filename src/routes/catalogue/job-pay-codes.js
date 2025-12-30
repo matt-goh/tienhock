@@ -529,6 +529,90 @@ export default function (pool) {
     }
   });
 
+  // Batch update is_default for multiple job-pay code associations
+  router.put("/batch-default", async (req, res) => {
+    const { items, is_default } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Items array is required and must not be empty" });
+    }
+
+    if (typeof is_default !== "boolean") {
+      return res.status(400).json({ message: "is_default must be a boolean value" });
+    }
+
+    // Validate all items have required fields
+    for (const item of items) {
+      if (!item.job_id || !item.pay_code_id) {
+        return res.status(400).json({
+          message: "All items must have job_id and pay_code_id",
+          invalid_item: item,
+        });
+      }
+    }
+
+    try {
+      await pool.query("BEGIN");
+
+      let updatedCount = 0;
+      const affectedJobIds = new Set();
+      const affectedPayCodeIds = new Set();
+
+      // Update each item
+      for (const item of items) {
+        const updateQuery = `
+          UPDATE job_pay_codes
+          SET is_default = $1
+          WHERE job_id = $2 AND pay_code_id = $3
+          RETURNING job_id, pay_code_id
+        `;
+        const result = await pool.query(updateQuery, [is_default, item.job_id, item.pay_code_id]);
+        if (result.rowCount > 0) {
+          updatedCount++;
+          affectedJobIds.add(item.job_id);
+          affectedPayCodeIds.add(item.pay_code_id);
+        }
+      }
+
+      // Update staff timestamps for all affected jobs
+      if (affectedJobIds.size > 0) {
+        const jobIdsArray = Array.from(affectedJobIds);
+        for (const jobId of jobIdsArray) {
+          const updateStaffQuery = `
+            UPDATE staffs
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE job::jsonb ? $1
+          `;
+          await pool.query(updateStaffQuery, [jobId]);
+        }
+      }
+
+      // Update pay codes' updated_at timestamps
+      if (affectedPayCodeIds.size > 0) {
+        const updatePayCodesQuery = `
+          UPDATE pay_codes
+          SET updated_at = CURRENT_TIMESTAMP
+          WHERE id = ANY($1::text[])
+        `;
+        await pool.query(updatePayCodesQuery, [Array.from(affectedPayCodeIds)]);
+      }
+
+      await pool.query("COMMIT");
+
+      res.json({
+        message: `Successfully updated ${updatedCount} pay code(s)`,
+        updated_count: updatedCount,
+      });
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error in batch default update:", error);
+      res.status(500).json({
+        message: "Error processing batch default update",
+        error: error.message,
+      });
+    }
+  });
+
   // Batch delete multiple pay code associations
   router.post("/batch-delete", async (req, res) => {
     const { items } = req.body;
