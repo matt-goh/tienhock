@@ -779,56 +779,54 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <BackButton onClick={handleCancel} />
-        <h1 className="text-xl font-semibold text-default-800">
-          {mode === "edit" ? "Edit" : "New"} {jobConfig?.name} Monthly Entry
-        </h1>
-      </div>
+      <BackButton onClick={handleCancel} />
 
-      {/* Month/Year Selection */}
+      {/* Header & Month/Year Selection */}
       <div className="bg-white p-4 rounded-lg border border-default-200">
-        <h2 className="text-sm font-medium text-default-700 mb-3">Select Period</h2>
-        {mode === "edit" ? (
-          <div className="flex gap-4">
-            <div className="px-4 py-2 bg-default-100 border border-default-200 rounded-lg text-sm font-medium text-default-700">
-              {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
-            </div>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-semibold text-default-800">
+              {mode === "edit" ? "Edit" : "New"} {jobConfig?.name} Monthly Entry
+            </h1>
+            <div className="w-px h-6 bg-default-300" />
+            {mode === "edit" ? (
+              <div className="px-4 py-2 bg-default-100 border border-default-200 rounded-lg text-sm font-medium text-default-700">
+                {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
+              </div>
+            ) : (
+              <div className="flex gap-4 items-center">
+                <MonthNavigator
+                  selectedMonth={selectedMonthDate}
+                  onChange={handleMonthNavigatorChange}
+                  formatDisplay={(date) => date.toLocaleDateString("en-MY", { month: "long" })}
+                  showGoToCurrentButton={false}
+                />
+                <YearNavigator
+                  selectedYear={formData.logYear}
+                  onChange={handleYearNavigatorChange}
+                  showGoToCurrentButton={false}
+                />
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex gap-4 items-end">
-            <MonthNavigator
-              selectedMonth={selectedMonthDate}
-              onChange={handleMonthNavigatorChange}
-              formatDisplay={(date) => date.toLocaleDateString("en-MY", { month: "long" })}
-              showGoToCurrentButton={false}
-            />
-            <YearNavigator
-              selectedYear={formData.logYear}
-              onChange={handleYearNavigatorChange}
-              showGoToCurrentButton={false}
-            />
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button color="sky" size="sm" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
+            </Button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Employee Selection Table */}
       <div className="bg-white rounded-lg border border-default-200">
-        <div className="p-4 border-b border-default-200">
-          <h2 className="text-sm font-medium text-default-700">
-            Employee Work Hours
-          </h2>
-          <p className="text-xs text-default-500 mt-1">
-            Select employees and enter their monthly work hours
-          </p>
-        </div>
-
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-default-200">
             <thead className="bg-default-50">
               <tr>
-                <th className="px-6 py-3 text-left w-12 whitespace-nowrap">
+                <th className="px-6 py-1 text-left w-12 whitespace-nowrap">
                   <Checkbox
                     checked={allSelected}
                     onChange={handleSelectAll}
@@ -838,22 +836,22 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     buttonClassName="p-1 rounded-lg"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
                   ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
                   Job
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
+                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
                   Regular Hours
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
+                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
                   Overtime
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase whitespace-nowrap">
                   Activities
                 </th>
               </tr>
@@ -868,7 +866,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   onClick={() => handleEmployeeSelect(entry.employeeId)}
                 >
                   <td
-                    className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                    className="px-6 py-2 whitespace-nowrap cursor-pointer"
                     onClickCapture={(e) => {
                       e.stopPropagation();
                       if (!isSaving) {
@@ -885,7 +883,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       buttonClassName="p-1 rounded-lg"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-700">
+                  <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700">
                     <Link
                       to={`/catalogue/staff/${entry.employeeId}`}
                       className="hover:underline hover:text-sky-600"
@@ -894,10 +892,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       {entry.employeeId}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                  <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900">
                     <span className="font-medium">{entry.employeeName}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                  <td className="px-6 py-2 whitespace-nowrap text-sm text-default-600">
                     <Link
                       to={`/catalogue/job?id=${entry.jobType}`}
                       className="hover:underline hover:text-sky-600"
@@ -906,7 +904,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       {entry.jobName}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-2 whitespace-nowrap">
                     <input
                       type="number"
                       value={entry.selected ? entry.totalHours : ""}
@@ -920,7 +918,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       step="0.5"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-2 whitespace-nowrap">
                     <input
                       type="number"
                       value={entry.selected ? entry.overtimeHours : ""}
@@ -934,7 +932,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       step="0.5"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                     <ActivitiesTooltip
                       activities={(
                         employeeActivities[entry.employeeId] || []
@@ -989,19 +987,19 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             <table className="min-w-full divide-y divide-default-200">
               <thead className="bg-default-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 uppercase">
                     Employee
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 uppercase">
                     Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 uppercase">
                     Type
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-center text-xs font-medium text-default-500 uppercase">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase w-20">
+                  <th className="px-4 py-1 text-center text-xs font-medium text-default-500 uppercase w-20">
                     Actions
                   </th>
                 </tr>
@@ -1009,14 +1007,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               <tbody className="divide-y divide-default-200">
                 {allLeaveRecords.map((leave, index) => (
                   <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white">
-                    <td className="px-4 py-3 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700">
                       <span className="font-medium">{leave.employeeName}</span>
                       <span className="text-default-400 ml-2">({leave.employeeId})</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700">
                       {format(new Date(leave.leaveDate), "dd MMM yyyy")}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(
                           leave.leaveType
@@ -1025,7 +1023,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         {getLeaveTypeLabel(leave.leaveType)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-2 text-center">
                       {leave.isNew ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
                           New
@@ -1036,7 +1034,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-2 text-center">
                       <button
                         onClick={() => {
                           if (leave.isNew) {
@@ -1064,16 +1062,6 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             <p className="text-xs mt-1">Click "Add Leave" to record leave entries.</p>
           </div>
         )}
-      </div>
-
-      {/* Footer Actions */}
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} color="sky" disabled={isSaving}>
-          {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
-        </Button>
       </div>
 
       {/* Add Leave Modal */}
