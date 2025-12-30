@@ -42,7 +42,7 @@ const Layout: React.FC = () => {
         <div
           className={
             !isPDFRoute && !isLoginRoute
-              ? "w-full max-w-8xl mx-auto px-4 md:px-6 my-3"
+              ? "w-full max-w-8xl mx-auto px-4 my-3"
               : ""
           }
         >

@@ -7,6 +7,11 @@ import {
   IconInfoCircle,
   IconCash,
   IconReceipt,
+  IconCoins,
+  IconClock,
+  IconHammer,
+  IconCalendarEvent,
+  IconCirclePlus,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -254,16 +259,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <BackButton onClick={handleBack} />
-
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-        <div>
-          <h1 className="text-xl font-semibold text-default-800">
-            Payroll Details
-          </h1>
-          <p className="text-sm text-default-500 mt-1">
-            {getMonthName(payroll.month)} {payroll.year}
-          </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div className="flex items-center gap-4">
+          <BackButton onClick={handleBack} className="!mb-0" />
+          <div className="h-6 w-px bg-default-300"></div>
+          <div>
+            <h1 className="text-xl font-semibold text-default-800">
+              Payroll Details
+            </h1>
+            <p className="text-sm text-default-500 mt-1">
+              {getMonthName(payroll.month)} {payroll.year}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-2 md:mt-0 w-full md:w-auto">
           <PrintPayslipButton
@@ -848,7 +855,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             const jobTotal = jobBaseTotal + jobTambahanTotal + jobOvertimeTotal;
 
             return (
-              <div key={jobType} className="mb-6">
+              <div key={jobType} className="mb-3">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-default-300">
                   <h3 className="text-lg font-semibold text-default-800">
                     {formatJobType(jobType as string)} Section
@@ -860,11 +867,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
                 {/* Base Pay for this job */}
                 {jobGroupedItems["Base"].length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-default-600 mb-2">
-                      Base Pay
-                    </h4>
-                    <div className="border rounded-lg overflow-x-auto">
+                  <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+                    <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-100">
+                      <h4 className="text-md font-semibold text-amber-800 flex items-center gap-2">
+                        <IconCoins size={18} className="text-amber-600" />
+                        Base Pay
+                      </h4>
+                    </div>
+                    <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
@@ -966,11 +976,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
                 {/* Tambahan Pay for this job */}
                 {jobGroupedItems["Tambahan"].length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-default-600 mb-2">
-                      Tambahan Pay
-                    </h4>
-                    <div className="border rounded-lg overflow-x-auto">
+                  <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+                    <div className="px-4 py-1.5 bg-violet-50 border-b border-violet-100">
+                      <h4 className="text-md font-semibold text-violet-800 flex items-center gap-2">
+                        <IconCirclePlus size={18} className="text-violet-600" />
+                        Tambahan Pay
+                      </h4>
+                    </div>
+                    <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
@@ -1100,11 +1113,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
                 {/* Overtime Pay for this job */}
                 {jobGroupedItems["Overtime"].length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-default-600 mb-2">
-                      Overtime Pay
-                    </h4>
-                    <div className="border rounded-lg overflow-x-auto">
+                  <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+                    <div className="px-4 py-1.5 bg-orange-50 border-b border-orange-100">
+                      <h4 className="text-md font-semibold text-orange-800 flex items-center gap-2">
+                        <IconClock size={18} className="text-orange-600" />
+                        Overtime Pay
+                      </h4>
+                    </div>
+                    <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
@@ -1211,11 +1227,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <>
             {/* Base Pay Items */}
             {groupedItems["Base"].length > 0 && (
-              <div className="mb-4">
-                <h3 className="text-md font-medium text-default-700 mb-2">
-                  Base Pay
-                </h3>
-                <div className="border rounded-lg overflow-x-auto">
+              <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+                <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-100">
+                  <h3 className="text-md font-semibold text-amber-800 flex items-center gap-2">
+                    <IconCoins size={18} className="text-amber-600" />
+                    Base Pay
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
@@ -1350,11 +1369,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Tambahan Pay Items */}
             {groupedItems["Tambahan"].length > 0 && (
-              <div className="mb-4">
-                <h3 className="text-md font-medium text-default-700 mb-2">
-                  Tambahan Pay
-                </h3>
-                <div className="border rounded-lg overflow-x-auto">
+              <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+                <div className="px-4 py-2 bg-violet-50 border-b border-violet-100">
+                  <h3 className="text-md font-semibold text-violet-800 flex items-center gap-2">
+                    <IconCirclePlus size={18} className="text-violet-600" />
+                    Tambahan Pay
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
@@ -1484,11 +1506,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Overtime Pay Items */}
             {groupedItems["Overtime"].length > 0 && (
-              <div className="mb-4">
-                <h3 className="text-md font-medium text-default-700 mb-2">
-                  Overtime Pay
-                </h3>
-                <div className="border rounded-lg overflow-x-auto">
+              <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+                <div className="px-4 py-2 bg-orange-50 border-b border-orange-100">
+                  <h3 className="text-md font-semibold text-orange-800 flex items-center gap-2">
+                    <IconClock size={18} className="text-orange-600" />
+                    Overtime Pay
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
@@ -1592,13 +1617,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
         {/* Commission Records */}
         {commissionRecords.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-md font-medium text-default-700 mb-2">
-              {commissionRecords
-                .map((record) => record.description)
-                .join(" + ")}
-            </h3>
-            <div className="border rounded-lg overflow-x-auto">
+          <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+            <div className="px-4 py-2 bg-teal-50 border-b border-teal-100">
+              <h3 className="text-md font-semibold text-teal-800 flex items-center gap-2">
+                <IconHammer size={18} className="text-teal-600" />
+                {commissionRecords
+                  .map((record) => record.description)
+                  .join(" + ")}
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
@@ -1671,11 +1699,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
         {/* Monthly Leave Summary */}
         {monthlyLeaveRecords.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-md font-medium text-default-700 mb-2">
-              Leave Records This Month
-            </h3>
-            <div className="border rounded-lg overflow-x-auto">
+          <div className="mb-4 border rounded-lg overflow-hidden bg-white">
+            <div className="px-4 py-2 bg-rose-50 border-b border-rose-100">
+              <h3 className="text-md font-semibold text-rose-800 flex items-center gap-2">
+                <IconCalendarEvent size={18} className="text-rose-600" />
+                Leave Records This Month
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-default-200">
                 <thead className="bg-default-50">
                   <tr>
