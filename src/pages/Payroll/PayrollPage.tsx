@@ -641,6 +641,15 @@ const PayrollPage: React.FC = () => {
               {payroll.status === "Finalized" && (
                 <>
                   <span className="text-default-300">•</span>
+                  <span className="text-default-500">
+                    Finalized{" "}
+                    {payroll.updated_at
+                      ? formatDistanceToNow(new Date(payroll.updated_at), {
+                          addSuffix: true,
+                        })
+                      : ""}
+                  </span>
+                  <span className="text-default-300">•</span>
                   <button
                     onClick={() => {
                       setNewStatus("Processing");
