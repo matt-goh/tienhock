@@ -4,8 +4,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   IconPlus,
   IconTrash,
-  IconChevronDown,
-  IconChevronUp,
+  IconInfoCircle,
+  IconCash,
+  IconReceipt,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -76,7 +77,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [commissionRecords, setCommissionRecords] = useState<
     CommissionRecord[]
   >([]);
-  const [isDeductionsExpanded, setIsDeductionsExpanded] = useState(false);
 
   useEffect(() => {
     fetchEmployeePayrollComprehensive();
@@ -251,8 +251,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     <div className="space-y-4">
       <BackButton onClick={handleBack} />
 
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+      <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 pt-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
           <div>
             <h1 className="text-xl font-semibold text-default-800">
               Employee Payroll Details
@@ -289,103 +289,110 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Employee Information */}
-        <div className="mb-4 border rounded-lg overflow-hidden bg-white">
-          <div className="bg-default-100 px-4 py-2 border-b">
-            <h2 className="text-md font-semibold text-default-700">Employee Information</h2>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Employee</p>
-                {payroll.employee_job_mapping && Object.keys(payroll.employee_job_mapping).length > 1 ? (
-                  <>
-                    <p className="font-semibold text-default-800">
-                      {payroll.employee_name || "Unknown"}
-                    </p>
-                    <div className="mt-2 space-y-1">
-                      {Object.entries(payroll.employee_job_mapping).map(([empId, jobType]) => (
-                        <div key={empId} className="flex items-center text-sm">
-                          <Link
-                            to={`/catalogue/staff/${empId}`}
-                            className="text-sky-600 hover:underline font-medium"
-                          >
-                            {empId}
-                          </Link>
-                          <span className="mx-2 text-default-300">→</span>
-                          <span className="text-default-600">{jobType as string}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-semibold text-default-800">
-                      <Link
-                        to={`/catalogue/staff/${payroll.employee_id}`}
-                        className="text-sky-600 hover:underline"
-                      >
+        {/* Payroll Summary Grid */}
+        <div className="mb-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Employee Information Column */}
+          <div className="border rounded-lg overflow-hidden bg-white transition-shadow hover:shadow-md">
+            <div className="px-4 py-3 bg-default-50 border-b border-default-100">
+              <h3 className="text-md font-semibold text-default-700">
+                Employee Information
+              </h3>
+            </div>
+            <div className="p-4 flex flex-col h-full">
+              <div className="space-y-4 flex-grow">
+                {/* Employee Name */}
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Employee</p>
+                  {payroll.employee_job_mapping && Object.keys(payroll.employee_job_mapping).length > 1 ? (
+                    <>
+                      <p className="font-semibold text-default-800">
                         {payroll.employee_name || "Unknown"}
-                      </Link>
-                    </p>
-                    <p className="text-sm text-default-500 mt-1">{payroll.employee_id}</p>
-                  </>
-                )}
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Job Type</p>
-                <p className="font-semibold text-default-800">{payroll.job_type}</p>
-                <p className="text-sm text-default-500 mt-1">{payroll.section}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Status</p>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
-                  payroll.payroll_status === 'CONFIRMED'
-                    ? 'bg-green-100 text-green-800'
-                    : payroll.payroll_status === 'PENDING'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-default-100 text-default-800'
-                }`}>
-                  {payroll.payroll_status}
-                </span>
+                      </p>
+                      <div className="mt-2 space-y-1">
+                        {Object.entries(payroll.employee_job_mapping).map(([empId, jobType]) => (
+                          <div key={empId} className="flex items-center text-sm">
+                            <Link
+                              to={`/catalogue/staff/${empId}`}
+                              className="text-sky-600 hover:underline font-medium"
+                            >
+                              {empId}
+                            </Link>
+                            <span className="mx-2 text-default-300">→</span>
+                            <span className="text-default-600">{jobType as string}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-default-800">
+                        <Link
+                          to={`/catalogue/staff/${payroll.employee_id}`}
+                          className="text-sky-600 hover:underline"
+                        >
+                          {payroll.employee_name || "Unknown"}
+                        </Link>
+                      </p>
+                      <p className="text-sm text-default-500 mt-1">{payroll.employee_id}</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Job Type */}
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Job Type</p>
+                  <p className="font-semibold text-default-800">{payroll.job_type}</p>
+                  <p className="text-sm text-default-500 mt-1">{payroll.section}</p>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-default-400 mb-1">Status</p>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
+                    payroll.payroll_status === 'CONFIRMED'
+                      ? 'bg-green-100 text-green-800'
+                      : payroll.payroll_status === 'PENDING'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-default-100 text-default-800'
+                  }`}>
+                    {payroll.payroll_status}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Payroll Summary */}
-        <div className="mb-4">
-          <h2 className="text-lg font-medium text-default-800 mb-4">
-            Payroll Summary
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Earnings Column */}
-            <div className="border rounded-lg p-4 flex flex-col bg-white">
-              <h3 className="text-md font-semibold text-default-700 mb-3">
+          {/* Earnings Column */}
+          <div className="border rounded-lg overflow-hidden bg-white flex flex-col transition-shadow hover:shadow-md">
+            <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100">
+              <h3 className="text-md font-semibold text-emerald-800 flex items-center gap-2">
+                <IconCash size={18} className="text-emerald-600" />
                 Earnings
               </h3>
+            </div>
+            <div className="p-4 flex flex-col flex-grow">
               <div className="space-y-2 flex-grow">
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600">Base Pay</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-default-800">
                     {formatCurrency(baseTotal)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600">Tambahan</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-default-800">
                     {formatCurrency(tambahanTotal)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600">Overtime</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-default-800">
                     {formatCurrency(overtimeTotal)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600">Leave Pay</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-default-800">
                     {formatCurrency(
                       monthlyLeaveRecords.reduce(
                         (sum, record) => sum + Number(record.amount_paid),
@@ -394,107 +401,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-default-600">
-                    {commissionRecords.length > 0
-                      ? commissionRecords
-                          .map((record) => record.description)
-                          .join(" + ")
-                      : "Commission"}
-                  </span>
-                  <span className="font-medium">
-                    {formatCurrency(
-                      commissionRecords.reduce(
-                        (sum, record) => sum + Number(record.amount),
-                        0
-                      )
-                    )}
-                  </span>
-                </div>
-              </div>
-              <div className="border-t border-default-200 mt-3 pt-3">
-                <div className="flex justify-between font-semibold">
-                  <span className="text-default-800">Gross Pay</span>
-                  <span className="text-default-900 text-lg">
-                    {formatCurrency(payroll.gross_pay)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Final Payment Column */}
-            <div className="border rounded-lg p-4 flex flex-col bg-sky-50 border-sky-200">
-              <button
-                onClick={() => setIsDeductionsExpanded(!isDeductionsExpanded)}
-                className="flex gap-1.5 items-center w-fit mb-3 cursor-pointer text-left"
-                title="Toggle Deductions Breakdown"
-                aria-expanded={isDeductionsExpanded}
-                aria-controls="deductions-breakdown"
-              >
-                <h3 className="text-md font-semibold text-sky-800">
-                  Final Payment
-                </h3>
-                {isDeductionsExpanded ? (
-                  <IconChevronUp
-                    size={16}
-                    stroke={2.5}
-                    className="text-sky-800"
-                  />
-                ) : (
-                  <IconChevronDown
-                    size={16}
-                    stroke={2.5}
-                    className="text-sky-800"
-                  />
-                )}
-              </button>
-              <div className="space-y-2 flex-grow">
-                <div className="flex justify-between text-sm">
-                  <span className="text-sky-700">Gross Pay</span>
-                  <span className="font-medium text-sky-900">
-                    {formatCurrency(payroll.gross_pay)}
-                  </span>
-                </div>
-                {payroll.deductions
-                  ?.filter((d) => d.employee_amount > 0)
-                  .sort((a, b) => {
-                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
-                    const aIndex = order.indexOf(
-                      a.deduction_type.toUpperCase()
-                    );
-                    const bIndex = order.indexOf(
-                      b.deduction_type.toUpperCase()
-                    );
-                    return (
-                      (aIndex === -1 ? 999 : aIndex) -
-                      (bIndex === -1 ? 999 : bIndex)
-                    );
-                  })
-                  .map((deduction) => (
-                    <div
-                      key={deduction.deduction_type}
-                      className="flex justify-between text-sm"
-                    >
-                      <span className="text-sky-700">
-                        {deduction.deduction_type.toUpperCase() === "INCOME_TAX"
-                          ? "Income Tax"
-                          : deduction.deduction_type.toUpperCase()}
-                      </span>
-                      <span className="font-medium text-sky-900">
-                        - {formatCurrency(deduction.employee_amount)}
-                      </span>
-                    </div>
-                  ))}
                 {commissionRecords.length > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-sky-700">
+                    <span className="text-default-600">
                       {commissionRecords
                         .map((record) => record.description)
-                        .join(" + ")}{" "}
-                      Advance
+                        .join(" + ")}
                     </span>
-                    <span className="font-medium text-sky-900">
-                      -{" "}
+                    <span className="font-medium text-default-800">
                       {formatCurrency(
                         commissionRecords.reduce(
                           (sum, record) => sum + Number(record.amount),
@@ -504,60 +418,253 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </span>
                   </div>
                 )}
-                {midMonthPayroll && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-sky-700">Mid-month Advance</span>
-                    <span className="font-medium text-sky-900">
-                      - {formatCurrency(midMonthPayroll.amount)}
+              </div>
+              <div className="border-t border-default-200 mt-auto pt-3">
+                <div className="flex justify-between font-semibold">
+                  <span className="text-default-800">Gross Pay</span>
+                  <span className="text-emerald-700 text-lg">
+                    {formatCurrency(payroll.gross_pay)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Deductions & Final Payment Column */}
+          <div className="border rounded-lg bg-white border-sky-200 flex flex-col transition-shadow hover:shadow-md">
+            <div className="px-4 py-3 bg-sky-50 border-b border-sky-100 rounded-t-lg">
+              <h3 className="text-md font-semibold text-sky-800 flex items-center gap-2">
+                <IconReceipt size={18} className="text-sky-600" />
+                Deductions & Final Pay
+              </h3>
+            </div>
+            <div className="p-4 flex flex-col flex-grow">
+              <div className="space-y-2 flex-grow">
+                <div className="flex justify-between text-sm">
+                  <span className="text-default-600">Gross Pay</span>
+                  <span className="font-medium text-default-800">
+                    {formatCurrency(payroll.gross_pay)}
+                  </span>
+                </div>
+
+                {/* Dotted divider */}
+                <div className="border-t border-dashed border-default-300 my-2"></div>
+
+                {/* Statutory Deductions with Tooltips */}
+                {payroll.deductions
+                  ?.filter((d) => d.employee_amount > 0)
+                  .sort((a, b) => {
+                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
+                    const aIndex = order.indexOf(a.deduction_type.toUpperCase());
+                    const bIndex = order.indexOf(b.deduction_type.toUpperCase());
+                    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+                  })
+                  .map((deduction) => {
+                    const deductionType = deduction.deduction_type.toUpperCase();
+                    const deductionName = deductionType === "INCOME_TAX" ? "Income Tax" : deductionType;
+                    const percentage = payroll.gross_pay > 0
+                      ? ((deduction.employee_amount / payroll.gross_pay) * 100).toFixed(1)
+                      : "0";
+                    return (
+                      <div key={deduction.deduction_type} className="group relative flex justify-between text-sm">
+                        <span className="text-default-600 flex items-center gap-1 cursor-help">
+                          {deductionName}
+                          <IconInfoCircle size={14} className="text-default-400 opacity-60 group-hover:opacity-100" />
+                          <span className="text-xs text-default-400">({percentage}%)</span>
+                        </span>
+                        <span className="font-medium text-rose-600">
+                          - {formatCurrency(deduction.employee_amount)}
+                        </span>
+                        {/* Tooltip - appears below */}
+                        <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-64">
+                          <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
+                            <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
+                            <div className="font-semibold mb-2 text-default-100">{deductionName} Breakdown</div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-default-300">Employee:</span>
+                                <span>{formatCurrency(deduction.employee_amount)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-default-300">Employer:</span>
+                                <span>{formatCurrency(deduction.employer_amount)}</span>
+                              </div>
+                              <div className="border-t border-default-600 mt-2 pt-2">
+                                <div className="flex justify-between text-default-400">
+                                  <span>Employee Rate:</span>
+                                  <span>{deduction.rate_info.employee_rate}</span>
+                                </div>
+                                <div className="flex justify-between text-default-400">
+                                  <span>Employer Rate:</span>
+                                  <span>{deduction.rate_info.employer_rate}</span>
+                                </div>
+                                {deduction.rate_info.age_group && (
+                                  <div className="flex justify-between text-default-400">
+                                    <span>Age Group:</span>
+                                    <span className="capitalize">{deduction.rate_info.age_group.replace(/_/g, " ")}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* Commission Advance with Tooltip */}
+                {commissionRecords.length > 0 && (
+                  <div className="group relative flex justify-between text-sm">
+                    <span className="text-default-600 flex items-center gap-1 cursor-help">
+                      {commissionRecords.map((record) => record.description).join(" + ")} Advance
+                      <IconInfoCircle size={14} className="text-default-400 opacity-60 group-hover:opacity-100" />
                     </span>
+                    <span className="font-medium text-rose-600">
+                      - {formatCurrency(commissionRecords.reduce((sum, record) => sum + Number(record.amount), 0))}
+                    </span>
+                    {/* Tooltip - appears below */}
+                    <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-64">
+                      <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
+                        <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
+                        <div className="font-semibold mb-2 text-default-100">Commission Advance</div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-default-300">Total Amount:</span>
+                            <span>{formatCurrency(commissionRecords.reduce((sum, record) => sum + Number(record.amount), 0))}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-default-300">Records:</span>
+                            <span>{commissionRecords.length}</span>
+                          </div>
+                        </div>
+                        <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
+                          Payments made in advance, deducted from final pay.
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
+
+                {/* Mid-month Advance with Tooltip */}
+                {midMonthPayroll && (
+                  <div className="group relative flex justify-between text-sm">
+                    <span className="text-default-600 flex items-center gap-1 cursor-help">
+                      Mid-month Advance
+                      <IconInfoCircle size={14} className="text-default-400 opacity-60 group-hover:opacity-100" />
+                    </span>
+                    <span className="font-medium text-rose-600">
+                      - {formatCurrency(midMonthPayroll.amount)}
+                    </span>
+                    {/* Tooltip - appears below */}
+                    <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-64">
+                      <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
+                        <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
+                        <div className="font-semibold mb-2 text-default-100">Mid-month Advance</div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-default-300">Amount:</span>
+                            <span>{formatCurrency(midMonthPayroll.amount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-default-300">Date:</span>
+                            <span>{format(new Date(midMonthPayroll.created_at), "dd MMM yyyy")}</span>
+                          </div>
+                        </div>
+                        <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
+                          Advance payment made mid-month, deducted from final pay.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cuti Tahunan Advance with Tooltip (MAINTEN only) */}
                 {payroll.job_type === "MAINTEN" &&
-                  monthlyLeaveRecords.filter(
-                    (record) => record.leave_type === "cuti_tahunan"
-                  ).length > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-sky-700">Cuti Tahunan Advance</span>
-                      <span className="font-medium text-sky-900">
-                        -{" "}
-                        {formatCurrency(
+                  monthlyLeaveRecords.filter((record) => record.leave_type === "cuti_tahunan").length > 0 && (
+                    <div className="group relative flex justify-between text-sm">
+                      <span className="text-default-600 flex items-center gap-1 cursor-help">
+                        Cuti Tahunan Advance
+                        <IconInfoCircle size={14} className="text-default-400 opacity-60 group-hover:opacity-100" />
+                      </span>
+                      <span className="font-medium text-rose-600">
+                        - {formatCurrency(
                           monthlyLeaveRecords
-                            .filter(
-                              (record) => record.leave_type === "cuti_tahunan"
-                            )
-                            .reduce(
-                              (sum, record) => sum + record.amount_paid,
-                              0
-                            )
+                            .filter((record) => record.leave_type === "cuti_tahunan")
+                            .reduce((sum, record) => sum + record.amount_paid, 0)
                         )}
                       </span>
+                      {/* Tooltip - appears below */}
+                      <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-64">
+                        <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
+                          <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
+                          <div className="font-semibold mb-2 text-default-100">Cuti Tahunan Advance</div>
+                          <div className="space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-default-300">Amount:</span>
+                              <span>{formatCurrency(
+                                monthlyLeaveRecords
+                                  .filter((record) => record.leave_type === "cuti_tahunan")
+                                  .reduce((sum, record) => sum + record.amount_paid, 0)
+                              )}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-default-300">Days:</span>
+                              <span>
+                                {monthlyLeaveRecords
+                                  .filter((record) => record.leave_type === "cuti_tahunan")
+                                  .reduce((sum, record) => sum + record.days_taken, 0)} day
+                                {monthlyLeaveRecords
+                                  .filter((record) => record.leave_type === "cuti_tahunan")
+                                  .reduce((sum, record) => sum + record.days_taken, 0) !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
+                            Annual leave payment for MAINTEN employees, treated as advance.
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
+
+                {/* Total Deductions */}
+                <div className="border-t border-default-200 mt-2 pt-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-default-600 font-medium">Total Deductions</span>
+                    <span className="font-semibold text-rose-600">
+                      - {formatCurrency(
+                        (() => {
+                          const statutoryDeductions = payroll.deductions
+                            ?.filter((d) => d.employee_amount > 0)
+                            .reduce((sum, d) => sum + d.employee_amount, 0) || 0;
+                          const commissionAdvance = commissionRecords.reduce((sum, r) => sum + Number(r.amount), 0);
+                          const midMonthAdvance = midMonthPayroll?.amount || 0;
+                          const cutiTahunanAdvance = payroll.job_type === "MAINTEN"
+                            ? monthlyLeaveRecords
+                                .filter((r) => r.leave_type === "cuti_tahunan")
+                                .reduce((sum, r) => sum + r.amount_paid, 0)
+                            : 0;
+                          return statutoryDeductions + commissionAdvance + midMonthAdvance + cutiTahunanAdvance;
+                        })()
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="border-t border-sky-200 mt-3 pt-3">
-                <div className="flex justify-between font-bold">
-                  <span className="text-sky-800">Take Home Pay</span>
-                  <span className="text-sky-900 text-xl">
+
+              {/* Take Home Pay - Highlighted */}
+              <div className="bg-sky-100 -mx-4 -mb-4 mt-4 px-4 py-4 border-t border-sky-200 rounded-b-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sky-800 font-bold text-base">Take Home Pay</span>
+                  <span className="text-sky-900 text-2xl font-bold">
                     {formatCurrency(
                       (() => {
-                        // Calculate additional deduction for MAINTEN job type (Cuti Tahunan in commission deduction)
                         const isMainten = payroll.job_type === "MAINTEN";
-                        const cutiTahunanRecords = monthlyLeaveRecords.filter(
-                          (record) => record.leave_type === "cuti_tahunan"
-                        );
-                        const cutiTahunanAmount = cutiTahunanRecords.reduce(
-                          (sum, record) => sum + record.amount_paid,
-                          0
-                        );
-                        const additionalMaintenDeduction = isMainten
-                          ? cutiTahunanAmount
-                          : 0;
-
-                        return (
-                          payroll.net_pay -
-                          (midMonthPayroll?.amount || 0) -
-                          additionalMaintenDeduction
-                        );
+                        const cutiTahunanAmount = monthlyLeaveRecords
+                          .filter((record) => record.leave_type === "cuti_tahunan")
+                          .reduce((sum, record) => sum + record.amount_paid, 0);
+                        const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
+                        return payroll.net_pay - (midMonthPayroll?.amount || 0) - additionalMaintenDeduction;
                       })()
                     )}
                   </span>
@@ -566,236 +673,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Deductions Breakdown */}
-        {isDeductionsExpanded && (
-          <div className="mb-4" id="deductions-breakdown">
-            <h2 className="text-lg font-medium text-default-800 mb-4">
-              Deductions Breakdown
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {/* Statutory Contributions */}
-              {payroll.deductions &&
-                payroll.deductions.length > 0 &&
-                payroll.deductions
-                  .sort((a, b) => {
-                    const order = ["EPF", "SIP", "SOCSO", "INCOME_TAX"];
-                    const aIndex = order.indexOf(
-                      a.deduction_type.toUpperCase()
-                    );
-                    const bIndex = order.indexOf(
-                      b.deduction_type.toUpperCase()
-                    );
-                    return (
-                      (aIndex === -1 ? 999 : aIndex) -
-                      (bIndex === -1 ? 999 : bIndex)
-                    );
-                  })
-                  .map((deduction, index) => {
-                    const deductionType =
-                      deduction.deduction_type.toUpperCase();
-                    const deductionName =
-                      deductionType === "INCOME_TAX"
-                        ? "Income Tax"
-                        : deductionType;
-                    return (
-                      <div key={index} className="border rounded-lg p-4">
-                        <h3 className="text-sm font-medium text-default-700 mb-2">
-                          {deductionName}
-                        </h3>
-                        <div className="space-y-2">
-                          <div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-default-600">
-                                Employee:
-                              </span>
-                              <span className="font-medium text-default-900">
-                                {formatCurrency(deduction.employee_amount)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-default-600">
-                                Employer:
-                              </span>
-                              <span className="font-medium text-default-900">
-                                {formatCurrency(deduction.employer_amount)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="border-t border-default-200 pt-2 mt-2">
-                            <div className="flex justify-between text-xs text-default-500">
-                              <span>Employee Rate:</span>
-                              <span>{deduction.rate_info.employee_rate}</span>
-                            </div>
-                            <div className="flex justify-between text-xs text-default-500">
-                              <span>Employer Rate:</span>
-                              <span>{deduction.rate_info.employer_rate}</span>
-                            </div>
-                            {deduction.rate_info.age_group && (
-                              <div className="flex justify-between text-xs text-default-500">
-                                <span>Age Group:</span>
-                                <span className="capitalize">
-                                  {deduction.rate_info.age_group.replace(
-                                    /_/g,
-                                    " "
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-              {/* Commission Advance */}
-              {commissionRecords.length > 0 && (
-                <div className="border rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-default-700 mb-2">
-                    {commissionRecords
-                      .map((record) => record.description)
-                      .join(" + ")}{" "}
-                    Advance
-                  </h3>
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-default-600">Total Amount:</span>
-                        <span className="font-medium text-default-900">
-                          {formatCurrency(
-                            commissionRecords.reduce(
-                              (sum, record) => sum + Number(record.amount),
-                              0
-                            )
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-default-600">Records:</span>
-                        <span className="font-medium text-default-900">
-                          {commissionRecords.length}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="border-t border-default-200 pt-2 mt-2">
-                      <div className="text-xs text-default-500">
-                        {commissionRecords
-                          .map((record) => record.description)
-                          .join(" + ")}{" "}
-                        payments made in advance, deducted from final pay.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Mid-month Advance */}
-              {midMonthPayroll && (
-                <div className="border rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-default-700 mb-2">
-                    Mid-month Advance
-                  </h3>
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-default-600">Amount:</span>
-                        <span className="font-medium text-default-900">
-                          {formatCurrency(midMonthPayroll.amount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-default-600">Date:</span>
-                        <span className="font-medium text-default-900">
-                          {format(
-                            new Date(midMonthPayroll.created_at),
-                            "dd MMM yyyy"
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="border-t border-default-200 pt-2 mt-2">
-                      <div className="text-xs text-default-500">
-                        Advance payment made mid-month, deducted from final pay.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Cuti Tahunan Advance (MAINTEN only) */}
-              {payroll.job_type === "MAINTEN" &&
-                monthlyLeaveRecords.filter(
-                  (record) => record.leave_type === "cuti_tahunan"
-                ).length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <h3 className="text-sm font-medium text-default-700 mb-2">
-                      Cuti Tahunan Advance
-                    </h3>
-                    <div className="space-y-2">
-                      <div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-default-600">Amount:</span>
-                          <span className="font-medium text-default-900">
-                            {formatCurrency(
-                              monthlyLeaveRecords
-                                .filter(
-                                  (record) =>
-                                    record.leave_type === "cuti_tahunan"
-                                )
-                                .reduce(
-                                  (sum, record) => sum + record.amount_paid,
-                                  0
-                                )
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-default-600">Days:</span>
-                          <span className="font-medium text-default-900">
-                            {monthlyLeaveRecords
-                              .filter(
-                                (record) => record.leave_type === "cuti_tahunan"
-                              )
-                              .reduce(
-                                (sum, record) => sum + record.days_taken,
-                                0
-                              )}{" "}
-                            day
-                            {monthlyLeaveRecords
-                              .filter(
-                                (record) => record.leave_type === "cuti_tahunan"
-                              )
-                              .reduce(
-                                (sum, record) => sum + record.days_taken,
-                                0
-                              ) !== 1
-                              ? "s"
-                              : ""}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="border-t border-default-200 pt-2 mt-2">
-                        <div className="text-xs text-default-500">
-                          Annual leave payment for MAINTEN employees, treated as
-                          advance for commission deduction.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-        )}
-
-        {/* Tabs for Items and Pay Slip View */}
-        <div className="mb-6">
           {/* Payroll Items Tab - This will contain all the existing payroll items tables */}
-          <div className="mt-4">
-            {/* Payroll Items Section */}
-            <h2 className="text-lg font-medium text-default-800 mb-4">
-              Payroll Items
-            </h2>
-
+          <div>
             {/* Payroll Items - Grouped by Job Type for Combined Payrolls */}
             {isCombinedPayroll && itemsByJob ? (
               // Combined Payroll: Group by Job Type first
@@ -1280,7 +1159,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
       </div>
 
       {/* Add Manual Item Modal */}
