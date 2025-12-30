@@ -1,4 +1,4 @@
-// src/pages/Payroll/MonthlyPayrollDetailsPage.tsx
+// src/pages/Payroll/PayrollPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
@@ -42,7 +42,7 @@ import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
 import MonthNavigator from "../../components/MonthNavigator";
 import EmployeePayrollCard from "../../components/Payroll/EmployeePayrollCard";
 
-const MonthlyPayrollDetailsPage: React.FC = () => {
+const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Initialize with current month
@@ -838,4 +838,4 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   );
 };
 
-export default MonthlyPayrollDetailsPage;
+export default PayrollPage;
