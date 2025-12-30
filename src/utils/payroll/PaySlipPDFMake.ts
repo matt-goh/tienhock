@@ -636,12 +636,12 @@ const buildMainPayrollPage = (
         {
           width: 'auto',
           stack: [
-            { text: 'RECEIVED BY', alignment: 'right' },
+            { text: 'Received By', alignment: 'right' },
             { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 150, y2: 0, lineWidth: 1 }], margin: [0, 5, 0, 0] },
           ],
         },
       ],
-      margin: [0, 50, 0, 0],
+      margin: [0, 25, 0, 0],
     },
   ];
 
