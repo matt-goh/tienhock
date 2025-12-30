@@ -7,13 +7,13 @@ import {
   IconClock,
   IconInfoCircle,
 } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import BackButton from "../../components/BackButton";
-import { api } from "../../routes/utils/api";
+import Button from "../../../components/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import BackButton from "../../../components/BackButton";
+import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
-import { getJobConfig } from "../../configs/payrollJobConfigs";
+import { getJobConfig } from "../../../configs/payrollJobConfigs";
 
 interface DailyLogDetailsPageProps {
   jobType: string;

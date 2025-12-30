@@ -1,8 +1,8 @@
 // src/pages/Payroll/CutiReportPage.tsx
 import React, { useState, useMemo, useEffect } from "react";
-import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { FormCombobox } from "../../components/FormComponents";
-import { Employee } from "../../types/types";
+import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { FormCombobox } from "../../../components/FormComponents";
+import { Employee } from "../../../types/types";
 import {
   IconCalendar,
   IconBriefcase,
@@ -14,17 +14,17 @@ import {
   IconSearch,
   IconPrinter,
 } from "@tabler/icons-react";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import Button from "../../components/Button";
-import { getMonthName } from "../../utils/payroll/payrollUtils";
-import { api } from "../../routes/utils/api";
-import { calculateYearsOfService } from "../../utils/payroll/leaveCalculationService";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button";
+import { getMonthName } from "../../../utils/payroll/payrollUtils";
+import { api } from "../../../routes/utils/api";
+import { calculateYearsOfService } from "../../../utils/payroll/leaveCalculationService";
 import {
   generateSingleCutiReportPDF,
   generateBatchCutiReportPDF,
   CutiReportData,
   CutiBatchReportData,
-} from "../../utils/payroll/CutiReportPDF";
+} from "../../../utils/payroll/CutiReportPDF";
 import toast from "react-hot-toast";
 
 // --- Types for API Data ---

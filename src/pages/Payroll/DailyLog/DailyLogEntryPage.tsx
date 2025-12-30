@@ -8,31 +8,31 @@ import React, {
   Fragment,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import Button from "../../components/Button";
-import { FormInput, FormListbox } from "../../components/FormComponents";
-import { Employee } from "../../types/types";
-import BackButton from "../../components/BackButton";
+import Button from "../../../components/Button";
+import { FormInput, FormListbox } from "../../../components/FormComponents";
+import { Employee } from "../../../types/types";
+import BackButton from "../../../components/BackButton";
 import { format } from "date-fns";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import Checkbox from "../../components/Checkbox";
-import ManageActivitiesModal from "../../components/Payroll/ManageActivitiesModal";
-import ActivitiesTooltip from "../../components/Payroll/ActivitiesTooltip";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Checkbox from "../../../components/Checkbox";
+import ManageActivitiesModal from "../../../components/Payroll/ManageActivitiesModal";
+import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
-import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
-import { api } from "../../routes/utils/api";
-import { useHolidayCache } from "../../utils/payroll/useHolidayCache";
+import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { api } from "../../../routes/utils/api";
+import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import {
   getJobConfig,
   getContextLinkedPayCodes,
   getJobIds,
-} from "../../configs/payrollJobConfigs";
-import DynamicContextForm from "../../components/Payroll/DynamicContextForm";
+} from "../../../configs/payrollJobConfigs";
+import DynamicContextForm from "../../../components/Payroll/DynamicContextForm";
 import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
-} from "../../utils/payroll/calculateActivityAmount";
+} from "../../../utils/payroll/calculateActivityAmount";
 import {
   Listbox,
   ListboxButton,
@@ -46,9 +46,9 @@ import {
   IconMapPin,
   IconMapPinOff,
 } from "@tabler/icons-react";
-import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
-import SafeLink from "../../components/SafeLink";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
+import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
+import SafeLink from "../../../components/SafeLink";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row

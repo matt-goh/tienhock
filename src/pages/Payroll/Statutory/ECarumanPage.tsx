@@ -10,12 +10,12 @@ import {
   IconAlertTriangle,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
-import MonthNavigator from "../../components/MonthNavigator";
-import YearNavigator from "../../components/YearNavigator";
-import { api } from "../../routes/utils/api";
+import MonthNavigator from "../../../components/MonthNavigator";
+import YearNavigator from "../../../components/YearNavigator";
+import { api } from "../../../routes/utils/api";
 import MissingEPFNumberDialog, {
   MissingEPFEmployee,
-} from "../../components/Payroll/MissingEPFNumberDialog";
+} from "../../../components/Payroll/MissingEPFNumberDialog";
 
 // File System Access API types
 interface FileSystemWritableFileStream extends WritableStream {

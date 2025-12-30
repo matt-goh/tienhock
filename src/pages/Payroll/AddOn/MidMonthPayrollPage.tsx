@@ -1,4 +1,4 @@
-// src/pages/Payroll/IncentivesPage.tsx
+// src/pages/Payroll/MidMonthPayrollPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import {
@@ -8,37 +8,28 @@ import {
   IconCash,
   IconRefresh,
 } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { getMonthName } from "../../utils/payroll/payrollUtils";
-import YearNavigator from "../../components/YearNavigator";
-import MonthNavigator from "../../components/MonthNavigator";
-import AddIncentiveModal from "../../components/Payroll/AddIncentiveModal";
-import EditIncentiveModal from "../../components/Payroll/EditIncentiveModal";
-import { api } from "../../routes/utils/api";
+import Button from "../../../components/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import {
+  getMidMonthPayrolls,
+  deleteMidMonthPayroll,
+  getMonthName,
+  MidMonthPayroll,
+} from "../../../utils/payroll/midMonthPayrollUtils";
+import YearNavigator from "../../../components/YearNavigator";
+import MonthNavigator from "../../../components/MonthNavigator";
+import AddMidMonthPayrollModal from "../../../components/Payroll/AddMidMonthPayrollModal";
+import EditMidMonthPayrollModal from "../../../components/Payroll/EditMidMonthPayrollModal";
 import toast from "react-hot-toast";
 
-interface Incentive {
-  id: number;
-  employee_id: string;
-  employee_name: string;
-  commission_date: string;
-  amount: number;
-  description: string;
-  created_by: string;
-  created_at: string;
-}
-
-const IncentivesPage: React.FC = () => {
+const MidMonthPayrollPage: React.FC = () => {
   // State
-  const [incentives, setIncentives] = useState<Incentive[]>([]);
+  const [payrolls, setPayrolls] = useState<MidMonthPayroll[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [addModalType, setAddModalType] = useState<
-    "Commission" | "Bonus" | null
-  >(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingIncentive, setEditingIncentive] = useState<Incentive | null>(
+  const [editingPayroll, setEditingPayroll] = useState<MidMonthPayroll | null>(
     null
   );
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -54,50 +45,45 @@ const IncentivesPage: React.FC = () => {
     [currentYear, currentMonth]
   );
 
-  // Load incentives on mount and filter changes
+  // Load payrolls on mount and filter changes
   useEffect(() => {
-    fetchIncentives();
+    fetchPayrolls();
   }, [currentYear, currentMonth]);
 
-  const fetchIncentives = async () => {
+  const fetchPayrolls = async () => {
     setIsLoading(true);
     try {
-      const startDate = `${currentYear}-${currentMonth
-        .toString()
-        .padStart(2, "0")}-01`;
-      const lastDay = new Date(currentYear, currentMonth, 0).getDate();
-      const endDate = `${currentYear}-${currentMonth
-        .toString()
-        .padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
-      const url = `/api/incentives?start_date=${encodeURIComponent(
-        startDate
-      )}&end_date=${encodeURIComponent(endDate)}`;
-      const response = await api.get(url);
-      setIncentives(response || []);
+      const response = await getMidMonthPayrolls({
+        year: currentYear,
+        month: currentMonth,
+        limit: 100,
+      });
+      setPayrolls(response.payrolls);
     } catch (error) {
-      console.error("Error fetching incentives:", error);
-      toast.error("Failed to load incentives");
+      console.error("Error fetching payrolls:", error);
+      toast.error("Failed to load mid-month payrolls");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEdit = (incentive: Incentive) => {
-    setEditingIncentive(incentive);
+  const handleEdit = (payroll: MidMonthPayroll) => {
+    setEditingPayroll(payroll);
     setShowEditModal(true);
   };
 
-  const handleDeleteIncentive = async () => {
+  const handleDeletePayroll = async () => {
     if (!deletingId) return;
+
     try {
-      await api.delete(`/api/incentives/${deletingId}`);
-      toast.success("Incentive record deleted successfully");
+      await deleteMidMonthPayroll(deletingId);
+      toast.success("Payroll deleted successfully");
       setShowDeleteDialog(false);
       setDeletingId(null);
-      await fetchIncentives();
+      await fetchPayrolls();
     } catch (error) {
-      console.error("Error deleting incentive:", error);
-      toast.error("Failed to delete incentive");
+      console.error("Error deleting payroll:", error);
+      toast.error("Failed to delete payroll");
     }
   };
 
@@ -108,8 +94,9 @@ const IncentivesPage: React.FC = () => {
     }).format(amount);
   };
 
-  const totalAmount = incentives.reduce(
-    (sum, incentive) => sum + (Number(incentive.amount) || 0),
+  // Calculate total amount
+  const totalAmount = payrolls.reduce(
+    (sum, payroll) => sum + payroll.amount,
     0
   );
 
@@ -117,11 +104,11 @@ const IncentivesPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800">
-          Incentives (Commission & Bonus)
+          Mid-month Payrolls
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
-            onClick={fetchIncentives}
+            onClick={fetchPayrolls}
             icon={IconRefresh}
             variant="outline"
             disabled={isLoading}
@@ -129,20 +116,12 @@ const IncentivesPage: React.FC = () => {
             Refresh
           </Button>
           <Button
-            onClick={() => setAddModalType("Commission")}
+            onClick={() => setShowAddModal(true)}
             icon={IconPlus}
             color="sky"
             variant="filled"
           >
-            Add Commission
-          </Button>
-          <Button
-            onClick={() => setAddModalType("Bonus")}
-            icon={IconPlus}
-            color="teal"
-            variant="filled"
-          >
-            Add Bonus
+            Add Payroll
           </Button>
         </div>
       </div>
@@ -167,7 +146,7 @@ const IncentivesPage: React.FC = () => {
           </div>
           <div className="text-sm text-default-600">
             <div className="font-medium">
-              Total: {incentives.length} records
+              Total: {payrolls.length} employees
             </div>
             <div className="font-medium">
               Amount: {formatCurrency(totalAmount)}
@@ -176,22 +155,23 @@ const IncentivesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Incentives Table */}
+      {/* Payrolls Table */}
       <div className="bg-white rounded-lg border border-default-200 shadow-sm">
         <div className="px-6 py-4 border-b border-default-200">
           <h2 className="text-lg font-medium text-default-800">
             {getMonthName(currentMonth)} {currentYear}
           </h2>
         </div>
+
         {isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : incentives.length === 0 ? (
+        ) : payrolls.length === 0 ? (
           <div className="text-center py-12 text-default-500">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No incentives found</p>
-            <p>Click "Add Commission" or "Add Bonus" to create records</p>
+            <p className="text-lg font-medium">No payrolls found</p>
+            <p>Click "Add Payroll" to create mid-month payrolls</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -208,10 +188,7 @@ const IncentivesPage: React.FC = () => {
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
-                    Date
+                    Payment Method
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
                     Created
@@ -222,33 +199,27 @@ const IncentivesPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-default-200">
-                {incentives.map((incentive) => (
-                  <tr key={incentive.id} className="hover:bg-default-50">
+                {payrolls.map((payroll) => (
+                  <tr key={payroll.id} className="hover:bg-default-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
-                      {incentive.employee_id}
+                      {payroll.employee_id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
-                      {incentive.employee_name}
+                      {payroll.employee_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900">
-                      {formatCurrency(incentive.amount)}
+                      {formatCurrency(payroll.amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
-                      {incentive.description}
+                      {payroll.payment_method}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
-                      {format(
-                        new Date(incentive.commission_date),
-                        "dd MMM yyyy"
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
-                      {format(new Date(incentive.created_at), "dd MMM yyyy")}
+                      {format(new Date(payroll.created_at), "dd MMM yyyy")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end space-x-3">
                         <button
-                          onClick={() => handleEdit(incentive)}
+                          onClick={() => handleEdit(payroll)}
                           className="text-sky-600 hover:text-sky-800"
                           title="Edit"
                         >
@@ -256,7 +227,7 @@ const IncentivesPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => {
-                            setDeletingId(incentive.id);
+                            setDeletingId(payroll.id);
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 hover:text-rose-800"
@@ -275,25 +246,22 @@ const IncentivesPage: React.FC = () => {
       </div>
 
       {/* Modals */}
-      {addModalType && (
-        <AddIncentiveModal
-          isOpen={addModalType !== null}
-          onClose={() => setAddModalType(null)}
-          onSuccess={fetchIncentives}
-          currentYear={currentYear}
-          currentMonth={currentMonth}
-          incentiveType={addModalType}
-        />
-      )}
+      <AddMidMonthPayrollModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={fetchPayrolls}
+        currentYear={currentYear}
+        currentMonth={currentMonth}
+      />
 
-      <EditIncentiveModal
+      <EditMidMonthPayrollModal
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
-          setEditingIncentive(null);
+          setEditingPayroll(null);
         }}
-        onSuccess={fetchIncentives}
-        incentive={editingIncentive}
+        onSuccess={fetchPayrolls}
+        payroll={editingPayroll}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -303,9 +271,9 @@ const IncentivesPage: React.FC = () => {
           setShowDeleteDialog(false);
           setDeletingId(null);
         }}
-        onConfirm={handleDeleteIncentive}
-        title="Delete Incentive"
-        message="Are you sure you want to delete this incentive record? This action cannot be undone."
+        onConfirm={handleDeletePayroll}
+        title="Delete Mid-month Payroll"
+        message="Are you sure you want to delete this mid-month payroll? This action cannot be undone."
         confirmButtonText="Delete"
         variant="danger"
       />
@@ -313,4 +281,4 @@ const IncentivesPage: React.FC = () => {
   );
 };
 
-export default IncentivesPage;
+export default MidMonthPayrollPage;

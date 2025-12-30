@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { IconPencil, IconTrash, IconCalendar } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import BackButton from "../../components/BackButton";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import { api } from "../../routes/utils/api";
+import Button from "../../../components/Button";
+import BackButton from "../../../components/BackButton";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
-import { getJobConfig } from "../../configs/payrollJobConfigs";
+import { getJobConfig } from "../../../configs/payrollJobConfigs";
 import { Link } from "react-router-dom";
 
 interface MonthlyLogDetailsPageProps {

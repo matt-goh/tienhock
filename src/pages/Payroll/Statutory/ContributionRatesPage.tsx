@@ -1,11 +1,11 @@
 // src/pages/Payroll/ContributionRatesPage.tsx
 import React from "react";
 import { useSearchParams } from "react-router-dom";
-import Tab from "../../components/Tab";
-import EPFRatesTab from "../../components/Payroll/ContributionRates/EPFRatesTab";
-import SOCSORatesTab from "../../components/Payroll/ContributionRates/SOCSORatesTab";
-import SIPRatesTab from "../../components/Payroll/ContributionRates/SIPRatesTab";
-import IncomeTaxRatesTab from "../../components/Payroll/ContributionRates/IncomeTaxRatesTab";
+import Tab from "../../../components/Tab";
+import EPFRatesTab from "../../../components/Payroll/ContributionRates/EPFRatesTab";
+import SOCSORatesTab from "../../../components/Payroll/ContributionRates/SOCSORatesTab";
+import SIPRatesTab from "../../../components/Payroll/ContributionRates/SIPRatesTab";
+import IncomeTaxRatesTab from "../../../components/Payroll/ContributionRates/IncomeTaxRatesTab";
 
 const ContributionRatesPage: React.FC = () => {
   const [searchParams] = useSearchParams();
