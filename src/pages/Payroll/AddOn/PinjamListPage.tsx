@@ -14,19 +14,19 @@ import {
   IconSquareCheckFilled,
   IconSquareMinusFilled,
 } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import PinjamFormModal from "../../components/Payroll/PinjamFormModal";
-import { api } from "../../routes/utils/api";
-import YearNavigator from "../../components/YearNavigator";
-import MonthNavigator from "../../components/MonthNavigator";
+import Button from "../../../components/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import PinjamFormModal from "../../../components/Payroll/PinjamFormModal";
+import { api } from "../../../routes/utils/api";
+import YearNavigator from "../../../components/YearNavigator";
+import MonthNavigator from "../../../components/MonthNavigator";
 import toast from "react-hot-toast";
 import {
   generatePinjamPDF,
   PinjamPDFData,
   PinjamEmployee,
-} from "../../utils/payroll/PinjamPDF";
+} from "../../../utils/payroll/PinjamPDF";
 
 interface PinjamRecord {
   id: number;

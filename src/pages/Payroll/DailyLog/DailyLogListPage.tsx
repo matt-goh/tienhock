@@ -2,16 +2,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconPlus, IconPencil, IconTrash, IconEye } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import DateRangePicker from "../../components/DateRangePicker";
-import MonthNavigator from "../../components/MonthNavigator";
-import StyledListbox from "../../components/StyledListbox";
-import { api } from "../../routes/utils/api";
+import Button from "../../../components/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import DateRangePicker from "../../../components/DateRangePicker";
+import MonthNavigator from "../../../components/MonthNavigator";
+import StyledListbox from "../../../components/StyledListbox";
+import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
-import { getJobConfig } from "../../configs/payrollJobConfigs";
+import { getJobConfig } from "../../../configs/payrollJobConfigs";
 
 interface DailyLogListPageProps {
   jobType: string;
