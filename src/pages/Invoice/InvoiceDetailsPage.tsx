@@ -41,8 +41,6 @@ import { api } from "../../routes/utils/api";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
-import PDFDownloadHandler from "../../utils/invoice/PDF/PDFDownloadHandler";
-import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
 import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
@@ -1369,7 +1367,7 @@ const InvoiceDetailsPage: React.FC = () => {
       : {};
 
   return (
-    <div className="space-y-4 relative">
+    <div className="space-y-3 relative">
       {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-30">
@@ -1389,7 +1387,6 @@ const InvoiceDetailsPage: React.FC = () => {
               }
             }}
             disabled={isLoading}
-            className="!mb-0"
           />
           <div className="h-6 w-px bg-default-300"></div>
           <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4 flex-wrap">
@@ -1626,7 +1623,7 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
       )}
       {/* Main Content Sections */}
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* Invoice Header Display */}
         <section className="p-4 border rounded-lg bg-white shadow-sm">
           <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">

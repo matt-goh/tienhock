@@ -245,7 +245,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Compact Header */}
       <div className="bg-white rounded-lg border border-default-200 px-4 py-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -253,6 +253,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-3">
               <BackButton onClick={handleBack} />
+              <div className="h-6 w-px bg-default-300"></div>
               <div>
                 <h1 className="text-xl font-semibold text-default-800">
                   {jobConfig?.name} - {getMonthName(workLog.log_month)}{" "}
@@ -359,7 +360,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
         </div>
 
         {workLog.employeeEntries.length > 0 ? (
-          <div className="max-h-[calc(100vh-350px)] overflow-y-auto">
+          <div className="max-h-full overflow-y-auto">
             <table className="min-w-full">
               <thead className="bg-default-50 sticky top-0 z-10">
                 <tr>
@@ -660,7 +661,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
       </div>
 
       {/* Metadata - Smaller, less prominent */}
-      <div className="text-xs text-default-400 flex items-center justify-end gap-4">
+      <div className="text-xs text-default-400 flex items-center justify-end gap-3">
         <span>
           Created: {format(new Date(workLog.created_at), "dd MMM yyyy hh:mm a")}
         </span>

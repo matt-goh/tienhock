@@ -101,19 +101,27 @@ const DeliveryOrderPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <BackButton onClick={handleBackClick} />
-        <div className="space-x-3">
-          <Button onClick={handlePrint} icon={IconPrinter} variant="outline">
-            Print
-          </Button>
-          <Button
-            onClick={handleDownload}
-            icon={IconDownload}
-            variant="default"
-          >
-            Download PDF
-          </Button>
+      <div className="bg-white rounded-lg border border-default-200 px-6 py-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBackClick} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <h1 className="text-xl font-semibold text-default-800">
+              Delivery Order
+            </h1>
+          </div>
+          <div className="space-x-3">
+            <Button onClick={handlePrint} icon={IconPrinter} variant="outline">
+              Print
+            </Button>
+            <Button
+              onClick={handleDownload}
+              icon={IconDownload}
+              variant="default"
+            >
+              Download PDF
+            </Button>
+          </div>
         </div>
       </div>
 

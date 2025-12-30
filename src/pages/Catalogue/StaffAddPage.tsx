@@ -367,16 +367,21 @@ const StaffAddPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBackClick} />
       <div className="bg-white rounded-lg shadow-sm border border-default-200">
-        <div className="p-6 border-b border-default-200">
-          <h1 className="text-xl font-semibold text-default-900">
-            Add New Staff
-          </h1>
-          <p className="mt-1 text-sm text-default-500">
-            Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
-            anda selesai.
-          </p>
+        <div className="px-6 py-4 border-b border-default-200">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBackClick} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <div>
+              <h1 className="text-xl font-semibold text-default-900">
+                Add New Staff
+              </h1>
+              <p className="mt-1 text-sm text-default-500">
+                Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
+                anda selesai.
+              </p>
+            </div>
+          </div>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="p-6">

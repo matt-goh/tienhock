@@ -191,28 +191,48 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       0
     ) || 0;
 
+  // Helper to get context field display value
+  const getContextFieldValue = (fieldId: string) => {
+    if (!workLog?.context_data) return null;
+    const value = workLog.context_data[fieldId];
+    if (value === undefined) return null;
+
+    const field = jobConfig?.contextFields.find((f) => f.id === fieldId);
+    if (!field) return String(value);
+
+    if (field.type === "select") {
+      return field.options?.find((opt) => opt.id === value)?.label || value;
+    }
+    return String(value);
+  };
+
+  // Check if there's context data to display
+  const hasContextData =
+    workLog?.context_data && Object.keys(workLog.context_data).length > 0;
+
   return (
     <div className="space-y-4">
       {/* Compact Header */}
       <div className="bg-white rounded-lg border border-default-200 px-4 py-3">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           {/* Left: Back + Title + Stats */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3">
-              <BackButton onClick={handleBack} />
-              <div>
-                <h1 className="text-xl font-semibold text-default-800">
-                  {jobConfig?.name} Details
-                </h1>
-                <p className="text-sm text-default-500">
-                  {format(new Date(workLog.log_date), "EEEE, dd MMM yyyy")}
-                </p>
-              </div>
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-2">
+            <BackButton onClick={handleBack} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <div>
+              <h1 className="text-xl font-semibold text-default-800">
+                {jobConfig?.name} Details
+              </h1>
+              <p className="text-sm text-default-500">
+                {format(new Date(workLog.log_date), "EEEE, dd MMM yyyy")}
+              </p>
             </div>
 
+            {/* Separator */}
+            <div className="h-10 w-px bg-default-200 hidden sm:block"></div>
+
             {/* Inline Stats */}
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm sm:ml-3">
-              <span className="text-default-300 hidden sm:inline">|</span>
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
               <div className="flex items-center gap-1.5">
                 <IconCalendarEvent size={16} className="text-sky-600" />
                 <span
@@ -247,6 +267,34 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                 )}
                 {workLog.status}
               </span>
+
+              {/* Production Details / Context Data - Inline */}
+              {hasContextData && (
+                <>
+                  <div className="h-6 w-px bg-default-300"></div>
+                  {jobConfig?.contextFields.map((field, index) => {
+                    const value = getContextFieldValue(field.id);
+                    if (value === null) return null;
+
+                    return (
+                      <React.Fragment key={field.id}>
+                        {index > 0 &&
+                          getContextFieldValue(
+                            jobConfig.contextFields[index - 1]?.id
+                          ) !== null && (
+                            <span className="text-default-300">•</span>
+                          )}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-default-500">{field.label}:</span>
+                          <span className="font-medium text-default-700">
+                            {value}
+                          </span>
+                        </div>
+                      </React.Fragment>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
 
@@ -263,38 +311,6 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
           )}
         </div>
       </div>
-
-      {/* Production Details / Context Data */}
-      {workLog.context_data &&
-        Object.keys(workLog.context_data).length > 0 && (
-          <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
-            <div className="px-4 py-2 bg-default-50 border-b border-default-100">
-              <h3 className="text-sm font-semibold text-default-700">
-                Production Details
-              </h3>
-            </div>
-            <div className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {jobConfig?.contextFields.map((field) => {
-                  const value = workLog.context_data[field.id];
-                  if (value === undefined) return null;
-
-                  return (
-                    <div key={field.id}>
-                      <p className="text-xs text-default-500">{field.label}</p>
-                      <p className="font-medium text-default-800">
-                        {field.type === "select"
-                          ? field.options?.find((opt) => opt.id === value)
-                              ?.label || value
-                          : String(value)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
 
       {/* Employee Details */}
       {workLog.employeeEntries && workLog.employeeEntries.length > 0 && (
@@ -320,7 +336,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </div>
           </div>
 
-          <div className="max-h-[calc(100vh-350px)] overflow-y-auto">
+          <div className="max-h-[calc(100vh-230px)] overflow-y-auto">
             <table className="min-w-full">
               <thead className="bg-default-50 sticky top-0 z-10">
                 <tr>

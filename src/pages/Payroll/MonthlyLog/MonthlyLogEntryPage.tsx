@@ -825,7 +825,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       <div className="bg-white p-4 rounded-lg border border-default-200">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <BackButton onClick={handleCancel} className="!mb-0" />
+            <BackButton onClick={handleCancel} />
             <div className="h-6 w-px bg-default-300"></div>
             <h1 className="text-lg font-semibold text-default-800">
               {mode === "edit" ? "Edit" : "New"} {jobConfig?.name} Monthly Entry
