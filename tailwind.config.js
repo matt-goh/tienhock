@@ -14,6 +14,7 @@ export default {
       blue: colors.blue,
       indigo: colors.indigo,
       purple: colors.purple,
+      violet: colors.violet,
       rose: colors.rose,
       red: colors.red,
       yellow: colors.yellow,
@@ -22,6 +23,7 @@ export default {
       black: colors.black,
       amber: colors.amber,
       emerald: colors.emerald,
+      orange: colors.orange,
     },
     extend: {
       fontFamily: {

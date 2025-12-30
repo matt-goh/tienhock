@@ -1,14 +1,12 @@
 // src/utils/payroll/PayslipManager.ts
-import { pdf, Document } from "@react-pdf/renderer";
-import PaySlipPDF from "./PaySlipPDF";
 import { EmployeePayroll } from "../../types/types";
 import { MidMonthPayroll } from "./midMonthPayrollUtils";
 import toast from "react-hot-toast";
-import React from "react";
 import {
   getEmployeePayrollDetails,
   getEmployeePayrollDetailsBatch,
 } from "./payrollUtils";
+import { getPaySlipPDFBlob, getBatchPaySlipPDFBlob } from "./PaySlipPDFMake";
 
 // Types
 export interface StaffDetails {
@@ -43,17 +41,12 @@ const generatePayslipPDF = async (
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   midMonthPayroll?: MidMonthPayroll | null
 ): Promise<Blob> => {
-  // Create React elements with createElement instead of JSX
-  const paySlipElement = React.createElement(PaySlipPDF, {
+  return await getPaySlipPDFBlob({
     payroll,
     companyName,
     staffDetails,
     midMonthPayroll,
   });
-
-  const documentElement = React.createElement(Document, {}, paySlipElement);
-
-  return await pdf(documentElement).toBlob();
 };
 
 const generateBatchPayslipPDF = async (
@@ -62,20 +55,12 @@ const generateBatchPayslipPDF = async (
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>
 ): Promise<Blob> => {
-  // Map payrolls to React elements
-  const paySlipElements = payrolls.map((payroll, index) =>
-    React.createElement(PaySlipPDF, {
-      key: index,
-      payroll,
-      companyName,
-      staffDetails: staffDetailsMap?.[payroll.employee_id],
-      midMonthPayroll: midMonthPayrollsMap?.[payroll.employee_id],
-    })
+  return await getBatchPaySlipPDFBlob(
+    payrolls,
+    staffDetailsMap,
+    companyName,
+    midMonthPayrollsMap
   );
-
-  const documentElement = React.createElement(Document, {}, ...paySlipElements);
-
-  return await pdf(documentElement).toBlob();
 };
 
 // Core functionality for downloading

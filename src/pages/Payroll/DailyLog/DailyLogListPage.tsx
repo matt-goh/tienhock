@@ -1,17 +1,26 @@
 // src/pages/Payroll/ProductionListPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconPlus, IconPencil, IconTrash, IconEye } from "@tabler/icons-react";
-import Button from "../../components/Button";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
-import DateRangePicker from "../../components/DateRangePicker";
-import MonthNavigator from "../../components/MonthNavigator";
-import StyledListbox from "../../components/StyledListbox";
-import { api } from "../../routes/utils/api";
+import {
+  IconPlus,
+  IconPencil,
+  IconTrash,
+  IconCalendarEvent,
+  IconClock,
+  IconUsers,
+  IconClipboardList,
+  IconLock,
+} from "@tabler/icons-react";
+import Button from "../../../components/Button";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import DateRangePicker from "../../../components/DateRangePicker";
+import MonthNavigator from "../../../components/MonthNavigator";
+import StyledListbox from "../../../components/StyledListbox";
+import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
-import { getJobConfig } from "../../configs/payrollJobConfigs";
+import { getJobConfig } from "../../../configs/payrollJobConfigs";
 
 interface DailyLogListPageProps {
   jobType: string;
@@ -40,7 +49,7 @@ interface WorkLog {
 }
 
 const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
-  const [workLogs, setWorkLogs] = useState<any[]>([]);
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const jobConfig = getJobConfig(jobType);
@@ -75,9 +84,6 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
       status: null,
     };
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalLogs, setTotalLogs] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [logToDelete, setLogToDelete] = useState<WorkLog | null>(null);
 
@@ -142,16 +148,14 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
         params.append("status", filters.status);
       }
 
-      params.append("page", currentPage.toString());
-      params.append("limit", "20");
+      // Remove pagination - fetch all records
+      params.append("limit", "1000");
 
       const response = await api.get(
         `/api/daily-work-logs?${params.toString()}`
       );
 
       setWorkLogs(response.logs);
-      setTotalLogs(response.total);
-      setTotalPages(response.totalPages);
     } catch (error) {
       console.error("Error fetching work logs:", error);
       toast.error("Failed to fetch work logs");
@@ -162,7 +166,18 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
 
   useEffect(() => {
     fetchWorkLogs();
-  }, [filters, currentPage, jobConfig]);
+  }, [filters, jobConfig]);
+
+  // Calculate summary stats
+  const summaryStats = useMemo(() => {
+    const totalRecords = workLogs.length;
+    const totalHours = workLogs.reduce((sum, log) => sum + log.total_hours, 0);
+    const totalWorkers = workLogs.reduce(
+      (sum, log) => sum + log.total_workers,
+      0
+    );
+    return { totalRecords, totalHours, totalWorkers };
+  }, [workLogs]);
 
   // Handle month change from MonthNavigator
   const handleMonthChange = (newDate: Date) => {
@@ -184,11 +199,11 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
     navigate(`/payroll/${jobType.toLowerCase()}-entry`);
   };
 
-  const handleViewLog = (log: any) => {
+  const handleViewLog = (log: WorkLog) => {
     navigate(`/payroll/${jobType.toLowerCase()}-production/${log.id}`);
   };
 
-  const handleEditLog = (log: any) => {
+  const handleEditLog = (log: WorkLog) => {
     navigate(`/payroll/${jobType.toLowerCase()}-production/${log.id}/edit`);
   };
 
@@ -210,15 +225,20 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Submitted":
-        return "bg-sky-100 text-sky-700";
-      case "Processed":
-        return "bg-emerald-100 text-emerald-700";
-      default:
-        return "bg-default-100 text-default-700";
+  const getStatusBadge = (status: string) => {
+    if (status === "Processed") {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+          <IconLock size={12} className="mr-1" />
+          {status}
+        </span>
+      );
     }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+        {status}
+      </span>
+    );
   };
 
   const getDayTypeColor = (dayType: string, logDate?: string) => {
@@ -242,77 +262,87 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800">
-          {jobConfig?.name} Records
-        </h1>
-        <div className="mt-4 md:mt-0">
-          <Button onClick={handleAddEntry} icon={IconPlus} color="sky">
-            New {jobConfig?.name} Entry
-          </Button>
+      {/* Compact Header */}
+      <div className="bg-white rounded-lg border border-default-200 px-4 py-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Left: Title + Stats */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <h1 className="text-xl font-semibold text-default-800">
+              {jobConfig?.name} Records
+            </h1>
+            {!isLoading && workLogs.length > 0 && (
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
+                <span className="text-default-300 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1.5">
+                  <IconCalendarEvent size={16} className="text-sky-600" />
+                  <span className="font-medium text-default-700">
+                    {summaryStats.totalRecords}
+                  </span>
+                  <span className="text-default-400">records</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Filters + Button */}
+          <div className="flex flex-wrap items-center gap-3">
+            <DateRangePicker
+              dateRange={filters.dateRange}
+              onDateChange={(newRange) =>
+                setFilters({ ...filters, dateRange: newRange })
+              }
+            />
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={handleMonthChange}
+              showGoToCurrentButton={false}
+              dateRange={filters.dateRange}
+            />
+            <div className="w-32">
+              <StyledListbox
+                value={filters.shift || "all"}
+                onChange={(value) =>
+                  setFilters({ ...filters, shift: value.toString() })
+                }
+                options={shiftOptions}
+                rounded="lg"
+              />
+            </div>
+            <div className="w-32">
+              <StyledListbox
+                value={filters.status || "all"}
+                onChange={(value) =>
+                  setFilters({ ...filters, status: value.toString() })
+                }
+                options={statusOptions}
+                rounded="lg"
+              />
+            </div>
+            <Button onClick={handleAddEntry} icon={IconPlus} color="sky">
+              New Entry
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-lg border border-default-200">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Date Range Picker */}
-          <DateRangePicker
-            dateRange={filters.dateRange}
-            onDateChange={(newRange) =>
-              setFilters({ ...filters, dateRange: newRange })
-            }
-          />
-          {/* Month Navigator */}
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={handleMonthChange}
-            showGoToCurrentButton={false}
-            dateRange={filters.dateRange}
-          />
-          {/* Shift Listbox */}
-          <div className="w-40">
-            <StyledListbox
-              value={filters.shift || "all"}
-              onChange={(value) =>
-                setFilters({ ...filters, shift: value.toString() })
-              }
-              options={shiftOptions}
-              rounded="lg"
-            />
-          </div>
-          {/* Status Listbox */}
-          <div className="w-40">
-            <StyledListbox
-              value={filters.status || "all"}
-              onChange={(value) =>
-                setFilters({ ...filters, status: value.toString() })
-              }
-              options={statusOptions}
-              rounded="lg"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Table with context-specific columns */}
+      {/* Table with Sticky Header */}
       {isLoading ? (
         <div className="flex justify-center py-20">
           <LoadingSpinner />
         </div>
       ) : workLogs.length > 0 ? (
         <div className="bg-white rounded-lg border border-default-200 shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-100">
+          <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
+            <table className="min-w-full table-fixed">
+              <thead className="bg-default-100 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-32">
                     Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-24">
                     Shift
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
                     Day Type
                   </th>
                   {/* Dynamic context columns */}
@@ -321,40 +351,40 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                     .map((field) => (
                       <th
                         key={field.id}
-                        className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600"
+                        className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-28"
                       >
                         {field.label}
                       </th>
                     ))}
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                    Total Workers
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                    Workers
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                    Total Hours
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                    Hours
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-28">
                     Status
                   </th>
-                  <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="w-24 px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-200 bg-white">
+              <tbody className="divide-y divide-default-100 bg-white">
                 {workLogs.map((log) => (
                   <tr
                     key={log.id}
-                    className="hover:bg-default-50 cursor-pointer"
+                    className="hover:bg-default-50 cursor-pointer transition-colors"
                     onClick={() => handleViewLog(log)}
                   >
-                    <td className="px-4 py-3 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700">
                       {format(new Date(log.log_date), "dd MMM yyyy")}
                     </td>
-                    <td className="px-4 py-3 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700">
                       {log.shift === 1 ? "Day" : "Night"}
                     </td>
                     <td
-                      className={`px-4 py-3 text-sm text-center font-medium ${getDayTypeColor(
+                      className={`px-4 py-2 text-sm text-center font-medium ${getDayTypeColor(
                         log.day_type,
                         log.log_date
                       )}`}
@@ -367,57 +397,43 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                       .map((field) => (
                         <td
                           key={field.id}
-                          className="px-4 py-3 text-sm text-center text-default-700"
+                          className="px-4 py-2 text-sm text-center text-default-700"
                         >
-                          {log.context_data?.[field.id] ?? "-"}
+                          {(log as any).context_data?.[field.id] ?? "-"}
                         </td>
                       ))}
-                    <td className="px-4 py-3 text-sm text-center text-default-700">
+                    <td className="px-4 py-2 text-sm text-center text-default-700">
                       {log.total_workers}
                     </td>
-                    <td className="px-4 py-3 text-sm text-center text-default-700">
+                    <td className="px-4 py-2 text-sm text-center text-default-700">
                       {log.total_hours.toFixed(1)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          log.status
-                        )}`}
-                      >
-                        {log.status}
-                      </span>
+                    <td className="px-4 py-2 text-center">
+                      {getStatusBadge(log.status)}
                     </td>
-                    <td className="px-4 py-3 text-center text-sm">
-                      <div className="flex items-center justify-center space-x-2">
-                        <button
-                          className="text-sky-600 hover:text-sky-800"
-                          title="View"
-                          onClick={() => {}}
-                        >
-                          <IconEye size={18} />
-                        </button>
+                    <td className="px-4 py-2 text-center text-sm">
+                      <div
+                        className="flex items-center justify-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {log.status !== "Processed" && (
                           <>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditLog(log);
-                              }}
-                              className="text-emerald-600 hover:text-emerald-800"
+                              onClick={() => handleEditLog(log)}
+                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-colors"
                               title="Edit"
                             >
-                              <IconPencil size={18} />
+                              <IconPencil size={16} />
                             </button>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
+                              onClick={() => {
                                 setLogToDelete(log);
                                 setShowDeleteDialog(true);
                               }}
-                              className="text-rose-600 hover:text-rose-800"
+                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition-colors"
                               title="Delete"
                             >
-                              <IconTrash size={18} />
+                              <IconTrash size={16} />
                             </button>
                           </>
                         )}
@@ -428,45 +444,24 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-4 py-3 flex items-center justify-between border-t border-default-200">
-              <div className="text-sm text-default-500">
-                Showing {workLogs.length} of {totalLogs} records
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-default-200 shadow-sm">
-          <div className="p-6 text-center text-default-500">
-            <p>No production records found.</p>
-            <p className="mt-2">
-              Click the "New {jobConfig?.name} Entry" button to record work
-              hours.
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mb-4">
+              <IconClipboardList size={32} className="text-default-400" />
+            </div>
+            <p className="text-default-600 font-medium mb-1">
+              No records found
+            </p>
+            <p className="text-default-400 text-sm text-center max-w-md">
+              No {jobConfig?.name.toLowerCase()} records found for the selected
+              date range. Click "New Entry" to add a work log.
             </p>
           </div>
         </div>
       )}
+
       <ConfirmationDialog
         isOpen={showDeleteDialog}
         onClose={() => {

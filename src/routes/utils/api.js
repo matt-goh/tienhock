@@ -27,6 +27,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        cache: "no-store",
         headers: {
           "Content-Type": "application/json",
           "x-session-id": sessionId,

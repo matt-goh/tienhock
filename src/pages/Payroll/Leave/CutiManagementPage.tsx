@@ -1,6 +1,6 @@
 // src/pages/Payroll/CutiManagementPage.tsx
 import React from "react";
-import Tab from "../../components/Tab";
+import Tab from "../../../components/Tab";
 import CutiReportPage from "./CutiReportPage";
 import HolidayCalendarPage from "./HolidayCalendarPage";
 

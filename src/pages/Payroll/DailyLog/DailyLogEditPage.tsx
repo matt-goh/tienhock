@@ -1,12 +1,12 @@
 // src/pages/Payroll/DailyLogEditPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import { api } from "../../routes/utils/api";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import DailyLogEntryPage from "./DailyLogEntryPage";
-import Button from "../../components/Button";
-import { getJobConfig } from "../../configs/payrollJobConfigs";
+import Button from "../../../components/Button";
+import { getJobConfig } from "../../../configs/payrollJobConfigs";
 
 interface DailyLogEditPageProps {
   jobType: string;

@@ -23,6 +23,8 @@ interface StyledListboxProps {
   rounded?: "full" | "lg";
   /** Size variant for the component */
   size?: "sm" | "md";
+  /** Anchor position for dropdown - "bottom" (default) or "top" */
+  anchor?: "bottom" | "top";
 }
 
 const StyledListbox: React.FC<StyledListboxProps> = ({
@@ -33,6 +35,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
   placeholder = "Select...",
   rounded = "full",
   size = "md",
+  anchor = "bottom",
 }) => {
   const selectedOption = options.find((option) => option.id === value);
   const displayValue = selectedOption?.name ?? placeholder;
@@ -58,7 +61,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <ListboxOptions className="absolute z-[100] w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            <ListboxOptions className={`absolute z-[100] w-full p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg ${anchor === "top" ? "bottom-full mb-1" : "mt-1"}`}>
               {options.map((option) => (
                 <ListboxOption
                   key={option.id}

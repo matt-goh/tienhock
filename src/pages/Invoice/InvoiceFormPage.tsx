@@ -748,34 +748,38 @@ const InvoiceFormPage: React.FC = () => {
   // --- JSX Output ---
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBackClick} disabled={isSaving} />
-
-      {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-        <h1 className="flex space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4">
-          New Invoice
-        </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={handleCreateInvoice}
-            variant="filled"
-            color="sky"
-            size="md"
-            disabled={isSaving} // Disable button during the entire save process
-          >
-            {isSaving // Show generic saving text
-              ? "Saving..."
-              : isPaid
-              ? "Create & Mark Paid"
-              : "Create Invoice"}
-          </Button>
+      {/* Unified Card - All Sections Connected */}
+      <div className="bg-white rounded-lg border border-default-200">
+        {/* Header */}
+        <div className="px-6 py-3 border-b border-default-200">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+            <div className="flex items-center gap-4">
+              <BackButton onClick={handleBackClick} disabled={isSaving} />
+              <div className="h-6 w-px bg-default-300"></div>
+              <h1 className="text-xl font-semibold text-default-900">
+                New Invoice
+              </h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={handleCreateInvoice}
+                variant="filled"
+                color="sky"
+                size="md"
+                disabled={isSaving}
+              >
+                {isSaving
+                  ? "Saving..."
+                  : isPaid
+                  ? "Create & Mark Paid"
+                  : "Create Invoice"}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div className="space-y-5">
         {/* Invoice Header Fields */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
+        <div className="p-4 border-b border-default-200">
           <InvoiceHeader
             invoice={invoiceData}
             onInputChange={handleHeaderInputChange}
@@ -791,10 +795,10 @@ const InvoiceFormPage: React.FC = () => {
             isFetchingCustomers={isCustomersLoading}
             readOnly={isSaving}
           />
-        </section>
+        </div>
 
         {/* Line Items Section */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
+        <div className="p-4 border-b border-default-200">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">Line Items</h2>
             <div>
@@ -822,18 +826,16 @@ const InvoiceFormPage: React.FC = () => {
             onItemsChange={handleLineItemsChange}
             customerProducts={customerProducts}
             productsCache={productsForTable}
-            readOnly={isSaving} // Make table read-only while saving
+            readOnly={isSaving}
           />
-        </section>
+        </div>
 
         {/* Totals & Payment Section */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm flex flex-col md:flex-row justify-between items-start gap-6">
+        <div className="p-4 flex flex-col md:flex-row justify-between items-start gap-6">
           <div className="flex w-full gap-4">
-            {/* Invoice Number & Date Fields */}
             {/* Left Side: Paid Checkbox & Payment Details */}
             <div className="w-full md:w-2/5 space-y-4">
               <div className="flex items-center pt-1">
-                {/* Paid Checkbox Logic */}
                 <button
                   type="button"
                   onClick={() => {
@@ -848,7 +850,7 @@ const InvoiceFormPage: React.FC = () => {
                     invoiceData?.paymenttype === "CASH"
                       ? "cursor-not-allowed opacity-70"
                       : ""
-                  } ${isSaving ? "cursor-not-allowed opacity-50" : ""}`} // Disable interaction when saving
+                  } ${isSaving ? "cursor-not-allowed opacity-50" : ""}`}
                   disabled={isSaving || invoiceData?.paymenttype === "CASH"}
                   title={
                     invoiceData?.paymenttype === "CASH"
@@ -873,7 +875,6 @@ const InvoiceFormPage: React.FC = () => {
               </div>
               {isPaid && (
                 <div className="flex items-center gap-3 w-full">
-                  {/* Payment Method & Reference */}
                   <FormListbox
                     name="paymentMethod"
                     label="Payment Method"
@@ -946,10 +947,10 @@ const InvoiceFormPage: React.FC = () => {
               rounding={invoiceData.rounding}
               grandTotal={invoiceData.totalamountpayable}
               onRoundingChange={handleRoundingChange}
-              readOnly={isSaving} // Make totals read-only while saving
+              readOnly={isSaving}
             />
           </div>
-        </section>
+        </div>
       </div>
 
       {/* Confirmation Dialogs */}

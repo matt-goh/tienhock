@@ -33,25 +33,34 @@ import ProductionEntryPage from "./Stock/ProductionEntryPage";
 import StockMovementPage from "./Stock/StockMovementPage";
 import StockAdjustmentEntryPage from "./Stock/StockAdjustmentEntryPage";
 
-// Payroll related imports
-import DailyLogListPage from "./Payroll/DailyLogListPage";
-import DailyLogEntryPage from "./Payroll/DailyLogEntryPage";
-import DailyLogDetailsPage from "./Payroll/DailyLogDetailsPage";
-import DailyLogEditPage from "./Payroll/DailyLogEditPage";
-import MonthlyLogListPage from "./Payroll/MonthlyLogListPage";
-import MonthlyLogEntryPage from "./Payroll/MonthlyLogEntryPage";
-import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
-import MonthlyLogEditPage from "./Payroll/MonthlyLogEditPage";
-import CutiManagementPage from "./Payroll/CutiManagementPage";
-import ContributionRatesPage from "./Payroll/ContributionRatesPage";
-import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
-import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
-import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
-import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
-import IncentivesPage from "./Payroll/IncentivesPage";
-import PinjamListPage from "./Payroll/PinjamListPage";
+// Payroll - DailyLog
+import DailyLogListPage from "./Payroll/DailyLog/DailyLogListPage";
+import DailyLogEntryPage from "./Payroll/DailyLog/DailyLogEntryPage";
+import DailyLogDetailsPage from "./Payroll/DailyLog/DailyLogDetailsPage";
+import DailyLogEditPage from "./Payroll/DailyLog/DailyLogEditPage";
+
+// Payroll - MonthlyLog
+import MonthlyLogListPage from "./Payroll/MonthlyLog/MonthlyLogListPage";
+import MonthlyLogEntryPage from "./Payroll/MonthlyLog/MonthlyLogEntryPage";
+import MonthlyLogDetailsPage from "./Payroll/MonthlyLog/MonthlyLogDetailsPage";
+import MonthlyLogEditPage from "./Payroll/MonthlyLog/MonthlyLogEditPage";
+
+// Payroll - Leave
+import CutiManagementPage from "./Payroll/Leave/CutiManagementPage";
+
+// Payroll - Statutory
+import ContributionRatesPage from "./Payroll/Statutory/ContributionRatesPage";
+import ECarumanPage from "./Payroll/Statutory/ECarumanPage";
+
+// Payroll - AddOn
+import IncentivesPage from "./Payroll/AddOn/IncentivesPage";
+import PinjamListPage from "./Payroll/AddOn/PinjamListPage";
+import MidMonthPayrollPage from "./Payroll/AddOn/MidMonthPayrollPage";
+
+// Payroll - Root
+import PayrollPage from "./Payroll/PayrollPage";
+import PayrollDetailsPage from "./Payroll/PayrollDetailsPage";
 import SalaryReportPage from "./Payroll/SalaryReportPage";
-import ECarumanPage from "./Payroll/ECarumanPage";
 
 // Catalogue related imports
 // Staff
@@ -79,19 +88,14 @@ const generatePayrollSubItems = (): SidebarItem[] => {
 
   // Add Monthly Payrolls
   payrollSubItems.push({
-    name: "Monthly Payrolls",
+    name: "Payrolls",
     path: "/payroll/monthly-payrolls",
-    component: MonthlyPayrollDetailsPage,
+    component: PayrollPage,
     subItems: [
-      {
-        name: "Process Payroll",
-        path: "/payroll/monthly-payrolls/:id/process",
-        component: PayrollProcessingPage,
-      },
       {
         name: "Employee Payroll Details",
         path: "/payroll/employee-payroll/:id",
-        component: EmployeePayrollDetailsPage,
+        component: PayrollDetailsPage,
       },
     ],
   });
