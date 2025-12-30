@@ -7,17 +7,12 @@ import {
   IconChevronUp,
   IconChevronsDown,
   IconChevronsUp,
-  IconEye,
   IconBriefcase,
   IconCash,
-  IconCircleCheck,
   IconUsers,
   IconLock,
   IconClockPlay,
   IconRefresh,
-  IconSearch,
-  IconX,
-  IconFilter,
   IconSelectAll,
   IconPlus,
 } from "@tabler/icons-react";
@@ -34,7 +29,6 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
-import { FormListbox } from "../../components/FormComponents";
 import Checkbox from "../../components/Checkbox";
 import {
   DownloadBatchPayslipsButton,
@@ -46,6 +40,7 @@ import {
 } from "../../utils/payroll/midMonthPayrollUtils";
 import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
 import MonthNavigator from "../../components/MonthNavigator";
+import EmployeePayrollCard from "../../components/Payroll/EmployeePayrollCard";
 
 const MonthlyPayrollDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -63,8 +58,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filteredJobType, setFilteredJobType] = useState<string>("all");
-  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
   const [selectedEmployeePayrolls, setSelectedEmployeePayrolls] = useState<
     Record<string, boolean>
   >({});
@@ -145,31 +138,17 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
 
   const getFilteredEmployees = useCallback(
     (jobType: string, employees: EmployeePayroll[]) => {
-      if (!searchTerm && filteredJobType === "all") return employees;
+      if (!searchTerm) return employees;
 
       return employees.filter((emp) => {
-        const matchesSearch =
-          !searchTerm ||
+        return (
           emp.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesJobFilter =
-          filteredJobType === "all" || emp.job_type === filteredJobType;
-
-        return matchesSearch && matchesJobFilter;
+          emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
+        );
       });
     },
-    [searchTerm, filteredJobType]
+    [searchTerm]
   );
-
-  // Get all unique job types for the filter dropdown
-  const jobTypes = useMemo(() => {
-    if (!payroll?.employeePayrolls) return [];
-    const types = Array.from(
-      new Set(payroll.employeePayrolls.map((emp) => emp.job_type))
-    );
-    return ["all", ...types];
-  }, [payroll?.employeePayrolls]);
 
   const handleToggleJobExpansion = (jobType: string) => {
     setExpandedJobs((prev) => ({
@@ -323,7 +302,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   // Reset selections when filters change
   useEffect(() => {
     setSelectedEmployeePayrolls({});
-  }, [searchTerm, filteredJobType]);
+  }, [searchTerm]);
 
   const handleToggleAllJobs = (expanded: boolean) => {
     if (!payroll?.employeePayrolls) return;
@@ -429,7 +408,7 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="bg-white rounded-lg border border-default-200 p-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
             <div className="flex items-center gap-3">
               <MonthNavigator
                 selectedMonth={selectedMonth}
@@ -460,10 +439,14 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
   );
   const totals = calculateTotals(payroll.employeePayrolls || []);
 
+  // Check if all jobs are expanded
+  const areAllJobsExpanded = Object.keys(groupedEmployees).length > 0 &&
+    Object.keys(groupedEmployees).every((jobType) => expandedJobs[jobType]);
+
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
           <div className="flex items-center gap-3">
             <MonthNavigator
               selectedMonth={selectedMonth}
@@ -526,92 +509,38 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Payroll Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm hover:shadow transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Total Employees</p>
-                <p className="text-xl font-semibold text-default-800 mt-1">
-                  {payroll.employeePayrolls.length}
-                </p>
-              </div>
-              <div className="bg-sky-100 p-2.5 rounded-full">
-                <IconUsers className="h-6 w-6 text-sky-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm hover:shadow transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Gross Pay</p>
-                <p className="text-xl font-semibold text-default-800 mt-1">
-                  {formatCurrency(totals.grossPay)}
-                </p>
-              </div>
-              <div className="bg-emerald-100 p-2.5 rounded-full">
-                <IconCash className="h-6 w-6 text-emerald-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm hover:shadow transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Job Types</p>
-                <p className="text-xl font-semibold text-default-800 mt-1">
-                  {Object.keys(groupedEmployees).length}
-                </p>
-              </div>
-              <div className="bg-amber-100 p-2.5 rounded-full">
-                <IconBriefcase className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm hover:shadow transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-default-500">Status</p>
-                <p className="text-xl font-semibold text-default-800 mt-1 flex items-center">
-                  <span>{payroll.status}</span>
-                  {payroll.status === "Finalized" && (
-                    <IconLock size={16} className="ml-1.5 text-amber-600" />
-                  )}
-                </p>
-              </div>
-              <div
-                className={clsx(
-                  "p-2.5 rounded-full",
-                  payroll.status === "Processing"
-                    ? "bg-sky-100"
-                    : payroll.status === "Finalized"
-                    ? "bg-emerald-100"
-                    : "bg-amber-100"
-                )}
-              >
-                <IconCircleCheck
-                  className={clsx(
-                    "h-6 w-6",
-                    payroll.status === "Processing"
-                      ? "text-sky-600"
-                      : payroll.status === "Finalized"
-                      ? "text-emerald-600"
-                      : "text-amber-600"
-                  )}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Enhanced Employee Payrolls Section */}
-        <div className="mt-6">
+        <div className="mt-2">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-            <h2 className="text-lg font-semibold text-default-800">
-              Employee Payrolls
-            </h2>
+            {/* Title + Inline Stats */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              {/* Compact Stats */}
+              <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <IconUsers size={16} className="text-sky-600" />
+                  <span className="font-medium text-default-700">
+                    {payroll.employeePayrolls.length}
+                  </span>
+                  <span className="text-default-400">employees</span>
+                </div>
+                <span className="text-default-300">•</span>
+                <div className="flex items-center gap-1.5">
+                  <IconBriefcase size={16} className="text-amber-600" />
+                  <span className="font-medium text-default-700">
+                    {Object.keys(groupedEmployees).length}
+                  </span>
+                  <span className="text-default-400">kerja</span>
+                </div>
+                <span className="text-default-300">•</span>
+                <div className="flex items-center gap-1.5">
+                  <IconCash size={16} className="text-emerald-600" />
+                  <span className="font-semibold text-emerald-700">
+                    {formatCurrency(totals.grossPay)}
+                  </span>
+                  <span className="text-default-400">total</span>
+                </div>
+              </div>
+            </div>
             <div className="flex space-x-2 mt-2 md:mt-0">
               {/* Batch action buttons - show only when employees are selected */}
               {selectedCount > 0 && (
@@ -654,104 +583,34 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
               >
                 {isAllSelected ? "Deselect All" : "Select All"}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={IconFilter}
-                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-              >
-                {isFilterExpanded ? "Hide Filters" : "Show Filters"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={IconChevronsDown}
-                onClick={() => handleToggleAllJobs(true)}
-              >
-                Expand All
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={IconChevronsUp}
-                onClick={() => handleToggleAllJobs(false)}
-              >
-                Collapse All
-              </Button>
-            </div>
-          </div>
-
-          {/* New Search & Filter Bar */}
-          {isFilterExpanded && (
-            <div className="bg-default-50 border border-default-200 rounded-lg p-4 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Search Input */}
-                <div>
-                  <label
-                    htmlFor="search-employees"
-                    className="block text-sm font-medium text-default-700 mb-1"
-                  >
-                    Search Employees
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <IconSearch size={18} className="text-default-400" />
-                    </div>
-                    <input
-                      id="search-employees"
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-                      placeholder="Search by name or ID..."
-                    />
-                  </div>
-                </div>
-
-                {/* Job Type Filter - Replace with FormListbox */}
-                <div>
-                  <FormListbox
-                    name="jobTypeFilter"
-                    label="Filter by Job Type"
-                    value={filteredJobType}
-                    onChange={(value) => setFilteredJobType(value)}
-                    options={jobTypes.map((type) => ({
-                      id: type,
-                      name: type === "all" ? "All Job Types" : type,
-                    }))}
-                  />
-                </div>
-              </div>
-
-              {/* Show active filters & counts */}
-              <div className="flex items-center mt-3 text-sm">
-                <span className="text-default-600">
-                  Showing{" "}
-                  {
-                    Object.values(groupedEmployees)
-                      .flat()
-                      .filter(
-                        (emp) =>
-                          getFilteredEmployees(emp.job_type, [emp]).length > 0
-                      ).length
-                  }{" "}
-                  of {payroll.employeePayrolls.length} employees
-                </span>
-                {(searchTerm || filteredJobType !== "all") && (
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="px-3 py-1 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
+                />
+                {searchTerm && (
                   <button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setFilteredJobType("all");
-                    }}
-                    className="ml-2 text-sky-600 hover:text-sky-800 flex items-center"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                    onClick={() => setSearchTerm("")}
+                    title="Clear search"
                   >
-                    <IconX size={14} className="mr-1" />
-                    Clear filters
+                    ×
                   </button>
                 )}
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                icon={areAllJobsExpanded ? IconChevronsUp : IconChevronsDown}
+                onClick={() => handleToggleAllJobs(!areAllJobsExpanded)}
+              >
+                {areAllJobsExpanded ? "Collapse All" : "Expand All"}
+              </Button>
             </div>
-          )}
+          </div>
 
           {Object.keys(groupedEmployees).length === 0 ? (
             <div className="text-center py-8 border rounded-lg">
@@ -769,11 +628,6 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
             </div>
           ) : (
             Object.entries(groupedEmployees)
-              // Only show job types that match the filter
-              .filter(
-                ([jobType, _]) =>
-                  filteredJobType === "all" || jobType === filteredJobType
-              )
               .map(([jobType, employees]) => {
                 // Filter employees by search term
                 const filteredEmployees = getFilteredEmployees(
@@ -784,269 +638,157 @@ const MonthlyPayrollDetailsPage: React.FC = () => {
                 // Skip rendering this job group if no employees match the search
                 if (filteredEmployees.length === 0) return null;
 
+                const groupGrossPay = filteredEmployees.reduce(
+                  (sum, emp) => sum + parseFloat(emp.gross_pay.toString()),
+                  0
+                );
+                const groupNetPay = filteredEmployees.reduce(
+                  (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+                  0
+                );
+                const isGrouped = jobType.startsWith("Grouped: ");
+                const displayJobType = isGrouped
+                  ? jobType.replace("Grouped: ", "")
+                  : jobType;
+
                 return (
-                  <div key={jobType} className="mb-4">
+                  <div
+                    key={jobType}
+                    className={clsx(
+                      "mb-2 rounded-lg overflow-hidden border transition-shadow duration-200",
+                      expandedJobs[jobType]
+                        ? "shadow-md border-default-200"
+                        : "shadow-sm border-default-200 hover:shadow"
+                    )}
+                  >
+                    {/* Accordion Header */}
                     <div
-                      className={`flex justify-between items-center p-4 bg-default-50 border border-default-200 cursor-pointer hover:bg-default-100 transition-colors duration-150 ${
-                        expandedJobs[jobType] ? "rounded-t-lg" : "rounded-lg"
-                      }`}
+                      className={clsx(
+                        "flex items-center cursor-pointer transition-colors duration-150",
+                        expandedJobs[jobType]
+                          ? "bg-gradient-to-r from-sky-50 to-white"
+                          : "bg-white hover:bg-default-50"
+                      )}
                       onClick={() => handleToggleJobExpansion(jobType)}
                     >
-                      <div className="flex items-center">
-                        {expandedJobs[jobType] ? (
-                          <IconChevronUp
-                            size={20}
-                            className="text-default-500 mr-2"
-                          />
-                        ) : (
-                          <IconChevronDown
-                            size={20}
-                            className="text-default-500 mr-2"
-                          />
+                      {/* Left accent bar */}
+                      <div
+                        className={clsx(
+                          "w-1 self-stretch flex-shrink-0",
+                          isGrouped ? "bg-emerald-500" : "bg-sky-500"
                         )}
-                        <h3 className="font-medium">
-                          {jobType.startsWith("Grouped: ") 
-                            ? jobType.replace("Grouped: ", "")
-                            : jobType
-                          }
-                        </h3>
-                        <span className="ml-2 text-sm text-default-500">
-                          ({filteredEmployees.length}{" "}
-                          {filteredEmployees.length === 1
-                            ? "employee"
-                            : "employees"}
-                          {jobType.startsWith("Grouped: ") 
-                            ? " - combined payrolls"
-                            : ""}
-                          )
-                        </span>
-                      </div>
-                      <div className="text-sm text-default-600">
-                        Total:{" "}
-                        {formatCurrency(
-                          filteredEmployees.reduce(
-                            (sum, emp) =>
-                              sum + parseFloat(emp.gross_pay.toString()),
-                            0
-                          )
-                        )}
+                      />
+
+                      <div className="flex-1 flex items-center justify-between px-4 py-3">
+                        {/* Left side: Checkbox + Job info */}
+                        <div className="flex items-center flex-1 min-w-0">
+                          {/* Group Checkbox */}
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="mr-3 flex-shrink-0"
+                          >
+                            <Checkbox
+                              checked={isJobGroupSelected(jobType)}
+                              onChange={() =>
+                                handleSelectJobGroup(
+                                  jobType,
+                                  !isJobGroupSelected(jobType)
+                                )
+                              }
+                              size={20}
+                              aria-label={`Select all ${displayJobType} employees`}
+                            />
+                          </div>
+
+                          {/* Job Type Icon & Name */}
+                          <div className="flex items-center min-w-0">
+                            <IconBriefcase
+                              size={20}
+                              className={clsx(
+                                "mr-2 flex-shrink-0",
+                                isGrouped ? "text-emerald-600" : "text-sky-600"
+                              )}
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-default-800 truncate">
+                                  {displayJobType}
+                                </h3>
+                                {isGrouped && (
+                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 flex-shrink-0">
+                                    Combined
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-default-500 mt-0.5">
+                                {filteredEmployees.length}{" "}
+                                {filteredEmployees.length === 1
+                                  ? "employee"
+                                  : "employees"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right side: Totals + Chevron */}
+                        <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                          {/* Pay Totals */}
+                          <div className="hidden sm:flex items-center gap-4 text-right">
+                            <div>
+                              <p className="text-xs text-default-400">Gross</p>
+                              <p className="text-sm font-semibold text-default-700">
+                                {formatCurrency(groupGrossPay)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-default-400">Net</p>
+                              <p className="text-sm font-semibold text-emerald-600">
+                                {formatCurrency(groupNetPay)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Chevron */}
+                          <div
+                            className={clsx(
+                              "p-1.5 rounded-full transition-colors",
+                              expandedJobs[jobType]
+                                ? "bg-sky-100 text-sky-600"
+                                : "bg-default-100 text-default-500"
+                            )}
+                          >
+                            {expandedJobs[jobType] ? (
+                              <IconChevronUp size={18} />
+                            ) : (
+                              <IconChevronDown size={18} />
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
+                    {/* Accordion Content - Card Grid */}
                     {expandedJobs[jobType] && (
-                      <div className="border-l border-r border-b border-default-200 rounded-b-lg overflow-hidden shadow-sm">
-                        <table className="min-w-full divide-y divide-default-200">
-                          <thead className="bg-default-50">
-                            <tr>
-                              <th
-                                scope="col"
-                                className="px-1 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectJobGroup(
-                                    jobType,
-                                    !isJobGroupSelected(jobType)
-                                  );
-                                }}
-                                style={{ cursor: "pointer" }}
-                              >
-                                <div className="flex justify-center">
-                                  <Checkbox
-                                    checked={isJobGroupSelected(jobType)}
-                                    onChange={() =>
-                                      handleSelectJobGroup(
-                                        jobType,
-                                        !isJobGroupSelected(jobType)
-                                      )
-                                    }
-                                    size={20}
-                                    aria-label={`Select all ${jobType} employees`}
-                                  />
-                                </div>
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                              >
-                                Employee
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
-                              >
-                                Section
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                              >
-                                Gross Pay
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                              >
-                                Net Pay
-                              </th>
-                              <th
-                                scope="col"
-                                className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
-                              >
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-default-200">
-                            {filteredEmployees.map((employeePayroll) => (
-                              <tr
-                                key={employeePayroll.id}
-                                className="hover:bg-default-50 transition-colors duration-150 cursor-pointer"
-                                onClick={() =>
-                                  handleViewEmployeePayroll(employeePayroll.id)
-                                }
-                              >
-                                <td
-                                  className="px-1 py-4 whitespace-nowrap align-middle"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSelectEmployee(
-                                      employeePayroll.id as number,
-                                      !selectedEmployeePayrolls[
-                                        `${employeePayroll.id}`
-                                      ],
-                                      e
-                                    );
-                                  }}
-                                  style={{ cursor: "pointer" }}
-                                >
-                                  <div className="flex justify-center">
-                                    <Checkbox
-                                      checked={
-                                        !!selectedEmployeePayrolls[
-                                          `${employeePayroll.id}`
-                                        ]
-                                      }
-                                      onChange={(checked) =>
-                                        handleSelectEmployee(
-                                          employeePayroll.id as number,
-                                          checked,
-                                          new MouseEvent(
-                                            "click"
-                                          ) as unknown as React.MouseEvent<
-                                            Element,
-                                            MouseEvent
-                                          >
-                                        )
-                                      }
-                                      size={20}
-                                      aria-label={`Select ${
-                                        employeePayroll.employee_name ||
-                                        "employee"
-                                      }`}
-                                    />
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-default-900">
-                                    {employeePayroll.employee_name || "Unknown"}{" "}
-                                    <span className="text-default-500">({employeePayroll.employee_id})</span>
-                                    {/* Show grouped indicator if multiple job types */}
-                                    {employeePayroll.job_type &&
-                                      employeePayroll.job_type.includes(
-                                        ", "
-                                      ) && (
-                                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
-                                          Grouped
-                                        </span>
-                                      )}
-                                  </div>
-                                  {/* Show all job types if grouped */}
-                                  {employeePayroll.job_type &&
-                                    employeePayroll.job_type.includes(", ") && (
-                                      <div className="text-xs text-sky-600 mt-0.5">
-                                        Jobs: {employeePayroll.job_type}
-                                      </div>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-default-600">
-                                    {employeePayroll.section}
-                                  </div>
-                                  {/* Show combined gross pay info for grouped employees */}
-                                  {employeePayroll.job_type &&
-                                    employeePayroll.job_type.includes(", ") && (
-                                      <div className="text-xs text-emerald-600 mt-1">
-                                        Combined from{" "}
-                                        {
-                                          employeePayroll.job_type.split(", ")
-                                            .length
-                                        }{" "}
-                                        jobs
-                                      </div>
-                                    )}
-                                  {payroll.status === "Finalized" && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 mt-1">
-                                      <IconLock size={12} className="mr-1" />
-                                      Finalized
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right">
-                                  <div className="text-sm font-medium text-default-900">
-                                    {formatCurrency(
-                                      parseFloat(
-                                        employeePayroll.gross_pay.toString()
-                                      )
-                                    )}
-                                    {/* Show combined indicator for grouped employees */}
-                                    {employeePayroll.job_type &&
-                                      employeePayroll.job_type.includes(
-                                        ", "
-                                      ) && (
-                                        <div className="text-xs text-emerald-600 mt-0.5">
-                                          ∑ Combined
-                                        </div>
-                                      )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right">
-                                  <div className="text-sm font-medium text-default-900">
-                                    {formatCurrency(
-                                      parseFloat(
-                                        employeePayroll.net_pay.toString()
-                                      )
-                                    )}
-                                    {/* Show single deduction indicator for grouped employees */}
-                                    {employeePayroll.job_type &&
-                                      employeePayroll.job_type.includes(
-                                        ", "
-                                      ) && (
-                                        <div className="text-xs text-emerald-600 mt-0.5">
-                                          Single deduction
-                                        </div>
-                                      )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right">
-                                  <div className="flex justify-end space-x-2">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewEmployeePayroll(
-                                          employeePayroll.id
-                                        );
-                                      }}
-                                      className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-50"
-                                      title="View Details"
-                                    >
-                                      <IconEye size={18} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="border-t border-default-100 p-4 bg-default-50/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {filteredEmployees.map((employeePayroll) => (
+                            <EmployeePayrollCard
+                              key={employeePayroll.id}
+                              employeePayroll={employeePayroll}
+                              isSelected={
+                                !!selectedEmployeePayrolls[
+                                  `${employeePayroll.id}`
+                                ]
+                              }
+                              onSelect={handleSelectEmployee}
+                              onViewDetails={handleViewEmployeePayroll}
+                              payrollStatus={payroll.status}
+                              midMonthPayroll={
+                                midMonthPayrollsMap[employeePayroll.employee_id]
+                              }
+                            />
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
