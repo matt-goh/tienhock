@@ -44,7 +44,7 @@ import MonthlyLogDetailsPage from "./Payroll/MonthlyLogDetailsPage";
 import MonthlyLogEditPage from "./Payroll/MonthlyLogEditPage";
 import CutiManagementPage from "./Payroll/CutiManagementPage";
 import ContributionRatesPage from "./Payroll/ContributionRatesPage";
-import MonthlyPayrollDetailsPage from "./Payroll/MonthlyPayrollDetailsPage";
+import PayrollPage from "./Payroll/PayrollPage";
 import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import EmployeePayrollDetailsPage from "./Payroll/EmployeePayrollDetailsPage";
 import MidMonthPayrollPage from "./Payroll/MidMonthPayrollPage";
@@ -81,7 +81,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   payrollSubItems.push({
     name: "Monthly Payrolls",
     path: "/payroll/monthly-payrolls",
-    component: MonthlyPayrollDetailsPage,
+    component: PayrollPage,
     subItems: [
       {
         name: "Process Payroll",
