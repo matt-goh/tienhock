@@ -119,6 +119,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   } | null>(null);
   const [bulkHolidaySelections, setBulkHolidaySelections] = useState<Record<string, boolean>>({});
 
+  // Ref to track which employee IDs were originally saved in the work log
+  // Used to determine whether to use CREATE mode or EDIT mode activity selection logic
+  const savedEmployeeIdsRef = React.useRef<Set<string>>(new Set());
+  // Ref to store the original saved activities from the work log
+  // This preserves the original state even if the employee is deselected and re-selected
+  const savedEmployeeActivitiesRef = React.useRef<Record<string, ActivityItem[]>>({});
+
   // Month/Year options (kept for leave records display)
   const monthOptions = useMemo(() => [
     { id: 1, name: "January" },
@@ -170,27 +177,40 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   useEffect(() => {
     if (loadingStaffs || eligibleEmployees.length === 0) return;
 
+    // Initialize with all eligible employees
+    const entries: Record<string, EmployeeEntry> = {};
+
+    // Create a map of saved entries for quick lookup (edit mode)
+    const savedEntriesMap = new Map<string, any>();
     if (mode === "edit" && existingWorkLog?.employeeEntries) {
-      // Populate from existing data
-      const entries: Record<string, EmployeeEntry> = {};
+      // Clear and populate the saved employee IDs ref
+      savedEmployeeIdsRef.current = new Set();
       existingWorkLog.employeeEntries.forEach((entry: any) => {
-        entries[entry.employee_id] = {
-          employeeId: entry.employee_id,
-          employeeName: entry.employee_name,
-          jobType: entry.job_id,
-          jobName: entry.job_name,
-          totalHours: entry.total_hours,
-          overtimeHours: entry.overtime_hours || 0,
+        savedEntriesMap.set(entry.employee_id, entry);
+        savedEmployeeIdsRef.current.add(entry.employee_id);
+      });
+    }
+
+    eligibleEmployees.forEach((emp: Employee) => {
+      const empJobs = emp.job || [];
+      const matchingJob = empJobs.find((job: string) => JOB_IDS.includes(job));
+      const savedEntry = savedEntriesMap.get(emp.id);
+
+      if (savedEntry) {
+        // Restore from saved data (edit mode)
+        entries[emp.id] = {
+          employeeId: savedEntry.employee_id,
+          employeeName: savedEntry.employee_name,
+          jobType: savedEntry.job_id,
+          jobName: savedEntry.job_name,
+          totalHours: savedEntry.total_hours,
+          overtimeHours: savedEntry.overtime_hours || 0,
           selected: true,
         };
-      });
-      setEmployeeEntries(entries);
-    } else {
-      // Initialize with all eligible employees (selected by default)
-      const entries: Record<string, EmployeeEntry> = {};
-      eligibleEmployees.forEach((emp: Employee) => {
-        const empJobs = emp.job || [];
-        const matchingJob = empJobs.find((job: string) => JOB_IDS.includes(job));
+      } else {
+        // Not in saved data - use default values
+        // In create mode: selected by default
+        // In edit mode: deselected by default (wasn't in original work log)
         entries[emp.id] = {
           employeeId: emp.id,
           employeeName: emp.name,
@@ -198,11 +218,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           jobName: matchingJob || JOB_IDS[0],
           totalHours: jobConfig?.defaultHours || 176,
           overtimeHours: 0,
-          selected: true,
+          selected: mode === "create",
         };
-      });
-      setEmployeeEntries(entries);
-    }
+      }
+    });
+
+    setEmployeeEntries(entries);
   }, [eligibleEmployees, loadingStaffs, mode, existingWorkLog, JOB_IDS, jobConfig]);
 
   // Fetch and apply activities for selected employees
@@ -240,8 +261,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         // Convert map back to array
         const mergedPayCodes = Array.from(allPayCodes.values());
 
+        // Check if this employee was originally saved in the work log
+        const wasOriginallySaved = savedEmployeeIdsRef.current.has(employeeId);
+
         // Get existing activities for this employee if in edit mode
-        const existingActivitiesForEmployee = currentActivities[employeeId] || [];
+        // For originally saved employees, use the preserved ref to handle deselect/re-select cycles
+        const existingActivitiesForEmployee = wasOriginallySaved
+          ? savedEmployeeActivitiesRef.current[employeeId] || []
+          : currentActivities[employeeId] || [];
 
         // Filter out overtime codes if no overtime hours entered
         const hasOvertimeHours = overtimeHours > 0;
@@ -265,10 +292,20 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           // Determine if selected based on specific rules
           let isSelected = false;
 
-          if (mode === "edit" && existingActivity) {
-            isSelected = existingActivity.isSelected;
+          // wasOriginallySaved is already defined above for existingActivitiesForEmployee lookup
+
+          if (mode === "edit" && wasOriginallySaved) {
+            // EDIT mode for originally saved employees:
+            // If existingActivity exists, use its saved state
+            // If not, the activity was deselected - keep it deselected
+            if (existingActivity) {
+              isSelected = existingActivity.isSelected;
+            } else {
+              isSelected = false;
+            }
           } else {
-            // Apply selection rules for new activities
+            // CREATE mode OR employee wasn't in original work log:
+            // Apply auto-selection rules for new activities
             if (payCode.pay_type === "Tambahan") {
               isSelected = false;
             } else if (payCode.pay_type === "Overtime") {
@@ -364,10 +401,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   useEffect(() => {
     if (mode === "edit" && existingWorkLog?.employeeEntries) {
       const restoredActivities: Record<string, ActivityItem[]> = {};
+      // Clear the saved activities ref for this work log
+      savedEmployeeActivitiesRef.current = {};
 
       existingWorkLog.employeeEntries.forEach((entry: any) => {
         if (entry.activities && entry.activities.length > 0) {
-          restoredActivities[entry.employee_id] = entry.activities.map(
+          const activities = entry.activities.map(
             (activity: any) => ({
               payCodeId: activity.pay_code_id,
               description: activity.description,
@@ -385,6 +424,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               isDefault: false,
             })
           );
+          restoredActivities[entry.employee_id] = activities;
+          // Also store in ref to preserve original state for deselect/re-select cycles
+          savedEmployeeActivitiesRef.current[entry.employee_id] = activities;
         }
       });
 

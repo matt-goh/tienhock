@@ -240,6 +240,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Ref to track which work log's formData has been initialized
   const formDataInitializedForRef = useRef<number | null>(null);
+  // Ref to track which employee row keys were originally saved in the work log
+  // Used to determine whether to use CREATE mode or EDIT mode activity selection logic
+  const savedEmployeeRowKeysRef = useRef<Set<string>>(new Set());
+  // Ref to store the original saved activities from the work log
+  // This preserves the original state even if the employee is deselected and re-selected
+  const savedEmployeeActivitiesRef = useRef<Record<string, any[]>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -1129,6 +1135,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           : [...currentSelectedJobs, jobType],
       };
 
+      // Initialize hours when selecting (if not already set)
+      let updatedJobHours = { ...prev.jobHours };
+      if (!wasSelected) {
+        // Selecting - ensure hours are initialized
+        if (!updatedJobHours[employeeId]) {
+          updatedJobHours[employeeId] = {};
+        }
+        if (!updatedJobHours[employeeId][jobType]) {
+          updatedJobHours[employeeId][jobType] = getDefaultHours(formData.logDate);
+        }
+      }
+
       // Handle SALESMAN selection/deselection cascading to SALESMAN_IKUT employees
       if (jobType === "SALESMAN") {
         const followedEmployees = followedBySalesman[employeeId] || [];
@@ -1148,6 +1166,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 ...ikutCurrentSelectedJobs,
                 "SALESMAN_IKUT",
               ];
+            }
+            // Initialize hours for auto-selected SALESMAN_IKUT employees
+            if (!updatedJobHours[ikutEmployeeId]) {
+              updatedJobHours[ikutEmployeeId] = {};
+            }
+            if (!updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"]) {
+              updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
             }
           }
         });
@@ -1228,8 +1253,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
 
       return {
-        ...prev,
         selectedJobs: updatedSelectedJobs,
+        jobHours: updatedJobHours,
       };
     });
   };
@@ -2134,8 +2159,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Convert map back to array
           const mergedPayCodes = Array.from(allPayCodes.values());
 
+          // Check if this employee was originally saved in the work log
+          const wasOriginallySaved = savedEmployeeRowKeysRef.current.has(rowKey);
+
           // Get existing activities for this employee/job if in edit mode
-          const existingActivitiesForRow = employeeActivities[rowKey] || [];
+          // For originally saved employees, use the preserved ref to handle deselect/re-select cycles
+          const existingActivitiesForRow = wasOriginallySaved
+            ? savedEmployeeActivitiesRef.current[rowKey] || []
+            : employeeActivities[rowKey] || [];
 
           // For salesmen, we don't filter by hours since hours aren't applicable
           // Use day-specific OT threshold (5 for Saturday, 8 for others)
@@ -2171,8 +2202,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             // Determine if selected based on specific rules
             let isSelected = false;
 
-            if (mode === "edit") {
-              // In edit mode: only select activities that were explicitly saved
+            // wasOriginallySaved is already defined above for existingActivitiesForRow lookup
+
+            if (mode === "edit" && wasOriginallySaved) {
+              // EDIT mode for originally saved employees:
+              // Only select activities that were explicitly saved
               // If existingActivity exists, it was saved (and is selected)
               // If existingActivity doesn't exist, it was NOT saved (meaning it was deselected or new)
               if (existingActivity) {
@@ -2185,7 +2219,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 isSelected = false;
               }
             } else {
-              // CREATE mode: Apply auto-selection rules for new entries
+              // CREATE mode OR employee wasn't in original work log:
+              // Apply auto-selection rules for new entries
               if (payCode.pay_type === "Tambahan") {
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
@@ -2531,8 +2566,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         { muatMee: number; muatBihun: number }
       > = {};
 
+      // Clear and populate the saved employee row keys ref
+      // This tracks which employees were originally in the work log
+      savedEmployeeRowKeysRef.current = new Set();
+      // Clear and populate the saved employee activities ref
+      // This preserves original activities even after deselect/re-select cycles
+      savedEmployeeActivitiesRef.current = {};
+
       existingWorkLog.employeeEntries.forEach((entry: any) => {
         const rowKey = `${entry.employee_id}-${entry.job_id}`;
+
+        // Track this row key as originally saved
+        savedEmployeeRowKeysRef.current.add(rowKey);
 
         // Restore employee selection and hours
         if (!newSelectedJobs[entry.employee_id]) {
@@ -2549,7 +2594,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
         // Restore activities
         if (entry.activities && entry.activities.length > 0) {
-          newEmployeeActivities[rowKey] = entry.activities.map(
+          const restoredActivities = entry.activities.map(
             (activity: any) => ({
               payCodeId: activity.pay_code_id,
               description: activity.description,
@@ -2567,6 +2612,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               isContextLinked: false,
             })
           );
+          newEmployeeActivities[rowKey] = restoredActivities;
+          // Also store in ref to preserve original state for deselect/re-select cycles
+          savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
         }
 
         // Restore SALESMAN_IKUT specific data
