@@ -49,7 +49,7 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
 }) => {
   return (
     <div className="border border-default-200 rounded-lg shadow-sm">
-      <div className="max-h-[calc(100vh-204px)] overflow-y-auto">
+      <div className="max-h-[calc(100vh-150px)] overflow-y-auto">
         <table className="min-w-full table-fixed">
           <thead className="bg-default-100 sticky top-0 z-10">
             <tr>
