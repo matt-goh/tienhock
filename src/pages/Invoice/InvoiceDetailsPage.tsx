@@ -1374,66 +1374,68 @@ const InvoiceDetailsPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       )}
-      {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-        <div className="flex items-center gap-4">
-          <BackButton
-            onClick={() => {
-              // Check if we came from the list page
-              if (location.state?.fromList) {
-                navigate(-1); // Use browser back to preserve state
-              } else {
-                navigate("/sales/invoice");
-              }
-            }}
-            disabled={isLoading}
-          />
-          <div className="h-6 w-px bg-default-300"></div>
-          <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4 flex-wrap">
-          <span className="flex items-center">
-            <IconFileInvoice size={26} className="mr-2 text-gray-500" />
-            Invoice #{invoiceData.paymenttype === "CASH" ? "C" : "I"}
-            {invoiceData.id}
-          </span>
-          {/* Status Badges */}
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${invoiceStatusStyle}`}
-          >
-            {invoiceData.invoice_status.charAt(0).toUpperCase() +
-              invoiceData.invoice_status.slice(1)}
-          </span>
-          {/* E-Invoice Status Badge */}
-          {eInvoiceStatusInfo && EInvoiceIcon && (
-            <a
-              href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
-              title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
-            >
-              <EInvoiceIcon size={14} className="mr-1" />
-              e-Invoice: {eInvoiceStatusInfo.text}
-            </a>
-          )}
-          {/* Consolidated Status Badge */}
-          {consolidatedStatusInfo && ConsolidatedIcon && (
-            <a
-              href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color} hover:underline`}
-              title={`View consolidated invoice ${consolidatedStatusInfo.info.id} in MyInvois Portal`}
-            >
-              <ConsolidatedIcon size={14} />
-              Consolidated Invoice
-            </a>
-          )}
-        </h1>
-        </div>
+      {/* Header Card */}
+      <div className="bg-white rounded-lg border border-default-200 p-4">
+        {/* Row 1: Back + Title + Badges + Action Buttons */}
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <div className="flex items-center gap-3">
+            <BackButton
+              onClick={() => {
+                if (location.state?.fromList) {
+                  navigate(-1);
+                } else {
+                  navigate("/sales/invoice");
+                }
+              }}
+              disabled={isLoading}
+            />
+            <div className="h-6 w-px bg-default-300"></div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <IconFileInvoice size={26} className="text-default-500" />
+              <h1 className="text-2xl font-bold text-default-900">
+                Invoice #{invoiceData.paymenttype === "CASH" ? "C" : "I"}
+                {invoiceData.id}
+              </h1>
+              {/* Status Badge */}
+              <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium ${invoiceStatusStyle}`}
+              >
+                {invoiceData.invoice_status.charAt(0).toUpperCase() +
+                  invoiceData.invoice_status.slice(1)}
+              </span>
+              {/* E-Invoice Status Badge */}
+              {eInvoiceStatusInfo && EInvoiceIcon && (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${eInvoiceStatusInfo.color} hover:underline`}
+                  title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+                >
+                  <EInvoiceIcon size={14} />
+                  e-Invoice: {eInvoiceStatusInfo.text}
+                </a>
+              )}
+              {/* Consolidated Status Badge */}
+              {consolidatedStatusInfo && ConsolidatedIcon && (
+                <a
+                  href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color} hover:underline`}
+                  title={`View consolidated invoice ${consolidatedStatusInfo.info.id} in MyInvois Portal`}
+                >
+                  <ConsolidatedIcon size={14} />
+                  Consolidated
+                </a>
+              )}
+            </div>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
           {invoiceData.invoice_status === "cancelled" &&
             invoiceData.uuid &&
             invoiceData.einvoice_status !== "cancelled" && (
@@ -1539,274 +1541,220 @@ const InvoiceDetailsPage: React.FC = () => {
               {isCancelling ? "Cancelling..." : "Cancel"}
             </Button>
           )}
+          </div>
         </div>
-      </div>
-      {/* Payment form */}
-      {showPaymentForm && !isCancelled && !isPaid && (
-        <div className="bg-sky-50 p-4 md:p-6 rounded-lg mb-6 border border-sky-200 shadow-sm transition-all duration-300 ease-out">
-          <h2 className="text-lg font-semibold text-sky-800 mb-4">
-            Record Payment
-          </h2>
-          <form onSubmit={handleSubmitPayment}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-              <FormInput
-                name="payment_date"
-                label="Payment Date"
-                type="date"
-                value={paymentFormData.payment_date}
-                onChange={handlePaymentFormChange}
-                disabled={isProcessingPayment}
-              />
-              <FormInput
-                name="amount_paid"
-                label="Amount Paid (RM)"
-                type="number"
-                value={paymentFormData.amount_paid}
-                onChange={handlePaymentFormChange}
-                step="0.01"
-                min={0.01}
-                disabled={isProcessingPayment}
-              />
-              <FormListbox
-                name="payment_method"
-                label="Payment Method"
-                value={paymentFormData.payment_method}
-                onChange={handlePaymentMethodChange}
-                options={paymentMethodOptions}
-              />
-              {(paymentFormData.payment_method === "cheque" ||
-                paymentFormData.payment_method === "bank_transfer" ||
-                paymentFormData.payment_method === "online") && (
-                <FormInput
-                  name="payment_reference"
-                  label={
-                    paymentFormData.payment_method === "cheque"
-                      ? "Cheque Number"
-                      : paymentFormData.payment_method === "online"
-                      ? "Transaction ID"
-                      : "Transaction Ref"
-                  }
-                  value={paymentFormData.payment_reference || ""}
-                  onChange={handlePaymentFormChange}
-                  disabled={isProcessingPayment}
-                />
+
+        {/* Row 2: Key Invoice Details */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-default-200">
+          {/* Customer */}
+          <div className="group">
+            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Customer</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => navigate(`/catalogue/customer/${invoiceData.customerid}`)}
+                className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline truncate"
+                title={`${invoiceData.customerName} (${invoiceData.customerid})`}
+              >
+                {invoiceData.customerName || invoiceData.customerid}
+              </button>
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                onClick={handleOpenCustomerEdit}
+                title="Edit customer"
+                disabled={isLoading}
+              >
+                <IconPencil size={14} className="text-sky-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Salesman */}
+          <div className="group">
+            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Salesman</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => navigate(`/catalogue/staff/${invoiceData.salespersonid}`)}
+                className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline truncate"
+                title={invoiceData.salespersonid}
+              >
+                {salesmen.find((s) => s.id === invoiceData.salespersonid)?.name ||
+                  invoiceData.salespersonid}
+              </button>
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                onClick={handleOpenSalesmanEdit}
+                title="Edit salesman"
+                disabled={isLoading}
+              >
+                <IconPencil size={14} className="text-sky-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Date/Time */}
+          <div className="group">
+            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Date / Time</span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium text-gray-900">
+                {formatDisplayDate(createdDate)}{" "}
+                <span className="text-gray-500">
+                  {parseDatabaseTimestamp(invoiceData.createddate).date?.toLocaleTimeString(
+                    "en-US",
+                    { hour: "numeric", minute: "2-digit", hour12: true }
+                  ) || ""}
+                </span>
+              </span>
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                onClick={handleOpenDateTimeEdit}
+                title="Edit date/time"
+                disabled={isLoading}
+              >
+                <IconPencil size={14} className="text-sky-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Payment Type */}
+          <div className="group">
+            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Payment Type</span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium text-gray-900 capitalize">
+                {invoiceData.paymenttype.toLowerCase()}
+              </span>
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                onClick={handleOpenPaymentTypeEdit}
+                title="Edit payment type"
+                disabled={isLoading}
+              >
+                <IconPencil size={14} className="text-sky-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Balance Due */}
+          <div>
+            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Balance Due</span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-lg font-bold ${
+                  isPaid || isCancelled
+                    ? "text-green-600"
+                    : invoiceData.invoice_status === "Overdue"
+                    ? "text-red-600"
+                    : "text-amber-600"
+                }`}
+              >
+                {formatCurrency(invoiceData.balance_due)}
+              </span>
+              {isPaid && !isCancelled && (
+                <span className="text-green-600 text-xs font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                  Paid
+                </span>
+              )}
+              {isCancelled && (
+                <span className="text-rose-600 text-xs font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                  Cancelled
+                </span>
               )}
             </div>
-            <div className="mt-4">
-              <FormInput
-                name="notes"
-                label="Notes (Optional)"
-                value={paymentFormData.notes || ""}
-                onChange={handlePaymentFormChange}
-                disabled={isProcessingPayment}
-              />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowPaymentForm(false)}
-                disabled={isProcessingPayment}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="filled"
-                color="sky"
-                disabled={isProcessingPayment}
-              >
-                {isProcessingPayment ? "Processing..." : "Confirm Payment"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-      {/* Main Content Sections */}
-      <div className="space-y-4">
-        {/* Invoice Header Display */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
-            Invoice Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
-            <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
-                Customer
-              </span>
-              <div className="flex items-center">
-                <span
-                  className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
-                  title={`${invoiceData.customerName} (${invoiceData.customerid})`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/catalogue/customer/${invoiceData.customerid}`);
-                  }}
-                >
-                  {invoiceData.customerName || invoiceData.customerid}
-                </span>
-                <button
-                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenCustomerEdit();
-                  }}
-                  title="Edit customer"
-                  disabled={isLoading}
-                >
-                  <IconPencil size={14} className="text-sky-600" />
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
-                Salesman
-              </span>
-              <div className="flex items-center">
-                <span
-                  className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
-                  title={invoiceData.salespersonid}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/catalogue/staff/${invoiceData.salespersonid}`);
-                  }}
-                >
-                  {salesmen.find((s) => s.id === invoiceData.salespersonid)
-                    ?.name || invoiceData.salespersonid}
-                </span>
-                <button
-                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenSalesmanEdit();
-                  }}
-                  title="Edit salesman"
-                  disabled={isLoading}
-                >
-                  <IconPencil size={14} className="text-sky-600" />
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
-                Date / Time
-              </span>
-              <div className="flex items-center">
-                <span className="flex text-gray-900 font-medium gap-2">
-                  <span>{formatDisplayDate(createdDate)}</span>
-                  <span className="text-gray-600">
-                    {parseDatabaseTimestamp(
-                      invoiceData.createddate
-                    ).date?.toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    }) || ""}
-                  </span>
-                </span>
-                <button
-                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenDateTimeEdit();
-                  }}
-                  title="Edit date/time"
-                  disabled={isLoading}
-                >
-                  <IconPencil size={14} className="text-sky-600" />
-                </button>
-              </div>
-            </div>
-
-            {/* Payment Type with edit functionality */}
-            <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
-                Payment Type
-              </span>
-              <div className="flex items-center">
-                <span className="text-gray-900 font-medium capitalize">
-                  {invoiceData.paymenttype.toLowerCase()}
-                </span>
-                <button
-                  className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenPaymentTypeEdit();
-                  }}
-                  title="Edit payment type"
-                  disabled={isLoading}
-                >
-                  <IconPencil size={14} className="text-sky-600" />
-                </button>
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
-                Balance Due
-              </span>
-              <div className="flex items-center">
-                <span
-                  className={`font-semibold text-base ${
-                    isPaid || isCancelled
-                      ? "text-green-600"
-                      : invoiceData.invoice_status === "Overdue"
-                      ? "text-red-600"
-                      : "text-amber-600"
-                  }`}
-                >
-                  {formatCurrency(invoiceData.balance_due)}
-                </span>
-                {isPaid && !isCancelled && (
-                  <span className="ml-2 text-green-600 text-sm font-medium px-2 py-0.5 bg-green-50 rounded-full">
-                    Paid in Full
-                  </span>
-                )}
-                {isCancelled && (
-                  <span className="ml-2 text-rose-600 text-sm font-medium px-2 py-0.5 bg-rose-50 rounded-full">
-                    Cancelled
-                  </span>
-                )}
-              </div>
-            </div>
-            {/* Manual UUID Input - Only show for null einvoice_status and on hover */}
-            {invoiceData.einvoice_status === null && (
-              <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300">
-                <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
-                  Manual UUID
-                </span>
-                <div className="flex items-center">
-                  <span className="text-gray-600 font-mono text-sm break-all">
-                    {invoiceData.uuid || "No UUID set"}
-                  </span>
-                  <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenUUIDEdit();
-                    }}
-                    title="Set UUID manually"
-                    disabled={isLoading}
-                  >
-                    <IconPencil size={14} className="text-sky-600" />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  Use this to manually set UUID if e-invoice submission didn't
-                  record it properly
-                </p>
-              </div>
-            )}
           </div>
-        </section>
+        </div>
+      </div>
+      {/* Unified Content Card */}
+      <div className="bg-white rounded-lg border border-default-200">
+        {/* Payment Form Section (collapsible) */}
+        {showPaymentForm && !isCancelled && !isPaid && (
+          <>
+            <div className="p-4 bg-sky-50/50">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-semibold text-sky-800">Record Payment</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentForm(false)}
+                  className="p-1 hover:bg-sky-100 rounded text-sky-600"
+                  title="Close payment form"
+                >
+                  <IconX size={18} />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitPayment}>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
+                  <FormInput
+                    name="payment_date"
+                    label="Payment Date"
+                    type="date"
+                    value={paymentFormData.payment_date}
+                    onChange={handlePaymentFormChange}
+                    disabled={isProcessingPayment}
+                  />
+                  <FormInput
+                    name="amount_paid"
+                    label="Amount Paid (RM)"
+                    type="number"
+                    value={paymentFormData.amount_paid}
+                    onChange={handlePaymentFormChange}
+                    step="0.01"
+                    min={0.01}
+                    disabled={isProcessingPayment}
+                  />
+                  <FormListbox
+                    name="payment_method"
+                    label="Payment Method"
+                    value={paymentFormData.payment_method}
+                    onChange={handlePaymentMethodChange}
+                    options={paymentMethodOptions}
+                  />
+                  {(paymentFormData.payment_method === "cheque" ||
+                    paymentFormData.payment_method === "bank_transfer" ||
+                    paymentFormData.payment_method === "online") && (
+                    <FormInput
+                      name="payment_reference"
+                      label={
+                        paymentFormData.payment_method === "cheque"
+                          ? "Cheque Number"
+                          : paymentFormData.payment_method === "online"
+                          ? "Transaction ID"
+                          : "Transaction Ref"
+                      }
+                      value={paymentFormData.payment_reference || ""}
+                      onChange={handlePaymentFormChange}
+                      disabled={isProcessingPayment}
+                    />
+                  )}
+                </div>
+                <div className="mt-3">
+                  <FormInput
+                    name="notes"
+                    label="Notes (Optional)"
+                    value={paymentFormData.notes || ""}
+                    onChange={handlePaymentFormChange}
+                    disabled={isProcessingPayment}
+                  />
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="submit"
+                    variant="filled"
+                    color="sky"
+                    disabled={isProcessingPayment}
+                  >
+                    {isProcessingPayment ? "Processing..." : "Confirm Payment"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+            <div className="border-t border-default-200"></div>
+          </>
+        )}
 
-        {/* Line Items Display */}
-        <section className="p-4 group border rounded-lg bg-white shadow-sm">
+        {/* Line Items Section */}
+        <div className="p-4 group">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold text-gray-800  flex items-center">
-              Line Items
-            </h2>
+            <h2 className="text-base font-semibold text-gray-800">Line Items</h2>
             <button
-              className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
               onClick={(e) => {
                 e.stopPropagation();
                 handleOpenOrderDetailsEdit();
@@ -1818,10 +1766,13 @@ const InvoiceDetailsPage: React.FC = () => {
             </button>
           </div>
           <LineItemsDisplayTable items={invoiceData.products} />
-        </section>
+        </div>
 
-        {/* Totals Display */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
+        {/* Separator */}
+        <div className="border-t border-default-200"></div>
+
+        {/* Totals Section */}
+        <div className="p-4">
           <InvoiceTotals
             subtotal={invoiceData.total_excluding_tax}
             taxTotal={invoiceData.tax_amount}
@@ -1830,131 +1781,154 @@ const InvoiceDetailsPage: React.FC = () => {
             onRoundingChange={() => {}}
             readOnly={true}
           />
-        </section>
+        </div>
 
-        {/* E-Invoice Details */}
+        {/* E-Invoice Details (conditional) */}
         {(invoiceData.uuid ||
           invoiceData.einvoice_status ||
           invoiceData.consolidated_part_of) && (
-          <section className="p-4 border rounded-lg bg-white shadow-sm">
-            <h2 className="text-lg font-semibold mb-3 text-gray-800">
-              {(invoiceData.einvoice_status === "valid" ||
-                invoiceData.einvoice_status === "cancelled") &&
-              invoiceData.long_id ? (
-                <a
-                  href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-sky-600 hover:underline"
-                  title="View in MyInvois Portal"
-                >
-                  E-Invoice Details
-                </a>
-              ) : consolidatedStatusInfo?.info?.long_id ? (
-                <a
-                  href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-sky-600 hover:underline"
-                  title="View Consolidated Invoice in MyInvois Portal"
-                >
-                  E-Invoice Details
-                </a>
-              ) : (
-                "E-Invoice Details"
-              )}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              {invoiceData.uuid && (
-                <p>
-                  <strong className="text-gray-500 font-medium w-24 inline-block">
-                    UUID:
-                  </strong>
-                  <span className="font-mono text-sm break-all">
-                    {invoiceData.uuid}
-                  </span>
-                </p>
-              )}
-              {invoiceData.long_id && (
-                <p>
-                  <strong className="text-gray-500 font-medium w-24 inline-block">
-                    Long ID:
-                  </strong>
-                  <span className="font-mono text-sm break-all">
-                    {invoiceData.long_id}
-                  </span>
-                </p>
-              )}
-              {invoiceData.submission_uid && (
-                <p>
-                  <strong className="text-gray-500 font-medium w-24 inline-block">
-                    Submission:
-                  </strong>
-                  <span className="font-mono text-sm break-all">
-                    {invoiceData.submission_uid}
-                  </span>
-                </p>
-              )}
-              {invoiceData.datetime_validated && (
-                <p>
-                  <strong className="text-gray-500 font-medium w-24 inline-block">
-                    Validated:
-                  </strong>
-                  {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
-                  {new Date(invoiceData.datetime_validated).toLocaleTimeString(
-                    "en-US",
-                    {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                      hour12: true,
-                    }
-                  )}
-                </p>
-              )}
-              {!consolidatedStatusInfo && (
-                <p>
-                  <strong className="text-gray-500 font-medium w-24 inline-block">
-                    Status:
-                  </strong>
-                  {eInvoiceStatusInfo ? (
-                    <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
-                      {eInvoiceStatusInfo.text}
-                    </span>
-                  ) : (
-                    <span className="text-gray-500">Not Submitted</span>
-                  )}
-                </p>
-              )}
-              {consolidatedStatusInfo && (
-                <>
+          <>
+            <div className="border-t border-default-200"></div>
+            <div className="p-4">
+              <h2 className="text-base font-semibold mb-3 text-gray-800">
+                {(invoiceData.einvoice_status === "valid" ||
+                  invoiceData.einvoice_status === "cancelled") &&
+                invoiceData.long_id ? (
+                  <a
+                    href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-sky-600 hover:underline"
+                    title="View in MyInvois Portal"
+                  >
+                    E-Invoice Details
+                  </a>
+                ) : consolidatedStatusInfo?.info?.long_id ? (
+                  <a
+                    href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-sky-600 hover:underline"
+                    title="View Consolidated Invoice in MyInvois Portal"
+                  >
+                    E-Invoice Details
+                  </a>
+                ) : (
+                  "E-Invoice Details"
+                )}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                {invoiceData.uuid && (
                   <p>
                     <strong className="text-gray-500 font-medium w-24 inline-block">
-                      Invoice ID:
+                      UUID:
                     </strong>
-                    <span className="font-medium">
-                      {consolidatedStatusInfo.info.id}
+                    <span className="font-mono text-sm break-all">
+                      {invoiceData.uuid}
                     </span>
                   </p>
-                  {consolidatedStatusInfo.info.uuid && (
+                )}
+                {invoiceData.long_id && (
+                  <p>
+                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                      Long ID:
+                    </strong>
+                    <span className="font-mono text-sm break-all">
+                      {invoiceData.long_id}
+                    </span>
+                  </p>
+                )}
+                {invoiceData.submission_uid && (
+                  <p>
+                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                      Submission:
+                    </strong>
+                    <span className="font-mono text-sm break-all">
+                      {invoiceData.submission_uid}
+                    </span>
+                  </p>
+                )}
+                {invoiceData.datetime_validated && (
+                  <p>
+                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                      Validated:
+                    </strong>
+                    {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
+                    {new Date(invoiceData.datetime_validated).toLocaleTimeString(
+                      "en-US",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true,
+                      }
+                    )}
+                  </p>
+                )}
+                {!consolidatedStatusInfo && (
+                  <p>
+                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                      Status:
+                    </strong>
+                    {eInvoiceStatusInfo ? (
+                      <span className={`font-medium ${eInvoiceStatusInfo.color}`}>
+                        {eInvoiceStatusInfo.text}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">Not Submitted</span>
+                    )}
+                  </p>
+                )}
+                {consolidatedStatusInfo && (
+                  <>
                     <p>
                       <strong className="text-gray-500 font-medium w-24 inline-block">
-                        UUID:
+                        Invoice ID:
                       </strong>
-                      <span className="font-mono text-sm break-all">
-                        {consolidatedStatusInfo.info.uuid}
+                      <span className="font-medium">
+                        {consolidatedStatusInfo.info.id}
                       </span>
                     </p>
-                  )}
-                </>
+                    {consolidatedStatusInfo.info.uuid && (
+                      <p>
+                        <strong className="text-gray-500 font-medium w-24 inline-block">
+                          UUID:
+                        </strong>
+                        <span className="font-mono text-sm break-all">
+                          {consolidatedStatusInfo.info.uuid}
+                        </span>
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Manual UUID Edit - only when einvoice_status is null */}
+              {invoiceData.einvoice_status === null && (
+                <div className="mt-3 pt-3 border-t border-default-100 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                  <span className="text-xs text-gray-500 uppercase tracking-wide">Manual UUID:</span>
+                  <span className="text-gray-600 font-mono text-sm">
+                    {invoiceData.uuid || "Not set"}
+                  </span>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded"
+                    onClick={handleOpenUUIDEdit}
+                    title="Set UUID manually"
+                    disabled={isLoading}
+                  >
+                    <IconPencil size={12} className="text-sky-600" />
+                  </button>
+                </div>
               )}
             </div>
-          </section>
+          </>
         )}
 
-        {/* Payment History */}
-        <section className="p-4 border rounded-lg bg-white shadow-sm">
-          <h2 className="text-lg font-semibold mb-3 text-gray-800">
+        {/* Separator */}
+        <div className="border-t border-default-200"></div>
+
+        {/* Payment History Section */}
+        <div className="p-4">
+          <h2 className="text-base font-semibold mb-3 text-gray-800">
             Payment History
           </h2>
           {payments.length === 0 ? (
@@ -1962,9 +1936,9 @@ const InvoiceDetailsPage: React.FC = () => {
               No payments recorded yet.
             </p>
           ) : (
-            <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+            <div className="max-h-[calc(100vh-500px)] overflow-y-auto border border-gray-200 rounded-lg">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                       Date
@@ -2102,7 +2076,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </table>
             </div>
           )}
-        </section>
+        </div>
       </div>
       {/* --- Submission Results Modal --- */}
       <SubmissionResultsModal
@@ -2187,7 +2161,7 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
       {/* Order Details Edit Modal */}
       {isEditingOrderDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 -top-4">
           <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -2276,7 +2250,7 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
       {/* Customer Edit Modal */}
       {isEditingCustomer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -2338,7 +2312,7 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
       {/* Salesman Edit Modal */}
       {isEditingSalesman && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -2395,7 +2369,7 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
       {/* Payment Type Edit Modal */}
       {isEditingPaymentType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -2482,7 +2456,7 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
       {/* Date/Time Edit Modal */}
       {isEditingDateTime && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -2535,7 +2509,7 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
       {/* UUID Edit Modal */}
       {isEditingUUID && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
