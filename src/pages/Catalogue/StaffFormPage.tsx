@@ -119,6 +119,15 @@ const StaffFormPage: React.FC = () => {
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
   const [payCodeViewMode, setPayCodeViewMode] = useState<PayCodeViewMode>('grouped');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [batchDefaultLoading, setBatchDefaultLoading] = useState<string | null>(null);
+  const [batchConfirmDialog, setBatchConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: 'set' | 'clear';
+    payType: string;
+    sectionKey: string;
+    payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[];
+    onConfirm: () => void;
+  } | null>(null);
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -272,6 +281,104 @@ const StaffFormPage: React.FC = () => {
     setCollapsedGroups(allGroupKeys);
   }, []);
 
+  // Execute batch default update for employee-specific pay codes
+  const executeBatchEmployeeDefault = useCallback(
+    async (payCodes: EmployeePayCodeDetails[], value: boolean) => {
+      if (!id || payCodes.length === 0) return;
+
+      const payType = payCodes[0]?.pay_type;
+      const loadingKey = `employee-${payType}`;
+      setBatchDefaultLoading(loadingKey);
+
+      try {
+        const payCodeIds = payCodes.map((pc) => pc.id);
+        await api.put("/api/employee-pay-codes/batch-default", {
+          employee_id: id,
+          pay_code_ids: payCodeIds,
+          is_default: value,
+        });
+
+        toast.success(
+          `Successfully ${value ? "set" : "cleared"} default for ${payCodes.length} pay code(s)`
+        );
+        await refreshPayCodeMappings();
+      } catch (error) {
+        console.error("Error in batch default update:", error);
+        toast.error("An error occurred while updating defaults");
+      } finally {
+        setBatchDefaultLoading(null);
+      }
+    },
+    [id, refreshPayCodeMappings]
+  );
+
+  // Execute batch default update for job-linked pay codes
+  const executeBatchJobDefault = useCallback(
+    async (payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[], value: boolean) => {
+      if (payCodes.length === 0) return;
+
+      const payType = payCodes[0]?.pay_type;
+      const loadingKey = `job-${payType}`;
+      setBatchDefaultLoading(loadingKey);
+
+      try {
+        const items = payCodes
+          .filter((pc): pc is JobPayCodeDetails => "job_id" in pc && !!pc.job_id)
+          .map((pc) => ({
+            job_id: pc.job_id,
+            pay_code_id: pc.id,
+          }));
+
+        if (items.length === 0) {
+          toast.error("No valid job pay codes to update");
+          return;
+        }
+
+        await api.put("/api/job-pay-codes/batch-default", {
+          items,
+          is_default: value,
+        });
+
+        toast.success(
+          `Successfully ${value ? "set" : "cleared"} default for ${items.length} pay code(s)`
+        );
+        await refreshPayCodeMappings();
+      } catch (error) {
+        console.error("Error in batch default update:", error);
+        toast.error("An error occurred while updating defaults");
+      } finally {
+        setBatchDefaultLoading(null);
+      }
+    },
+    [refreshPayCodeMappings]
+  );
+
+  // Show batch confirmation dialog
+  const showBatchConfirmDialog = useCallback(
+    (
+      sectionKey: string,
+      payType: string,
+      payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[],
+      value: boolean
+    ) => {
+      setBatchConfirmDialog({
+        isOpen: true,
+        action: value ? "set" : "clear",
+        payType,
+        sectionKey,
+        payCodes,
+        onConfirm: () => {
+          if (sectionKey === "employee") {
+            executeBatchEmployeeDefault(payCodes as EmployeePayCodeDetails[], value);
+          } else {
+            executeBatchJobDefault(payCodes, value);
+          }
+        },
+      });
+    },
+    [executeBatchEmployeeDefault, executeBatchJobDefault]
+  );
+
   // Check if all groups are collapsed
   const areAllGroupsCollapsed = collapsedGroups.size >= 9;
 
@@ -413,7 +520,9 @@ const StaffFormPage: React.FC = () => {
     payType: PayType,
     payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[],
     onCardClick: (payCode: EmployeePayCodeDetails | JobPayCodeDetails) => void,
-    showJobName?: boolean
+    showJobName?: boolean,
+    onBatchSetDefault?: (payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[], value: boolean) => void,
+    isBatchLoading?: boolean
   ) => {
     if (payCodes.length === 0) return null;
 
@@ -433,19 +542,51 @@ const StaffFormPage: React.FC = () => {
 
     return (
       <div key={groupKey} className="space-y-2">
-        <button
-          type="button"
-          onClick={() => toggleGroupCollapse(groupKey)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${colorScheme.headerBg} ${colorScheme.border} ${colorScheme.headerText} hover:opacity-90 transition-opacity w-full text-left`}
+        <div
+          className={`flex items-center justify-between px-3 py-1.5 rounded-md border ${colorScheme.headerBg} ${colorScheme.border} ${colorScheme.headerText}`}
         >
-          {isCollapsed ? (
-            <IconChevronRight size={16} />
-          ) : (
-            <IconChevronDown size={16} />
+          {/* Left: Collapse toggle */}
+          <button
+            type="button"
+            onClick={() => toggleGroupCollapse(groupKey)}
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity text-left flex-1"
+          >
+            {isCollapsed ? (
+              <IconChevronRight size={16} />
+            ) : (
+              <IconChevronDown size={16} />
+            )}
+            <span className="font-medium text-sm">{payType}</span>
+            <span className="text-xs opacity-75">({filteredPayCodes.length})</span>
+          </button>
+
+          {/* Right: Batch buttons (only for Base and Overtime, only in edit mode) */}
+          {isEditMode && payType !== "Tambahan" && onBatchSetDefault && (
+            <div
+              className="flex items-center gap-1.5 ml-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => onBatchSetDefault(filteredPayCodes, true)}
+                disabled={isBatchLoading}
+                className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-200 text-emerald-800 hover:bg-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Set all as default"
+              >
+                {isBatchLoading ? "..." : "All Default"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onBatchSetDefault(filteredPayCodes, false)}
+                disabled={isBatchLoading}
+                className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 text-default-700 hover:bg-default-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Clear all defaults"
+              >
+                {isBatchLoading ? "..." : "Clear All"}
+              </button>
+            </div>
           )}
-          <span className="font-medium text-sm">{payType}</span>
-          <span className="text-xs opacity-75">({filteredPayCodes.length})</span>
-        </button>
+        </div>
 
         {!isCollapsed && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pl-2">
@@ -1077,7 +1218,10 @@ const StaffFormPage: React.FC = () => {
                                     (payCode) => {
                                       setSelectedPayCodeForEdit(payCode as EmployeePayCodeDetails);
                                       setShowEditRateModal(true);
-                                    }
+                                    },
+                                    undefined,
+                                    (payCodes, value) => showBatchConfirmDialog('employee', payType, payCodes, value),
+                                    batchDefaultLoading === `employee-${payType}`
                                   )
                                 );
                               })()}
@@ -1131,7 +1275,10 @@ const StaffFormPage: React.FC = () => {
                                       (payCode) => {
                                         setSelectedJobPayCodeForEdit(payCode as JobPayCodeDetails);
                                         setShowJobPayCodeEditModal(true);
-                                      }
+                                      },
+                                      undefined,
+                                      (payCodes, value) => showBatchConfirmDialog('job', payType, payCodes, value),
+                                      batchDefaultLoading === `job-${payType}`
                                     )
                                   );
                                 })()}
@@ -1187,7 +1334,9 @@ const StaffFormPage: React.FC = () => {
                                         setSelectedJobPayCodeForEdit(payCode as JobPayCodeDetails);
                                         setShowJobPayCodeEditModal(true);
                                       },
-                                      true // showJobName for shared paycodes
+                                      true, // showJobName for shared paycodes
+                                      (payCodes, value) => showBatchConfirmDialog('shared', payType, payCodes, value),
+                                      batchDefaultLoading === `shared-${payType}`
                                     )
                                   );
                                 })()}
@@ -1342,6 +1491,23 @@ const StaffFormPage: React.FC = () => {
         message="Are you sure you want to go back? All unsaved changes will be lost."
         confirmButtonText="Confirm"
       />
+      {/* Batch Default Confirmation Dialog */}
+      {batchConfirmDialog && (
+        <ConfirmationDialog
+          isOpen={batchConfirmDialog.isOpen}
+          onClose={() => setBatchConfirmDialog(null)}
+          onConfirm={() => {
+            batchConfirmDialog.onConfirm();
+            setBatchConfirmDialog(null);
+          }}
+          title={batchConfirmDialog.action === "set" ? "Set All as Default" : "Clear All Defaults"}
+          message={`Are you sure you want to ${
+            batchConfirmDialog.action === "set" ? "set" : "clear"
+          } default for all ${batchConfirmDialog.payCodes.length} ${batchConfirmDialog.payType} pay codes?`}
+          confirmButtonText={batchConfirmDialog.action === "set" ? "Set Default" : "Clear Default"}
+          variant={batchConfirmDialog.action === "set" ? "success" : "default"}
+        />
+      )}
     </div>
   );
 };
