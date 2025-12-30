@@ -113,7 +113,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
 
         {/* Employee Name */}
         <td className="px-3 py-2">
-          <span className="font-medium text-default-800">
+          <span className="font-medium text-default-700">
             {employeePayroll.employee_name || "Unknown"}
           </span>
         </td>
@@ -138,7 +138,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
         </td>
 
         {/* Gross Pay */}
-        <td className="px-3 py-2 text-right text-default-700">
+        <td className="px-3 py-2 text-right font-medium text-default-700">
           {formatCurrency(parseFloat(employeePayroll.gross_pay.toString()))}
         </td>
 
@@ -169,13 +169,13 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
           className="p-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 group-hover:rounded-lg group-hover:border group-hover:border-sky-100 transition-opacity">
             {/* Print Button */}
             <button
               onClick={handlePrint}
               disabled={isPrinting}
               className={clsx(
-                "w-full h-full flex items-center justify-center py-2 px-3 transition-colors rounded-lg",
+                "w-full h-full flex items-center justify-center py-2 px-3 transition-colors rounded-lg border border-sky-100",
                 isPrinting
                   ? "text-default-400 cursor-wait"
                   : "hover:bg-sky-100 text-sky-600"
