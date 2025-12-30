@@ -25,7 +25,8 @@
       "Bash(del \"c:\\\\tienhock\\\\src\\\\pages\\\\Payroll\\\\MonthlyPayrollsPage.tsx\")",
       "Bash(git mv:*)",
       "Bash(npm install:*)",
-      "Bash(del \"c:\\\\tienhock\\\\src\\\\components\\\\Payroll\\\\EmployeePayrollCard.tsx\")"
+      "Bash(del \"c:\\\\tienhock\\\\src\\\\components\\\\Payroll\\\\EmployeePayrollCard.tsx\")",
+      "Bash(del \"c:\\\\tienhock\\\\src\\\\utils\\\\payroll\\\\PaySlipPDF.tsx\")"
     ],
     "deny": []
   }
