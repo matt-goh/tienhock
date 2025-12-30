@@ -11,6 +11,7 @@ import {
   IconClockPlay,
   IconRefresh,
   IconPlus,
+  IconClock,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -20,8 +21,13 @@ import {
   getMonthName,
   updateMonthlyPayrollStatus,
   createMonthlyPayroll,
+  getEligibleEmployees,
 } from "../../utils/payroll/payrollUtils";
-import { format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { api } from "../../routes/utils/api";
+import MissingIncomeTaxRatesDialog, {
+  MissingIncomeTaxEmployee,
+} from "../../components/Payroll/MissingIncomeTaxRatesDialog";
 import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
@@ -59,6 +65,18 @@ const PayrollPage: React.FC = () => {
   >({});
   const [isFetchingMidMonth, setIsFetchingMidMonth] = useState(false);
 
+  // Processing state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<{
+    current: number;
+    total: number;
+    stage: string;
+  }>({ current: 0, total: 0, stage: "" });
+  const [showMissingTaxDialog, setShowMissingTaxDialog] = useState(false);
+  const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
+    MissingIncomeTaxEmployee[]
+  >([]);
+
   // Fetch payroll when selected month changes
   useEffect(() => {
     fetchPayrollDetails();
@@ -83,10 +101,10 @@ const PayrollPage: React.FC = () => {
         const initialExpanded: Record<string, boolean> = {};
         jobTypes.forEach((jobType) => {
           // Create the group key that will be used in groupEmployeesByJobType
-          const groupKey = (jobType as string).includes(", ") 
+          const groupKey = (jobType as string).includes(", ")
             ? `Grouped: ${jobType}`
-            : jobType as string;
-          
+            : (jobType as string);
+
           // Expand all sections by default
           initialExpanded[groupKey] = true;
         });
@@ -175,14 +193,10 @@ const PayrollPage: React.FC = () => {
 
     setIsCreating(true);
     try {
-      const response = await createMonthlyPayroll(year, month);
+      await createMonthlyPayroll(year, month);
       toast.success("Payroll created successfully");
       // Fetch the newly created payroll
       await fetchPayrollDetails();
-      // Navigate to processing page
-      if (response?.payroll?.id) {
-        navigate(`/payroll/monthly-payrolls/${response.payroll.id}/process`);
-      }
     } catch (error: unknown) {
       const axiosError = error as { response?: { status?: number } };
       if (axiosError.response?.status === 409) {
@@ -302,10 +316,8 @@ const PayrollPage: React.FC = () => {
     const newExpanded: Record<string, boolean> = {};
     jobTypes.forEach((jobType) => {
       // Create the group key that matches what's used in groupEmployeesByJobType
-      const groupKey = jobType.includes(", ") 
-        ? `Grouped: ${jobType}`
-        : jobType;
-      
+      const groupKey = jobType.includes(", ") ? `Grouped: ${jobType}` : jobType;
+
       newExpanded[groupKey] = expanded;
     });
     setExpandedJobs(newExpanded);
@@ -344,9 +356,91 @@ const PayrollPage: React.FC = () => {
     navigate(`/payroll/employee-payroll/${employeePayrollId}`);
   };
 
-  const handleProcessPayroll = () => {
-    if (!payroll?.id) return;
-    navigate(`/payroll/monthly-payrolls/${payroll.id}/process`);
+  // Handle processing all eligible employees
+  const handleProcessAll = async () => {
+    if (!payroll?.id || isProcessing) return;
+
+    setIsProcessing(true);
+    setProcessingProgress({
+      current: 10,
+      total: 100,
+      stage: "Fetching eligible employees...",
+    });
+
+    try {
+      // 1. Get eligible employees
+      const eligibleData = await getEligibleEmployees(payroll.id);
+
+      // 2. Build selected_employees array (all employees)
+      const selectedCombinations: Array<{
+        employeeId: string;
+        jobType: string;
+      }> = [];
+      Object.entries(eligibleData.jobEmployeeMap).forEach(
+        ([jobId, employeeIds]) => {
+          (employeeIds as string[]).forEach((empId) => {
+            selectedCombinations.push({ employeeId: empId, jobType: jobId });
+          });
+        }
+      );
+
+      if (selectedCombinations.length === 0) {
+        toast.error("No eligible employees found for processing");
+        setIsProcessing(false);
+        setProcessingProgress({ current: 0, total: 0, stage: "" });
+        return;
+      }
+
+      setProcessingProgress({
+        current: 30,
+        total: 100,
+        stage: `Processing ${selectedCombinations.length} employee-job combinations...`,
+      });
+
+      // 3. Call process-all API
+      const response = await api.post(
+        `/api/monthly-payrolls/${payroll.id}/process-all`,
+        { selected_employees: selectedCombinations }
+      );
+
+      setProcessingProgress({
+        current: 90,
+        total: 100,
+        stage: "Finalizing...",
+      });
+
+      // 4. Handle missing income tax rates
+      if (response.missing_income_tax_employees?.length > 0) {
+        setMissingIncomeTaxEmployees(response.missing_income_tax_employees);
+        setShowMissingTaxDialog(true);
+      }
+
+      // 5. Show result
+      if (response.errors?.length > 0) {
+        toast.error(`Processed with ${response.errors.length} errors`);
+      } else {
+        toast.success(
+          `Successfully processed ${response.processed_count} employees`
+        );
+      }
+
+      // 6. Refresh data for complete update
+      await fetchPayrollDetails();
+
+      // 7. Update the payroll's updated_at AFTER fetch to ensure it's not overwritten
+      // The response.updated_at is the server timestamp at processing completion
+      if (response.updated_at) {
+        setPayroll((prev) =>
+          prev ? { ...prev, updated_at: response.updated_at } : prev
+        );
+      }
+    } catch (error) {
+      console.error("Error processing payroll:", error);
+      toast.error("Failed to process payroll");
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress({ current: 0, total: 0, stage: "" });
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -431,215 +525,241 @@ const PayrollPage: React.FC = () => {
   const totals = calculateTotals(payroll.employeePayrolls || []);
 
   // Check if all jobs are expanded
-  const areAllJobsExpanded = Object.keys(groupedEmployees).length > 0 &&
+  const areAllJobsExpanded =
+    Object.keys(groupedEmployees).length > 0 &&
     Object.keys(groupedEmployees).every((jobType) => expandedJobs[jobType]);
 
   return (
     <div className="space-y-3">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div className="flex items-center gap-3">
+      {/* Processing Progress Display */}
+      {isProcessing && (
+        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
+          <div className="flex items-center mb-3">
+            <IconClock className="text-sky-500 mr-3" size={24} />
+            <div className="flex-1">
+              <h3 className="font-medium text-sky-800">Processing Payroll</h3>
+              <p className="text-sm text-sky-600">
+                {processingProgress.stage ||
+                  "Please wait while employee payrolls are being calculated..."}
+              </p>
+            </div>
+          </div>
+          {processingProgress.total > 0 && (
+            <div className="w-full bg-sky-200 rounded-full h-2">
+              <div
+                className="bg-sky-500 h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${processingProgress.current}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Enhanced Employee Payrolls Section */}
+      <div>
+        {/* Header Row */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 mb-3">
+          {/* Left side: Month Navigator + Stats (stats wrap under on md and below) */}
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
             <MonthNavigator
               selectedMonth={selectedMonth}
               onChange={setSelectedMonth}
               showGoToCurrentButton={false}
+              size="sm"
             />
-          </div>
-          <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
-            {payroll.status === "Processing" ? (
-              <>
-                <Button
-                  onClick={() =>
-                    navigate(`/payroll/monthly-payrolls/${payroll.id}/process`)
-                  }
-                  variant="outline"
-                  color="sky"
-                  icon={IconClockPlay}
-                >
-                  Process
-                </Button>
-                <Button
-                  onClick={() => setShowFinalizeDialog(true)}
-                  variant="filled"
-                  color="amber"
-                  icon={IconLock}
-                >
-                  Finalize Payroll
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  onClick={() => {
-                    setNewStatus("Processing");
-                    setIsStatusDialogOpen(true);
-                  }}
-                  variant="outline"
-                  color="amber"
-                  icon={IconRefresh}
-                >
-                  Revert to Processing
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Enhanced Employee Payrolls Section */}
-        <div>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3">
-            {/* Title + Inline Stats */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              {/* Compact Stats */}
-              <div className="flex items-center flex-wrap gap-3 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <IconUsers size={16} className="text-sky-600" />
-                  <span className="font-medium text-default-700">
-                    {payroll.employeePayrolls.length}
-                  </span>
-                  <span className="text-default-400">employees</span>
-                </div>
-                <span className="text-default-300">•</span>
-                <div className="flex items-center gap-1.5">
-                  <IconBriefcase size={16} className="text-amber-600" />
-                  <span className="font-medium text-default-700">
-                    {Object.keys(groupedEmployees).length}
-                  </span>
-                  <span className="text-default-400">kerja</span>
-                </div>
-                <span className="text-default-300">•</span>
-                <div className="flex items-center gap-1.5">
-                  <IconCash size={16} className="text-emerald-600" />
-                  <span className="font-semibold text-emerald-700">
-                    {formatCurrency(totals.grossPay)}
-                  </span>
-                  <span className="text-default-400">total</span>
-                </div>
-                <span className="text-default-300">•</span>
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                    payroll.status
-                  )}`}
-                >
-                  {payroll.status === "Processing" ? (
-                    <IconClockPlay size={12} className="mr-1" />
-                  ) : (
-                    <IconLock size={12} className="mr-1" />
-                  )}
-                  {payroll.status}
+            {/* Compact Stats */}
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
+              <div className="flex items-center gap-1.5">
+                <IconUsers size={16} className="text-sky-600" />
+                <span className="font-medium text-default-700">
+                  {payroll.employeePayrolls.length}
                 </span>
-                <span className="text-default-300">•</span>
-                <span className="text-default-500">
-                  Created {format(new Date(payroll.created_at), "dd MMM yyyy")}
-                </span>
+                <span className="text-default-400">employees</span>
               </div>
-            </div>
-            <div className="flex space-x-2 mt-2 md:mt-0">
-              {/* Print buttons - Show "Print X" when some selected, "Print All" otherwise */}
-              {selectedCount > 0 && !isAllSelected && (
-                <PrintBatchPayslipsButton
-                  payrolls={getSelectedPayrolls()}
-                  size="sm"
-                  variant="outline"
-                  color="sky"
-                  buttonText={
-                    isFetchingMidMonth
-                      ? "Loading mid-month data..."
-                      : `Print ${selectedCount} Payslips`
-                  }
-                  disabled={isFetchingMidMonth || selectedCount === 0}
-                  midMonthPayrollsMap={midMonthPayrollsMap}
-                />
+              <span className="text-default-300">•</span>
+              <div className="flex items-center gap-1.5">
+                <IconBriefcase size={16} className="text-amber-600" />
+                <span className="font-medium text-default-700">
+                  {Object.keys(groupedEmployees).length}
+                </span>
+                <span className="text-default-400">kerja</span>
+              </div>
+              <span className="text-default-300">•</span>
+              <div className="flex items-center gap-1.5">
+                <IconCash size={16} className="text-emerald-600" />
+                <span className="font-semibold text-emerald-700">
+                  {formatCurrency(totals.grossPay)}
+                </span>
+                <span className="text-default-400">total</span>
+              </div>
+              <span className="text-default-300">|</span>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                  payroll.status
+                )}`}
+              >
+                {payroll.status === "Processing" ? (
+                  <IconClockPlay size={12} className="mr-1" />
+                ) : (
+                  <IconLock size={12} className="mr-1" />
+                )}
+                {payroll.status}
+              </span>
+              {payroll.status === "Processing" && (
+                <>
+                  <span className="text-default-300">•</span>
+                  <button
+                    onClick={handleProcessAll}
+                    disabled={isProcessing}
+                    className="inline-flex items-center gap-1.5 text-default-400 hover:text-sky-600 transition-colors disabled:opacity-50"
+                    title="Re-process payroll"
+                  >
+                    <IconRefresh
+                      size={14}
+                      className={isProcessing ? "animate-spin" : ""}
+                    />
+                    <span>
+                      {payroll.employeePayrolls.length > 0 && payroll.updated_at
+                        ? formatDistanceToNow(new Date(payroll.updated_at), {
+                            addSuffix: true,
+                          })
+                        : "Process"}
+                    </span>
+                  </button>
+                  <span className="text-default-300">•</span>
+                  <button
+                    onClick={() => setShowFinalizeDialog(true)}
+                    disabled={isProcessing}
+                    className="inline-flex items-center gap-1.5 text-default-400 hover:text-amber-600 transition-colors disabled:opacity-50"
+                    title="Finalize payroll"
+                  >
+                    <IconLock size={14} />
+                    <span>Finalize</span>
+                  </button>
+                </>
               )}
+              {payroll.status === "Finalized" && (
+                <>
+                  <span className="text-default-300">•</span>
+                  <button
+                    onClick={() => {
+                      setNewStatus("Processing");
+                      setIsStatusDialogOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-default-400 hover:text-amber-600 transition-colors"
+                    title="Revert to Processing"
+                  >
+                    <IconRefresh size={14} />
+                    <span>Revert</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
 
+          {/* Right side: Action Buttons */}
+          <div className="flex space-x-2">
+            {selectedCount > 0 && !isAllSelected && (
               <PrintBatchPayslipsButton
-                payrolls={payroll.employeePayrolls || []}
+                payrolls={getSelectedPayrolls()}
                 size="sm"
-                variant={isAllSelected ? "filled" : "outline"}
+                variant="outline"
                 color="sky"
                 buttonText={
                   isFetchingMidMonth
                     ? "Loading mid-month data..."
-                    : "Print All"
+                    : `Print ${selectedCount} Payslips`
                 }
-                disabled={isFetchingMidMonth}
+                disabled={isFetchingMidMonth || selectedCount === 0}
                 midMonthPayrollsMap={midMonthPayrollsMap}
               />
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search employees..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="px-3 py-1 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
-                />
-                {searchTerm && (
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
-                    onClick={() => setSearchTerm("")}
-                    title="Clear search"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                icon={areAllJobsExpanded ? IconChevronsUp : IconChevronsDown}
-                onClick={() => handleToggleAllJobs(!areAllJobsExpanded)}
-              >
-                {areAllJobsExpanded ? "Collapse All" : "Expand All"}
-              </Button>
-            </div>
-          </div>
-
-          {Object.keys(groupedEmployees).length === 0 ? (
-            <div className="text-center py-8 border rounded-lg">
-              <p className="text-default-500">No employee payrolls found.</p>
-              {payroll.status === "Processing" && (
-                <Button
-                  onClick={handleProcessPayroll}
-                  color="sky"
-                  variant="outline"
-                  className="mt-4"
+            )}
+            <PrintBatchPayslipsButton
+              payrolls={payroll.employeePayrolls || []}
+              size="sm"
+              variant={isAllSelected ? "filled" : "outline"}
+              color="sky"
+              buttonText={
+                isFetchingMidMonth ? "Loading mid-month data..." : "Print All"
+              }
+              disabled={isFetchingMidMonth}
+              midMonthPayrollsMap={midMonthPayrollsMap}
+            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search employees..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-3 py-1 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 w-[154px]"
+              />
+              {searchTerm && (
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                  onClick={() => setSearchTerm("")}
+                  title="Clear search"
                 >
-                  Process Payroll
-                </Button>
+                  ×
+                </button>
               )}
             </div>
-          ) : (
-            <PayrollUnifiedTable
-              jobGroups={Object.entries(groupedEmployees)
-                .sort(([, employeesA], [, employeesB]) => {
-                  // Sort by total net pay (highest to lowest)
-                  const netPayA = employeesA.reduce(
-                    (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
-                    0
-                  );
-                  const netPayB = employeesB.reduce(
-                    (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
-                    0
-                  );
-                  return netPayB - netPayA;
-                })
-                .map(([jobType, employees]) => ({
-                  jobType,
-                  employees: getFilteredEmployees(jobType, employees),
-                }))
-                .filter((group) => group.employees.length > 0)}
-              expandedJobs={expandedJobs}
-              onToggleExpand={handleToggleJobExpansion}
-              isJobGroupSelected={isJobGroupSelected}
-              onSelectGroup={handleSelectJobGroup}
-              selectedEmployeePayrolls={selectedEmployeePayrolls}
-              onSelectEmployee={handleSelectEmployee}
-              onViewDetails={handleViewEmployeePayroll}
-              payrollStatus={payroll.status}
-              midMonthPayrollsMap={midMonthPayrollsMap}
-              formatCurrency={formatCurrency}
-            />
-          )}
+            <Button
+              size="sm"
+              variant="outline"
+              icon={areAllJobsExpanded ? IconChevronsUp : IconChevronsDown}
+              onClick={() => handleToggleAllJobs(!areAllJobsExpanded)}
+            ></Button>
+          </div>
         </div>
+
+        {Object.keys(groupedEmployees).length === 0 ? (
+          <div className="text-center py-8 border rounded-lg">
+            <p className="text-default-500">No employee payrolls found.</p>
+            {payroll.status === "Processing" && (
+              <Button
+                onClick={handleProcessAll}
+                color="sky"
+                variant="outline"
+                className="mt-4"
+                disabled={isProcessing}
+              >
+                {isProcessing ? "Processing..." : "Process Payroll"}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <PayrollUnifiedTable
+            jobGroups={Object.entries(groupedEmployees)
+              .sort(([, employeesA], [, employeesB]) => {
+                // Sort by total net pay (highest to lowest)
+                const netPayA = employeesA.reduce(
+                  (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+                  0
+                );
+                const netPayB = employeesB.reduce(
+                  (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+                  0
+                );
+                return netPayB - netPayA;
+              })
+              .map(([jobType, employees]) => ({
+                jobType,
+                employees: getFilteredEmployees(jobType, employees),
+              }))
+              .filter((group) => group.employees.length > 0)}
+            expandedJobs={expandedJobs}
+            onToggleExpand={handleToggleJobExpansion}
+            isJobGroupSelected={isJobGroupSelected}
+            onSelectGroup={handleSelectJobGroup}
+            selectedEmployeePayrolls={selectedEmployeePayrolls}
+            onSelectEmployee={handleSelectEmployee}
+            onViewDetails={handleViewEmployeePayroll}
+            payrollStatus={payroll.status}
+            midMonthPayrollsMap={midMonthPayrollsMap}
+            formatCurrency={formatCurrency}
+          />
+        )}
+      </div>
       {/* Status Change Dialog */}
       <ConfirmationDialog
         isOpen={isStatusDialogOpen}
@@ -676,6 +796,12 @@ const PayrollPage: React.FC = () => {
         payrollYear={payroll.year}
         employeeCount={payroll.employeePayrolls.length}
         totalGrossPay={totals.grossPay}
+      />
+      {/* Missing Income Tax Rates Dialog */}
+      <MissingIncomeTaxRatesDialog
+        isOpen={showMissingTaxDialog}
+        onClose={() => setShowMissingTaxDialog(false)}
+        employees={missingIncomeTaxEmployees}
       />
     </div>
   );
