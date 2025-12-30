@@ -120,7 +120,16 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
 
         {/* Employee ID */}
         <td className="px-3 py-2 text-default-500 text-sm">
-          {employeePayroll.employee_id}
+          {employeePayroll.employee_job_mapping &&
+          Object.keys(employeePayroll.employee_job_mapping).length > 1 ? (
+            <div className="flex flex-col gap-0.5">
+              {Object.keys(employeePayroll.employee_job_mapping).map((id) => (
+                <span key={id}>{id}</span>
+              ))}
+            </div>
+          ) : (
+            employeePayroll.employee_id
+          )}
         </td>
 
         {/* Section */}
