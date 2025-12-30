@@ -103,7 +103,7 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                 {/* Job Group Header Row */}
                 <tr
                   className={clsx(
-                    "cursor-pointer transition-colors border-t border-default-200",
+                    "group cursor-pointer transition-colors border-t border-default-200",
                     isExpanded
                       ? "bg-sky-50 hover:bg-sky-100"
                       : "bg-default-50 hover:bg-default-100"
@@ -176,7 +176,7 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                   <td className="px-3 py-2 text-center">
                     <div
                       className={clsx(
-                        "inline-flex p-1 rounded-full transition-colors",
+                        "inline-flex p-1 rounded-full transition-all opacity-0 group-hover:opacity-100",
                         isExpanded
                           ? "bg-sky-200 text-sky-700"
                           : "bg-default-200 text-default-500"
