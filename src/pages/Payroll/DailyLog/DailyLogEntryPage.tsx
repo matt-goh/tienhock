@@ -2829,7 +2829,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-3">
         <div className="flex justify-between items-center pb-3 mb-4 border-b border-default-200">
           <div className="flex items-center gap-4">
-            <BackButton onClick={handleBack} className="!mb-0" />
+            <BackButton onClick={handleBack} />
             <div className="h-6 w-px bg-default-300"></div>
             <h1 className="text-lg font-semibold text-default-800">
               {mode === "edit"
