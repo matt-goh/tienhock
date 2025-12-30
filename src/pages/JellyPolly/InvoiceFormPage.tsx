@@ -736,27 +736,31 @@ const InvoiceFormPage: React.FC = () => {
   // --- JSX Output ---
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBackClick} disabled={isSaving} />
-
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-        <h1 className="flex space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 pr-4">
-          New Invoice
-        </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={handleCreateInvoice}
-            variant="filled"
-            color="sky"
-            size="md"
-            disabled={isSaving} // Disable button during the entire save process
-          >
-            {isSaving // Show generic saving text
-              ? "Saving..."
-              : isPaid
-              ? "Create & Mark Paid"
-              : "Create Invoice"}
-          </Button>
+      <div className="bg-white rounded-lg border border-default-200 px-6 py-3">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBackClick} disabled={isSaving} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <h1 className="text-xl font-semibold text-default-900">
+              New Invoice
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={handleCreateInvoice}
+              variant="filled"
+              color="sky"
+              size="md"
+              disabled={isSaving}
+            >
+              {isSaving
+                ? "Saving..."
+                : isPaid
+                ? "Create & Mark Paid"
+                : "Create Invoice"}
+            </Button>
+          </div>
         </div>
       </div>
 

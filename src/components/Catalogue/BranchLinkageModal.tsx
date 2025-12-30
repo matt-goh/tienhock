@@ -706,7 +706,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                               <h4 className="font-medium mb-3">
                                 Create New Branch Group
                               </h4>
-                              <div className="space-y-4">
+                              <div className="space-y-3">
                                 <FormInput
                                   name="group-name"
                                   label="Group Name"

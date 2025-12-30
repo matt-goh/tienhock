@@ -261,7 +261,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     <div className="space-y-3">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div className="flex items-center gap-4">
-          <BackButton onClick={handleBack} className="!mb-0" />
+          <BackButton onClick={handleBack} />
           <div className="h-6 w-px bg-default-300"></div>
           <div>
             <h1 className="text-xl font-semibold text-default-800">

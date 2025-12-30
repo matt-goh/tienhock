@@ -525,19 +525,22 @@ const CustomerFormPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
-      <BackButton onClick={handleBackClick} />
+    <div className="space-y-3">
       <div className="bg-white rounded-lg">
-        <div className="justify-between flex px-6">
-          <div>
-            <h1 className="text-xl font-semibold text-default-900">
-              {isEditMode ? "Edit Customer" : "Add New Customer"}
-            </h1>
-            <p className="mt-1 text-sm text-default-500">
-              {isEditMode
-                ? 'Edit customer information here. Click "Save" when you\'re done.'
-                : 'Enter new customer information here. Click "Save" when you\'re done.'}
-            </p>
+        <div className="justify-between flex px-6 pb-4 mb-4 border-b border-default-200">
+          <div className="flex items-center gap-4">
+            <BackButton onClick={handleBackClick} />
+            <div className="h-6 w-px bg-default-300"></div>
+            <div>
+              <h1 className="text-xl font-semibold text-default-900">
+                {isEditMode ? "Edit Customer" : "Add New Customer"}
+              </h1>
+              <p className="mt-1 text-sm text-default-500">
+                {isEditMode
+                  ? 'Edit customer information here. Click "Save" when you\'re done.'
+                  : 'Enter new customer information here. Click "Save" when you\'re done.'}
+              </p>
+            </div>
           </div>
           {isEditMode && (
             <div className="space-y-2 text-right">
@@ -576,7 +579,7 @@ const CustomerFormPage: React.FC = () => {
             </div>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="px-6">
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {renderInput("name", "Customer Name")}
@@ -589,10 +592,10 @@ const CustomerFormPage: React.FC = () => {
             )}
 
             {/* Locations Section */}
-            <div className="border-t pt-6 mt-6">
+            <div className="border-t pt-4 mt-4">
               <h2 className="text-lg font-medium mb-4">Customer Locations</h2>
 
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex flex-row space-x-2 w-full">
                   {/* Location input - 70% width */}
                   <div
@@ -747,7 +750,7 @@ const CustomerFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 py-3 text-right">
+          <div className="mt-4 py-3 text-right">
             {isEditMode && (
               <Button
                 type="button"
