@@ -3,9 +3,13 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   IconPencil,
-  IconCalendar,
+  IconUsers,
   IconClock,
-  IconInfoCircle,
+  IconLock,
+  IconSun,
+  IconMoon,
+  IconCalendarEvent,
+  IconBeach,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -32,7 +36,7 @@ interface EmployeeEntry {
   employee_name: string;
   job_name: string;
   following_salesman_name?: string | null;
-  activities: any[]; // Kept as any to avoid deep typing complex structure for now
+  activities: any[];
 }
 
 interface LeaveRecord {
@@ -100,7 +104,6 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   const getDayTypeColor = (dayType: string, logDate?: string) => {
     if (dayType === "Umum") return "text-red-600";
     if (dayType === "Ahad") return "text-amber-600";
-    // Check if it's Saturday (and not a holiday)
     if (logDate && dayType === "Biasa") {
       const date = new Date(logDate);
       if (date.getDay() === 6) return "text-sky-600";
@@ -123,7 +126,6 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     }));
   };
 
-  // Separate context-linked activities from regular activities
   const separateActivities = (activities: any[]) => {
     const contextLinked: any[] = [];
     const regular: any[] = [];
@@ -141,6 +143,13 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     });
 
     return { contextLinked, regular };
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-MY", {
+      style: "currency",
+      currency: "MYR",
+    }).format(amount);
   };
 
   if (isLoading) {
@@ -176,27 +185,72 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
       ),
     0
   );
+  const totalLeaveAmount =
+    workLog.leaveRecords?.reduce(
+      (sum, record) => sum + record.amount_paid,
+      0
+    ) || 0;
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={handleBack} />
+      {/* Compact Header */}
+      <div className="bg-white rounded-lg border border-default-200 px-4 py-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Left: Back + Title + Stats */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <BackButton onClick={handleBack} />
+              <div>
+                <h1 className="text-xl font-semibold text-default-800">
+                  {jobConfig?.name} Details
+                </h1>
+                <p className="text-sm text-default-500">
+                  {format(new Date(workLog.log_date), "EEEE, dd MMM yyyy")}
+                </p>
+              </div>
+            </div>
 
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-default-800">
-              {jobConfig?.name} Details
-            </h1>
-            <p className="text-sm text-default-500 mt-1">
-              {format(new Date(workLog.log_date), "EEEE, dd MMM yyyy")}
-            </p>
-            <div className="mt-1">
-              <span className="text-sm text-default-500">Section: </span>
-              <span className="text-sm font-medium text-default-700">
-                {workLog.section}
+            {/* Inline Stats */}
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm sm:ml-3">
+              <span className="text-default-300 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1.5">
+                <IconCalendarEvent size={16} className="text-sky-600" />
+                <span
+                  className={`font-medium ${getDayTypeColor(workLog.day_type, workLog.log_date)}`}
+                >
+                  {getDisplayDayType(workLog.day_type, workLog.log_date)}
+                  {getDisplayDayType(workLog.day_type, workLog.log_date) !==
+                    "Sabtu" && " Rate"}
+                </span>
+              </div>
+              <span className="text-default-300">•</span>
+              <div className="flex items-center gap-1.5">
+                {workLog.shift === 1 ? (
+                  <IconSun size={16} className="text-amber-500" />
+                ) : (
+                  <IconMoon size={16} className="text-indigo-500" />
+                )}
+                <span className="font-medium text-default-700">
+                  {workLog.shift === 1 ? "Day" : "Night"}
+                </span>
+              </div>
+              <span className="text-default-300">•</span>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                  workLog.status === "Processed"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-sky-100 text-sky-700"
+                }`}
+              >
+                {workLog.status === "Processed" && (
+                  <IconLock size={12} className="mr-1" />
+                )}
+                {workLog.status}
               </span>
             </div>
           </div>
+
+          {/* Right: Edit Button */}
           {workLog.status !== "Processed" && (
             <Button
               onClick={handleEdit}
@@ -208,510 +262,437 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </Button>
           )}
         </div>
+      </div>
 
-        {/* Overview Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
-                <IconCalendar className="w-5 h-5 text-sky-600" />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">Date & Type</p>
-                <p
-                  className={`font-medium ${getDayTypeColor(workLog.day_type, workLog.log_date)}`}
-                >
-                  {getDisplayDayType(workLog.day_type, workLog.log_date)}
-                  {getDisplayDayType(workLog.day_type, workLog.log_date) !== "Sabtu" && " Rate"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                <IconClock className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">Shift</p>
-                <p className="font-medium text-default-800">
-                  {workLog.shift === 1 ? "Day Shift" : "Night Shift"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                <IconInfoCircle className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm text-default-500">Status</p>
-                <p className="font-medium text-default-800">{workLog.status}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Production Details / Context Data */}
-        {workLog.context_data &&
-          Object.keys(workLog.context_data).length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-lg font-semibold text-default-800 mb-4">
+      {/* Production Details / Context Data */}
+      {workLog.context_data &&
+        Object.keys(workLog.context_data).length > 0 && (
+          <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+            <div className="px-4 py-2 bg-default-50 border-b border-default-100">
+              <h3 className="text-sm font-semibold text-default-700">
                 Production Details
-              </h2>
-              <div className="border rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {jobConfig?.contextFields.map((field) => {
-                    const value = workLog.context_data[field.id];
-                    if (value === undefined) return null;
-
-                    return (
-                      <div key={field.id}>
-                        <p className="text-sm text-default-500">
-                          {field.label}
-                        </p>
-                        <p className="font-medium text-default-800">
-                          {field.type === "select"
-                            ? field.options?.find((opt) => opt.id === value)
-                                ?.label || value
-                            : String(value)}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              </h3>
             </div>
-          )}
+            <div className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {jobConfig?.contextFields.map((field) => {
+                  const value = workLog.context_data[field.id];
+                  if (value === undefined) return null;
 
-        {/* Employee Details - Only show if there are employee entries */}
-        {workLog.employeeEntries && workLog.employeeEntries.length > 0 && (
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-default-800">
-                Employee Details
-              </h2>
-              <div className="text-sm text-default-500">
-                {totalEmployees} employees
-                {jobType !== "SALESMAN"
-                  ? ` • ${totalHours.toFixed(1)} total hours`
-                  : ""}
+                  return (
+                    <div key={field.id}>
+                      <p className="text-xs text-default-500">{field.label}</p>
+                      <p className="font-medium text-default-800">
+                        {field.type === "select"
+                          ? field.options?.find((opt) => opt.id === value)
+                              ?.label || value
+                          : String(value)}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-
-            <div className="overflow-x-auto border border-default-200 rounded-lg">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                      Employee
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                      {jobType === "SALESMAN" ? "Location" : "Hours"}
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                      Activities
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-default-200">
-                  {workLog.employeeEntries
-                    .sort((a: EmployeeEntry, b: EmployeeEntry) => {
-                      // Sort by job name first, then by employee name
-                      const jobCompare = (a.job_name || "").localeCompare(
-                        b.job_name || ""
-                      );
-                      if (jobCompare !== 0) return jobCompare;
-                      return (a.employee_name || "").localeCompare(
-                        b.employee_name || ""
-                      );
-                    })
-                    .map((entry: EmployeeEntry) => {
-                      // ... rest of the existing mapping code remains the same
-                      const employeeTotal = entry.activities.reduce(
-                        (sum: number, activity: any) =>
-                          sum + activity.calculated_amount,
-                        0
-                      );
-
-                      const { contextLinked, regular } = separateActivities(
-                        entry.activities
-                      );
-
-                      // Calculate total activities count
-                      const totalActivities =
-                        contextLinked.length + regular.length;
-                      // Determine if we need to show the expand/collapse button
-                      const needsExpansion = totalActivities > 10;
-                      // Check if this entry is expanded
-                      const isExpanded =
-                        expandedEntries[String(entry.id)] || false;
-
-                      // Prepare activities to display based on expansion state
-                      const displayContextLinked = isExpanded
-                        ? contextLinked
-                        : needsExpansion && contextLinked.length > 0
-                        ? contextLinked.slice(
-                            0,
-                            Math.min(contextLinked.length, 10)
-                          )
-                        : contextLinked;
-
-                      const displayRegular = isExpanded
-                        ? regular
-                        : needsExpansion && displayContextLinked.length < 10
-                        ? regular.slice(
-                            0,
-                            Math.min(
-                              regular.length,
-                              10 - displayContextLinked.length
-                            )
-                          )
-                        : needsExpansion
-                        ? []
-                        : regular;
-
-                      return (
-                        <tr key={entry.id}>
-                          <td className="px-4 py-3">
-                            <Link
-                              to={`/catalogue/staff/${entry.employee_id}`}
-                              className="text-sky-600 hover:text-sky-800 font-medium"
-                            >
-                              {entry.employee_name}
-                            </Link>
-                            <p className="text-sm text-default-500">
-                              {entry.employee_id} • {entry.job_name}
-                            </p>
-                            {entry.job_id === "SALESMAN_IKUT" && (
-                              <div className="text-xs text-default-500 mt-1.5 space-y-1 pl-1 border-l-2 border-default-200">
-                                <p>
-                                  <span className="text-default-400">
-                                    Following:
-                                  </span>{" "}
-                                  <span className="font-medium text-default-600">
-                                    {entry.following_salesman_name || "N/A"}
-                                  </span>
-                                </p>
-                                <p>
-                                  <span className="text-default-400">
-                                    Mee Bags:
-                                  </span>{" "}
-                                  <span className="font-medium text-default-600">
-                                    {entry.muat_mee_bags || 0}
-                                  </span>
-                                </p>
-                                <p>
-                                  <span className="text-default-400">
-                                    Bihun Bags:
-                                  </span>{" "}
-                                  <span className="font-medium text-default-600">
-                                    {entry.muat_bihun_bags || 0}
-                                  </span>
-                                </p>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {jobType === "SALESMAN"
-                              ? entry.location_type || "Local"
-                              : entry.total_hours.toFixed(1)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="space-y-1">
-                              {/* Context-linked activities */}
-                              {displayContextLinked.length > 0 && (
-                                <div>
-                                  <p className="text-xs font-medium text-sky-600 mb-1">
-                                    Production Activities
-                                  </p>
-                                  <div className="space-y-2">
-                                    {displayContextLinked.map(
-                                      (activity: any) => (
-                                        <div
-                                          key={activity.id}
-                                          className="flex justify-between text-sm"
-                                        >
-                                          <div>
-                                            <span className="font-medium">
-                                              {activity.description}
-                                            </span>
-                                            <span className="text-default-500 ml-2">
-                                              ({activity.pay_type})
-                                            </span>
-                                            {/* Display rate used for all activity types */}
-                                            <span className="text-default-500 ml-2">
-                                              •{" "}
-                                              {activity.rate_unit === "Percent"
-                                                ? `${activity.rate_used}%`
-                                                : `RM${activity.rate_used}`}
-                                            </span>
-                                            {/* Show units produced for non-Hour units or when explicitly available */}
-                                            {activity.units_produced !== null &&
-                                              activity.rate_unit !== "Day" &&
-                                              activity.rate_unit !==
-                                                "Fixed" && (
-                                                <span className="text-default-500 ml-2">
-                                                  • {activity.units_produced}{" "}
-                                                  {activity.rate_unit ===
-                                                  "Percent"
-                                                    ? "Units"
-                                                    : activity.rate_unit}
-                                                </span>
-                                              )}
-                                          </div>
-                                          <div className="font-medium">
-                                            RM
-                                            {activity.calculated_amount.toFixed(
-                                              2
-                                            )}
-                                          </div>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Regular activities */}
-                              {displayRegular.length > 0 && (
-                                <div>
-                                  {displayContextLinked.length > 0 && (
-                                    <p className="text-xs font-medium text-default-600 mb-1">
-                                      Standard Activities
-                                    </p>
-                                  )}
-                                  <div className="space-y-1">
-                                    {displayRegular.map((activity: any) => (
-                                      <div
-                                        key={activity.id}
-                                        className="flex justify-between text-sm"
-                                      >
-                                        <div>
-                                          <span className="font-medium">
-                                            {activity.description}
-                                          </span>
-                                          <span className="text-default-500 ml-2">
-                                            ({activity.pay_type})
-                                          </span>
-                                          {activity.source === "employee" && (
-                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
-                                              Staff
-                                            </span>
-                                          )}
-                                          {activity.source === "job" && (
-                                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                              Job
-                                            </span>
-                                          )}
-                                          {/* Display rate used for all activity types */}
-                                          <span className="text-default-500 ml-2">
-                                            •{" "}
-                                            {activity.rate_unit === "Percent"
-                                              ? `${activity.rate_used}%`
-                                              : `RM${activity.rate_used}`}
-                                          </span>
-                                          {/* Show units produced for non-Hour units or when explicitly available */}
-                                          {activity.units_produced !== null &&
-                                            activity.rate_unit !== "Hour" && (
-                                              <span className="text-default-500 ml-2">
-                                                • {activity.units_produced}{" "}
-                                                {activity.rate_unit ===
-                                                "Percent"
-                                                  ? "Units"
-                                                  : activity.rate_unit}
-                                              </span>
-                                            )}
-                                        </div>
-                                        <div className="font-medium">
-                                          RM
-                                          {activity.calculated_amount.toFixed(
-                                            2
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Show more/less button when needed */}
-                              {needsExpansion && (
-                                <button
-                                  onClick={() =>
-                                    toggleExpansion(String(entry.id))
-                                  }
-                                  className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
-                                >
-                                  {isExpanded
-                                    ? "Show Less"
-                                    : `Show ${
-                                        totalActivities -
-                                        (displayContextLinked.length +
-                                          displayRegular.length)
-                                      } More...`}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium">
-                            RM{employeeTotal.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-                <tfoot className="bg-default-50">
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="px-4 py-3 text-right font-medium text-default-800"
-                    >
-                      Total
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold text-default-900">
-                      RM{totalAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
             </div>
           </div>
         )}
 
-        {/* Leave Records Section */}
-        {workLog.leaveRecords && workLog.leaveRecords.length > 0 && (
-          <div className="mt-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-default-800">
-                Leave Records
-              </h2>
-              <div className="text-sm text-default-500">
-                {workLog.leaveRecords.length} employee(s) on leave
+      {/* Employee Details */}
+      {workLog.employeeEntries && workLog.employeeEntries.length > 0 && (
+        <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+          {/* Section Header - Sky */}
+          <div className="px-4 py-2.5 bg-sky-50 border-b border-sky-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-sky-800 flex items-center gap-2">
+                <IconUsers size={16} className="text-sky-600" />
+                Employee Details
+              </h3>
+              <div className="flex items-center gap-3 text-xs text-sky-700">
+                <span className="font-medium">{totalEmployees} employees</span>
+                {jobType !== "SALESMAN" && (
+                  <>
+                    <span className="text-sky-300">•</span>
+                    <span className="font-medium">
+                      {totalHours.toFixed(1)} hours
+                    </span>
+                  </>
+                )}
               </div>
             </div>
+          </div>
 
-            <div className="overflow-x-auto border border-default-200 rounded-lg">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
-                      Employee
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                      Leave Type
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
-                      Days
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
-                      Amount Paid
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-default-200">
-                  {workLog.leaveRecords.map((record) => {
-                    const formatCurrency = (amount: number) => {
-                      return new Intl.NumberFormat("en-MY", {
-                        style: "currency",
-                        currency: "MYR",
-                      }).format(amount);
-                    };
+          <div className="max-h-[calc(100vh-350px)] overflow-y-auto">
+            <table className="min-w-full">
+              <thead className="bg-default-50 sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    Employee
+                  </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                    {jobType === "SALESMAN" ? "Location" : "Hours"}
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    Activities
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-100">
+                {workLog.employeeEntries
+                  .sort((a: EmployeeEntry, b: EmployeeEntry) => {
+                    const jobCompare = (a.job_name || "").localeCompare(
+                      b.job_name || ""
+                    );
+                    if (jobCompare !== 0) return jobCompare;
+                    return (a.employee_name || "").localeCompare(
+                      b.employee_name || ""
+                    );
+                  })
+                  .map((entry: EmployeeEntry) => {
+                    const employeeTotal = entry.activities.reduce(
+                      (sum: number, activity: any) =>
+                        sum + activity.calculated_amount,
+                      0
+                    );
 
-                    const getLeaveTypeDisplay = (leaveType: string) => {
-                      switch (leaveType) {
-                        case "cuti_umum":
-                          return "Cuti Umum";
-                        case "cuti_sakit":
-                          return "Cuti Sakit";
-                        case "cuti_tahunan":
-                          return "Cuti Tahunan";
-                        default:
-                          return leaveType;
-                      }
-                    };
+                    const { contextLinked, regular } = separateActivities(
+                      entry.activities
+                    );
 
-                    const getLeaveTypeColor = (leaveType: string) => {
-                      switch (leaveType) {
-                        case "cuti_umum":
-                          return "bg-red-100 text-red-700";
-                        case "cuti_sakit":
-                          return "bg-amber-100 text-amber-700";
-                        case "cuti_tahunan":
-                          return "bg-green-100 text-green-700";
-                        default:
-                          return "bg-default-100 text-default-700";
-                      }
-                    };
+                    const totalActivities = contextLinked.length + regular.length;
+                    const needsExpansion = totalActivities > 10;
+                    const isExpanded =
+                      expandedEntries[String(entry.id)] || false;
+
+                    const displayContextLinked = isExpanded
+                      ? contextLinked
+                      : needsExpansion && contextLinked.length > 0
+                      ? contextLinked.slice(
+                          0,
+                          Math.min(contextLinked.length, 10)
+                        )
+                      : contextLinked;
+
+                    const displayRegular = isExpanded
+                      ? regular
+                      : needsExpansion && displayContextLinked.length < 10
+                      ? regular.slice(
+                          0,
+                          Math.min(
+                            regular.length,
+                            10 - displayContextLinked.length
+                          )
+                        )
+                      : needsExpansion
+                      ? []
+                      : regular;
 
                     return (
-                      <tr key={record.id} className="hover:bg-default-50">
+                      <tr
+                        key={entry.id}
+                        className="hover:bg-default-50 transition-colors"
+                      >
                         <td className="px-4 py-3">
                           <Link
-                            to={`/catalogue/staff/${record.employee_id}`}
+                            to={`/catalogue/staff/${entry.employee_id}`}
                             className="text-sky-600 hover:text-sky-800 font-medium"
                           >
-                            {record.employee_name}
+                            {entry.employee_name}
                           </Link>
                           <p className="text-sm text-default-500">
-                            {record.employee_id}
+                            {entry.employee_id} • {entry.job_name}
                           </p>
+                          {entry.job_id === "SALESMAN_IKUT" && (
+                            <div className="text-xs text-default-500 mt-1.5 space-y-1 pl-1 border-l-2 border-default-200">
+                              <p>
+                                <span className="text-default-400">
+                                  Following:
+                                </span>{" "}
+                                <span className="font-medium text-default-600">
+                                  {entry.following_salesman_name || "N/A"}
+                                </span>
+                              </p>
+                              <p>
+                                <span className="text-default-400">
+                                  Mee Bags:
+                                </span>{" "}
+                                <span className="font-medium text-default-600">
+                                  {entry.muat_mee_bags || 0}
+                                </span>
+                              </p>
+                              <p>
+                                <span className="text-default-400">
+                                  Bihun Bags:
+                                </span>{" "}
+                                <span className="font-medium text-default-600">
+                                  {entry.muat_bihun_bags || 0}
+                                </span>
+                              </p>
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(
-                              record.leave_type
-                            )}`}
-                          >
-                            {getLeaveTypeDisplay(record.leave_type)}
-                          </span>
+                        <td className="px-4 py-3 text-center text-sm">
+                          {jobType === "SALESMAN"
+                            ? entry.location_type || "Local"
+                            : entry.total_hours.toFixed(1)}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="text-sm font-medium text-default-900">
-                            {Math.round(record.days_taken)}
-                          </span>
+                        <td className="px-4 py-3">
+                          <div className="space-y-1">
+                            {displayContextLinked.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-sky-600 mb-1">
+                                  Production Activities
+                                </p>
+                                <div className="space-y-1">
+                                  {displayContextLinked.map((activity: any) => (
+                                    <div
+                                      key={activity.id}
+                                      className="flex justify-between text-sm"
+                                    >
+                                      <div>
+                                        <span className="font-medium">
+                                          {activity.description}
+                                        </span>
+                                        <span className="text-default-500 ml-2">
+                                          ({activity.pay_type})
+                                        </span>
+                                        <span className="text-default-500 ml-2">
+                                          •{" "}
+                                          {activity.rate_unit === "Percent"
+                                            ? `${activity.rate_used}%`
+                                            : `RM${activity.rate_used}`}
+                                        </span>
+                                        {activity.units_produced !== null &&
+                                          activity.rate_unit !== "Day" &&
+                                          activity.rate_unit !== "Fixed" && (
+                                            <span className="text-default-500 ml-2">
+                                              • {activity.units_produced}{" "}
+                                              {activity.rate_unit === "Percent"
+                                                ? "Units"
+                                                : activity.rate_unit}
+                                            </span>
+                                          )}
+                                      </div>
+                                      <div className="font-medium">
+                                        RM{activity.calculated_amount.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {displayRegular.length > 0 && (
+                              <div>
+                                {displayContextLinked.length > 0 && (
+                                  <p className="text-xs font-medium text-default-600 mb-1">
+                                    Standard Activities
+                                  </p>
+                                )}
+                                <div className="space-y-1">
+                                  {displayRegular.map((activity: any) => (
+                                    <div
+                                      key={activity.id}
+                                      className="flex justify-between text-sm"
+                                    >
+                                      <div>
+                                        <span className="font-medium">
+                                          {activity.description}
+                                        </span>
+                                        <span className="text-default-500 ml-2">
+                                          ({activity.pay_type})
+                                        </span>
+                                        {activity.source === "employee" && (
+                                          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                                            Staff
+                                          </span>
+                                        )}
+                                        {activity.source === "job" && (
+                                          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                            Job
+                                          </span>
+                                        )}
+                                        <span className="text-default-500 ml-2">
+                                          •{" "}
+                                          {activity.rate_unit === "Percent"
+                                            ? `${activity.rate_used}%`
+                                            : `RM${activity.rate_used}`}
+                                        </span>
+                                        {activity.units_produced !== null &&
+                                          activity.rate_unit !== "Hour" && (
+                                            <span className="text-default-500 ml-2">
+                                              • {activity.units_produced}{" "}
+                                              {activity.rate_unit === "Percent"
+                                                ? "Units"
+                                                : activity.rate_unit}
+                                            </span>
+                                          )}
+                                      </div>
+                                      <div className="font-medium">
+                                        RM{activity.calculated_amount.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {needsExpansion && (
+                              <button
+                                onClick={() =>
+                                  toggleExpansion(String(entry.id))
+                                }
+                                className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
+                              >
+                                {isExpanded
+                                  ? "Show Less"
+                                  : `Show ${
+                                      totalActivities -
+                                      (displayContextLinked.length +
+                                        displayRegular.length)
+                                    } More...`}
+                              </button>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-medium text-default-900">
-                            {formatCurrency(record.amount_paid)}
-                          </span>
+                        <td className="px-4 py-3 text-right font-medium">
+                          RM{employeeTotal.toFixed(2)}
                         </td>
                       </tr>
                     );
                   })}
-                </tbody>
-                <tfoot className="bg-default-50 border-t-2 border-default-200">
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="px-4 py-3 text-right text-sm font-medium text-default-600"
-                    >
-                      Total Leave Pay
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-default-900">
-                      {new Intl.NumberFormat("en-MY", {
-                        style: "currency",
-                        currency: "MYR",
-                      }).format(
-                        workLog.leaveRecords.reduce(
-                          (sum, record) => sum + record.amount_paid,
-                          0
-                        )
-                      )}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+              </tbody>
+              <tfoot className="bg-sky-50 border-t-2 border-sky-200">
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="px-4 py-3 text-right font-semibold text-sky-800"
+                  >
+                    Total Employee Pay
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-sky-900">
+                    {formatCurrency(totalAmount)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Records Section */}
+      {workLog.leaveRecords && workLog.leaveRecords.length > 0 && (
+        <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+          {/* Section Header - Rose */}
+          <div className="px-4 py-2.5 bg-rose-50 border-b border-rose-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-rose-800 flex items-center gap-2">
+                <IconBeach size={16} className="text-rose-600" />
+                Leave Records
+              </h3>
+              <span className="text-xs font-medium text-rose-700">
+                {workLog.leaveRecords.length} employee(s) on leave
+              </span>
             </div>
           </div>
-        )}
-      </div>
+
+          <table className="min-w-full">
+            <thead className="bg-default-50">
+              <tr>
+                <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                  Employee
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                  Leave Type
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-20">
+                  Days
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                  Amount
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-default-100">
+              {workLog.leaveRecords.map((record) => {
+                const getLeaveTypeDisplay = (leaveType: string) => {
+                  switch (leaveType) {
+                    case "cuti_umum":
+                      return "Cuti Umum";
+                    case "cuti_sakit":
+                      return "Cuti Sakit";
+                    case "cuti_tahunan":
+                      return "Cuti Tahunan";
+                    default:
+                      return leaveType;
+                  }
+                };
+
+                const getLeaveTypeColor = (leaveType: string) => {
+                  switch (leaveType) {
+                    case "cuti_umum":
+                      return "bg-red-100 text-red-700";
+                    case "cuti_sakit":
+                      return "bg-amber-100 text-amber-700";
+                    case "cuti_tahunan":
+                      return "bg-green-100 text-green-700";
+                    default:
+                      return "bg-default-100 text-default-700";
+                  }
+                };
+
+                return (
+                  <tr
+                    key={record.id}
+                    className="hover:bg-default-50 transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/catalogue/staff/${record.employee_id}`}
+                        className="text-sky-600 hover:text-sky-800 font-medium"
+                      >
+                        {record.employee_name}
+                      </Link>
+                      <p className="text-sm text-default-500">
+                        {record.employee_id}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(
+                          record.leave_type
+                        )}`}
+                      >
+                        {getLeaveTypeDisplay(record.leave_type)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center font-medium text-default-700">
+                      {Math.round(record.days_taken)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-default-700">
+                      {formatCurrency(record.amount_paid)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className="bg-rose-50 border-t-2 border-rose-200">
+              <tr>
+                <td
+                  colSpan={3}
+                  className="px-4 py-3 text-right font-semibold text-rose-800"
+                >
+                  Total Leave Pay
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-rose-900">
+                  {formatCurrency(totalLeaveAmount)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
