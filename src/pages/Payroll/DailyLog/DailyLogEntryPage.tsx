@@ -3574,6 +3574,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           leaveTo="opacity-0"
                                         >
                                           <ListboxOptions
+                                            onClick={(e) => e.stopPropagation()}
                                             className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
                                               isLastRow
                                                 ? "bottom-full mb-1"
