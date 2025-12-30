@@ -265,26 +265,29 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             {getMonthName(payroll.month)} {payroll.year}
           </p>
         </div>
-        <div className="flex flex-wrap gap-3 mt-2 md:mt-0 w-full md:w-auto">
-          <DownloadPayslipButton
-            payroll={payroll}
-            midMonthPayroll={midMonthPayroll}
-            buttonText="Download PDF"
-            variant="outline"
-            className="flex-1 md:flex-none"
-          />
+        <div className="flex flex-wrap gap-2 mt-2 md:mt-0 w-full md:w-auto">
           <PrintPayslipButton
             payroll={payroll}
             midMonthPayroll={midMonthPayroll}
             buttonText="Print Pay Slip"
-            variant="outline"
+            variant="filled"
+            color="sky"
+            className="flex-1 md:flex-none shadow-sm"
+          />
+          <DownloadPayslipButton
+            payroll={payroll}
+            midMonthPayroll={midMonthPayroll}
+            buttonText="Download PDF"
+            variant="default"
+            color="sky"
             className="flex-1 md:flex-none"
           />
           {isEditable && (
             <Button
               onClick={() => setShowAddItemModal(true)}
               icon={IconPlus}
-              variant="outline"
+              variant="default"
+              color="default"
               className="flex-1 md:flex-none"
             >
               Add Manual Item
