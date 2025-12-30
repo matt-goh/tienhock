@@ -518,6 +518,7 @@ const IndividualJobPage: React.FC<{
             <View
               key={`base-${group.hours}-${itemIndex}`}
               style={styles.tableRow}
+              wrap={false}
             >
               <View style={[styles.tableCol, styles.descriptionCol]}>
                 <View style={{ height: 12, overflow: "hidden" }}>
@@ -549,7 +550,7 @@ const IndividualJobPage: React.FC<{
 
         {/* Base Pay Subtotal Row */}
         {(groupedItems.Base && groupedItems.Base.length > 0) && (
-          <View style={[styles.tableRow, styles.subtotalRow]}>
+          <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <Text></Text>
             </View>
@@ -584,7 +585,7 @@ const IndividualJobPage: React.FC<{
           <>
             {/* Tambahan Items */}
             {(groupedItems["Tambahan"] || []).map((item, index) => (
-              <View key={`tambahan-${index}`} style={styles.tableRow}>
+              <View key={`tambahan-${index}`} style={styles.tableRow} wrap={false}>
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
                     <Text>{item.description}</Text>
@@ -617,6 +618,7 @@ const IndividualJobPage: React.FC<{
               <View
                 key={`tambahan-commission-${index}`}
                 style={styles.tableRow}
+                wrap={false}
               >
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
@@ -643,7 +645,7 @@ const IndividualJobPage: React.FC<{
 
             {/* Leave Records */}
             {leaveRecordsArray.map((leaveRecord: any, index) => (
-              <View key={`leave-${index}`} style={styles.tableRow}>
+              <View key={`leave-${index}`} style={styles.tableRow} wrap={false}>
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
                     <Text>{prettifyLeaveType(leaveRecord.leave_type)}</Text>
@@ -668,7 +670,7 @@ const IndividualJobPage: React.FC<{
             ))}
 
             {/* Tambahan Subtotal Row */}
-            <View style={[styles.tableRow, styles.subtotalRow]}>
+            <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
                 <Text></Text>
               </View>
@@ -702,6 +704,7 @@ const IndividualJobPage: React.FC<{
                 <View
                   key={`overtime-${group.hours}-${itemIndex}`}
                   style={styles.tableRow}
+                  wrap={false}
                 >
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <View style={{ height: 12, overflow: "hidden" }}>
@@ -735,7 +738,7 @@ const IndividualJobPage: React.FC<{
 
             {/* Overtime Subtotal Row */}
             {(groupedItems.Overtime && groupedItems.Overtime.length > 0) && (
-              <View style={[styles.tableRow, styles.subtotalRow]}>
+              <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <Text></Text>
                 </View>
@@ -767,7 +770,7 @@ const IndividualJobPage: React.FC<{
         )}
 
         {/* Job Gross Pay Row (without deductions for individual job pages) */}
-        <View style={[styles.tableRow, styles.grandTotalRow, { borderTopWidth: 0.5 }]}>
+        <View style={[styles.tableRow, styles.grandTotalRow, { borderTopWidth: 0.5 }]} wrap={false}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -789,19 +792,21 @@ const IndividualJobPage: React.FC<{
         </View>
       </View>
 
-      {/* Notice Section */}
-      <View style={styles.notesSection}>
-        <Text>
-          *** Individual job breakdown - {isGrouped ? "No deductions applied to individual jobs" : ""}
-        </Text>
-      </View>
+      {/* Footer Section - Notice and Signature grouped together to prevent separation */}
+      <View wrap={false}>
+        <View style={styles.notesSection}>
+          <Text>
+            *** Individual job breakdown - {isGrouped ? "No deductions applied to individual jobs" : ""}
+          </Text>
+        </View>
 
-      {/* Signature Section */}
-      <View style={styles.signatureSection}>
-        <View style={styles.signatureBlock}></View>
-        <View style={styles.signatureBlock}>
-          <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
-          <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
+        {/* Signature Section */}
+        <View style={styles.signatureSection}>
+          <View style={styles.signatureBlock}></View>
+          <View style={styles.signatureBlock}>
+            <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
+            <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
+          </View>
         </View>
       </View>
     </Page>
@@ -1258,7 +1263,7 @@ const MainPayrollPage: React.FC<{
             <React.Fragment key={`base-job-${jobGroupIndex}`}>
               {/* Job Category Header - only show for grouped payrolls */}
               {isGroupedPayroll && jobGroup.jobType && (
-                <View style={styles.jobCategoryRow}>
+                <View style={styles.jobCategoryRow} wrap={false}>
                   <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                     <Text style={styles.jobCategoryText}>
                       [ {jobGroup.jobType}{getEmployeeIdForJob(jobGroup.jobType) ? ` (${getEmployeeIdForJob(jobGroup.jobType)})` : ''} ]
@@ -1273,7 +1278,7 @@ const MainPayrollPage: React.FC<{
               )}
               {/* Shared items header */}
               {isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0 && (
-                <View style={styles.jobCategoryRow}>
+                <View style={styles.jobCategoryRow} wrap={false}>
                   <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                     <Text style={styles.jobCategoryText}>
                       [ Shared ]
@@ -1292,6 +1297,7 @@ const MainPayrollPage: React.FC<{
                   <View
                     key={`base-${jobGroupIndex}-${group.hours}-${itemIndex}`}
                     style={styles.tableRow}
+                    wrap={false}
                   >
                     <View style={[styles.tableCol, styles.descriptionCol]}>
                       <View style={{ height: 12, overflow: "hidden" }}>
@@ -1326,7 +1332,7 @@ const MainPayrollPage: React.FC<{
 
         {/* Base Pay Subtotal Row */}
         {(groupedItems.Base && groupedItems.Base.length > 0) && (
-          <View style={[styles.tableRow, styles.subtotalRow]}>
+          <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <Text></Text>
             </View>
@@ -1366,7 +1372,7 @@ const MainPayrollPage: React.FC<{
               <React.Fragment key={`tambahan-job-${jobGroupIndex}`}>
                 {/* Job Category Header - only show for grouped payrolls with items */}
                 {isGroupedPayroll && jobGroup.jobType && jobGroup.items.length > 0 && (
-                  <View style={styles.jobCategoryRow}>
+                  <View style={styles.jobCategoryRow} wrap={false}>
                     <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                       <Text style={styles.jobCategoryText}>
                         [ {jobGroup.jobType}{getEmployeeIdForJob(jobGroup.jobType) ? ` (${getEmployeeIdForJob(jobGroup.jobType)})` : ''} - Tambahan ]
@@ -1381,7 +1387,7 @@ const MainPayrollPage: React.FC<{
                 )}
                 {/* Shared items header */}
                 {isGroupedPayroll && !jobGroup.jobType && jobGroup.items.length > 0 && (
-                  <View style={styles.jobCategoryRow}>
+                  <View style={styles.jobCategoryRow} wrap={false}>
                     <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                       <Text style={styles.jobCategoryText}>
                         [ Shared - Tambahan ]
@@ -1396,7 +1402,7 @@ const MainPayrollPage: React.FC<{
                 )}
                 {/* Items for this job */}
                 {jobGroup.items.map((item, index) => (
-                  <View key={`tambahan-${jobGroupIndex}-${index}`} style={styles.tableRow}>
+                  <View key={`tambahan-${jobGroupIndex}-${index}`} style={styles.tableRow} wrap={false}>
                     <View style={[styles.tableCol, styles.descriptionCol]}>
                       <View style={{ height: 12, overflow: "hidden" }}>
                         <Text>{item.description}</Text>
@@ -1432,6 +1438,7 @@ const MainPayrollPage: React.FC<{
               <View
                 key={`tambahan-commission-${index}`}
                 style={styles.tableRow}
+                wrap={false}
               >
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
@@ -1458,7 +1465,7 @@ const MainPayrollPage: React.FC<{
 
             {/* Leave Records */}
             {leaveRecordsArray.map((leaveRecord, index) => (
-              <View key={`leave-${index}`} style={styles.tableRow}>
+              <View key={`leave-${index}`} style={styles.tableRow} wrap={false}>
                 <View style={[styles.tableCol, styles.descriptionCol]}>
                   <View style={{ height: 12, overflow: "hidden" }}>
                     <Text>{prettifyLeaveType(leaveRecord.leave_type)}</Text>
@@ -1483,7 +1490,7 @@ const MainPayrollPage: React.FC<{
             ))}
 
             {/* Tambahan Subtotal Row */}
-            <View style={[styles.tableRow, styles.subtotalRow]}>
+            <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
                 <Text></Text>
               </View>
@@ -1519,7 +1526,7 @@ const MainPayrollPage: React.FC<{
                 <React.Fragment key={`overtime-job-${jobGroupIndex}`}>
                   {/* Job Category Header - only show for grouped payrolls with items */}
                   {isGroupedPayroll && jobGroup.jobType && jobGroup.items.length > 0 && (
-                    <View style={styles.jobCategoryRow}>
+                    <View style={styles.jobCategoryRow} wrap={false}>
                       <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                         <Text style={styles.jobCategoryText}>
                           [ {jobGroup.jobType}{getEmployeeIdForJob(jobGroup.jobType) ? ` (${getEmployeeIdForJob(jobGroup.jobType)})` : ''} - OT ]
@@ -1534,7 +1541,7 @@ const MainPayrollPage: React.FC<{
                   )}
                   {/* Shared items header */}
                   {isGroupedPayroll && !jobGroup.jobType && jobGroup.items.length > 0 && (
-                    <View style={styles.jobCategoryRow}>
+                    <View style={styles.jobCategoryRow} wrap={false}>
                       <View style={[styles.tableCol, { flex: 5, borderRightWidth: 0 }]}>
                         <Text style={styles.jobCategoryText}>
                           [ Shared - OT ]
@@ -1553,6 +1560,7 @@ const MainPayrollPage: React.FC<{
                       <View
                         key={`overtime-${jobGroupIndex}-${group.hours}-${itemIndex}`}
                         style={styles.tableRow}
+                        wrap={false}
                       >
                         <View style={[styles.tableCol, styles.descriptionCol]}>
                           <View style={{ height: 12, overflow: "hidden" }}>
@@ -1588,7 +1596,7 @@ const MainPayrollPage: React.FC<{
             })}
 
             {/* Overtime Subtotal Row */}
-            <View style={[styles.tableRow, styles.subtotalRow]}>
+            <View style={[styles.tableRow, styles.subtotalRow]} wrap={false}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
                 <Text></Text>
               </View>
@@ -1619,7 +1627,7 @@ const MainPayrollPage: React.FC<{
         )}
 
         {/* Jumlah Gaji Kasar Row */}
-        <View style={[styles.tableRow, styles.jumlahGajiKasarRow]}>
+        <View style={[styles.tableRow, styles.jumlahGajiKasarRow]} wrap={false} minPresenceAhead={20}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -1645,7 +1653,7 @@ const MainPayrollPage: React.FC<{
             {payroll.deductions
               .filter((d) => d.deduction_type.toUpperCase() === "EPF")
               .map((deduction, index) => (
-                <View key="deduction-epf" style={styles.tableRow}>
+                <View key="deduction-epf" style={styles.tableRow} wrap={false}>
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <Text>EPF (Majikan)</Text>
                   </View>
@@ -1671,7 +1679,7 @@ const MainPayrollPage: React.FC<{
             {payroll.deductions
               .filter((d) => d.deduction_type.toUpperCase() === "SOCSO")
               .map((deduction, index) => (
-                <View key="deduction-socso" style={styles.tableRow}>
+                <View key="deduction-socso" style={styles.tableRow} wrap={false}>
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <Text>SOCSO (Majikan)</Text>
                   </View>
@@ -1697,7 +1705,7 @@ const MainPayrollPage: React.FC<{
             {payroll.deductions
               .filter((d) => d.deduction_type.toUpperCase() === "SIP")
               .map((deduction, index) => (
-                <View key="deduction-sip" style={styles.tableRow}>
+                <View key="deduction-sip" style={styles.tableRow} wrap={false}>
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <Text>SIP (Majikan)</Text>
                   </View>
@@ -1723,7 +1731,7 @@ const MainPayrollPage: React.FC<{
             {payroll.deductions
               .filter((d) => d.deduction_type === "income_tax")
               .map((deduction, index) => (
-                <View key="deduction-income-tax" style={styles.tableRow}>
+                <View key="deduction-income-tax" style={styles.tableRow} wrap={false}>
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <Text></Text>
                   </View>
@@ -1760,6 +1768,7 @@ const MainPayrollPage: React.FC<{
               ? {}
               : { borderBottomWidth: 0 },
           ]}
+          wrap={false}
         >
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
@@ -1805,6 +1814,7 @@ const MainPayrollPage: React.FC<{
                 <View
                   key={`commission-advance-${index}`}
                   style={styles.tableRow}
+                  wrap={false}
                 >
                   <View style={[styles.tableCol, styles.descriptionCol]}>
                     <Text>{description}</Text>
@@ -1834,7 +1844,7 @@ const MainPayrollPage: React.FC<{
         {commissionRecords.length === 0 &&
           isMainten &&
           cutiTahunanAmount > 0 && (
-            <View style={styles.tableRow}>
+            <View style={styles.tableRow} wrap={false}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
                 <Text>Cuti Tahunan (Advance)</Text>
               </View>
@@ -1859,7 +1869,7 @@ const MainPayrollPage: React.FC<{
         {/* Mid Month Payment Deduction - Show if mid-month payment exists */}
         {midMonthPayroll && (
           <>
-            <View style={styles.tableRow}>
+            <View style={styles.tableRow} wrap={false}>
               <View style={[styles.tableCol, styles.descriptionCol]}>
                 <Text>BAYARAN PENDAHULUAN (ADVANCES PAYMENT)</Text>
               </View>
@@ -1886,7 +1896,7 @@ const MainPayrollPage: React.FC<{
         {(midMonthPayroll ||
           commissionRecords.length > 0 ||
           (isMainten && cutiTahunanAmount > 0)) && (
-          <View style={[styles.tableRow, styles.jumlahRow]}>
+          <View style={[styles.tableRow, styles.jumlahRow]} wrap={false}>
             <View style={[styles.tableCol, styles.descriptionCol]}>
               <Text></Text>
             </View>
@@ -1911,7 +1921,7 @@ const MainPayrollPage: React.FC<{
         )}
 
         {/* Final Rounded Amount Row */}
-        <View style={[styles.tableRow, styles.grandTotalRow]}>
+        <View style={[styles.tableRow, styles.grandTotalRow]} wrap={false}>
           <View style={[styles.tableCol, styles.descriptionCol]}>
             <Text></Text>
           </View>
@@ -1929,19 +1939,21 @@ const MainPayrollPage: React.FC<{
         </View>
       </View>
 
-      {/* Notice Section */}
-      <View style={styles.notesSection}>
-        <Text>
-          *** Perhatian : Sila kembalikan selepas tandatangan slip ini
-        </Text>
-      </View>
+      {/* Footer Section - Notice and Signature grouped together to prevent separation */}
+      <View wrap={false}>
+        <View style={styles.notesSection}>
+          <Text>
+            *** Perhatian : Sila kembalikan selepas tandatangan slip ini
+          </Text>
+        </View>
 
-      {/* Signature Section */}
-      <View style={styles.signatureSection}>
-        <View style={styles.signatureBlock}></View>
-        <View style={styles.signatureBlock}>
-          <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
-          <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
+        {/* Signature Section */}
+        <View style={styles.signatureSection}>
+          <View style={styles.signatureBlock}></View>
+          <View style={styles.signatureBlock}>
+            <Text style={{ textAlign: "right" }}>RECEIVED BY</Text>
+            <View style={[styles.signatureLine, { marginLeft: "auto" }]}></View>
+          </View>
         </View>
       </View>
     </Page>

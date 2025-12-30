@@ -23,7 +23,9 @@
       "Bash(cmd /c del \"c:\\\\tienhock\\\\start-dev.bat\")",
       "Bash(del \"c:\\\\tienhock\\\\src\\\\utils\\\\stock\\\\useProductionWorkersCache.ts\")",
       "Bash(del \"c:\\\\tienhock\\\\src\\\\pages\\\\Payroll\\\\MonthlyPayrollsPage.tsx\")",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(npm install:*)",
+      "Bash(del \"c:\\\\tienhock\\\\src\\\\components\\\\Payroll\\\\EmployeePayrollCard.tsx\")"
     ],
     "deny": []
   }
