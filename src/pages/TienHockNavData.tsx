@@ -89,7 +89,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
 
   // Add Monthly Payrolls
   payrollSubItems.push({
-    name: "Monthly Payrolls",
+    name: "Payrolls",
     path: "/payroll/monthly-payrolls",
     component: PayrollPage,
     subItems: [
