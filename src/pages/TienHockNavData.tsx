@@ -59,7 +59,6 @@ import MidMonthPayrollPage from "./Payroll/AddOn/MidMonthPayrollPage";
 
 // Payroll - Root
 import PayrollPage from "./Payroll/PayrollPage";
-import PayrollProcessingPage from "./Payroll/PayrollProcessingPage";
 import PayrollDetailsPage from "./Payroll/PayrollDetailsPage";
 import SalaryReportPage from "./Payroll/SalaryReportPage";
 
@@ -93,11 +92,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     path: "/payroll/monthly-payrolls",
     component: PayrollPage,
     subItems: [
-      {
-        name: "Process Payroll",
-        path: "/payroll/monthly-payrolls/:id/process",
-        component: PayrollProcessingPage,
-      },
       {
         name: "Employee Payroll Details",
         path: "/payroll/employee-payroll/:id",
