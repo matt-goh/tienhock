@@ -1,10 +1,7 @@
 // src/pages/Payroll/PayrollPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import clsx from "clsx";
 import {
-  IconChevronDown,
-  IconChevronUp,
   IconChevronsDown,
   IconChevronsUp,
   IconBriefcase,
@@ -13,7 +10,6 @@ import {
   IconLock,
   IconClockPlay,
   IconRefresh,
-  IconSelectAll,
   IconPlus,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
@@ -29,18 +25,14 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import FinalizePayrollDialog from "../../components/Payroll/FinalizePayrollDialog";
 import { EmployeePayroll, MonthlyPayroll } from "../../types/types";
-import Checkbox from "../../components/Checkbox";
-import {
-  DownloadBatchPayslipsButton,
-  PrintBatchPayslipsButton,
-} from "../../utils/payroll/PayslipButtons";
+import { PrintBatchPayslipsButton } from "../../utils/payroll/PayslipButtons";
 import {
   getBatchMidMonthPayrolls,
   MidMonthPayroll,
 } from "../../utils/payroll/midMonthPayrollUtils";
 import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
 import MonthNavigator from "../../components/MonthNavigator";
-import EmployeePayrollCard from "../../components/Payroll/EmployeePayrollCard";
+import PayrollUnifiedTable from "../../components/Payroll/PayrollUnifiedTable";
 
 const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
@@ -121,7 +113,6 @@ const PayrollPage: React.FC = () => {
         payroll.month
       );
 
-      // Create a map of employee IDs to mid-month payrolls
       const payrollsMap = createMidMonthPayrollsMap(
         midMonthPayrolls,
         employeeIds
@@ -444,30 +435,14 @@ const PayrollPage: React.FC = () => {
     Object.keys(groupedEmployees).every((jobType) => expandedJobs[jobType]);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+    <div className="space-y-3">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
           <div className="flex items-center gap-3">
             <MonthNavigator
               selectedMonth={selectedMonth}
               onChange={setSelectedMonth}
               showGoToCurrentButton={false}
             />
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                payroll.status
-              )}`}
-            >
-              {payroll.status === "Processing" ? (
-                <IconClockPlay size={12} className="mr-1" />
-              ) : (
-                <IconLock size={12} className="mr-1" />
-              )}
-              {payroll.status}
-            </span>
-            <p className="text-sm text-default-500">
-              Created on {format(new Date(payroll.created_at), "dd MMM yyyy")}
-            </p>
           </div>
           <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
             {payroll.status === "Processing" ? (
@@ -510,12 +485,12 @@ const PayrollPage: React.FC = () => {
         </div>
 
         {/* Enhanced Employee Payrolls Section */}
-        <div className="mt-2">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+        <div>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3">
             {/* Title + Inline Stats */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               {/* Compact Stats */}
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center flex-wrap gap-3 text-sm">
                 <div className="flex items-center gap-1.5">
                   <IconUsers size={16} className="text-sky-600" />
                   <span className="font-medium text-default-700">
@@ -539,50 +514,56 @@ const PayrollPage: React.FC = () => {
                   </span>
                   <span className="text-default-400">total</span>
                 </div>
+                <span className="text-default-300">•</span>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                    payroll.status
+                  )}`}
+                >
+                  {payroll.status === "Processing" ? (
+                    <IconClockPlay size={12} className="mr-1" />
+                  ) : (
+                    <IconLock size={12} className="mr-1" />
+                  )}
+                  {payroll.status}
+                </span>
+                <span className="text-default-300">•</span>
+                <span className="text-default-500">
+                  Created {format(new Date(payroll.created_at), "dd MMM yyyy")}
+                </span>
               </div>
             </div>
             <div className="flex space-x-2 mt-2 md:mt-0">
-              {/* Batch action buttons - show only when employees are selected */}
-              {selectedCount > 0 && (
-                <>
-                  <DownloadBatchPayslipsButton
-                    payrolls={getSelectedPayrolls()}
-                    size="sm"
-                    variant="outline"
-                    color="sky"
-                    buttonText={
-                      isFetchingMidMonth
-                        ? "Loading mid-month data..."
-                        : `Download ${selectedCount} PDFs`
-                    }
-                    disabled={isFetchingMidMonth || selectedCount === 0}
-                    midMonthPayrollsMap={midMonthPayrollsMap}
-                  />
-                  <PrintBatchPayslipsButton
-                    payrolls={getSelectedPayrolls()}
-                    size="sm"
-                    variant="outline"
-                    color="sky"
-                    buttonText={
-                      isFetchingMidMonth
-                        ? "Loading mid-month data..."
-                        : `Print ${selectedCount} Payslips`
-                    }
-                    disabled={isFetchingMidMonth || selectedCount === 0}
-                    midMonthPayrollsMap={midMonthPayrollsMap}
-                  />
-                </>
+              {/* Print buttons - Show "Print X" when some selected, "Print All" otherwise */}
+              {selectedCount > 0 && !isAllSelected && (
+                <PrintBatchPayslipsButton
+                  payrolls={getSelectedPayrolls()}
+                  size="sm"
+                  variant="outline"
+                  color="sky"
+                  buttonText={
+                    isFetchingMidMonth
+                      ? "Loading mid-month data..."
+                      : `Print ${selectedCount} Payslips`
+                  }
+                  disabled={isFetchingMidMonth || selectedCount === 0}
+                  midMonthPayrollsMap={midMonthPayrollsMap}
+                />
               )}
 
-              <Button
+              <PrintBatchPayslipsButton
+                payrolls={payroll.employeePayrolls || []}
                 size="sm"
-                variant="outline"
+                variant={isAllSelected ? "filled" : "outline"}
                 color="sky"
-                icon={IconSelectAll}
-                onClick={handleSelectAll}
-              >
-                {isAllSelected ? "Deselect All" : "Select All"}
-              </Button>
+                buttonText={
+                  isFetchingMidMonth
+                    ? "Loading mid-month data..."
+                    : "Print All"
+                }
+                disabled={isFetchingMidMonth}
+                midMonthPayrollsMap={midMonthPayrollsMap}
+              />
               <div className="relative">
                 <input
                   type="text"
@@ -627,176 +608,38 @@ const PayrollPage: React.FC = () => {
               )}
             </div>
           ) : (
-            Object.entries(groupedEmployees)
-              .map(([jobType, employees]) => {
-                // Filter employees by search term
-                const filteredEmployees = getFilteredEmployees(
+            <PayrollUnifiedTable
+              jobGroups={Object.entries(groupedEmployees)
+                .sort(([, employeesA], [, employeesB]) => {
+                  // Sort by total net pay (highest to lowest)
+                  const netPayA = employeesA.reduce(
+                    (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+                    0
+                  );
+                  const netPayB = employeesB.reduce(
+                    (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+                    0
+                  );
+                  return netPayB - netPayA;
+                })
+                .map(([jobType, employees]) => ({
                   jobType,
-                  employees
-                );
-
-                // Skip rendering this job group if no employees match the search
-                if (filteredEmployees.length === 0) return null;
-
-                const groupGrossPay = filteredEmployees.reduce(
-                  (sum, emp) => sum + parseFloat(emp.gross_pay.toString()),
-                  0
-                );
-                const groupNetPay = filteredEmployees.reduce(
-                  (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
-                  0
-                );
-                const isGrouped = jobType.startsWith("Grouped: ");
-                const displayJobType = isGrouped
-                  ? jobType.replace("Grouped: ", "")
-                  : jobType;
-
-                return (
-                  <div
-                    key={jobType}
-                    className={clsx(
-                      "mb-2 rounded-lg overflow-hidden border transition-shadow duration-200",
-                      expandedJobs[jobType]
-                        ? "shadow-md border-default-200"
-                        : "shadow-sm border-default-200 hover:shadow"
-                    )}
-                  >
-                    {/* Accordion Header */}
-                    <div
-                      className={clsx(
-                        "flex items-center cursor-pointer transition-colors duration-150",
-                        expandedJobs[jobType]
-                          ? "bg-gradient-to-r from-sky-50 to-white"
-                          : "bg-white hover:bg-default-50"
-                      )}
-                      onClick={() => handleToggleJobExpansion(jobType)}
-                    >
-                      {/* Left accent bar */}
-                      <div
-                        className={clsx(
-                          "w-1 self-stretch flex-shrink-0",
-                          isGrouped ? "bg-emerald-500" : "bg-sky-500"
-                        )}
-                      />
-
-                      <div className="flex-1 flex items-center justify-between px-4 py-3">
-                        {/* Left side: Checkbox + Job info */}
-                        <div className="flex items-center flex-1 min-w-0">
-                          {/* Group Checkbox */}
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="mr-3 flex-shrink-0"
-                          >
-                            <Checkbox
-                              checked={isJobGroupSelected(jobType)}
-                              onChange={() =>
-                                handleSelectJobGroup(
-                                  jobType,
-                                  !isJobGroupSelected(jobType)
-                                )
-                              }
-                              size={20}
-                              aria-label={`Select all ${displayJobType} employees`}
-                            />
-                          </div>
-
-                          {/* Job Type Icon & Name */}
-                          <div className="flex items-center min-w-0">
-                            <IconBriefcase
-                              size={20}
-                              className={clsx(
-                                "mr-2 flex-shrink-0",
-                                isGrouped ? "text-emerald-600" : "text-sky-600"
-                              )}
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-semibold text-default-800 truncate">
-                                  {displayJobType}
-                                </h3>
-                                {isGrouped && (
-                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 flex-shrink-0">
-                                    Combined
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-default-500 mt-0.5">
-                                {filteredEmployees.length}{" "}
-                                {filteredEmployees.length === 1
-                                  ? "employee"
-                                  : "employees"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Right side: Totals + Chevron */}
-                        <div className="flex items-center gap-4 flex-shrink-0 ml-4">
-                          {/* Pay Totals */}
-                          <div className="hidden sm:flex items-center gap-4 text-right">
-                            <div>
-                              <p className="text-xs text-default-400">Gross</p>
-                              <p className="text-sm font-semibold text-default-700">
-                                {formatCurrency(groupGrossPay)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-default-400">Net</p>
-                              <p className="text-sm font-semibold text-emerald-600">
-                                {formatCurrency(groupNetPay)}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Chevron */}
-                          <div
-                            className={clsx(
-                              "p-1.5 rounded-full transition-colors",
-                              expandedJobs[jobType]
-                                ? "bg-sky-100 text-sky-600"
-                                : "bg-default-100 text-default-500"
-                            )}
-                          >
-                            {expandedJobs[jobType] ? (
-                              <IconChevronUp size={18} />
-                            ) : (
-                              <IconChevronDown size={18} />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Accordion Content - Card Grid */}
-                    {expandedJobs[jobType] && (
-                      <div className="border-t border-default-100 p-4 bg-default-50/50">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                          {filteredEmployees.map((employeePayroll) => (
-                            <EmployeePayrollCard
-                              key={employeePayroll.id}
-                              employeePayroll={employeePayroll}
-                              isSelected={
-                                !!selectedEmployeePayrolls[
-                                  `${employeePayroll.id}`
-                                ]
-                              }
-                              onSelect={handleSelectEmployee}
-                              onViewDetails={handleViewEmployeePayroll}
-                              payrollStatus={payroll.status}
-                              midMonthPayroll={
-                                midMonthPayrollsMap[employeePayroll.employee_id]
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                  employees: getFilteredEmployees(jobType, employees),
+                }))
+                .filter((group) => group.employees.length > 0)}
+              expandedJobs={expandedJobs}
+              onToggleExpand={handleToggleJobExpansion}
+              isJobGroupSelected={isJobGroupSelected}
+              onSelectGroup={handleSelectJobGroup}
+              selectedEmployeePayrolls={selectedEmployeePayrolls}
+              onSelectEmployee={handleSelectEmployee}
+              onViewDetails={handleViewEmployeePayroll}
+              payrollStatus={payroll.status}
+              midMonthPayrollsMap={midMonthPayrollsMap}
+              formatCurrency={formatCurrency}
+            />
           )}
         </div>
-      </div>
       {/* Status Change Dialog */}
       <ConfirmationDialog
         isOpen={isStatusDialogOpen}
