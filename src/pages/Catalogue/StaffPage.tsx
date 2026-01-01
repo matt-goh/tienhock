@@ -174,8 +174,6 @@ const StaffPage = () => {
     showResigned: false,
     jobFilter: null,
     applyJobFilter: true,
-    locationFilter: null,
-    applyLocationFilter: true,
   });
   const navigate = useNavigate();
 
@@ -227,21 +225,10 @@ const StaffPage = () => {
         filters.jobFilter.length === 0 ||
         employee.job.some((job: string) => filters.jobFilter?.includes(job));
 
-      const matchesLocationFilter =
-        !filters.applyLocationFilter ||
-        !filters.locationFilter ||
-        filters.locationFilter.length === 0 ||
-        (Array.isArray(employee.location)
-          ? employee.location.some((loc: string) =>
-              filters.locationFilter?.includes(loc)
-            )
-          : filters.locationFilter?.includes(employee.location));
-
       return (
         matchesSearch &&
         matchesResignedFilter &&
-        matchesJobFilter &&
-        matchesLocationFilter
+        matchesJobFilter
       );
     });
   }, [employees, searchTerm, filters]);
@@ -412,7 +399,6 @@ const StaffPage = () => {
               onFilterChange={handleFilterChange}
               currentFilters={filters}
               jobOptions={employees.map((emp) => emp.job).flat()}
-              locationOptions={employees.map((emp) => emp.location).flat()}
             />
             <Button
               onClick={() => navigate("/catalogue/staff/new")}
@@ -436,10 +422,7 @@ const StaffPage = () => {
             filters.showResigned ||
             (filters.applyJobFilter &&
               filters.jobFilter &&
-              filters.jobFilter.length > 0) ||
-            (filters.applyLocationFilter &&
-              filters.locationFilter &&
-              filters.locationFilter.length > 0)
+              filters.jobFilter.length > 0)
               ? "Try adjusting your search or filter criteria"
               : "Get started by adding your first staff member"}
           </p>
@@ -448,10 +431,7 @@ const StaffPage = () => {
               filters.showResigned ||
               (filters.applyJobFilter &&
                 filters.jobFilter &&
-                filters.jobFilter.length > 0) ||
-              (filters.applyLocationFilter &&
-                filters.locationFilter &&
-                filters.locationFilter.length > 0)
+                filters.jobFilter.length > 0)
             ) && (
               <Button
                 onClick={() => navigate("/catalogue/staff/new")}

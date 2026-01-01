@@ -66,7 +66,6 @@ const StaffFormPage: React.FC = () => {
     birthdate: "",
     address: "",
     job: [],
-    location: [],
     dateJoined: "",
     icNo: "",
     bankAccountNumber: "",
@@ -95,7 +94,6 @@ const StaffFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [jobQuery, setJobQuery] = useState("");
-  const [locationQuery, setLocationQuery] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const { options } = useStaffFormOptions();
@@ -695,7 +693,6 @@ const StaffFormPage: React.FC = () => {
         agama: mapDisplayNameToId(data.agama, options.agama),
         // Ensure arrays for multi-selects
         job: Array.isArray(data.job) ? data.job : [],
-        location: Array.isArray(data.location) ? data.location : [],
         // Ensure date fields are strings or empty strings for input type="date"
         birthdate: data.birthdate || "",
         dateJoined: data.dateJoined || "",
@@ -840,7 +837,7 @@ const StaffFormPage: React.FC = () => {
   };
 
   const handleComboboxChange = useCallback(
-    (name: "job" | "location", value: string[] | null) => {
+    (name: "job", value: string[] | null) => {
       if (value === null) return;
 
       setFormData((prevData) => ({
@@ -978,7 +975,7 @@ const StaffFormPage: React.FC = () => {
   };
 
   const renderCombobox = (
-    name: "job" | "location",
+    name: "job",
     label: string,
     options: SelectOption[],
     query: string,
@@ -1000,23 +997,11 @@ const StaffFormPage: React.FC = () => {
         query={query}
         setQuery={setQuery}
       />
-      {name === "location" ? (
-        <div>
-          <SelectedTagsDisplay
-            selectedItems={(formData[name] as string[]).map((locId) => {
-              const locationOption = options.find((opt) => opt.id === locId);
-              return locationOption ? `${locationOption.name}` : locId;
-            })}
-            label={label}
-          />
-        </div>
-      ) : (
-        <SelectedTagsDisplay
-          selectedItems={formData[name] as string[]}
-          label={label}
-          navigable={true}
-        />
-      )}
+      <SelectedTagsDisplay
+        selectedItems={formData[name] as string[]}
+        label={label}
+        navigable={true}
+      />
     </div>
   );
 
@@ -1101,15 +1086,8 @@ const StaffFormPage: React.FC = () => {
                 </div>
               </div>
               <div className="space-y-6 mt-5">
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
-                  {renderCombobox(
-                    "location",
-                    "Location",
-                    options.locations,
-                    locationQuery,
-                    setLocationQuery
-                  )}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
                 <div className="border-t border-default-200 pt-6 mt-6">

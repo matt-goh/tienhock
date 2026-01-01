@@ -1,10 +1,11 @@
-// src/pages/Accounting/LocationAccountMappingsPage.tsx
+// src/pages/Payroll/Settings/LocationAccountMappingsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { api } from "../../routes/utils/api";
+import { useNavigate, useLocation } from "react-router-dom";
+import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
-import LoadingSpinner from "../../components/LoadingSpinner";
-import Button from "../../components/Button";
-import ConfirmationDialog from "../../components/ConfirmationDialog";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import Button from "../../../components/Button";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import {
   IconPlus,
   IconPencil,
@@ -19,6 +20,40 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
+
+// Settings navigation tabs
+const SettingsTabs: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const tabs = [
+    { name: "Job Location Mappings", path: "/payroll/settings/job-location-mappings" },
+    { name: "Location Account Mappings", path: "/payroll/settings/location-account-mappings" },
+  ];
+
+  return (
+    <div className="border-b border-default-200 mb-4">
+      <nav className="flex space-x-6" aria-label="Tabs">
+        {tabs.map((tab) => {
+          const isActive = location.pathname === tab.path;
+          return (
+            <button
+              key={tab.path}
+              onClick={() => navigate(tab.path)}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                isActive
+                  ? "border-sky-500 text-sky-600"
+                  : "border-transparent text-default-500 hover:text-default-700 hover:border-default-300"
+              }`}
+            >
+              {tab.name}
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+};
 
 interface LocationAccountMapping {
   id: number;
@@ -232,6 +267,9 @@ const LocationAccountMappingsPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* Settings Navigation Tabs */}
+      <SettingsTabs />
+
       {/* Header */}
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>

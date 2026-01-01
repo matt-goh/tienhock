@@ -21,15 +21,20 @@ export default function (pool) {
     try {
       // Main comprehensive query to get all employee data with payroll details
       const comprehensiveQuery = `
-        WITH employee_base_data AS (
-          SELECT 
+        WITH job_location_map AS (
+          SELECT job_id, location_code
+          FROM job_location_mappings
+          WHERE is_active = true
+        ),
+        employee_base_data AS (
+          SELECT
             ep.employee_id,
             s.id as staff_id,
             s.name as staff_name,
             s.ic_no,
             s.bank_account_number,
             s.payment_preference,
-            s.location,
+            COALESCE(jlm.location_code, '02') as location_code,
             ep.gross_pay,
             ep.net_pay,
             ep.job_type,
@@ -37,6 +42,7 @@ export default function (pool) {
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
+          LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
         ),
@@ -183,7 +189,7 @@ export default function (pool) {
           ic_no: row.ic_no,
           bank_account_number: row.bank_account_number,
           payment_preference: row.payment_preference,
-          location: row.location,
+          location_code: row.location_code,
           job_type: row.job_type,
           section: row.section,
           // Salary tab data
@@ -238,27 +244,20 @@ export default function (pool) {
         };
       });
 
-      // Process each employee and group by locations
+      // Process each employee and group by job-based location
       processedData.forEach(employee => {
-        const locations = employee.location || [];
-        const locationArray = Array.isArray(locations) ? locations : [];
-        
-        if (locationArray.length === 0) {
-          // Default to location "02" (OFFICE) if no location assigned
-          locationArray.push("02");
-        }
+        // Use job-based location_code (defaults to "02" if not mapped)
+        const loc = employee.location_code || "02";
 
-        locationArray.forEach(loc => {
-          if (locationData[loc]) {
-            // Add employee data to location
-            locationData[loc].employees.push(employee);
-            
-            // Add to location totals
-            Object.keys(locationData[loc].totals).forEach(key => {
-              locationData[loc].totals[key] += employee[key] || 0;
-            });
-          }
-        });
+        if (locationData[loc]) {
+          // Add employee data to location
+          locationData[loc].employees.push(employee);
+
+          // Add to location totals
+          Object.keys(locationData[loc].totals).forEach(key => {
+            locationData[loc].totals[key] += employee[key] || 0;
+          });
+        }
 
         // Add to grand totals
         Object.keys(grandTotals).forEach(key => {
