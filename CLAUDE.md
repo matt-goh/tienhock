@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 8. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
 9. When it is used, write space-y-3 instead of space-y-6.
 10. Use rm instead of del when deleting files.
+11. To access the dev database, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
 
 ## Architecture Overview
 
