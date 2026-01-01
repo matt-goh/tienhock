@@ -19,6 +19,7 @@ import customerBranchesRouter from "./catalogue/customer-branches.js";
 import jobCategoriesRouter from "./catalogue/job-categories.js";
 import staffOptionsRouter from "./catalogue/staff-options.js";
 import jobPayCodesRouter from "./catalogue/job-pay-codes.js";
+import jobLocationMappingsRouter from "./catalogue/job-location-mappings.js";
 import productPayCodesRouter from "./catalogue/product-pay-codes.js";
 import jobDetailsRouter from "./catalogue/job-details.js";
 import customerRouter from "./catalogue/customers.js";
@@ -219,6 +220,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/pay-codes", payCodesRouter(pool));
   app.use("/api/job-details", jobDetailsRouter(pool));
   app.use("/api/job-pay-codes", jobPayCodesRouter(pool));
+  app.use("/api/job-location-mappings", jobLocationMappingsRouter(pool));
   app.use("/api/product-pay-codes", productPayCodesRouter(pool));
   app.use("/api/job-categories", jobCategoriesRouter(pool));
   app.use("/api/staff-options", staffOptionsRouter(pool));
