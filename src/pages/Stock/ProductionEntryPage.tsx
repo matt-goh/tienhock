@@ -12,7 +12,9 @@ import {
   ProductionWorker,
   StockProduct,
 } from "../../types/types";
-import { IconCalendar, IconStarFilled } from "@tabler/icons-react";
+import { IconCalendar, IconStarFilled, IconSettings } from "@tabler/icons-react";
+import Button from "../../components/Button";
+import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -46,6 +48,7 @@ const ProductionEntryPage: React.FC = () => {
   const [originalEntries, setOriginalEntries] = useState<
     Record<string, number>
   >({});
+  const [showMappingModal, setShowMappingModal] = useState(false);
 
   // Update URL params when date or product changes
   useEffect(() => {
@@ -267,11 +270,21 @@ const ProductionEntryPage: React.FC = () => {
             Record daily production output per worker
           </p>
         </div>
-        {hasUnsavedChanges && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
-            Unsaved changes
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {hasUnsavedChanges && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+              Unsaved changes
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            icon={IconSettings}
+            onClick={() => setShowMappingModal(true)}
+          >
+            Manage Mappings
+          </Button>
+        </div>
       </div>
 
       {/* Selection controls */}
@@ -391,6 +404,12 @@ const ProductionEntryPage: React.FC = () => {
           isSaving={isSaving}
         />
       )}
+
+      {/* Product Pay Code Mapping Modal */}
+      <ProductPayCodeMappingModal
+        isOpen={showMappingModal}
+        onClose={() => setShowMappingModal(false)}
+      />
     </div>
   );
 };

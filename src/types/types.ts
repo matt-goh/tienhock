@@ -636,6 +636,19 @@ export interface JobPayCodeDetails
   override_rate_umum: number | null;
 }
 
+export interface ProductPayCodeDetails {
+  id: string;
+  pay_code_id: string;
+  description: string;
+  pay_type: PayType;
+  rate_unit: RateUnit;
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+  is_active: boolean;
+  requires_units_input: boolean;
+}
+
 export interface EmployeePayroll {
   id?: number;
   monthly_payroll_id?: number;
