@@ -125,13 +125,21 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
   // Load current mappings when product is selected
   useEffect(() => {
-    if (selectedProduct && productMappings) {
-      const currentMappings = productMappings[selectedProduct.id] || [];
-      const payCodeIds = new Set(currentMappings.map((m) => m.pay_code_id));
+    // Only run when modal is open and a product is selected
+    if (!isOpen || !selectedProduct) return;
+
+    const currentMappings = productMappings[selectedProduct.id] || [];
+    const payCodeIds = new Set(currentMappings.map((m) => m.pay_code_id));
+
+    // Only update if the pay code IDs actually changed to prevent infinite loops
+    const currentIds = Array.from(payCodeIds).sort().join(',');
+    const existingIds = Array.from(originalPayCodeIds).sort().join(',');
+
+    if (currentIds !== existingIds) {
       setSelectedPayCodeIds(payCodeIds);
       setOriginalPayCodeIds(new Set(payCodeIds));
     }
-  }, [selectedProduct, productMappings]);
+  }, [isOpen, selectedProduct, productMappings]);
 
   // Filter products based on search
   const filteredProducts = useMemo(() => {
