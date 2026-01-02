@@ -62,96 +62,96 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   };
 
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
               Code
             </th>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[28%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[28%]">
               Description
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
               FOC
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
               RTN
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
               Qty
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
               Price
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
               Tax
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[14%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[14%]">
               Total
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           {(items || []).map((item, index) => {
             const isSubtotal = item.issubtotal;
             return (
               <tr
                 key={item.uid || item.id || index} // Use available unique key
-                className={`${isSubtotal ? "bg-gray-100 font-semibold" : ""}`}
+                className={`${isSubtotal ? "bg-gray-100 dark:bg-gray-700 font-semibold" : ""}`}
               >
                 <td
                   className={`px-4 py-2 whitespace-nowrap text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {item.code}
                 </td>
                 <td
                   className={`px-4 py-2 text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {item.description}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : item.freeProduct || 0}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : item.returnProduct || 0}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : item.quantity}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : formatCurrency(item.price)}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : formatCurrency(item.tax)}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700 font-bold" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200 font-bold" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {formatCurrency(item.total)}
@@ -1252,15 +1252,15 @@ const InvoiceDetailsPage: React.FC = () => {
       status?.toLowerCase() // Use toLowerCase for safety
     ) {
       case "paid":
-        return "bg-green-100 text-green-700";
+        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
       case "cancelled":
-        return "bg-rose-100 text-rose-700";
+        return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300";
       case "overdue":
-        return "bg-red-100 text-red-700";
+        return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
       case "active":
       case "unpaid":
       default:
-        return "bg-amber-100 text-amber-700";
+        return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300";
     }
   };
 
@@ -1271,23 +1271,23 @@ const InvoiceDetailsPage: React.FC = () => {
       case "valid":
         return {
           text: "Valid",
-          color: "text-green-600",
+          color: "text-green-600 dark:text-green-400",
           icon: IconCircleCheck,
         };
       case "pending":
         return {
           text: "Pending",
-          color: "text-yellow-600",
+          color: "text-yellow-600 dark:text-yellow-400",
           icon: IconClockHour4,
         };
       case "invalid":
         return {
           text: "Invalid",
-          color: "text-red-600",
+          color: "text-red-600 dark:text-red-400",
           icon: IconAlertTriangle,
         };
       case "cancelled":
-        return { text: "Cancelled", color: "text-rose-600", icon: IconBan };
+        return { text: "Cancelled", color: "text-rose-600 dark:text-rose-400", icon: IconBan };
       default:
         return null;
     }
@@ -1301,8 +1301,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
     return {
       text: "Consolidated",
-      color: "text-indigo-600",
-      border: "border-indigo-200",
+      color: "text-indigo-600 dark:text-indigo-400",
+      border: "border-indigo-200 dark:border-indigo-800",
       icon: IconFiles,
       info: consolidatedInfo,
     };
@@ -1322,7 +1322,7 @@ const InvoiceDetailsPage: React.FC = () => {
     return (
       <div className="p-6">
         <BackButton onClick={() => navigate("/sales/invoice")} />
-        <div className="p-4 text-center text-rose-600 bg-rose-50 rounded-lg mt-4">
+        <div className="p-4 text-center text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 rounded-lg mt-4">
           Error: {error}
         </div>
       </div>
@@ -1333,7 +1333,7 @@ const InvoiceDetailsPage: React.FC = () => {
     return (
       <div className="p-6">
         <BackButton onClick={() => navigate("/sales/invoice")} />
-        <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-lg mt-4">
+        <div className="p-4 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg mt-4">
           Invoice data could not be loaded or invoice not found.
         </div>
       </div>
@@ -1370,12 +1370,12 @@ const InvoiceDetailsPage: React.FC = () => {
     <div className="space-y-3 relative">
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-30">
+        <div className="absolute inset-0 bg-white dark:bg-gray-800/70 flex justify-center items-center z-30">
           <LoadingSpinner />
         </div>
       )}
       {/* Header Card */}
-      <div className="bg-white rounded-lg border border-default-200 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
         {/* Row 1: Back + Title + Badges + Action Buttons */}
         <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
           <div className="flex items-center gap-3">
@@ -1389,10 +1389,10 @@ const InvoiceDetailsPage: React.FC = () => {
               }}
               disabled={isLoading}
             />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div className="flex items-center gap-2 flex-wrap">
-              <IconFileInvoice size={26} className="text-default-500" />
-              <h1 className="text-2xl font-bold text-default-900">
+              <IconFileInvoice size={26} className="text-default-500 dark:text-gray-400" />
+              <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">
                 Invoice #{invoiceData.paymenttype === "CASH" ? "C" : "I"}
                 {invoiceData.id}
               </h1>
@@ -1545,59 +1545,59 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
 
         {/* Row 2: Key Invoice Details */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-default-200">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-default-200 dark:border-gray-700">
           {/* Customer */}
           <div className="group">
-            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Customer</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Customer</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => navigate(`/catalogue/customer/${invoiceData.customerid}`)}
-                className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline truncate"
+                className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline truncate"
                 title={`${invoiceData.customerName} (${invoiceData.customerid})`}
               >
                 {invoiceData.customerName || invoiceData.customerid}
               </button>
               <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
                 onClick={handleOpenCustomerEdit}
                 title="Edit customer"
                 disabled={isLoading}
               >
-                <IconPencil size={14} className="text-sky-600" />
+                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
               </button>
             </div>
           </div>
 
           {/* Salesman */}
           <div className="group">
-            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Salesman</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Salesman</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => navigate(`/catalogue/staff/${invoiceData.salespersonid}`)}
-                className="text-sm font-medium text-gray-900 hover:text-sky-600 hover:underline truncate"
+                className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline truncate"
                 title={invoiceData.salespersonid}
               >
                 {salesmen.find((s) => s.id === invoiceData.salespersonid)?.name ||
                   invoiceData.salespersonid}
               </button>
               <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
                 onClick={handleOpenSalesmanEdit}
                 title="Edit salesman"
                 disabled={isLoading}
               >
-                <IconPencil size={14} className="text-sky-600" />
+                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
               </button>
             </div>
           </div>
 
           {/* Date/Time */}
           <div className="group">
-            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Date / Time</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Date / Time</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {formatDisplayDate(createdDate)}{" "}
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   {parseDatabaseTimestamp(invoiceData.createddate).date?.toLocaleTimeString(
                     "en-US",
                     { hour: "numeric", minute: "2-digit", hour12: true }
@@ -1605,56 +1605,56 @@ const InvoiceDetailsPage: React.FC = () => {
                 </span>
               </span>
               <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
                 onClick={handleOpenDateTimeEdit}
                 title="Edit date/time"
                 disabled={isLoading}
               >
-                <IconPencil size={14} className="text-sky-600" />
+                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
               </button>
             </div>
           </div>
 
           {/* Payment Type */}
           <div className="group">
-            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Payment Type</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Payment Type</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-medium text-gray-900 capitalize">
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
                 {invoiceData.paymenttype.toLowerCase()}
               </span>
               <button
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 rounded flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
                 onClick={handleOpenPaymentTypeEdit}
                 title="Edit payment type"
                 disabled={isLoading}
               >
-                <IconPencil size={14} className="text-sky-600" />
+                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
               </button>
             </div>
           </div>
 
           {/* Balance Due */}
           <div>
-            <span className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Balance Due</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Balance Due</span>
             <div className="flex items-center gap-2">
               <span
                 className={`text-lg font-bold ${
                   isPaid || isCancelled
-                    ? "text-green-600"
+                    ? "text-green-600 dark:text-green-400"
                     : invoiceData.invoice_status === "Overdue"
-                    ? "text-red-600"
-                    : "text-amber-600"
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-400"
                 }`}
               >
                 {formatCurrency(invoiceData.balance_due)}
               </span>
               {isPaid && !isCancelled && (
-                <span className="text-green-600 text-xs font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                <span className="text-green-600 dark:text-green-300 text-xs font-medium px-2 py-0.5 bg-green-50 dark:bg-green-900/30 rounded-full">
                   Paid
                 </span>
               )}
               {isCancelled && (
-                <span className="text-rose-600 text-xs font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                <span className="text-rose-600 dark:text-rose-300 text-xs font-medium px-2 py-0.5 bg-rose-50 dark:bg-rose-900/30 rounded-full">
                   Cancelled
                 </span>
               )}
@@ -1663,17 +1663,17 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
       </div>
       {/* Unified Content Card */}
-      <div className="bg-white rounded-lg border border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
         {/* Payment Form Section (collapsible) */}
         {showPaymentForm && !isCancelled && !isPaid && (
           <>
-            <div className="p-4 bg-sky-50/50">
+            <div className="p-4 bg-sky-50/50 dark:bg-sky-900/20">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-sky-800">Record Payment</h2>
+                <h2 className="text-base font-semibold text-sky-800 dark:text-sky-300">Record Payment</h2>
                 <button
                   type="button"
                   onClick={() => setShowPaymentForm(false)}
-                  className="p-1 hover:bg-sky-100 rounded text-sky-600"
+                  className="p-1 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded text-sky-600 dark:text-sky-400"
                   title="Close payment form"
                 >
                   <IconX size={18} />
@@ -1745,16 +1745,16 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               </form>
             </div>
-            <div className="border-t border-default-200"></div>
+            <div className="border-t border-default-200 dark:border-gray-700"></div>
           </>
         )}
 
         {/* Line Items Section */}
         <div className="p-4 group">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-base font-semibold text-gray-800">Line Items</h2>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">Line Items</h2>
             <button
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded"
               onClick={(e) => {
                 e.stopPropagation();
                 handleOpenOrderDetailsEdit();
@@ -1762,14 +1762,14 @@ const InvoiceDetailsPage: React.FC = () => {
               title="Edit line items"
               disabled={isLoading}
             >
-              <IconPencil size={16} className="text-sky-600" />
+              <IconPencil size={16} className="text-sky-600 dark:text-sky-400" />
             </button>
           </div>
           <LineItemsDisplayTable items={invoiceData.products} />
         </div>
 
         {/* Separator */}
-        <div className="border-t border-default-200"></div>
+        <div className="border-t border-default-200 dark:border-gray-700"></div>
 
         {/* Totals Section */}
         <div className="p-4">
@@ -1788,9 +1788,9 @@ const InvoiceDetailsPage: React.FC = () => {
           invoiceData.einvoice_status ||
           invoiceData.consolidated_part_of) && (
           <>
-            <div className="border-t border-default-200"></div>
+            <div className="border-t border-default-200 dark:border-gray-700"></div>
             <div className="p-4">
-              <h2 className="text-base font-semibold mb-3 text-gray-800">
+              <h2 className="text-base font-semibold mb-3 text-gray-800 dark:text-gray-100">
                 {(invoiceData.einvoice_status === "valid" ||
                   invoiceData.einvoice_status === "cancelled") &&
                 invoiceData.long_id ? (
@@ -1798,7 +1798,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-sky-600 hover:underline"
+                    className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                     title="View in MyInvois Portal"
                   >
                     E-Invoice Details
@@ -1808,7 +1808,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-sky-600 hover:underline"
+                    className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                     title="View Consolidated Invoice in MyInvois Portal"
                   >
                     E-Invoice Details
@@ -1820,7 +1820,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {invoiceData.uuid && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       UUID:
                     </strong>
                     <span className="font-mono text-sm break-all">
@@ -1830,7 +1830,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {invoiceData.long_id && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Long ID:
                     </strong>
                     <span className="font-mono text-sm break-all">
@@ -1840,7 +1840,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {invoiceData.submission_uid && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Submission:
                     </strong>
                     <span className="font-mono text-sm break-all">
@@ -1850,7 +1850,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {invoiceData.datetime_validated && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Validated:
                     </strong>
                     {formatDisplayDate(new Date(invoiceData.datetime_validated))}{" "}
@@ -1867,7 +1867,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {!consolidatedStatusInfo && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Status:
                     </strong>
                     {eInvoiceStatusInfo ? (
@@ -1875,14 +1875,14 @@ const InvoiceDetailsPage: React.FC = () => {
                         {eInvoiceStatusInfo.text}
                       </span>
                     ) : (
-                      <span className="text-gray-500">Not Submitted</span>
+                      <span className="text-gray-500 dark:text-gray-400">Not Submitted</span>
                     )}
                   </p>
                 )}
                 {consolidatedStatusInfo && (
                   <>
                     <p>
-                      <strong className="text-gray-500 font-medium w-24 inline-block">
+                      <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                         Invoice ID:
                       </strong>
                       <span className="font-medium">
@@ -1891,7 +1891,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     </p>
                     {consolidatedStatusInfo.info.uuid && (
                       <p>
-                        <strong className="text-gray-500 font-medium w-24 inline-block">
+                        <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                           UUID:
                         </strong>
                         <span className="font-mono text-sm break-all">
@@ -1905,7 +1905,7 @@ const InvoiceDetailsPage: React.FC = () => {
               {/* Manual UUID Edit - only when einvoice_status is null */}
               {invoiceData.einvoice_status === null && (
                 <div className="mt-3 pt-3 border-t border-default-100 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                  <span className="text-xs text-gray-500 uppercase tracking-wide">Manual UUID:</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Manual UUID:</span>
                   <span className="text-gray-600 font-mono text-sm">
                     {invoiceData.uuid || "Not set"}
                   </span>
@@ -1915,7 +1915,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     title="Set UUID manually"
                     disabled={isLoading}
                   >
-                    <IconPencil size={12} className="text-sky-600" />
+                    <IconPencil size={12} className="text-sky-600 dark:text-sky-400" />
                   </button>
                 </div>
               )}
@@ -1924,7 +1924,7 @@ const InvoiceDetailsPage: React.FC = () => {
         )}
 
         {/* Separator */}
-        <div className="border-t border-default-200"></div>
+        <div className="border-t border-default-200 dark:border-gray-700"></div>
 
         {/* Payment History Section */}
         <div className="p-4">
@@ -1932,38 +1932,38 @@ const InvoiceDetailsPage: React.FC = () => {
             Payment History
           </h2>
           {payments.length === 0 ? (
-            <p className="text-sm text-gray-500 italic">
+            <p className="text-sm text-gray-500 dark:text-gray-400 italic">
               No payments recorded yet.
             </p>
           ) : (
             <div className="max-h-[calc(100vh-500px)] overflow-y-auto border border-gray-200 rounded-lg">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 sticky top-0 z-10">
+                <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
                       Date
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
                       Method
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
                       Reference
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Notes
                     </th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                    <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
                       Amount
                     </th>
-                    <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
                       Action
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
                   {payments.map((p) => (
                     <tr
                       key={p.payment_id}
@@ -2024,7 +2024,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-center">
                         <div className="flex justify-center gap-1">
                           {p.status === "cancelled" ? (
-                            <span className="italic text-gray-500 text-sm">
+                            <span className="italic text-gray-500 dark:text-gray-400 text-sm">
                               Cancelled
                             </span>
                           ) : p.status === "pending" ? (
@@ -2162,9 +2162,9 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Order Details Edit Modal */}
       {isEditingOrderDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 -top-4">
-          <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Edit Line Items
               </h3>
               <button
@@ -2226,7 +2226,7 @@ const InvoiceDetailsPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50">
+            <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50 dark:bg-gray-900/50">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -2251,9 +2251,9 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Customer Edit Modal */}
       {isEditingCustomer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Change Customer
               </h3>
               <button
@@ -2313,9 +2313,9 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Salesman Edit Modal */}
       {isEditingSalesman && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Change Salesman
               </h3>
               <button
@@ -2370,9 +2370,9 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Payment Type Edit Modal */}
       {isEditingPaymentType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Change Payment Type
               </h3>
               <button
@@ -2457,9 +2457,9 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Date/Time Edit Modal */}
       {isEditingDateTime && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Change Date & Time
               </h3>
               <button
@@ -2510,9 +2510,9 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* UUID Edit Modal */}
       {isEditingUUID && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 -top-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Set Manual UUID
               </h3>
               <button
@@ -2537,7 +2537,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={isUpdatingUUID}
                 placeholder="Enter UUID (e.g., 4RKA7KDV6JM3HVTSQ9S60MZJ10)"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Enter the UUID from MyInvois if the system failed to record it
                 automatically
               </p>
@@ -2614,7 +2614,7 @@ const InvoiceDetailsPage: React.FC = () => {
           overpaymentDetails ? (
             <div className="space-y-2">
               <p>The payment amount exceeds the balance due:</p>
-              <div className="bg-gray-50 p-3 border rounded-lg text-sm">
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-3 border rounded-lg text-sm">
                 <div className="flex justify-between">
                   <span>Total Payment:</span>
                   <span className="font-medium">

@@ -1,6 +1,5 @@
 // src/pages/Stock/ProductionEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
@@ -12,16 +11,17 @@ import {
   ProductionWorker,
   StockProduct,
 } from "../../types/types";
-import { IconCalendar, IconStarFilled } from "@tabler/icons-react";
+import { IconCalendar, IconStarFilled, IconSettings } from "@tabler/icons-react";
+import Button from "../../components/Button";
+import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 const ProductionEntryPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-
   // Get initial values from URL params or defaults
   const getInitialDate = () => {
-    const dateParam = searchParams.get("date");
+    const params = new URLSearchParams(window.location.search);
+    const dateParam = params.get("date");
     if (dateParam) {
       // Validate the date format
       const parsed = new Date(dateParam);
@@ -33,7 +33,8 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   const getInitialProduct = () => {
-    return searchParams.get("product") || null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("product") || null;
   };
 
   // State
@@ -46,18 +47,7 @@ const ProductionEntryPage: React.FC = () => {
   const [originalEntries, setOriginalEntries] = useState<
     Record<string, number>
   >({});
-
-  // Update URL params when date or product changes
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (selectedDate) {
-      params.set("date", selectedDate);
-    }
-    if (selectedProductId) {
-      params.set("product", selectedProductId);
-    }
-    setSearchParams(params, { replace: true });
-  }, [selectedDate, selectedProductId, setSearchParams]);
+  const [showMappingModal, setShowMappingModal] = useState(false);
 
   // Compute hasUnsavedChanges by comparing entries with originalEntries
   const hasUnsavedChanges = useMemo(() => {
@@ -260,26 +250,36 @@ const ProductionEntryPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-default-900">
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">
             Production Entry
           </h1>
-          <p className="mt-1 text-sm text-default-500">
+          <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
             Record daily production output per worker
           </p>
         </div>
-        {hasUnsavedChanges && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
-            Unsaved changes
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {hasUnsavedChanges && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+              Unsaved changes
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            icon={IconSettings}
+            onClick={() => setShowMappingModal(true)}
+          >
+            Manage Mappings
+          </Button>
+        </div>
       </div>
 
       {/* Selection controls */}
-      <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Date selector */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-default-700">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
               <div className="flex items-center gap-2">
                 <IconCalendar size={16} />
                 Date
@@ -290,9 +290,9 @@ const ProductionEntryPage: React.FC = () => {
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               max={new Date().toISOString().split("T")[0]}
-              className="w-full rounded-lg border border-default-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
             />
-            <p className="text-xs text-default-500">
+            <p className="text-xs text-default-500 dark:text-gray-400">
               {formatDateDisplay(selectedDate).english} ({formatDateDisplay(selectedDate).malay})
             </p>
           </div>
@@ -320,13 +320,13 @@ const ProductionEntryPage: React.FC = () => {
               required
             />
             {selectedProduct && (
-              <p className="mt-2 text-xs text-default-500">
+              <p className="mt-2 text-xs text-default-500 dark:text-gray-400">
                 Type:{" "}
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                     selectedProduct.type === "MEE"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-blue-100 text-blue-700"
+                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                      : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
                   }`}
                 >
                   {selectedProduct.type === "MEE" ? "Mee" : "Bihun"}
@@ -359,7 +359,7 @@ const ProductionEntryPage: React.FC = () => {
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                       selectedProductId === product.id
                         ? "bg-sky-500 text-white"
-                        : "bg-default-100 text-default-600 hover:bg-default-200"
+                        : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
                     }`}
                   >
                     {product.id}
@@ -373,8 +373,8 @@ const ProductionEntryPage: React.FC = () => {
 
       {/* Workers entry grid */}
       {!selectedProductId ? (
-        <div className="rounded-lg border border-dashed border-default-300 p-8 text-center">
-          <p className="text-default-500">
+        <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-8 text-center">
+          <p className="text-default-500 dark:text-gray-400">
             Please select a product to view workers
           </p>
         </div>
@@ -391,6 +391,12 @@ const ProductionEntryPage: React.FC = () => {
           isSaving={isSaving}
         />
       )}
+
+      {/* Product Pay Code Mapping Modal */}
+      <ProductPayCodeMappingModal
+        isOpen={showMappingModal}
+        onClose={() => setShowMappingModal(false)}
+      />
     </div>
   );
 };

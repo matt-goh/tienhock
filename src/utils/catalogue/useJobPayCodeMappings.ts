@@ -1,9 +1,10 @@
 // In src/utils/catalogue/useJobPayCodeMappings.ts
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../../routes/utils/api";
-import { PayCode, JobPayCodeDetails } from "../../types/types";
+import { PayCode, JobPayCodeDetails, ProductPayCodeDetails } from "../../types/types";
 
 type DetailedJobPayCodeMap = Record<string, JobPayCodeDetails[]>;
+type ProductPayCodeMap = Record<string, ProductPayCodeDetails[]>;
 
 export interface EmployeePayCodeDetails
   extends Omit<PayCode, "rate_biasa" | "rate_ahad" | "rate_umum"> {
@@ -23,6 +24,7 @@ export interface EmployeePayCodeDetails
 interface CacheData {
   detailedMappings: DetailedJobPayCodeMap;
   employeeMappings: Record<string, EmployeePayCodeDetails[]>;
+  productMappings: ProductPayCodeMap;
   payCodes: PayCode[];
   timestamp: number;
 }
@@ -33,16 +35,28 @@ export const useJobPayCodeMappings = () => {
   const [employeeMappings, setEmployeeMappings] = useState<
     Record<string, EmployeePayCodeDetails[]>
   >({});
+  const [productMappings, setProductMappings] = useState<ProductPayCodeMap>({});
   const [payCodes, setPayCodes] = useState<PayCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const CACHE_KEY = "payCodeData";
-  const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+  const CACHE_DURATION = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+
+  const clearCache = useCallback(() => {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch (err) {
+      console.error("Error clearing cache:", err);
+    }
+  }, []);
 
   const fetchData = useCallback(async (force = false) => {
-    // Try to load from cache first
-    if (!force) {
+    // If forcing refresh, clear cache first
+    if (force) {
+      clearCache();
+    } else {
+      // Try to load from cache
       try {
         const cachedData = localStorage.getItem(CACHE_KEY);
         if (cachedData) {
@@ -53,6 +67,7 @@ export const useJobPayCodeMappings = () => {
             setDetailedMappings(parsedData.detailedMappings);
             setPayCodes(parsedData.payCodes);
             setEmployeeMappings(parsedData.employeeMappings || {});
+            setProductMappings(parsedData.productMappings || {});
             setLoading(false);
             return;
           }
@@ -72,16 +87,23 @@ export const useJobPayCodeMappings = () => {
         "/api/employee-pay-codes/all-mappings"
       );
 
+      // Fetch product mappings
+      const productResponse = await api.get(
+        "/api/product-pay-codes/all-mappings"
+      );
+
       if (response && response.payCodes && response.detailedMappings) {
         setPayCodes(response.payCodes);
         setDetailedMappings(response.detailedMappings);
         setEmployeeMappings(employeeResponse.detailedMappings || {});
+        setProductMappings(productResponse.detailedMappings || {});
 
         // Cache the data
         try {
           const cacheData: CacheData = {
             detailedMappings: response.detailedMappings,
             employeeMappings: employeeResponse.detailedMappings || {},
+            productMappings: productResponse.detailedMappings || {},
             payCodes: response.payCodes,
             timestamp: Date.now(),
           };
@@ -100,7 +122,7 @@ export const useJobPayCodeMappings = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearCache]);
 
   // Load data on initial render
   useEffect(() => {
@@ -110,9 +132,11 @@ export const useJobPayCodeMappings = () => {
   return {
     detailedMappings,
     employeeMappings,
+    productMappings,
     payCodes,
     loading,
     error,
     refreshData: () => fetchData(true),
+    clearCache,
   };
 };

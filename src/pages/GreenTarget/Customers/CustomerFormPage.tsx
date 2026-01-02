@@ -494,7 +494,7 @@ const CustomerFormPage: React.FC = () => {
       <div className="space-y-2">
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-default-700"
+          className="block text-sm font-medium text-default-700 dark:text-gray-200"
         >
           {label}
         </label>
@@ -526,16 +526,16 @@ const CustomerFormPage: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <div className="bg-white rounded-lg">
-        <div className="justify-between flex px-6 pb-4 mb-4 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg">
+        <div className="justify-between flex px-6 pb-4 mb-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode ? "Edit Customer" : "Add New Customer"}
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
                   ? 'Edit customer information here. Click "Save" when you\'re done.'
                   : 'Enter new customer information here. Click "Save" when you\'re done.'}
@@ -554,13 +554,13 @@ const CustomerFormPage: React.FC = () => {
                 >
                   {formData.has_active_rental ? "Active" : "Inactive"}
                 </span>
-                <label className="text-sm font-medium text-default-700">
+                <label className="text-sm font-medium text-default-700 dark:text-gray-200">
                   Last Activity
                 </label>
               </div>
               <div>
                 {formData.last_activity_date ? (
-                  <span className="text-default-500">
+                  <span className="text-default-500 dark:text-gray-400">
                     {new Date(formData.last_activity_date).toLocaleDateString(
                       "en-GB",
                       {
@@ -571,7 +571,7 @@ const CustomerFormPage: React.FC = () => {
                     )}
                   </span>
                 ) : (
-                  <span className="text-default-500 italic">
+                  <span className="text-default-500 dark:text-gray-400 italic">
                     No activity recorded
                   </span>
                 )}
@@ -670,7 +670,7 @@ const CustomerFormPage: React.FC = () => {
                   {locations.map((location, index) => (
                     <div
                       key={index}
-                      className="flex justify-between items-center bg-white border border-default-200 p-4 rounded-lg hover:shadow-sm transition-all duration-200 hover:bg-default-100/75 active:bg-default-200/75"
+                      className="flex justify-between items-center bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 p-4 rounded-lg hover:shadow-sm transition-all duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800/75 active:bg-default-200/75"
                       onClick={() => {
                         setSelectedLocation(location);
                         setIsLocationModalOpen(true);
@@ -679,7 +679,7 @@ const CustomerFormPage: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <span className="flex h-8 w-8 items-center justify-center bg-sky-100 text-sky-600 rounded-full mr-3">
+                            <span className="flex h-8 w-8 items-center justify-center bg-sky-100 text-sky-600 dark:text-sky-400 rounded-full mr-3">
                               <IconMapPin size={16} />
                             </span>
                             <span className="font-medium">
@@ -689,7 +689,7 @@ const CustomerFormPage: React.FC = () => {
                           {/* Only show phone if it's different from the customer's default */}
                           {location.phone_number &&
                             location.phone_number !== formData.phone_number && (
-                              <div className="flex items-center px-2 text-default-600 text-sm">
+                              <div className="flex items-center px-2 text-default-600 dark:text-gray-300 text-sm">
                                 <IconPhone size={14} className="mr-1" />
                                 {location.phone_number}
                               </div>
@@ -711,14 +711,14 @@ const CustomerFormPage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="border-2 border-dashed border-default-200 rounded-lg p-6 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-default-100">
-                    <IconMap size={24} className="text-default-600" />
+                <div className="border-2 border-dashed border-default-200 dark:border-gray-700 rounded-lg p-6 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-default-100 dark:bg-gray-800">
+                    <IconMap size={24} className="text-default-600 dark:text-gray-300" />
                   </div>
-                  <h3 className="mt-3 text-sm font-medium text-default-900">
+                  <h3 className="mt-3 text-sm font-medium text-default-900 dark:text-gray-100">
                     No locations
                   </h3>
-                  <p className="mt-1 text-sm text-default-500">
+                  <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                     Add location for this customer.
                   </p>
                 </div>

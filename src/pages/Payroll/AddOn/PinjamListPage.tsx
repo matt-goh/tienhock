@@ -314,7 +314,7 @@ const PinjamListPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800">
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
           Pinjam System
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
@@ -358,7 +358,7 @@ const PinjamListPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
             <YearNavigator
@@ -376,11 +376,11 @@ const PinjamListPage: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-default-700">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
               Total Pinjam
             </label>
-            <div className="mt-1 flex items-center px-3 h-[34px] w-full rounded-md border border-default-200 bg-default-50">
-              <span className="font-semibold text-lg text-default-800">
+            <div className="mt-1 flex items-center px-3 h-[34px] w-full rounded-md border border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50">
+              <span className="font-semibold text-lg text-default-800 dark:text-gray-100">
                 {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
               </span>
             </div>
@@ -391,7 +391,7 @@ const PinjamListPage: React.FC = () => {
       {/* Selection Controls */}
       {employeeData.length > 0 && (
         <div
-          className="bg-white rounded-lg cursor-pointer border border-default-200 shadow-sm p-4"
+          className="bg-white dark:bg-gray-800 rounded-lg cursor-pointer border border-default-200 dark:border-gray-700 shadow-sm p-4"
           onClick={() => handleSelectAll(!isAllSelected)}
         >
           <div className="flex items-center justify-between">
@@ -407,12 +407,12 @@ const PinjamListPage: React.FC = () => {
                     size={20}
                   />
                 )}
-                <span className="text-sm font-medium text-default-700">
+                <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                   Select All ({employeeData.length})
                 </span>
               </div>
               {selectedEmployees.size > 0 && (
-                <span className="text-sm text-sky-600 font-medium">
+                <span className="text-sm text-sky-600 dark:text-sky-400 font-medium">
                   {selectedEmployees.size} employee
                   {selectedEmployees.size > 1 ? "s" : ""} selected
                 </span>
@@ -424,7 +424,7 @@ const PinjamListPage: React.FC = () => {
                   e.stopPropagation();
                   setSelectedEmployees(new Set());
                 }}
-                className="text-sm text-default-500 hover:text-default-700"
+                className="text-sm text-default-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
               >
                 Clear Selection
               </button>
@@ -436,8 +436,8 @@ const PinjamListPage: React.FC = () => {
       {/* Individual Employee Records - Card Grid Layout */}
       <div>
         {employeeData.length === 0 ? (
-          <div className="bg-white rounded-lg border border-default-200 shadow-sm">
-            <div className="text-center py-12 text-default-500">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+            <div className="text-center py-12 text-default-500 dark:text-gray-400">
               <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
               <p className="text-lg font-medium">No employee records found</p>
               <p>No mid-month pay or pinjam records for this period</p>
@@ -490,23 +490,23 @@ const PinjamListPage: React.FC = () => {
               return (
                 <div
                   key={employee.employee_id}
-                  className={`relative border rounded-lg overflow-hidden bg-white transition-shadow duration-200 group ${
+                  className={`relative border rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-shadow duration-200 group ${
                     isSelected
-                      ? "shadow-md ring-2 ring-blue-500 ring-offset-1"
+                      ? "shadow-md ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1"
                       : "shadow-sm hover:shadow-md"
-                  } border-default-200 px-4 pb-4 space-y-3`}
+                  } border-default-200 dark:border-gray-700 px-4 pb-4 space-y-3`}
                   onClick={handleCardClick}
                 >
                   {/* Employee header - Now clickable for selection */}
                   <div
-                    className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 bg-default-50 -mx-4 px-4 py-3 rounded-t-lg cursor-pointer"
+                    className="employee-card-header flex justify-between items-center gap-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 -mx-4 px-4 py-3 rounded-t-lg cursor-pointer"
                     onClick={handleHeaderClick}
                   >
                     <div className="flex-1">
-                      <h3 className="text-lg font-medium text-default-800 truncate">
+                      <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 truncate">
                         {employee.employee_name}
                       </h3>
-                      <p className="text-sm text-default-500">
+                      <p className="text-sm text-default-500 dark:text-gray-400">
                         {employee.employee_id}
                       </p>
                     </div>
@@ -532,29 +532,29 @@ const PinjamListPage: React.FC = () => {
 
                   {/* Body - Horizontal layout for content sections */}
                   <div className="space-y-4">
-                    <div className="flex gap-6 divide-x divide-default-200 h-full">
+                    <div className="flex gap-6 divide-x divide-default-200 dark:divide-gray-700 h-full">
                       {/* Mid-month Pay Section - Always visible */}
                       <div className="flex-1 min-w-0 pr-6 flex flex-col">
                         {employee.midMonthPinjam > 0 ? (
                           <>
                             <div className="mb-3">
                               <p
-                                className="text-sm text-default-500 mb-1 truncate"
+                                className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
                                 title="Mid-month Pay (Before Pinjam)"
                               >
                                 Mid-Month Pay (Before Pinjam)
                               </p>
-                              <p className="text-xl font-bold text-default-800">
+                              <p className="text-xl font-bold text-default-800 dark:text-gray-100">
                                 {formatCurrency(employee.midMonthPay)}
                               </p>
                             </div>
 
                             {employee.midMonthPinjamDetails.length > 0 && (
                               <div className="mb-3">
-                                <p className="text-sm font-medium text-default-700 mb-2">
+                                <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                                   Pinjam Items:
                                 </p>
-                                <div className="space-y-1 text-sm text-default-600">
+                                <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                                   {employee.midMonthPinjamDetails.map(
                                     (detail, index) => (
                                       <div
@@ -574,7 +574,7 @@ const PinjamListPage: React.FC = () => {
 
                             <div className="text-sm">
                               <div className="flex justify-between mb-2">
-                                <span className="text-default-600">
+                                <span className="text-default-600 dark:text-gray-300">
                                   Jumlah Pinjam:
                                 </span>
                                 <span className="font-semibold text-red-600">
@@ -583,13 +583,13 @@ const PinjamListPage: React.FC = () => {
                               </div>
                               <div className="flex justify-between font-semibold">
                                 <span
-                                  className="text-default-800 truncate mr-2"
+                                  className="text-default-800 dark:text-gray-100 truncate mr-2"
                                   title="Final Mid-month Pay"
                                 >
                                   Final Mid-month pay:
                                 </span>
                                 <span
-                                  className="text-lg font-bold truncate text-sky-600"
+                                  className="text-lg font-bold truncate text-sky-600 dark:text-sky-400"
                                   title={formatCurrency(
                                     employee.midMonthPay -
                                       employee.midMonthPinjam
@@ -607,7 +607,7 @@ const PinjamListPage: React.FC = () => {
                           <div className="flex items-center justify-center text-default-400 h-full">
                             <div className="text-center">
                               <IconCash className="mx-auto h-6 w-6 text-default-300 mb-2" />
-                              <p className="text-sm font-medium text-default-500">
+                              <p className="text-sm font-medium text-default-500 dark:text-gray-400">
                                 Mid-Month Pay
                               </p>
                               <p className="text-xs text-default-400 mt-1">
@@ -624,22 +624,22 @@ const PinjamListPage: React.FC = () => {
                           <>
                             <div className="mb-3">
                               <p
-                                className="text-sm text-default-500 mb-1 truncate"
+                                className="text-sm text-default-500 dark:text-gray-400 mb-1 truncate"
                                 title="Gaji Genap (Before Pinjam)"
                               >
                                 Gaji Genap (Before Pinjam)
                               </p>
-                              <p className="text-xl font-bold text-default-800">
+                              <p className="text-xl font-bold text-default-800 dark:text-gray-100">
                                 {formatCurrency(employee.gajiGenap)}
                               </p>
                             </div>
 
                             {employee.monthlyPinjamDetails.length > 0 && (
                               <div className="mb-3">
-                                <p className="text-sm font-medium text-default-700 mb-2">
+                                <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                                   Pinjam Items:
                                 </p>
-                                <div className="space-y-1 text-sm text-default-600">
+                                <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                                   {employee.monthlyPinjamDetails.map(
                                     (detail, index) => (
                                       <div
@@ -659,7 +659,7 @@ const PinjamListPage: React.FC = () => {
 
                             <div className="text-sm">
                               <div className="flex justify-between mb-2">
-                                <span className="text-default-600">
+                                <span className="text-default-600 dark:text-gray-300">
                                   Jumlah Pinjam:
                                 </span>
                                 <span className="font-semibold text-red-600">
@@ -668,7 +668,7 @@ const PinjamListPage: React.FC = () => {
                               </div>
                               <div className="flex justify-between font-semibold">
                                 <span
-                                  className="text-default-800 flex items-center truncate mr-2"
+                                  className="text-default-800 dark:text-gray-100 flex items-center truncate mr-2"
                                   title="Jumlah Masuk Bank"
                                 >
                                   <IconBuildingBank className="w-4 h-4 mr-1.5 flex-shrink-0" />
@@ -676,7 +676,7 @@ const PinjamListPage: React.FC = () => {
                                     Jumlah Masuk Bank:
                                   </span>
                                 </span>
-                                <span className="text-lg font-bold text-sky-600">
+                                <span className="text-lg font-bold text-sky-600 dark:text-sky-400">
                                   {formatCurrency(
                                     employee.gajiGenap - employee.monthlyPinjam
                                   )}
@@ -688,7 +688,7 @@ const PinjamListPage: React.FC = () => {
                           <div className="flex items-center justify-center text-default-400 h-full">
                             <div className="text-center">
                               <IconBuildingBank className="mx-auto h-6 w-6 text-default-300 mb-2" />
-                              <p className="text-sm font-medium text-default-500">
+                              <p className="text-sm font-medium text-default-500 dark:text-gray-400">
                                 Monthly Pay
                               </p>
                               <p className="text-xs text-default-400 mt-1">
@@ -708,60 +708,60 @@ const PinjamListPage: React.FC = () => {
       </div>
 
       {/* All Pinjam Records Table */}
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200">
-          <h3 className="text-lg font-medium text-default-800">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-default-800 dark:text-gray-100">
             All Pinjam Records
           </h3>
         </div>
 
         {pinjamRecords.length === 0 ? (
-          <div className="text-center py-12 text-default-500">
+          <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No pinjam records found</p>
             <p>Click "Record Pinjam" to add pinjam records</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Employee
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-default-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                 {pinjamRecords.map((record) => (
-                  <tr key={record.id} className="hover:bg-default-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                  <tr key={record.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                       <div>
                         <div>{record.employee_name}</div>
-                        <div className="text-xs text-default-500">
+                        <div className="text-xs text-default-500 dark:text-gray-400">
                           {record.employee_id}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                           record.pinjam_type === "mid_month"
-                            ? "bg-blue-100 text-blue-800"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                             : "bg-green-100 text-green-800"
                         }`}
                       >
@@ -770,20 +770,20 @@ const PinjamListPage: React.FC = () => {
                           : "Monthly"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
                       {formatCurrency(record.amount)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {record.description}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {format(new Date(record.created_at), "dd MMM yyyy")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end space-x-3">
                         <button
                           onClick={() => handleEdit(record)}
-                          className="text-sky-600 hover:text-sky-800"
+                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
                           title="Edit"
                         >
                           <IconEdit size={18} />

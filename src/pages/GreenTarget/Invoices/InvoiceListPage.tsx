@@ -227,7 +227,7 @@ const InvoiceCard = ({
             }}
             className="flex items-center justify-center gap-1.5"
           >
-            <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
+            <span className="text-xs py-0.5 px-2 bg-white dark:bg-gray-800/20 rounded-full">
               {isCancelled
                 ? "Cancelled"
                 : isPaid
@@ -257,7 +257,7 @@ const InvoiceCard = ({
           <div className="flex justify-between items-start">
             <div className="max-w-[65%]">
               <h3
-                className="w-fit font-semibold text-default-900 truncate cursor-pointer hover:underline"
+                className="w-fit font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:underline"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/greentarget/customers/${invoice.customer_id}`);
@@ -269,7 +269,7 @@ const InvoiceCard = ({
               {(invoice.customer_phone_number ||
                 invoice.location_phone_number) && (
                 <p
-                  className="text-sm text-default-600 mt-[3px] truncate"
+                  className="text-sm text-default-600 dark:text-gray-300 mt-[3px] truncate"
                   title={
                     invoice.customer_phone_number !==
                       invoice.location_phone_number &&
@@ -301,11 +301,11 @@ const InvoiceCard = ({
               Array.isArray(invoice.rental_details) &&
               invoice.rental_details.length > 0 ? (
                 <div className="text-right truncate">
-                  <h3 className="font-medium text-default-700 text-sm">
+                  <h3 className="font-medium text-default-700 dark:text-gray-200 text-sm">
                     {invoice.rental_details.length} Rental
                     {invoice.rental_details.length > 1 ? "s" : ""}
                   </h3>
-                  <div className="text-xs text-default-500">
+                  <div className="text-xs text-default-500 dark:text-gray-400">
                     {invoice.rental_details.map((rental, index) => (
                       <span key={rental.rental_id || index}>
                         #{rental.rental_id || "N/A"}
@@ -321,7 +321,7 @@ const InvoiceCard = ({
                 invoice.rental_id && (
                   <div className="text-right truncate">
                     <h3
-                      className="font-medium text-default-700 cursor-pointer hover:underline truncate"
+                      className="font-medium text-default-700 dark:text-gray-200 cursor-pointer hover:underline truncate"
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/greentarget/rentals/${invoice.rental_id}`);
@@ -446,7 +446,7 @@ const InvoiceCard = ({
           </div>
           {invoice.location_address && (
             <p
-              className="text-sm text-default-600 mt-0.5 truncate"
+              className="text-sm text-default-600 dark:text-gray-300 mt-0.5 truncate"
               title={invoice.location_address}
             >
               <IconMapPin
@@ -458,7 +458,7 @@ const InvoiceCard = ({
           )}
           {invoice.driver && (
             <p
-              className="text-sm text-default-600 mt-0.5 truncate"
+              className="text-sm text-default-600 dark:text-gray-300 mt-0.5 truncate"
               title={invoice.driver}
             >
               <IconTruck
@@ -473,8 +473,8 @@ const InvoiceCard = ({
           {invoice.rental_details &&
             Array.isArray(invoice.rental_details) &&
             invoice.rental_details.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-default-200">
-                <div className="text-xs text-default-500 mb-1 font-medium">
+              <div className="mt-2 pt-2 border-t border-default-200 dark:border-gray-700">
+                <div className="text-xs text-default-500 dark:text-gray-400 mb-1 font-medium">
                   Rental Details ({invoice.rental_details.length} rental
                   {invoice.rental_details.length > 1 ? "s" : ""})
                 </div>
@@ -482,7 +482,7 @@ const InvoiceCard = ({
                   {invoice.rental_details.slice(0, 3).map((rental, index) => (
                     <div
                       key={rental.rental_id || index}
-                      className="flex items-center justify-between text-xs text-default-600 py-1 px-2 bg-default-50 rounded cursor-pointer hover:bg-default-100 transition-colors"
+                      className="flex items-center justify-between text-xs text-default-600 dark:text-gray-300 py-1 px-2 bg-default-50 dark:bg-gray-900/50 rounded cursor-pointer hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (rental.rental_id) {
@@ -497,12 +497,12 @@ const InvoiceCard = ({
                           #{rental.rental_id || "N/A"}
                         </span>
                         {rental.tong_no && (
-                          <span className="ml-1 text-default-500">
+                          <span className="ml-1 text-default-500 dark:text-gray-400">
                             • {rental.tong_no}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center text-default-500">
+                      <div className="flex items-center text-default-500 dark:text-gray-400">
                         {rental.driver && (
                           <span
                             className="truncate max-w-40"
@@ -515,7 +515,7 @@ const InvoiceCard = ({
                     </div>
                   ))}
                   {invoice.rental_details.length > 3 && (
-                    <div className="text-xs text-default-500 text-center py-1">
+                    <div className="text-xs text-default-500 dark:text-gray-400 text-center py-1">
                       +{invoice.rental_details.length - 3} more rental
                       {invoice.rental_details.length - 3 > 1 ? "s" : ""}
                     </div>
@@ -527,8 +527,8 @@ const InvoiceCard = ({
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
-            <p className="text-xs text-default-500 mb-1">Date Issued</p>
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Date Issued</p>
             <p className="font-medium">{formatDate(invoice.date_issued)}</p>
           </div>
           <div
@@ -542,7 +542,7 @@ const InvoiceCard = ({
                 : "bg-amber-50 border-amber-100"
             }`}
           >
-            <p className="text-xs text-default-500 mb-1">Balance</p>
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Balance</p>
             <p
               className={`font-medium ${
                 isCancelled
@@ -1752,7 +1752,7 @@ const InvoiceListPage: React.FC = () => {
         {/* Row 1: Header with title, filters, search and action buttons */}
         <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
           {/* Title */}
-          <h1 className="text-2xl text-default-700 font-bold whitespace-nowrap">
+          <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold whitespace-nowrap">
             Invoices ({filteredInvoices.length})
           </h1>
 
@@ -1809,23 +1809,23 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Filters info dropdown panel - Improved */}
               {isFilterButtonHovered && (
-                <div className="absolute z-30 mt-2 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
-                  <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
+                <div className="absolute z-30 mt-2 w-72 bg-white dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top">
+                  <h3 className="font-semibold text-default-800 dark:text-gray-100 mb-2 border-b pb-1.5 border-default-100">
                     {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
                   {activeFilterCount === 0 ? (
-                    <div className="text-default-500 py-2 px-1">
+                    <div className="text-default-500 dark:text-gray-400 py-2 px-1">
                       No filters applied.
                     </div>
                   ) : (
                     <ul className="space-y-2">
                       {filters.customer_id && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                           <div className="bg-sky-100 p-1 rounded-md mr-2">
-                            <IconUser size={14} className="text-sky-600" />
+                            <IconUser size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div>
-                            <span className="text-default-500 text-xs">
+                            <span className="text-default-500 dark:text-gray-400 text-xs">
                               Customer
                             </span>
                             <div className="font-medium truncate">
@@ -1837,15 +1837,15 @@ const InvoiceListPage: React.FC = () => {
                         </li>
                       )}
                       {filters.status && filters.status.length > 0 && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                           <div className="bg-sky-100 p-1 rounded-md mr-2">
                             <IconCircleCheck
                               size={14}
-                              className="text-sky-600"
+                              className="text-sky-600 dark:text-sky-400"
                             />
                           </div>
                           <div>
-                            <span className="text-default-500 text-xs">
+                            <span className="text-default-500 dark:text-gray-400 text-xs">
                               Status
                             </span>
                             <div className="font-medium">
@@ -1861,12 +1861,12 @@ const InvoiceListPage: React.FC = () => {
                         </li>
                       )}
                       {filters.consolidation !== "all" && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                           <div className="bg-sky-100 p-1 rounded-md mr-2">
-                            <IconFiles size={14} className="text-sky-600" />
+                            <IconFiles size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div>
-                            <span className="text-default-500 text-xs">
+                            <span className="text-default-500 dark:text-gray-400 text-xs">
                               Consolidation
                             </span>
                             <div className="font-medium">
@@ -1914,9 +1914,9 @@ const InvoiceListPage: React.FC = () => {
         >
           <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
             {/* Selection checkbox - always visible */}
-            <button className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
+            <button className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500">
               {isAllSelectedOnPage ? (
-                <IconSquareMinusFilled className="text-sky-600" size={20} />
+                <IconSquareMinusFilled className="text-sky-600 dark:text-sky-400" size={20} />
               ) : (
                 <IconSelectAll className="text-default-400" size={20} />
               )}
@@ -1947,7 +1947,7 @@ const InvoiceListPage: React.FC = () => {
                 </span>
               ) : (
                 <span
-                  className="text-default-500 text-sm cursor-pointer"
+                  className="text-default-500 dark:text-gray-400 text-sm cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSelectAllOnPage();
@@ -2032,16 +2032,16 @@ const InvoiceListPage: React.FC = () => {
         </div>
 
         {filteredInvoices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200">
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200 dark:border-gray-700">
             <IconFileInvoice
               size={64}
               className="text-default-300 mb-5"
               stroke={1.2}
             />
-            <h3 className="text-xl font-semibold text-default-700 mb-2">
+            <h3 className="text-xl font-semibold text-default-700 dark:text-gray-200 mb-2">
               No invoices found
             </h3>
-            <p className="text-default-500 text-center max-w-md mb-6">
+            <p className="text-default-500 dark:text-gray-400 text-center max-w-md mb-6">
               {searchTerm
                 ? "Your search didn't match any invoices. Try adjusting your search terms or filters."
                 : "You haven't created any invoices yet."}
@@ -2071,9 +2071,9 @@ const InvoiceListPage: React.FC = () => {
       </div>
 
       {filteredInvoices.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
+        <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -2081,7 +2081,7 @@ const InvoiceListPage: React.FC = () => {
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
@@ -2110,14 +2110,14 @@ const InvoiceListPage: React.FC = () => {
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <div className="relative bg-white rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
+            <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
               <div className="flex justify-between items-center mb-4">
                 <DialogTitle as="h3" className="text-lg font-medium">
                   Filter Invoices
                 </DialogTitle>
                 <button
                   onClick={() => setShowFilters(false)}
-                  className="p-2 rounded-full hover:bg-default-100"
+                  className="p-2 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800"
                 >
                   <IconX size={18} />
                 </button>
@@ -2237,7 +2237,7 @@ const InvoiceListPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <span className="text-default-700">All</span>
+                      <span className="text-default-700 dark:text-gray-200">All</span>
                     </label>
                     <label className="inline-flex items-center cursor-pointer">
                       <div className="relative flex items-center">
@@ -2265,7 +2265,7 @@ const InvoiceListPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <span className="text-default-700">Individual</span>
+                      <span className="text-default-700 dark:text-gray-200">Individual</span>
                     </label>
                     <label className="inline-flex items-center cursor-pointer">
                       <div className="relative flex items-center">
@@ -2293,7 +2293,7 @@ const InvoiceListPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <span className="text-default-700">Consolidated</span>
+                      <span className="text-default-700 dark:text-gray-200">Consolidated</span>
                     </label>
                   </div>
                 </div>

@@ -16,10 +16,10 @@ const LoadingSpinner = ({
   return (
     <div className="flex flex-col items-center justify-center gap-3">
       <div
-        className={`${spinnerSizes[size]} border-4 border-gray-100 border-t-sky-500 rounded-full animate-spin`}
+        className={`${spinnerSizes[size]} border-4 border-gray-100 dark:border-gray-700 border-t-sky-500 dark:border-t-sky-400 rounded-full animate-spin`}
       />
       {!hideText && (
-        <div className="text-sky-500 text-sm font-medium">Loading...</div>
+        <div className="text-sky-500 dark:text-sky-400 text-sm font-medium">Loading...</div>
       )}
     </div>
   );

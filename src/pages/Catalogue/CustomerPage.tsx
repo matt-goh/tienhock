@@ -125,24 +125,24 @@ const CustomerPage: React.FC = () => {
     <div className="flex items-center">
       <Listbox value={selectedSalesman} onChange={setSelectedSalesman}>
         <div className="relative">
-          <ListboxButton className="w-48 rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+          <ListboxButton className="w-48 rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500">
             <span className="block truncate pl-2">{selectedSalesman}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-default-400"
+                className="h-5 w-5 text-default-400 dark:text-gray-500 dark:text-gray-400"
                 aria-hidden="true"
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {salesmen.map((salesman) => (
               <ListboxOption
                 key={salesman}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                     active
-                      ? "bg-default-100 text-default-900"
-                      : "text-default-900"
+                      ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                      : "text-default-900 dark:text-gray-100"
                   }`
                 }
                 value={salesman}
@@ -157,7 +157,7 @@ const CustomerPage: React.FC = () => {
                       {salesman}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                         <IconCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}
@@ -197,9 +197,9 @@ const CustomerPage: React.FC = () => {
         <button
           key={1}
           onClick={() => handlePageChange(1)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
             1 === currentPage
-              ? "border border-default-200 font-semibold"
+              ? "border border-default-200 dark:border-gray-600 font-semibold"
               : "font-medium"
           }`}
         >
@@ -225,9 +225,9 @@ const CustomerPage: React.FC = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               i === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -250,9 +250,9 @@ const CustomerPage: React.FC = () => {
         <button
           key={totalPages}
           onClick={() => handlePageChange(totalPages)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
             totalPages === currentPage
-              ? "border border-default-200 font-semibold"
+              ? "border border-default-200 dark:border-gray-600 font-semibold"
               : "font-medium"
           }`}
         >
@@ -280,11 +280,11 @@ const CustomerPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
+          <h1 className="flex items-center text-2xl text-default-700 dark:text-gray-200 font-bold gap-2.5">
             <IconBuildingStore
               size={28}
               stroke={2.5}
-              className="text-default-700"
+              className="text-default-700 dark:text-gray-200"
             />
             Customers ({filteredCustomers.length})
           </h1>
@@ -292,19 +292,19 @@ const CustomerPage: React.FC = () => {
         <div className="flex space-x-3">
           <div className="relative">
             <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-500 dark:text-gray-400"
               size={22}
             />
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500 dark:text-gray-400 hover:text-default-700 dark:text-gray-200 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
                 title="Clear search"
               >
@@ -343,7 +343,7 @@ const CustomerPage: React.FC = () => {
 
       {filteredCustomers.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-default-500">No customers found.</p>
+          <p className="text-default-500 dark:text-gray-400">No customers found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -359,9 +359,9 @@ const CustomerPage: React.FC = () => {
       )}
 
       {filteredCustomers.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
+        <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -369,7 +369,7 @@ const CustomerPage: React.FC = () => {
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >

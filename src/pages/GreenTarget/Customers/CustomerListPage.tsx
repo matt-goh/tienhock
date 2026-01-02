@@ -245,7 +245,7 @@ const CustomerListPage = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl text-default-700 font-bold">
+        <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold">
           Customers ({filteredCustomers.length})
         </h1>
         <div className="flex space-x-3">
@@ -253,7 +253,7 @@ const CustomerListPage = () => {
             <button
               type="button"
               onClick={() => setShowInactive(!showInactive)}
-              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200 flex items-center"
+              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 flex items-center"
             >
               {showInactive ? (
                 <IconSquareCheckFilled
@@ -296,55 +296,55 @@ const CustomerListPage = () => {
 
       {filteredCustomers.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-default-500">No customers found.</p>
+          <p className="text-default-500 dark:text-gray-400">No customers found.</p>
         </div>
       ) : (
-        <div className="bg-white border border-default-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Customer Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Phone Number
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Last Activity
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-default-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                 {paginatedCustomers.map((customer) => (
                   <tr
                     key={customer.customer_id}
                     onClick={() =>
                       navigate(`/greentarget/customers/${customer.customer_id}`)
                     }
-                    className="hover:bg-default-50 cursor-pointer"
+                    className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-default-900">
+                      <div className="font-medium text-default-900 dark:text-gray-100">
                         {customer.name}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-default-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-default-600 dark:text-gray-300">
                       {customer.customer_id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-default-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-default-600 dark:text-gray-300">
                       {customer.phone_number || "N/A"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-default-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-default-600 dark:text-gray-300">
                       {formatDate(customer.last_activity_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -382,9 +382,9 @@ const CustomerListPage = () => {
       )}
 
       {filteredCustomers.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
+        <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -392,7 +392,7 @@ const CustomerListPage = () => {
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >

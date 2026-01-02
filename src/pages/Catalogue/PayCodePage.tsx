@@ -286,10 +286,10 @@ const PayCodePage: React.FC = () => {
   // --- Render Functions (Filters, Pagination) ---
   const renderJobFilter = () => (
     <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700">Job:</span>
+      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Job:</span>
       <Listbox value={selectedJob} onChange={setSelectedJob}>
         <div className="relative">
-          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
             <span className="block truncate">
               {selectedJob === "All"
                 ? "All Jobs"
@@ -300,12 +300,12 @@ const PayCodePage: React.FC = () => {
               <IconChevronDown size={20} className="text-gray-400" />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
             <ListboxOption
               value="All"
               className={({ active }) =>
                 `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                  active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                  active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                 }`
               }
             >
@@ -319,7 +319,7 @@ const PayCodePage: React.FC = () => {
                     All Jobs
                   </span>
                   {selected && (
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                       <IconCheck size={20} />
                     </span>
                   )}
@@ -327,7 +327,7 @@ const PayCodePage: React.FC = () => {
               )}
             </ListboxOption>
             {loadingJobs ? (
-              <div className="py-2 px-4 text-gray-500 italic text-sm">
+              <div className="py-2 px-4 text-gray-500 dark:text-gray-400 italic text-sm">
                 Loading jobs...
               </div>
             ) : (
@@ -351,7 +351,7 @@ const PayCodePage: React.FC = () => {
                     key={String(job.id)} // Ensure key is a string
                     className={({ active }) =>
                       `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                        active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                       }`
                     }
                     value={job.id}
@@ -366,7 +366,7 @@ const PayCodePage: React.FC = () => {
                           {job.name}
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                             <IconCheck size={20} />
                           </span>
                         )}
@@ -384,22 +384,22 @@ const PayCodePage: React.FC = () => {
 
   const renderPayTypeFilter = () => (
     <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700">Type:</span>
+      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Type:</span>
       <Listbox value={selectedType} onChange={setSelectedType}>
         <div className="relative">
-          <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+          <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
             <span className="block truncate">{selectedType}</span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown size={20} className="text-gray-400" />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
             {payTypeOptions.map((type) => (
               <ListboxOption
                 key={type}
                 className={({ active }) =>
                   `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                    active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                    active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                   }`
                 }
                 value={type}
@@ -414,7 +414,7 @@ const PayCodePage: React.FC = () => {
                       {type}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                         <IconCheck size={20} />
                       </span>
                     )}
@@ -446,9 +446,9 @@ const PayCodePage: React.FC = () => {
     if (totalPages <= 1) return null;
 
     return (
-      <div className="flex items-center justify-between pt-3 border-t border-default-200 mt-4">
+      <div className="flex items-center justify-between pt-3 border-t border-default-200 dark:border-gray-700 mt-4">
         <div>
-          <p className="text-sm text-default-600">
+          <p className="text-sm text-default-600 dark:text-gray-300">
             Showing{" "}
             <span className="font-medium">
               {(currentPage - 1) * itemsPerPage + 1}
@@ -469,10 +469,10 @@ const PayCodePage: React.FC = () => {
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium ${
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                 currentPage === 1
-                  ? "text-default-300 cursor-not-allowed"
-                  : "text-default-500 hover:bg-default-50"
+                  ? "text-default-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-default-500 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
               <IconChevronLeft size={18} />
@@ -481,12 +481,12 @@ const PayCodePage: React.FC = () => {
               <>
                 <button
                   onClick={() => handlePageChange(1)}
-                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 >
                   1
                 </button>
                 {startPage > 2 && (
-                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-500 dark:text-gray-400">
                     ...
                   </span>
                 )}
@@ -498,8 +498,8 @@ const PayCodePage: React.FC = () => {
                 onClick={() => handlePageChange(num)}
                 className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                   currentPage === num
-                    ? "z-10 bg-sky-50 border-sky-500 text-sky-600"
-                    : "bg-white border-default-300 text-default-700 hover:bg-default-50"
+                    ? "z-10 bg-sky-50 dark:bg-sky-900/40 border-sky-500 dark:border-sky-600 text-sky-600 dark:text-sky-300"
+                    : "bg-white dark:bg-gray-800 border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 }`}
               >
                 {num}
@@ -508,13 +508,13 @@ const PayCodePage: React.FC = () => {
             {endPage < totalPages && (
               <>
                 {endPage < totalPages - 1 && (
-                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-500 dark:text-gray-400">
                     ...
                   </span>
                 )}
                 <button
                   onClick={() => handlePageChange(totalPages)}
-                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 >
                   {totalPages}
                 </button>
@@ -523,10 +523,10 @@ const PayCodePage: React.FC = () => {
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium ${
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                 currentPage === totalPages
-                  ? "text-default-300 cursor-not-allowed"
-                  : "text-default-500 hover:bg-default-50"
+                  ? "text-default-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-default-500 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
               <IconChevronRight size={18} />
@@ -542,7 +542,7 @@ const PayCodePage: React.FC = () => {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-        <h1 className="text-xl font-semibold text-default-800">Pay Code</h1>
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">Pay Code</h1>
         <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
           {renderPayTypeFilter()}
           {renderJobFilter()}
@@ -555,13 +555,13 @@ const PayCodePage: React.FC = () => {
             <input
               type="text"
               placeholder="Search ID or description..." // Updated placeholder
-              className="w-full rounded-full border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                 onClick={() => setSearchTerm("")}
                 title="Clear search"
               >
@@ -591,42 +591,42 @@ const PayCodePage: React.FC = () => {
       ) : (
         <>
           {/* Table - Removed Code Column, Added ID Column */}
-          <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-100">
+          <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-100 dark:bg-gray-800">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                     ID
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 max-w-sm">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 max-w-sm">
                     Description
                   </th>
                   {selectedType === "All" && (
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                       Type
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                     Unit
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 min-w-[110px]">
                     Biasa Rate
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 min-w-[110px]">
                     Ahad Rate
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 min-w-[110px]">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 min-w-[110px]">
                     Umum Rate
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                     Active
                   </th>
-                  <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-200 bg-white">
+              <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {paginatedCodes.length > 0 ? (
                   paginatedCodes.map(
                     (
@@ -634,10 +634,10 @@ const PayCodePage: React.FC = () => {
                     ) => (
                       <tr
                         key={pc.id}
-                        className="hover:bg-default-50 cursor-pointer"
+                        className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                         onClick={() => handleEditClick(pc)}
                       >
-                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-500 flex items-center">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400 flex items-center">
                           {pc.id}
                           <JobsAndEmployeesUsingPayCodeTooltip
                             payCodeId={pc.id}
@@ -651,32 +651,32 @@ const PayCodePage: React.FC = () => {
                             className="ml-1"
                           />
                         </td>
-                        <td className="px-4 py-3 text-sm text-default-700 max-w-sm truncate">
+                        <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200 max-w-sm truncate">
                           {pc.description}
                         </td>
                         {selectedType === "All" && (
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                             {pc.pay_type}
                           </td>
                         )}
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                           {pc.rate_unit}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 dark:text-gray-200 min-w-[110px]">
                           {Number(pc.rate_biasa || 0).toFixed(2)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 dark:text-gray-200 min-w-[110px]">
                           {Number(pc.rate_ahad || 0).toFixed(2)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 min-w-[110px]">
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 dark:text-gray-200 min-w-[110px]">
                           {Number(pc.rate_umum || 0).toFixed(2)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-default-700">
+                        <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-default-700 dark:text-gray-200">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               pc.is_active
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                             }`}
                           >
                             {pc.is_active ? "Yes" : "No"}
@@ -689,7 +689,7 @@ const PayCodePage: React.FC = () => {
                                 e.stopPropagation();
                                 handleEditClick(pc);
                               }}
-                              className="text-sky-600 hover:text-sky-800"
+                              className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
                               title="Edit"
                             >
                               <IconPencil size={18} />
@@ -699,7 +699,7 @@ const PayCodePage: React.FC = () => {
                                 e.stopPropagation();
                                 handleAssociateWithJobs(pc);
                               }}
-                              className="text-amber-600 hover:text-amber-800"
+                              className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300"
                               title="Link to Jobs"
                             >
                               <IconLink size={18} />
@@ -709,7 +709,7 @@ const PayCodePage: React.FC = () => {
                                 e.stopPropagation();
                                 handleAssociateWithEmployees(pc);
                               }}
-                              className="text-emerald-600 hover:text-emerald-800"
+                              className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
                               title="Link to Employees"
                             >
                               <IconUser size={18} />
@@ -719,7 +719,7 @@ const PayCodePage: React.FC = () => {
                                 e.stopPropagation();
                                 handleDeleteClick(pc);
                               }}
-                              className="text-rose-600 hover:text-rose-800"
+                              className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
                               title="Delete"
                             >
                               <IconTrash size={18} />
@@ -734,7 +734,7 @@ const PayCodePage: React.FC = () => {
                   <tr>
                     <td
                       colSpan={selectedType === "All" ? 8 : 7}
-                      className="px-6 py-10 text-center text-sm text-default-500"
+                      className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                     >
                       {filteredCodes.length === 0 &&
                       searchTerm === "" &&

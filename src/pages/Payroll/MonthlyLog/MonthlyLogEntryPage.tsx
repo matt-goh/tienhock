@@ -822,17 +822,17 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   return (
     <div className="space-y-4">
       {/* Header & Month/Year Selection */}
-      <div className="bg-white p-4 rounded-lg border border-default-200">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-default-200 dark:border-gray-700">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleCancel} />
-            <div className="h-6 w-px bg-default-300"></div>
-            <h1 className="text-lg font-semibold text-default-800">
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
+            <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {mode === "edit" ? "Edit" : "New"} {jobConfig?.name} Monthly Entry
             </h1>
-            <div className="w-px h-6 bg-default-300" />
+            <div className="w-px h-6 bg-default-300 dark:bg-gray-600" />
             {mode === "edit" ? (
-              <div className="px-4 py-2 bg-default-100 border border-default-200 rounded-lg text-sm font-medium text-default-700">
+              <div className="px-4 py-2 bg-default-100 dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg text-sm font-medium text-default-700 dark:text-gray-200">
                 {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
               </div>
             ) : (
@@ -863,10 +863,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       </div>
 
       {/* Employee Selection Table */}
-      <div className="bg-white rounded-lg border border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-default-200">
-            <thead className="bg-default-50">
+          <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+            <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-6 py-1 text-left w-12 whitespace-nowrap">
                   <Checkbox
@@ -878,27 +878,27 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     buttonClassName="p-1 rounded-lg"
                   />
                 </th>
-                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   ID
                 </th>
-                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   Name
                 </th>
-                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   Job
                 </th>
-                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
+                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-32">
                   Regular Hours
                 </th>
-                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase whitespace-nowrap w-32">
+                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-32">
                   Overtime
                 </th>
-                <th className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase whitespace-nowrap">
+                <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   Activities
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-default-200">
+            <tbody className="divide-y divide-default-200 dark:divide-gray-700">
               {Object.values(employeeEntries).map((entry) => (
                 <tr
                   key={entry.employeeId}
@@ -925,22 +925,22 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       buttonClassName="p-1 rounded-lg"
                     />
                   </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700">
+                  <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
                     <Link
                       to={`/catalogue/staff/${entry.employeeId}`}
-                      className="hover:underline hover:text-sky-600"
+                      className="hover:underline hover:text-sky-600 dark:text-sky-400"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {entry.employeeId}
                     </Link>
                   </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900">
+                  <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                     <span className="font-medium">{entry.employeeName}</span>
                   </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-sm text-default-600">
+                  <td className="px-6 py-2 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                     <Link
                       to={`/catalogue/job?id=${entry.jobType}`}
-                      className="hover:underline hover:text-sky-600"
+                      className="hover:underline hover:text-sky-600 dark:text-sky-400"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {entry.jobName}
@@ -955,7 +955,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       }
                       onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
-                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
+                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400"
                       min="0"
                       step="0.5"
                     />
@@ -969,7 +969,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       }
                       onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
-                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 disabled:text-default-400"
+                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400"
                       min="0"
                       step="0.5"
                     />
@@ -996,20 +996,20 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         </div>
 
         {Object.values(employeeEntries).length === 0 && (
-          <div className="p-8 text-center text-default-500">
+          <div className="p-8 text-center text-default-500 dark:text-gray-400">
             No employees found for this job type.
           </div>
         )}
       </div>
 
       {/* Leave Records Section */}
-      <div className="bg-white rounded-lg border border-default-200">
-        <div className="p-4 border-b border-default-200 flex justify-between items-center">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
+        <div className="p-4 border-b border-default-200 dark:border-gray-700 flex justify-between items-center">
           <div>
-            <h2 className="text-sm font-medium text-default-700">
+            <h2 className="text-sm font-medium text-default-700 dark:text-gray-200">
               Leave Records for {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
             </h2>
-            <p className="text-xs text-default-500 mt-1">
+            <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
               View existing leave and add new leave entries for this month
             </p>
           </div>
@@ -1026,34 +1026,34 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
         {allLeaveRecords.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                     Employee
                   </th>
-                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                     Date
                   </th>
-                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                     Type
                   </th>
-                  <th className="px-4 py-1 text-center text-xs font-medium text-default-500 uppercase">
+                  <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                     Status
                   </th>
-                  <th className="px-4 py-1 text-center text-xs font-medium text-default-500 uppercase w-20">
+                  <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-20">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-200">
+              <tbody className="divide-y divide-default-200 dark:divide-gray-700">
                 {allLeaveRecords.map((leave, index) => (
-                  <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white">
-                    <td className="px-4 py-2 text-sm text-default-700">
+                  <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white dark:bg-gray-800">
+                    <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       <span className="font-medium">{leave.employeeName}</span>
-                      <span className="text-default-400 ml-2">({leave.employeeId})</span>
+                      <span className="text-default-400 dark:text-gray-500 ml-2">({leave.employeeId})</span>
                     </td>
-                    <td className="px-4 py-2 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       {format(new Date(leave.leaveDate), "dd MMM yyyy")}
                     </td>
                     <td className="px-4 py-2">
@@ -1067,11 +1067,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     </td>
                     <td className="px-4 py-2 text-center">
                       {leave.isNew ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
                           New
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 text-default-600">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-800 text-default-600 dark:text-gray-300">
                           Existing
                         </span>
                       )}
@@ -1098,8 +1098,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             </table>
           </div>
         ) : (
-          <div className="p-8 text-center text-default-500">
-            <IconCalendar size={32} className="mx-auto mb-2 text-default-300" />
+          <div className="p-8 text-center text-default-500 dark:text-gray-400">
+            <IconCalendar size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
             <p>No leave records for this month.</p>
             <p className="text-xs mt-1">Click "Add Leave" to record leave entries.</p>
           </div>
@@ -1140,16 +1140,16 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               leaveTo="opacity-0 scale-95"
             >
               <DialogPanel
-                className="relative z-50 inline-block w-full max-w-md p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+                className="relative z-50 inline-block w-full max-w-md p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900">
+                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
                   Add Leave Entry
                 </DialogTitle>
 
                 <div className="space-y-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Employee
                     </label>
                     <StyledListbox
@@ -1170,7 +1170,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Date
                     </label>
                     <input
@@ -1186,10 +1186,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           leaveType: isPublicHoliday ? "cuti_umum" : leaveFormData.leaveType,
                         });
                       }}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                      className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
                     />
                     {leaveFormData.leaveDate && isHoliday(new Date(leaveFormData.leaveDate)) && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-sky-600">
+                      <div className="flex items-center gap-1 mt-1 text-xs text-sky-600 dark:text-sky-400">
                         <IconAlertCircle size={14} />
                         <span>
                           This date is a public holiday: {getHolidayDescription(new Date(leaveFormData.leaveDate))}
@@ -1199,7 +1199,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Leave Type
                     </label>
                     <StyledListbox
@@ -1218,7 +1218,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       rounded="lg"
                     />
                     {leaveFormData.leaveType === "cuti_umum" && (
-                      <p className="text-xs text-sky-600 mt-1">
+                      <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">
                         You'll be prompted to add this leave for other employees too.
                       </p>
                     )}
@@ -1228,7 +1228,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <div className="mt-6 flex justify-end space-x-2">
                   <button
                     type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 bg-default-100 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-800 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
                     onClick={() => setShowAddLeaveModal(false)}
                   >
                     Cancel
@@ -1283,15 +1283,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               leaveTo="opacity-0 scale-95"
             >
               <DialogPanel
-                className="relative z-50 inline-block w-full max-w-lg p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+                className="relative z-50 inline-block w-full max-w-lg p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900">
+                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
                   Add Public Holiday for Other Employees?
                 </DialogTitle>
 
                 <div className="mt-3">
-                  <p className="text-sm text-default-600">
+                  <p className="text-sm text-default-600 dark:text-gray-300">
                     You're adding a public holiday leave for{" "}
                     <span className="font-medium">{pendingHolidayLeave?.firstEmployeeName}</span> on{" "}
                     <span className="font-medium">
@@ -1301,7 +1301,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     </span>
                     .
                   </p>
-                  <p className="text-sm text-default-600 mt-2">
+                  <p className="text-sm text-default-600 dark:text-gray-300 mt-2">
                     Would you like to add this leave for other selected employees too?
                   </p>
                 </div>
@@ -1309,25 +1309,25 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 {Object.keys(bulkHolidaySelections).length > 0 ? (
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-default-700">
+                      <label className="text-sm font-medium text-default-700 dark:text-gray-200">
                         Select Employees ({Object.values(bulkHolidaySelections).filter(Boolean).length} selected)
                       </label>
                       <button
                         type="button"
                         onClick={handleBulkSelectAll}
-                        className="text-xs text-sky-600 hover:text-sky-700"
+                        className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700"
                       >
                         {Object.values(bulkHolidaySelections).every((v) => v) ? "Deselect All" : "Select All"}
                       </button>
                     </div>
-                    <div className="max-h-48 overflow-y-auto border border-default-200 rounded-lg">
+                    <div className="max-h-48 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg">
                       {Object.entries(bulkHolidaySelections).map(([employeeId, isSelected]) => {
                         const employee = eligibleEmployees.find((e: Employee) => e.id === employeeId);
                         return (
                           <div
                             key={employeeId}
-                            className={`flex items-center px-3 py-2 cursor-pointer hover:bg-default-50 ${
-                              isSelected ? "bg-sky-50" : ""
+                            className={`flex items-center px-3 py-2 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
+                              isSelected ? "bg-sky-50 dark:bg-sky-900/30" : ""
                             }`}
                             onClick={() => handleBulkSelectionToggle(employeeId)}
                           >
@@ -1337,7 +1337,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                               size={18}
                               checkedColor="text-sky-600"
                             />
-                            <span className="ml-3 text-sm text-default-700">
+                            <span className="ml-3 text-sm text-default-700 dark:text-gray-200">
                               {employee?.name} ({employeeId})
                             </span>
                           </div>
@@ -1346,8 +1346,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-4 p-4 bg-default-50 rounded-lg text-center">
-                    <p className="text-sm text-default-500">
+                  <div className="mt-4 p-4 bg-default-50 dark:bg-gray-900/50 rounded-lg text-center">
+                    <p className="text-sm text-default-500 dark:text-gray-400">
                       No other employees available to add this leave.
                     </p>
                   </div>
@@ -1356,7 +1356,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <div className="mt-6 flex justify-end space-x-2">
                   <button
                     type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 bg-default-100 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-800 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
                     onClick={handleSkipBulkHoliday}
                   >
                     {Object.keys(bulkHolidaySelections).length > 0 ? "Skip" : "OK"}

@@ -23,7 +23,7 @@ const ToolTip = ({
     return words.map((word, index) => {
       if (word === "Klik" || word === "Seret") {
         return (
-          <span key={index} className="font-bold text-default-500">
+          <span key={index} className="font-bold text-default-500 dark:text-gray-400">
             {word}
           </span>
         );
@@ -36,7 +36,7 @@ const ToolTip = ({
       <div>{children}</div>
       {visible && (
         <div
-          className={`absolute z-10 px-3 py-2 w-[304px] font-semibold text-xs text-default-500/80 text-center bg-default-200 rounded-lg shadow-sm left-1/2 transform -translate-x-1/2 whitespace-pre-wrap ${tooltipClass}`}
+          className={`absolute z-10 px-3 py-2 w-[304px] font-semibold text-xs text-default-500/80 dark:text-gray-400 text-center bg-default-200 dark:bg-gray-700 rounded-lg shadow-sm left-1/2 transform -translate-x-1/2 whitespace-pre-wrap ${tooltipClass}`}
         >
           {renderContent(content)}
         </div>

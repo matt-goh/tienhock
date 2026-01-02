@@ -9,7 +9,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import backupRouter from "./admin/backup.js";
 
 // User routes
-import sidebarRouter from "./user/sidebar.js";
+import bookmarksRouter from "./user/bookmarks.js";
 
 // Catalogue routes
 import customerValidationRouter from "./catalogue/customer-validation.js";
@@ -19,6 +19,8 @@ import customerBranchesRouter from "./catalogue/customer-branches.js";
 import jobCategoriesRouter from "./catalogue/job-categories.js";
 import staffOptionsRouter from "./catalogue/staff-options.js";
 import jobPayCodesRouter from "./catalogue/job-pay-codes.js";
+import jobLocationMappingsRouter from "./catalogue/job-location-mappings.js";
+import productPayCodesRouter from "./catalogue/product-pay-codes.js";
 import jobDetailsRouter from "./catalogue/job-details.js";
 import customerRouter from "./catalogue/customers.js";
 import payCodesRouter from "./catalogue/pay-codes.js";
@@ -73,6 +75,7 @@ import greenTargetRentalRouter from "./greentarget/rentals.js";
 import greenTargetInvoiceRouter from "./greentarget/invoices.js";
 import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
+import greenTargetDashboardRouter from "./greentarget/dashboard.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -144,7 +147,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/backup", backupRouter(pool));
 
   // User routes
-  app.use("/api/bookmarks", sidebarRouter(pool));
+  app.use("/api/bookmarks", bookmarksRouter(pool));
 
   // Accounting routes
   app.use("/api/debtors", debtorsRouter(pool));
@@ -177,6 +180,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/stock", stockRouter(pool));
 
   // Green Target routes
+  app.use("/greentarget/api/dashboard", greenTargetDashboardRouter(pool));
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));
   app.use("/greentarget/api/locations", greenTargetLocationRouter(pool));
   app.use("/greentarget/api/dumpsters", greenTargetDumpsterRouter(pool));
@@ -218,6 +222,8 @@ export default function setupRoutes(app, pool) {
   app.use("/api/pay-codes", payCodesRouter(pool));
   app.use("/api/job-details", jobDetailsRouter(pool));
   app.use("/api/job-pay-codes", jobPayCodesRouter(pool));
+  app.use("/api/job-location-mappings", jobLocationMappingsRouter(pool));
+  app.use("/api/product-pay-codes", productPayCodesRouter(pool));
   app.use("/api/job-categories", jobCategoriesRouter(pool));
   app.use("/api/staff-options", staffOptionsRouter(pool));
   app.use("/api/employee-pay-codes", employeePayCodesRouter(pool));

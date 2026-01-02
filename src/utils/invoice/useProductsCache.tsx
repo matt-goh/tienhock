@@ -167,12 +167,15 @@ export const useProductsCache = (
     fetchProducts();
   }, []); // Only run on mount
 
+  // Serialize type for stable dependency (arrays create new references each render)
+  const typeKey = Array.isArray(type) ? type.join(',') : type;
+
   // Update filtered products when type changes
   useEffect(() => {
     if (allProducts.length > 0) {
       setProducts(filterProducts(allProducts, type));
     }
-  }, [type, allProducts]);
+  }, [typeKey, allProducts]);
 
   // Listen for product updates
   useEffect(() => {
@@ -196,7 +199,7 @@ export const useProductsCache = (
         handleProductsUpdated as EventListener
       );
     };
-  }, [type]);
+  }, [typeKey]);
 
   const invalidateCache = () => {
     localStorage.removeItem(CACHE_KEY);

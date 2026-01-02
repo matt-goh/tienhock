@@ -366,16 +366,16 @@ const CustomerAddPage: React.FC = () => {
   // --- Render ---
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow-sm border border-default-200">
-        <div className="px-6 py-4 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 Add New Customer
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 Enter the customer's information below.
               </p>
             </div>
@@ -385,10 +385,10 @@ const CustomerAddPage: React.FC = () => {
         {/* Wrap form in a div to handle potential saving overlay */}
         <div className="relative">
           {isSaving && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
-              <div className="flex items-center space-x-3 bg-white px-6 py-4 rounded-lg shadow-lg border border-default-200">
+            <div className="absolute inset-0 bg-white dark:bg-gray-800/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
-                <span className="text-sm font-medium text-default-700">
+                <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                   Saving customer...
                 </span>
               </div>
@@ -429,8 +429,8 @@ const CustomerAddPage: React.FC = () => {
                     {renderListbox("closeness", "Closeness", closenessOptions)}
                     {renderListbox("salesman", "Salesman", salesmen, true)}
                   </div>
-                  <hr className="my-4 border-t border-default-200" />
-                  <h3 className="text-base font-medium text-default-700 mb-3">
+                  <hr className="my-4 border-t border-default-200 dark:border-gray-700" />
+                  <h3 className="text-base font-medium text-default-700 dark:text-gray-200 mb-3">
                     e-Invoice Information (Optional, requires all 3 if provided)
                   </h3>
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-3">
@@ -466,8 +466,8 @@ const CustomerAddPage: React.FC = () => {
                 <div className="space-y-8 mt-5">
                   {/* Increased spacing */}
                   {/* --- Credit Management Section --- */}
-                  <div className="p-4 border border-default-200 rounded-lg bg-gray-50/50">
-                    <h3 className="text-lg font-medium text-default-900 mb-4">
+                  <div className="p-4 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50/50 dark:bg-gray-900/50">
+                    <h3 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
                       Credit Management
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -475,7 +475,7 @@ const CustomerAddPage: React.FC = () => {
                       <div>
                         <label
                           htmlFor="credit_limit"
-                          className="block text-sm font-medium text-default-700 mb-1"
+                          className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1"
                         >
                           Credit Limit (RM)
                         </label>
@@ -506,7 +506,7 @@ const CustomerAddPage: React.FC = () => {
                             }
                           }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-default-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100"
+                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 dark:disabled:bg-gray-800"
                           disabled={isSaving}
                         />
                         {formData.credit_limit === 0 && (
@@ -518,11 +518,11 @@ const CustomerAddPage: React.FC = () => {
 
                       {/* Used Credit (Always 0 for new) */}
                       <div>
-                        <label className="block text-sm font-medium text-default-700 mb-1">
+                        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                           Credit Used
                         </label>
-                        <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          <span className="font-medium text-default-700">
+                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-800 dark:bg-gray-900 h-[42px] flex items-center">
+                          <span className="font-medium text-default-700 dark:text-gray-200">
                             RM 0.00
                           </span>
                         </div>
@@ -530,11 +530,11 @@ const CustomerAddPage: React.FC = () => {
 
                       {/* Available Credit (Equals Limit for new) */}
                       <div>
-                        <label className="block text-sm font-medium text-default-700 mb-1">
+                        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                           Available Credit
                         </label>
-                        <div className="px-3 py-2 border border-default-200 rounded-md bg-default-100 h-[42px] flex items-center">
-                          <span className="font-medium text-default-700">
+                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-800 dark:bg-gray-900 h-[42px] flex items-center">
+                          <span className="font-medium text-default-700 dark:text-gray-200">
                             {formData.credit_limit === 0
                               ? "Unlimited"
                               : `RM ${Number(
@@ -547,7 +547,7 @@ const CustomerAddPage: React.FC = () => {
                     {/* Credit Usage Bar (Always 0% for new) */}
                     {(formData.credit_limit ?? 0) > 0 && (
                       <div className="mt-4">
-                        <div className="flex justify-between text-xs text-default-600 mb-1">
+                        <div className="flex justify-between text-xs text-default-600 dark:text-gray-300 dark:text-gray-400 mb-1">
                           <span>Usage</span>
                           <span>
                             0.00 /{" "}
@@ -555,7 +555,7 @@ const CustomerAddPage: React.FC = () => {
                             (0.0%)
                           </span>
                         </div>
-                        <div className="w-full bg-default-200 rounded-full h-2.5">
+                        <div className="w-full bg-default-200 dark:bg-gray-700 rounded-full h-2.5">
                           <div
                             className="h-2.5 rounded-full bg-emerald-500" // Always green initially
                             style={{ width: "0%" }}
@@ -575,7 +575,7 @@ const CustomerAddPage: React.FC = () => {
             </div>
 
             {/* --- Form Actions --- */}
-            <div className="px-6 py-4 flex justify-end items-center space-x-3 border-t border-default-200">
+            <div className="px-6 py-4 flex justify-end items-center space-x-3 border-t border-default-200 dark:border-gray-700">
               {/* No Delete button in Add mode */}
               <Button
                 type="button" // Go back button

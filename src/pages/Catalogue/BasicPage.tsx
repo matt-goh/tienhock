@@ -240,10 +240,10 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
       <div className="w-auto">
         {/* Header row with title and Edit/Save/Cancel buttons */}
         <div className="flex items-center justify-between mb-2">
-          <div className="text-lg text-default-700 font-medium">{title}</div>
+          <div className="text-lg text-default-700 dark:text-gray-200 font-medium">{title}</div>
           {!isEditing ? (
             <div
-              className="px-3 py-2 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center transition-colors duration-200"
+              className="px-3 py-2 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 cursor-pointer text-default-600 dark:text-gray-300 font-medium flex items-center transition-colors duration-200"
               onClick={handleToggleEditing}
             >
               <IconEdit className="mr-1.5" size={18} />
@@ -252,13 +252,13 @@ const BasicPage: React.FC<CatalogueBasicPageProps> = ({
           ) : (
             <div className="flex space-x-2">
               <div
-                className="px-4 py-2 hover:text-sky-500 active:text-sky-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
+                className="px-4 py-2 hover:text-sky-500 active:text-sky-600 dark:text-sky-400 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 cursor-pointer text-default-600 dark:text-gray-300 font-medium flex items-center border border-default-300 dark:border-gray-600 transition-colors duration-200"
                 onClick={handleSave}
               >
                 Save
               </div>
               <div
-                className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-default-100 active:bg-default-200 cursor-pointer text-default-600 font-medium flex items-center border border-default-300 transition-colors duration-200"
+                className="px-4 py-2 hover:text-rose-500 active:text-rose-600 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 cursor-pointer text-default-600 dark:text-gray-300 font-medium flex items-center border border-default-300 dark:border-gray-600 transition-colors duration-200"
                 onClick={handleCancel}
               >
                 Cancel

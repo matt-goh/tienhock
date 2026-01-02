@@ -327,7 +327,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <DialogPanel className="fixed inset-0 bg-black opacity-30" />
+              <DialogPanel className="fixed inset-0 bg-black/50 dark:bg-black/70" />
             </TransitionChild>
 
             <span className="inline-block h-screen align-middle">&#8203;</span>
@@ -341,23 +341,23 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="inline-block w-full max-w-5xl p-6 my-4 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              <DialogPanel className="inline-block w-full max-w-5xl p-6 my-4 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
                 {/* Modal Header */}
                 <div className="flex justify-between items-center">
                   <DialogTitle
                     as="h3"
-                    className="text-lg font-medium leading-6 text-default-900"
+                    className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
                     Database Backups
                   </DialogTitle>
                   <div className="flex items-center space-x-2">
                     {restorePhase === "COOLDOWN" && (
-                      <div className="flex items-center px-2 py-1 text-sm rounded-full bg-sky-50 text-sky-700">
+                      <div className="flex items-center px-2 py-1 text-sm rounded-full bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
                         <IconClock size={16} className="mr-1" />
                         <span>Finalizing...</span>
                       </div>
                     )}
-                    <span className="px-2 py-1 text-sm rounded-full bg-default-100 text-default-700">
+                    <span className="px-2 py-1 text-sm rounded-full bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200">
                       {NODE_ENV === "development" ? "Development" : NODE_ENV}
                     </span>
                   </div>
@@ -365,7 +365,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="mt-4 p-4 bg-rose-50 text-rose-700 rounded-lg flex items-center">
+                  <div className="mt-4 p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-lg flex items-center">
                     <IconAlertTriangle className="mr-2" size={20} />
                     <span>{error}</span>
                   </div>
@@ -390,7 +390,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             placeholder={defaultBackUpName}
                             value={backupName}
                             onChange={(e) => setBackupName(e.target.value)}
-                            className="px-3 py-2 w-44 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                            className="px-3 py-2 w-44 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                           />
                           <Button
                             onClick={handleCreateBackup}
@@ -422,11 +422,11 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Table Section */}
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
                   <div className="relative">
                     {/* Fixed Header */}
                     <div
-                      className={`bg-default-100 border-b ${
+                      className={`bg-default-50 dark:bg-gray-800 border-b border-default-200 dark:border-gray-700 ${
                         hasScrollbar ? "pr-[17px]" : ""
                       }`}
                     >
@@ -439,16 +439,16 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                         </colgroup>
                         <thead>
                           <tr>
-                            <th className="px-6 py-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
                               Filename
                             </th>
-                            <th className="px-6 py-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
                               Created
                             </th>
-                            <th className="px-6 py-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
                               Size
                             </th>
-                            <th className="px-6 py-3 text-left font-medium text-default-700">
+                            <th className="px-6 py-3 text-left font-medium text-default-500 dark:text-gray-400">
                               Actions
                             </th>
                           </tr>
@@ -468,7 +468,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                           <col className="w-[15%]" />
                           <col className="w-[30%]" />
                         </colgroup>
-                        <tbody className="bg-white">
+                        <tbody className="bg-white dark:bg-gray-800">
                           {loading ? (
                             <tr>
                               <td colSpan={4} className="px-6 py-8 text-center">
@@ -479,7 +479,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             <tr>
                               <td
                                 colSpan={4}
-                                className="px-6 py-3 text-center text-default-500"
+                                className="px-6 py-3 text-center text-default-500 dark:text-gray-400"
                               >
                                 No backups found
                               </td>
@@ -494,15 +494,15 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                               .map((backup) => (
                                 <tr
                                   key={backup.filename}
-                                  className="border-b last:border-0"
+                                  className="border-b border-default-200 dark:border-gray-700 last:border-0"
                                 >
-                                  <td className="px-6 py-3 text-default-700 truncate">
+                                  <td className="px-6 py-3 text-default-700 dark:text-gray-200 truncate">
                                     {backup.filename}
                                   </td>
-                                  <td className="px-6 py-3 text-default-700">
+                                  <td className="px-6 py-3 text-default-700 dark:text-gray-200">
                                     {formatDate(backup.created)}
                                   </td>
-                                  <td className="px-6 py-3 text-default-700">
+                                  <td className="px-6 py-3 text-default-700 dark:text-gray-200">
                                     {formatSize(backup.size)}
                                   </td>
                                   <td className="px-6 py-3">
@@ -511,7 +511,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                       selectedBackup === backup.filename ? (
                                         <div className="flex items-center space-x-2">
                                           <LoadingSpinner size="sm" hideText />
-                                          <span className="text-sm text-default-500">
+                                          <span className="text-sm text-default-500 dark:text-gray-400">
                                             {restorePhase === "COOLDOWN"
                                               ? "Finalizing..."
                                               : "Restoring..."}
@@ -571,14 +571,14 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 {/* Full Modal Loading Overlay */}
                 {restoring && (
-                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+                  <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50">
                     <div className="flex flex-col items-center space-y-3 p-6 rounded-lg text-center">
                       <LoadingSpinner size="lg" hideText />
                       <div className="space-y-2">
-                        <h3 className="text-lg font-medium text-default-900">
+                        <h3 className="text-lg font-medium text-default-900 dark:text-gray-100">
                           Restoring Database
                         </h3>
-                        <p className="text-default-600">
+                        <p className="text-default-600 dark:text-gray-300">
                           {restorePhase === "INITIALIZATION"
                             ? "Preparing for restore..."
                             : restorePhase === "CLEANUP"
@@ -591,7 +591,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             ? "Finalizing restore process..."
                             : "Please wait while the database is being restored"}
                         </p>
-                        <p className="text-sm text-default-500">
+                        <p className="text-sm text-default-500 dark:text-gray-400">
                           Please do not close this window or refresh the page
                         </p>
                       </div>

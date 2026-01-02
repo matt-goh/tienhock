@@ -313,10 +313,10 @@ const DebtorsReportPage: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="text-center max-w-md mx-auto p-6">
           <IconAlertCircle size={64} className="text-red-500 mb-4 mx-auto" />
-          <h2 className="text-2xl font-semibold mb-2 text-gray-900">
+          <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
             Error Loading Report
           </h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
           <Button onClick={handleRefresh} icon={IconRefresh}>
             Refresh
           </Button>
@@ -330,22 +330,22 @@ const DebtorsReportPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
-        <div className="p-6 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-default-700 flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-default-700 dark:text-gray-100 flex items-center gap-3">
                 <IconCalendarDollar
                   size={28}
                   stroke={2.5}
-                  className="text-default-700"
+                  className="text-default-700 dark:text-gray-100"
                 />
                 Debtors Report
               </h1>
               <div className="flex items-center gap-2 mt-2">
-                <IconCalendar size={16} className="text-gray-500" />
-                <span className="text-gray-600">Report Date:</span>
-                <span className="font-medium text-default-800">
+                <IconCalendar size={16} className="text-gray-500 dark:text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-300">Report Date:</span>
+                <span className="font-medium text-default-800 dark:text-gray-100">
                   {debtorsData.report_date}
                 </span>
               </div>
@@ -386,13 +386,13 @@ const DebtorsReportPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search customers..."
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 focus:border-blue-500 rounded-full text-sm"
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-full text-sm bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 {searchTerm && (
                   <button
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200 dark:hover:text-gray-300"
                     onClick={() => setSearchTerm("")}
                     title="Clear search"
                   >
@@ -412,8 +412,8 @@ const DebtorsReportPage: React.FC = () => {
                 onClick={handleAllTimeToggle}
                 className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${
                   allTimeMode
-                    ? "bg-sky-100 border-sky-300 text-sky-700"
-                    : "bg-default-50 border-default-300 text-default-600 hover:bg-default-100"
+                    ? "bg-sky-100 dark:bg-sky-900/40 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300"
+                    : "bg-default-50 dark:bg-gray-700 border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
                 }`}
               >
                 All Time
@@ -422,27 +422,27 @@ const DebtorsReportPage: React.FC = () => {
 
             {/* Summary Cards */}
             <div className="flex-grow grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-sky-500">
-                <div className="text-sm text-default-500 font-medium">
+              <div className="bg-default-100/75 dark:bg-gray-700/50 rounded-lg p-4 border-l-4 border-sky-500">
+                <div className="text-sm text-default-500 dark:text-gray-400 font-medium">
                   Total Amount
                 </div>
-                <div className="text-xl font-bold text-default-800">
+                <div className="text-xl font-bold text-default-800 dark:text-gray-100">
                   RM {formatCurrency(filteredData.grand_total_amount)}
                 </div>
               </div>
-              <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-green-500">
-                <div className="text-sm text-default-500 font-medium">
+              <div className="bg-default-100/75 dark:bg-gray-700/50 rounded-lg p-4 border-l-4 border-green-500">
+                <div className="text-sm text-default-500 dark:text-gray-400 font-medium">
                   Total Paid
                 </div>
-                <div className="text-xl font-bold text-green-600">
+                <div className="text-xl font-bold text-green-600 dark:text-green-400">
                   RM {formatCurrency(filteredData.grand_total_paid)}
                 </div>
               </div>
-              <div className="bg-default-100/75 rounded-lg p-4 border-l-4 border-red-500">
-                <div className="text-sm text-default-500 font-medium">
+              <div className="bg-default-100/75 dark:bg-gray-700/50 rounded-lg p-4 border-l-4 border-red-500">
+                <div className="text-sm text-default-500 dark:text-gray-400 font-medium">
                   Total Outstanding
                 </div>
-                <div className="text-xl font-bold text-red-600">
+                <div className="text-xl font-bold text-red-600 dark:text-red-400">
                   RM {formatCurrency(filteredData.grand_total_balance)}
                 </div>
               </div>
@@ -454,49 +454,49 @@ const DebtorsReportPage: React.FC = () => {
       {/* Report Content */}
       <div
         ref={printRef}
-        className="bg-white rounded-lg shadow-sm border border-gray-200"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
       >
         {filteredData.salesmen.length === 0 ? (
           <div className="text-center py-12">
             <IconUser size={48} className="text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
               No Results Found
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-300">
               {searchTerm
                 ? "No customers match your search criteria."
                 : "No debtors data available for the selected period."}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredData.salesmen.map((salesman) => (
               <div key={salesman.salesman_id} className="p-4">
                 {/* Salesman Header */}
                 <div
-                  className="flex items-center justify-between cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-lg transition-colors"
+                  className="flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 -m-4 p-4 rounded-lg transition-colors"
                   onClick={() => toggleSalesman(salesman.salesman_id)}
                 >
                   <div className="flex items-center gap-3">
                     {expandedSalesmen.has(salesman.salesman_id) ? (
-                      <IconChevronDown size={20} className="text-gray-500" />
+                      <IconChevronDown size={20} className="text-gray-500 dark:text-gray-400" />
                     ) : (
-                      <IconChevronRight size={20} className="text-gray-500" />
+                      <IconChevronRight size={20} className="text-gray-500 dark:text-gray-400" />
                     )}
-                    <IconUser size={20} className="text-sky-600" />
+                    <IconUser size={20} className="text-sky-600 dark:text-sky-400" />
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {salesman.salesman_name}
                       </h3>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
                         {salesman.customers.length} customer
                         {salesman.customers.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-600">Total Outstanding</p>
-                    <p className="text-lg font-bold text-red-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Total Outstanding</p>
+                    <p className="text-lg font-bold text-red-600 dark:text-red-400">
                       RM {formatCurrency(salesman.total_balance)}
                     </p>
                   </div>
@@ -508,11 +508,11 @@ const DebtorsReportPage: React.FC = () => {
                     {salesman.customers.map((customer) => (
                       <div
                         key={customer.customer_id}
-                        className="border border-gray-200 rounded-lg"
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg"
                       >
                         {/* Customer Header */}
                         <div
-                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                           onClick={() => toggleCustomer(customer.customer_id)}
                         >
                           <div className="flex items-center gap-12">
@@ -520,21 +520,21 @@ const DebtorsReportPage: React.FC = () => {
                               {expandedCustomers.has(customer.customer_id) ? (
                                 <IconChevronDown
                                   size={16}
-                                  className="text-gray-500"
+                                  className="text-gray-500 dark:text-gray-400"
                                 />
                               ) : (
                                 <IconChevronRight
                                   size={16}
-                                  className="text-gray-500"
+                                  className="text-gray-500 dark:text-gray-400"
                                 />
                               )}
                               <IconBuildingStore
                                 size={16}
-                                className="text-sky-600"
+                                className="text-sky-600 dark:text-sky-400"
                               />
                               <div>
                                 <span
-                                  className="font-medium text-gray-900 hover:underline cursor-pointer"
+                                  className="font-medium text-gray-900 dark:text-gray-100 hover:underline cursor-pointer"
                                   title={
                                     customer.customer_name ||
                                     customer.customer_id
@@ -549,7 +549,7 @@ const DebtorsReportPage: React.FC = () => {
                                   {customer.customer_name ||
                                     customer.customer_id}
                                 </span>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
                                   ID: {customer.customer_id} •{" "}
                                   {customer.invoices.length} invoice
                                   {customer.invoices.length !== 1 ? "s" : ""}
@@ -557,10 +557,10 @@ const DebtorsReportPage: React.FC = () => {
                               </div>
                             </div>
                             {customer.phone_number && (
-                              <div className="flex items-center gap-2 text-default-600">
+                              <div className="flex items-center gap-2 text-default-600 dark:text-gray-300">
                                 <IconPhone
                                   size={16}
-                                  className="text-default-600"
+                                  className="text-default-600 dark:text-gray-300"
                                 />
                                 <span className="font-semibold">
                                   {customer.phone_number}
@@ -570,8 +570,8 @@ const DebtorsReportPage: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-right">
-                              <p className="text-sm text-gray-600">Balance</p>
-                              <p className="font-bold text-red-600">
+                              <p className="text-sm text-gray-600 dark:text-gray-300">Balance</p>
+                              <p className="font-bold text-red-600 dark:text-red-400">
                                 RM {formatCurrency(customer.total_balance)}
                               </p>
                             </div>
@@ -589,38 +589,38 @@ const DebtorsReportPage: React.FC = () => {
 
                         {/* Customer Details */}
                         {expandedCustomers.has(customer.customer_id) && (
-                          <div className="border-t border-gray-200 p-4">
+                          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
                             {/* Customer Summary */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                               <div>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                   Total Amount
                                 </p>
-                                <p className="font-medium">
+                                <p className="font-medium text-default-800 dark:text-gray-100">
                                   RM {formatCurrency(customer.total_amount)}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                   Total Paid
                                 </p>
-                                <p className="font-medium text-green-600">
+                                <p className="font-medium text-green-600 dark:text-green-400">
                                   RM {formatCurrency(customer.total_paid)}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                   Credit Limit
                                 </p>
-                                <p className="font-medium">
+                                <p className="font-medium text-default-800 dark:text-gray-100">
                                   RM {formatCurrency(customer.credit_limit)}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-xs text-gray-600">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
                                   Credit Balance
                                 </p>
-                                <p className="font-medium">
+                                <p className="font-medium text-default-800 dark:text-gray-100">
                                   RM {formatCurrency(customer.credit_balance)}
                                 </p>
                               </div>
@@ -630,42 +630,42 @@ const DebtorsReportPage: React.FC = () => {
                             <div className="overflow-x-auto">
                               <table className="min-w-full text-sm">
                                 <thead>
-                                  <tr className="bg-gray-100">
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                  <tr className="bg-gray-100 dark:bg-gray-900/50">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       #
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Invoice No.
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Date
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Amount
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Payment Method
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Reference
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Payment Date
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Paid Amount
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
                                       Balance
                                     </th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                   {customer.invoices.map((invoice, index) => (
                                     <React.Fragment key={invoice.invoice_id}>
                                       {invoice.payments.length === 0 ? (
                                         <tr
-                                          className="hover:bg-gray-50 cursor-pointer"
+                                          className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                                           onClick={() => {
                                             const basePath =
                                               activeCompany.id === "jellypolly"
@@ -693,19 +693,19 @@ const DebtorsReportPage: React.FC = () => {
                                           <td className="px-3 py-2 text-right">
                                             RM {formatCurrency(invoice.amount)}
                                           </td>
-                                          <td className="px-3 py-2 text-gray-500">
+                                          <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
                                             -
                                           </td>
-                                          <td className="px-3 py-2 text-gray-500">
+                                          <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
                                             -
                                           </td>
-                                          <td className="px-3 py-2 text-gray-500">
+                                          <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
                                             -
                                           </td>
-                                          <td className="px-3 py-2 text-right text-gray-500">
+                                          <td className="px-3 py-2 text-right text-gray-500 dark:text-gray-400">
                                             -
                                           </td>
-                                          <td className="px-3 py-2 text-right font-medium text-red-600">
+                                          <td className="px-3 py-2 text-right font-medium text-red-600 dark:text-red-400">
                                             RM {formatCurrency(invoice.balance)}
                                           </td>
                                         </tr>
@@ -714,7 +714,7 @@ const DebtorsReportPage: React.FC = () => {
                                           (payment, paymentIndex) => (
                                             <tr
                                               key={`${invoice.invoice_id}-${payment.payment_id}`}
-                                              className={`hover:bg-gray-50 ${
+                                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
                                                 invoice.balance !== 0
                                                   ? "cursor-pointer"
                                                   : ""
@@ -793,13 +793,13 @@ const DebtorsReportPage: React.FC = () => {
                                               <td className="px-3 py-2">
                                                 {payment.date}
                                               </td>
-                                              <td className="px-3 py-2 text-right text-green-600">
+                                              <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">
                                                 RM{" "}
                                                 {formatCurrency(payment.amount)}
                                               </td>
                                               {paymentIndex === 0 && (
                                                 <td
-                                                  className="px-3 py-2 text-right font-medium text-red-600"
+                                                  className="px-3 py-2 text-right font-medium text-red-600 dark:text-red-400"
                                                   rowSpan={
                                                     invoice.payments.length
                                                   }

@@ -89,11 +89,11 @@ const CustomersUsingProductTooltip: React.FC<
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`text-default-400 hover:text-default-600 cursor-help inline-flex items-center ${className}`}
+        className={`text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex items-center ${className}`}
       >
         <IconInfoCircle size={16} />
         {totalCount > 0 && (
-          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-xs">
+          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 text-xs">
             {totalCount}
           </span>
         )}
@@ -102,7 +102,7 @@ const CustomersUsingProductTooltip: React.FC<
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -115,7 +115,7 @@ const CustomersUsingProductTooltip: React.FC<
           >
             {/* Fixed Header */}
             <div className="flex-shrink-0">
-              <div className="text-sm font-medium text-default-700 mb-2 flex justify-between items-center">
+              <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
                 <span
                   className="truncate"
                   title={`Custom Product Prices: ${productId}`}
@@ -123,13 +123,13 @@ const CustomersUsingProductTooltip: React.FC<
                   Custom Product Prices: {productId}
                 </span>
                 <span
-                  className="text-xs text-default-500 truncate"
+                  className="text-xs text-default-500 dark:text-gray-400 truncate"
                   title={`Total: ${totalCount} customers`}
                 >
                   ({totalCount} customers)
                 </span>
               </div>
-              <div className="border-t border-default-200"></div>
+              <div className="border-t border-default-200 dark:border-gray-700"></div>
             </div>
 
             {/* Scrollable Content */}
@@ -139,7 +139,7 @@ const CustomersUsingProductTooltip: React.FC<
                 <div>
                   <div className="flex items-center mb-2">
                     <IconUser size={16} className="text-sky-600 mr-2" />
-                    <span className="text-sm font-medium text-default-700">
+                    <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                       Customers ({customersUsingProduct.length})
                     </span>
                   </div>
@@ -147,7 +147,7 @@ const CustomersUsingProductTooltip: React.FC<
                     {customersUsingProduct.map((customerInfo) => (
                       <div
                         key={customerInfo.customer_id}
-                        className={`py-2 px-2 bg-sky-50 rounded border border-sky-200 ${
+                        className={`py-2 px-2 bg-sky-50 dark:bg-sky-900/20 rounded border border-sky-200 dark:border-sky-800 ${
                           !disableNavigation
                             ? "cursor-pointer hover:bg-sky-100"
                             : ""
@@ -166,7 +166,7 @@ const CustomersUsingProductTooltip: React.FC<
                             <div className="font-medium text-sm truncate">
                               {customerInfo.customer_name}
                             </div>
-                            <div className="text-xs text-default-500">
+                            <div className="text-xs text-default-500 dark:text-gray-400">
                               ID: {customerInfo.customer_id}
                             </div>
                           </div>
@@ -178,8 +178,8 @@ const CustomersUsingProductTooltip: React.FC<
                               <span
                                 className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
                                   customerInfo.is_available
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-red-100 text-red-700"
+                                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                                    : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
                                 }`}
                               >
                                 {customerInfo.is_available
@@ -196,7 +196,7 @@ const CustomersUsingProductTooltip: React.FC<
               )}
 
               {totalCount === 0 && (
-                <div className="text-center text-sm text-default-500 py-2">
+                <div className="text-center text-sm text-default-500 dark:text-gray-400 py-2">
                   Not used by any customers
                 </div>
               )}

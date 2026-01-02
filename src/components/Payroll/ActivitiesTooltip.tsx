@@ -103,7 +103,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
         activities.length > 0 &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform -translate-y-full opacity-0 transition-opacity duration-200 flex flex-col"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-4 w-96 transform -translate-y-full opacity-0 transition-opacity duration-200 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -117,19 +117,19 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
           >
             {/* --- Sticky Header --- */}
             <div className="flex-shrink-0">
-              <div className="text-sm font-medium text-default-700 mb-1 flex justify-between items-center">
+              <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1 flex justify-between items-center">
                 <span className="text-base">Applied Activities</span>
-                <span className="text-xs text-default-500">
+                <span className="text-xs text-default-500 dark:text-gray-400">
                   ({activities.length} total)
                 </span>
               </div>
               {employeeName && (
-                <div className="text-sm text-default-600 mb-2">
+                <div className="text-sm text-default-600 dark:text-gray-300 mb-2">
                   Employee: <span className="font-medium">{employeeName}</span>
                 </div>
               )}
               {/* Separator line */}
-              <div className="border-t border-default-200"></div>
+              <div className="border-t border-default-200 dark:border-gray-700"></div>
             </div>
 
             {/* --- Scrollable Content --- */}
@@ -141,7 +141,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <div
-                      className="font-medium text-default-800 truncate"
+                      className="font-medium text-default-800 dark:text-gray-100 truncate"
                       title={`${activity.description} (${activity.payCodeId})`}
                     >
                       <SafeLink
@@ -161,13 +161,13 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         </span>
                       )}
                       {activity.isContextLinked && (
-                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
                           <IconLink size={10} className="mr-0.5" />
                           Linked
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-2 text-default-500 text-xs mt-0.5">
+                    <div className="flex gap-2 text-default-500 dark:text-gray-400 text-xs mt-0.5">
                       <span>{activity.payType}</span>
                       <span>•</span>
                       <span>{activity.rateUnit}</span>
@@ -207,7 +207,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       {activity.unitsProduced !== null &&
                         activity.rateUnit !== "Hour" &&
                         activity.rateUnit !== "Fixed" && (
-                          <span className="text-default-500">
+                          <span className="text-default-500 dark:text-gray-400">
                             • {activity.unitsProduced}{" "}
                             {activity.rateUnit === "Percent"
                               ? "Units"
@@ -234,8 +234,8 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
 
             {/* --- Sticky Footer --- */}
             <div className="flex-shrink-0">
-              <div className="border-t border-default-200 pt-3 flex justify-between items-center">
-                <span className="font-medium text-default-800">Total</span>
+              <div className="border-t border-default-200 dark:border-gray-700 pt-3 flex justify-between items-center">
+                <span className="font-medium text-default-800 dark:text-gray-100">Total</span>
                 <span className="font-semibold text-default-900 text-base">
                   RM{totalAmount.toFixed(2)}
                 </span>

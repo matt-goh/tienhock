@@ -116,7 +116,7 @@ const IncentivesPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800">
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
           Incentives (Commission & Bonus)
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
@@ -148,7 +148,7 @@ const IncentivesPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
             <YearNavigator
@@ -165,7 +165,7 @@ const IncentivesPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          <div className="text-sm text-default-600">
+          <div className="text-sm text-default-600 dark:text-gray-300">
             <div className="font-medium">
               Total: {incentives.length} records
             </div>
@@ -177,9 +177,9 @@ const IncentivesPage: React.FC = () => {
       </div>
 
       {/* Incentives Table */}
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200">
-          <h2 className="text-lg font-medium text-default-800">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
             {getMonthName(currentMonth)} {currentYear}
           </h2>
         </div>
@@ -188,68 +188,68 @@ const IncentivesPage: React.FC = () => {
             <LoadingSpinner />
           </div>
         ) : incentives.length === 0 ? (
-          <div className="text-center py-12 text-default-500">
+          <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No incentives found</p>
             <p>Click "Add Commission" or "Add Bonus" to create records</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Employee ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-default-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                 {incentives.map((incentive) => (
-                  <tr key={incentive.id} className="hover:bg-default-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                  <tr key={incentive.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {incentive.employee_id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                       {incentive.employee_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
                       {formatCurrency(incentive.amount)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {incentive.description}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {format(
                         new Date(incentive.commission_date),
                         "dd MMM yyyy"
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {format(new Date(incentive.created_at), "dd MMM yyyy")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end space-x-3">
                         <button
                           onClick={() => handleEdit(incentive)}
-                          className="text-sky-600 hover:text-sky-800"
+                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
                           title="Edit"
                         >
                           <IconEdit size={18} />
@@ -259,7 +259,7 @@ const IncentivesPage: React.FC = () => {
                             setDeletingId(incentive.id);
                             setShowDeleteDialog(true);
                           }}
-                          className="text-rose-600 hover:text-rose-800"
+                          className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
                           title="Delete"
                         >
                           <IconTrash size={18} />

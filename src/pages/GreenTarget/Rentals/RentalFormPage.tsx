@@ -725,18 +725,18 @@ const RentalFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow border border-default-200">
-        <div className="p-6 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-default-200 dark:border-gray-700">
+        <div className="p-6 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode
                   ? `Edit Rental #${formData.rental_id}`
                   : "Create New Rental"}
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
                   ? `Update details for the rental placed on ${formatDateForInput(
                       initialFormData?.date_placed ?? null
@@ -749,8 +749,8 @@ const RentalFormPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             {/* --- Customer & Location Section --- */}
-            <div className="border-b border-default-200 pb-6">
-              <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
+            <div className="border-b border-default-200 dark:border-gray-700 pb-6">
+              <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100 mb-4">
                 Customer Information
               </h2>
               <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
@@ -777,7 +777,7 @@ const RentalFormPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setIsNewCustomerModalOpen(true)}
-                      className="mt-2 text-sm text-sky-600 hover:text-sky-800 flex items-center"
+                      className="mt-2 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 flex items-center"
                     >
                       <IconPlus size={16} className="mr-1" /> Add New Customer
                     </button>
@@ -787,7 +787,7 @@ const RentalFormPage: React.FC = () => {
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="location_id-button"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     Delivery Location
                   </label>
@@ -805,7 +805,7 @@ const RentalFormPage: React.FC = () => {
                             "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                             !formData.customer_id
-                              ? "bg-gray-50 text-gray-500 cursor-not-allowed"
+                              ? "bg-gray-50 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                               : ""
                           )}
                         >
@@ -826,7 +826,7 @@ const RentalFormPage: React.FC = () => {
                                   {a}
                                 </span>
                                 {s && (
-                                  <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                  <span className="text-xs text-default-500 dark:text-gray-400 flex items-center mt-0.5">
                                     <IconPhone size={12} className="mr-1" />
                                     {p}
                                   </span>
@@ -863,7 +863,7 @@ const RentalFormPage: React.FC = () => {
                                   "relative cursor-default select-none py-2 pl-3 pr-10",
                                   active
                                     ? "bg-sky-100 text-sky-900"
-                                    : "text-gray-900"
+                                    : "text-gray-900 dark:text-gray-100"
                                 )
                               }
                             >
@@ -873,13 +873,13 @@ const RentalFormPage: React.FC = () => {
                                     className={clsx(
                                       "block truncate italic",
                                       selected ? "font-medium" : "font-normal",
-                                      "text-gray-500"
+                                      "text-gray-500 dark:text-gray-400"
                                     )}
                                   >
                                     No Specific Location
                                   </span>
                                   {selected && (
-                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                       <IconCheck size={20} />
                                     </span>
                                   )}
@@ -895,7 +895,7 @@ const RentalFormPage: React.FC = () => {
                                     "relative cursor-default select-none py-2 pl-3 pr-10",
                                     active
                                       ? "bg-sky-100 text-sky-900"
-                                      : "text-gray-900"
+                                      : "text-gray-900 dark:text-gray-100"
                                   )
                                 }
                               >
@@ -920,7 +920,7 @@ const RentalFormPage: React.FC = () => {
                                               c.customer_id ===
                                               formData.customer_id
                                           )?.phone_number && (
-                                          <span className="text-xs text-default-500 flex items-center mt-0.5">
+                                          <span className="text-xs text-default-500 dark:text-gray-400 flex items-center mt-0.5">
                                             <IconPhone
                                               size={12}
                                               className="mr-1"
@@ -930,7 +930,7 @@ const RentalFormPage: React.FC = () => {
                                         )}
                                     </div>
                                     {selected && (
-                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                         <IconCheck size={20} />
                                       </span>
                                     )}
@@ -970,8 +970,8 @@ const RentalFormPage: React.FC = () => {
               </div>
             </div>
             {/* --- Rental Details Section --- */}
-            <div className="border-b border-default-200 pb-6">
-              <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
+            <div className="border-b border-default-200 dark:border-gray-700 pb-6">
+              <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100 mb-4">
                 Rental Details
               </h2>
               <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
@@ -979,7 +979,7 @@ const RentalFormPage: React.FC = () => {
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="date_placed"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     Placement Date <span className="text-red-500">*</span>
                   </label>
@@ -1001,10 +1001,10 @@ const RentalFormPage: React.FC = () => {
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="date_picked"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     Pickup Date{" "}
-                    <span className="text-xs text-default-500">(Optional)</span>
+                    <span className="text-xs text-default-500 dark:text-gray-400">(Optional)</span>
                   </label>
                   <div className="mt-2">
                     <input
@@ -1025,7 +1025,7 @@ const RentalFormPage: React.FC = () => {
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="tong_no-button"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     Dumpster <span className="text-red-500">*</span>
                   </label>
@@ -1043,7 +1043,7 @@ const RentalFormPage: React.FC = () => {
                             "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                             !formData.date_placed
-                              ? "bg-gray-50 text-gray-500 cursor-not-allowed"
+                              ? "bg-gray-50 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                               : ""
                           )}
                         >
@@ -1074,7 +1074,7 @@ const RentalFormPage: React.FC = () => {
                           >
                             {dumpsterOptions.length === 0 &&
                             formData.date_placed ? (
-                              <div className="relative cursor-default select-none py-2 px-4 text-gray-500">
+                              <div className="relative cursor-default select-none py-2 px-4 text-gray-500 dark:text-gray-400">
                                 Loading...
                               </div>
                             ) : (
@@ -1135,7 +1135,7 @@ const RentalFormPage: React.FC = () => {
                                         "relative cursor-default select-none py-2 pl-3 pr-10",
                                         active
                                           ? "bg-sky-100 text-sky-900"
-                                          : "text-gray-900"
+                                          : "text-gray-900 dark:text-gray-100"
                                       )
                                     }
                                     value={option.id.toString()}
@@ -1160,7 +1160,7 @@ const RentalFormPage: React.FC = () => {
                                           {t && <span className={c}>{t}</span>}
                                         </div>
                                         {selected && (
-                                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                             <IconCheck size={20} />
                                           </span>
                                         )}
@@ -1191,7 +1191,7 @@ const RentalFormPage: React.FC = () => {
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="driver-button"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     Driver <span className="text-red-500">*</span>
                   </label>
@@ -1247,7 +1247,7 @@ const RentalFormPage: React.FC = () => {
                                     "relative cursor-default select-none py-2 pl-3 pr-10",
                                     active
                                       ? "bg-sky-100 text-sky-900"
-                                      : "text-gray-900"
+                                      : "text-gray-900 dark:text-gray-100"
                                   )
                                 }
                                 value={o.name}
@@ -1263,7 +1263,7 @@ const RentalFormPage: React.FC = () => {
                                       {o.name}
                                     </span>
                                     {selected && (
-                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                         <IconCheck size={20} />
                                       </span>
                                     )}
@@ -1280,13 +1280,13 @@ const RentalFormPage: React.FC = () => {
               </div>
             </div>
             {/* --- Remarks Section --- */}
-            <div className="border-b border-default-200 pb-6">
+            <div className="border-b border-default-200 dark:border-gray-700 pb-6">
               <label
                 htmlFor="remarks"
-                className="block text-sm font-medium leading-6 text-default-700"
+                className="block text-sm font-medium leading-6 text-default-700 dark:text-gray-200"
               >
                 Remarks{" "}
-                <span className="text-xs text-default-500">(Optional)</span>
+                <span className="text-xs text-default-500 dark:text-gray-400">(Optional)</span>
               </label>
               <div className="mt-2">
                 <textarea
@@ -1306,8 +1306,8 @@ const RentalFormPage: React.FC = () => {
             </div>
             {/* --- Associated Invoice Section --- */}
             {isEditMode && formData.invoice_info && (
-              <div className="border-b border-default-200 pb-6">
-                <h2 className="text-base font-semibold leading-7 text-default-900 mb-4">
+              <div className="border-b border-default-200 dark:border-gray-700 pb-6">
+                <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100 mb-4">
                   Invoice Information
                 </h2>
                 <AssociatedInvoiceDisplay

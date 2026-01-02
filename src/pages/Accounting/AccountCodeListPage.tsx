@@ -242,7 +242,7 @@ const AccountCodeListPage: React.FC = () => {
     return (
       <React.Fragment key={node.code}>
         <tr
-          className={`hover:bg-default-50 cursor-pointer ${
+          className={`hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer ${
             !node.is_active ? "opacity-50" : ""
           }`}
           onClick={() => handleEditClick(node)}
@@ -258,7 +258,7 @@ const AccountCodeListPage: React.FC = () => {
                     e.stopPropagation();
                     toggleExpand(node.code);
                   }}
-                  className="p-1 hover:bg-default-200 rounded mr-1"
+                  className="p-1 hover:bg-default-200 dark:hover:bg-gray-600 rounded mr-1"
                 >
                   {isExpanded ? (
                     <IconChevronDown size={16} />
@@ -273,31 +273,31 @@ const AccountCodeListPage: React.FC = () => {
                 isExpanded ? (
                   <IconFolderOpen
                     size={18}
-                    className="text-amber-500 mr-2 flex-shrink-0"
+                    className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
                   />
                 ) : (
                   <IconFolder
                     size={18}
-                    className="text-amber-500 mr-2 flex-shrink-0"
+                    className="text-amber-500 dark:text-amber-400 mr-2 flex-shrink-0"
                   />
                 )
               ) : (
                 <IconFile
                   size={18}
-                  className="text-default-400 mr-2 flex-shrink-0"
+                  className="text-default-400 dark:text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0"
                 />
               )}
-              <span className="font-mono text-sky-700 font-medium">
+              <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
                 {node.code}
               </span>
             </div>
           </td>
-          <td className="px-4 py-2 text-sm text-default-700">
+          <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
             {node.description}
           </td>
-          <td className="px-4 py-2 text-sm text-default-600">
+          <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
             {node.ledger_type ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 text-default-700">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200">
                 {node.ledger_type}
               </span>
             ) : (
@@ -308,8 +308,8 @@ const AccountCodeListPage: React.FC = () => {
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                 node.is_active
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
+                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
               }`}
             >
               {node.is_active ? "Active" : "Inactive"}
@@ -322,7 +322,7 @@ const AccountCodeListPage: React.FC = () => {
                   e.stopPropagation();
                   handleEditClick(node);
                 }}
-                className="text-sky-600 hover:text-sky-800"
+                className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
                 title="Edit"
               >
                 <IconPencil size={18} />
@@ -330,7 +330,7 @@ const AccountCodeListPage: React.FC = () => {
               {!node.is_system && (
                 <button
                   onClick={(e) => handleDeleteClick(node, e)}
-                  className="text-rose-600 hover:text-rose-800"
+                  className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
                   title="Delete"
                 >
                   <IconTrash size={18} />
@@ -353,37 +353,37 @@ const AccountCodeListPage: React.FC = () => {
     return (
       <tr
         key={account.code}
-        className={`hover:bg-default-50 cursor-pointer ${
+        className={`hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer ${
           !account.is_active ? "opacity-50" : ""
         }`}
         onClick={() => handleEditClick(account)}
       >
         <td className="px-4 py-2 text-sm">
-          <span className="font-mono text-sky-700 font-medium">
+          <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
             {account.code}
           </span>
         </td>
-        <td className="px-4 py-2 text-sm text-default-700">
+        <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
           {account.description}
         </td>
-        <td className="px-4 py-2 text-sm text-default-600">
+        <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
           {account.ledger_type ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 text-default-700">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200">
               {account.ledger_type}
             </span>
           ) : (
             "-"
           )}
         </td>
-        <td className="px-4 py-2 text-sm text-default-600 font-mono">
+        <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300 font-mono">
           {account.parent_code || "-"}
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <span
             className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
               account.is_active
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
+                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
             }`}
           >
             {account.is_active ? "Active" : "Inactive"}
@@ -421,10 +421,10 @@ const AccountCodeListPage: React.FC = () => {
       {/* Header */}
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-xl font-semibold text-default-800">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Chart of Accounts
           </h1>
-          <p className="text-sm text-default-500 mt-1">
+          <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
             Manage account codes and hierarchy
           </p>
         </div>
@@ -445,28 +445,28 @@ const AccountCodeListPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-4">
           {/* Ledger Type Filter */}
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-sm text-default-700">Type:</span>
+            <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Type:</span>
             <Listbox
               value={selectedLedgerType}
               onChange={setSelectedLedgerType}
             >
               <div className="relative">
-                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
-                  <span className="block truncate">
+                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-gray-700 dark:text-gray-100">
+                  <span className="block truncate text-gray-900 dark:text-gray-100">
                     {selectedLedgerType === "All"
                       ? "All Types"
                       : selectedLedgerType}
                   </span>
                   <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <IconChevronDown size={20} className="text-gray-400" />
+                    <IconChevronDown size={20} className="text-gray-400 dark:text-gray-500 dark:text-gray-400" />
                   </span>
                 </ListboxButton>
-                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
                   <ListboxOption
                     value="All"
                     className={({ active }) =>
                       `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                        active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-300" : "text-gray-900 dark:text-gray-100"
                       }`
                     }
                   >
@@ -493,7 +493,7 @@ const AccountCodeListPage: React.FC = () => {
                       value={lt.code}
                       className={({ active }) =>
                         `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                          active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                          active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-300" : "text-gray-900 dark:text-gray-100"
                         }`
                       }
                     >
@@ -528,17 +528,17 @@ const AccountCodeListPage: React.FC = () => {
               onChange={(e) => setShowInactive(e.target.checked)}
               className="rounded border-default-300 text-sky-600 focus:ring-sky-500"
             />
-            <span className="text-sm text-default-700">Show Inactive</span>
+            <span className="text-sm text-default-700 dark:text-gray-200">Show Inactive</span>
           </label>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center space-x-1 bg-default-100 rounded-lg p-1">
+          <div className="flex items-center space-x-1 bg-default-100 dark:bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setViewMode("tree")}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
                 viewMode === "tree"
-                  ? "bg-white shadow text-default-900"
-                  : "text-default-600 hover:text-default-900"
+                  ? "bg-white dark:bg-gray-700 shadow text-default-900 dark:text-gray-100"
+                  : "text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
               }`}
             >
               Tree
@@ -547,8 +547,8 @@ const AccountCodeListPage: React.FC = () => {
               onClick={() => setViewMode("flat")}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
                 viewMode === "flat"
-                  ? "bg-white shadow text-default-900"
-                  : "text-default-600 hover:text-default-900"
+                  ? "bg-white dark:bg-gray-700 shadow text-default-900 dark:text-gray-100"
+                  : "text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
               }`}
             >
               Flat
@@ -566,13 +566,13 @@ const AccountCodeListPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search code or description..."
-              className="w-full rounded-full border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
                 title="Clear search"
               >
@@ -586,14 +586,14 @@ const AccountCodeListPage: React.FC = () => {
             <div className="flex items-center gap-1">
               <button
                 onClick={expandAll}
-                className="p-2 text-default-600 hover:text-default-900 hover:bg-default-100 rounded"
+                className="p-2 text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
                 title="Expand All"
               >
                 <IconFolderOpen size={20} />
               </button>
               <button
                 onClick={collapseAll}
-                className="p-2 text-default-600 hover:text-default-900 hover:bg-default-100 rounded"
+                className="p-2 text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
                 title="Collapse All"
               >
                 <IconFolder size={20} />
@@ -604,10 +604,10 @@ const AccountCodeListPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="mb-4 flex items-center gap-4 text-sm text-default-600">
+      <div className="mb-4 flex items-center gap-4 text-sm text-default-600 dark:text-gray-400">
         <span>
           Total:{" "}
-          <span className="font-medium text-default-900">
+          <span className="font-medium text-default-900 dark:text-gray-100">
             {flatAccounts.length}
           </span>{" "}
           accounts
@@ -615,7 +615,7 @@ const AccountCodeListPage: React.FC = () => {
         {searchTerm || selectedLedgerType !== "All" || !showInactive ? (
           <span>
             Showing:{" "}
-            <span className="font-medium text-default-900">
+            <span className="font-medium text-default-900 dark:text-gray-100">
               {filteredAccounts.length}
             </span>
           </span>
@@ -628,33 +628,33 @@ const AccountCodeListPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-default-200">
-            <thead className="bg-default-100">
+        <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+          <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+            <thead className="bg-default-100 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 min-w-[200px]">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 min-w-[200px]">
                   Code
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                   Description
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
                   Type
                 </th>
                 {viewMode === "flat" && (
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
                     Parent
                   </th>
                 )}
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-default-200 bg-white">
+            <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
               {viewMode === "tree" ? (
                 filteredTree.length > 0 ? (
                   filteredTree.map((node) => renderTreeNode(node, 0))
@@ -662,7 +662,7 @@ const AccountCodeListPage: React.FC = () => {
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-6 py-10 text-center text-sm text-default-500"
+                      className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                     >
                       No account codes found.{" "}
                       {searchTerm || selectedLedgerType !== "All"
@@ -677,7 +677,7 @@ const AccountCodeListPage: React.FC = () => {
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-6 py-10 text-center text-sm text-default-500"
+                    className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
                     No account codes found.{" "}
                     {searchTerm || selectedLedgerType !== "All"

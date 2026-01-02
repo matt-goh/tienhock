@@ -100,11 +100,11 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`text-default-400 hover:text-default-600 cursor-help inline-flex items-center ${className}`}
+        className={`text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex items-center ${className}`}
       >
         <IconInfoCircle size={16} />
         {totalCount > 0 && (
-          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-xs">
+          <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 text-xs">
             {totalCount}
           </span>
         )}
@@ -113,7 +113,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -126,7 +126,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
           >
             {/* Fixed Header */}
             <div className="flex-shrink-0">
-              <div className="text-sm font-medium text-default-700 mb-2 flex justify-between items-center">
+              <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
                 <span
                   className="truncate"
                   title={`Pay Code Usage: ${payCodeId}`}
@@ -134,13 +134,13 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                   Pay Code Usage: {payCodeId}
                 </span>
                 <span
-                  className="text-xs text-default-500 truncate"
+                  className="text-xs text-default-500 dark:text-gray-400 truncate"
                   title={`Total: ${totalCount}`}
                 >
                   ({totalCount} total)
                 </span>
               </div>
-              <div className="border-t border-default-200"></div>
+              <div className="border-t border-default-200 dark:border-gray-700"></div>
             </div>
 
             {/* Scrollable Content */}
@@ -150,7 +150,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                 <div>
                   <div className="flex items-center mb-2">
                     <IconBriefcase size={16} className="text-amber-600 mr-2" />
-                    <span className="text-sm font-medium text-default-700">
+                    <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                       Jobs ({jobDetails.length})
                     </span>
                   </div>
@@ -158,7 +158,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                     {jobDetails.map((job) => (
                       <div
                         key={job.id}
-                        className={`py-1 px-2 bg-amber-50 rounded border border-amber-200 ${
+                        className={`py-1 px-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800 ${
                           !disableNavigation
                             ? "cursor-pointer hover:bg-amber-100"
                             : ""
@@ -171,7 +171,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                         }}
                       >
                         <span className="font-medium text-sm">{job.name}</span>
-                        <span className="text-xs text-default-500">
+                        <span className="text-xs text-default-500 dark:text-gray-400">
                           {job.id}
                         </span>
                       </div>
@@ -185,7 +185,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                 <div>
                   <div className="flex items-center mb-2">
                     <IconUser size={16} className="text-sky-600 mr-2" />
-                    <span className="text-sm font-medium text-default-700">
+                    <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                       Employees ({employeeDetails.length})
                     </span>
                   </div>
@@ -193,7 +193,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                     {employeeDetails.map((employee) => (
                       <div
                         key={employee.id}
-                        className={`py-1 px-2 bg-sky-50 rounded border border-sky-200 ${
+                        className={`py-1 px-2 bg-sky-50 dark:bg-sky-900/20 rounded border border-sky-200 dark:border-sky-800 ${
                           !disableNavigation
                             ? "cursor-pointer hover:bg-sky-100"
                             : ""
@@ -208,7 +208,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                         <span className="font-medium text-sm">
                           {employee.name}
                         </span>
-                        <span className="text-xs text-default-500">
+                        <span className="text-xs text-default-500 dark:text-gray-400">
                           {employee.id}
                         </span>
                       </div>
@@ -218,7 +218,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
               )}
 
               {totalCount === 0 && (
-                <div className="text-center text-sm text-default-500 py-2">
+                <div className="text-center text-sm text-default-500 dark:text-gray-400 py-2">
                   Not used by any jobs or employees
                 </div>
               )}

@@ -223,12 +223,11 @@ const ProductPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col items-center justify-center w-full">
-        <div className="relative w-full text-center text-lg text-default-700 font-medium">
-          Product Catalogue
-        </div>
-
         <div className="w-full mb-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
+            <h1 className="text-lg text-default-700 dark:text-gray-200 font-medium">
+              Product Catalogue
+            </h1>
             <div className="w-48">
               <FormListbox
                 name="typeFilter"
@@ -250,28 +249,28 @@ const ProductPage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="w-full border border-default-200 rounded-lg overflow-hidden">
+        <div className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
           {/* Sticky Header */}
-          <div className="bg-gray-50 border-b border-gray-200">
+          <div className="bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <table className="min-w-full">
               <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-300 uppercase tracking-wider w-[15%]">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[35%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-300 uppercase tracking-wider w-[35%]">
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-300 uppercase tracking-wider w-[12%]">
                     Price/Unit
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-300 uppercase tracking-wider w-[10%]">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-300 uppercase tracking-wider w-[8%]">
                     Tax
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-300 uppercase tracking-wider w-[20%]">
                     Actions
                   </th>
                 </tr>
@@ -280,12 +279,12 @@ const ProductPage: React.FC = () => {
           </div>
 
           {/* Scrollable Body */}
-          <div className="max-h-[72vh] overflow-y-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <tbody className="bg-white divide-y divide-gray-200">
+          <div className="max-h-[76vh] overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredProducts.map((product: Product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-[15%]">
+                  <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 w-[15%]">
                       <div className="flex items-center">
                         {product.id}
                         <CustomersUsingProductTooltip
@@ -295,19 +294,19 @@ const ProductPage: React.FC = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[35%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[35%]">
                       <div className="truncate" title={product.description}>
                         {product.description}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[12%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[12%]">
                       {product.price_per_unit.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[10%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           product.type === "MEE"
-                            ? "bg-blue-100 text-blue-800"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                             : product.type === "BH"
                             ? "bg-green-100 text-green-800"
                             : product.type === "JP"
@@ -320,7 +319,7 @@ const ProductPage: React.FC = () => {
                         {product.type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[8%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[8%]">
                       {product.tax}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center w-[20%]">
@@ -351,7 +350,7 @@ const ProductPage: React.FC = () => {
             </table>
 
             {filteredProducts.length === 0 && !cacheLoading && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 {typeFilter === "all"
                   ? 'No products found. Click "Add Product" to create your first product.'
                   : `No products found for type "${typeFilter}". Try changing the filter or add a new product.`}
@@ -359,7 +358,7 @@ const ProductPage: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="text-sm text-gray-500 mt-2 ml-auto text-right">
+        <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 ml-auto text-right">
           Showing {filteredProducts.length} of {products.length} products
         </div>
       </div>

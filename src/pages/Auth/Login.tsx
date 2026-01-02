@@ -81,18 +81,18 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-950">
       <div className="relative max-w-md w-full">
         {/* Main login card */}
-        <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl shadow-2xl p-8 transform transition-all duration-300 hover:shadow-3xl">
+        <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm border border-white/20 dark:border-gray-700 rounded-2xl shadow-2xl p-8 transform transition-all duration-300 hover:shadow-3xl">
           {/* Header */}
           <div className="flex items-center mb-8">
-            <div className="mr-6 w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="mr-6 w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg bg-white dark:bg-gray-700">
               <TienHockLogo width={60} height={60} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-1">Welcome Back</h1>
-              <p className="text-gray-600 text-sm">
+              <h1 className="text-3xl font-bold mb-1 text-gray-900 dark:text-gray-100">Welcome Back</h1>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
                 Sign in to your account to continue
               </p>
             </div>
@@ -104,14 +104,14 @@ const Login: React.FC = () => {
             <div className="space-y-1">
               <label
                 htmlFor="ic_no"
-                className="block text-sm font-medium text-default-700 mb-2"
+                className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-2"
               >
                 IC Number
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
                   <IconId
-                    className="text-default-500 group-focus-within:text-default-600 transition-colors duration-200"
+                    className="text-default-500 dark:text-gray-400 group-focus-within:text-default-600 dark:group-focus-within:text-gray-300 transition-colors duration-200"
                     size={20}
                     stroke={1.5}
                   />
@@ -122,7 +122,7 @@ const Login: React.FC = () => {
                   type="text"
                   placeholder="000000-00-0000"
                   required
-                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg  focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:border-sky-400 dark:focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 dark:text-gray-100 group-focus-within:text-default-600 dark:group-focus-within:text-gray-100 tracking-wide placeholder-gray-400 dark:placeholder-gray-500"
                   value={ic_no}
                   onChange={(e) => {
                     const formatted = formatIcNo(e.target.value);
@@ -138,14 +138,14 @@ const Login: React.FC = () => {
             <div className="space-y-1">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-default-700 mb-2"
+                className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-2"
               >
                 Password
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center">
                   <IconLock
-                    className="text-default-500 group-focus-within:text-default-600 transition-colors duration-200"
+                    className="text-default-500 dark:text-gray-400 group-focus-within:text-default-600 dark:group-focus-within:text-gray-300 transition-colors duration-200"
                     size={20}
                     stroke={1.5}
                   />
@@ -156,13 +156,13 @@ const Login: React.FC = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   required
-                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 rounded-lg  focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 group-focus-within:text-default-600 tracking-wide"
+                  className="pl-10 pr-4 pt-3 pb-[12.5px] h-11 w-full border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:border-sky-400 dark:focus:border-sky-400 transition-colors focus:outline-none font-medium text-default-500 dark:text-gray-100 group-focus-within:text-default-600 dark:group-focus-within:text-gray-100 tracking-wide placeholder-gray-400 dark:placeholder-gray-500"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 w-12 flex items-center justify-center text-default-400 hover:text-default-600 transition-colors duration-200"
+                  className="absolute inset-y-0 right-0 w-12 flex items-center justify-center text-default-400 dark:text-gray-500 hover:text-default-600 dark:hover:text-gray-300 transition-colors duration-200"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -201,7 +201,7 @@ const Login: React.FC = () => {
 
           {/* Footer */}
           <div className="mt-8 text-center">
-            <p className="text-xs text-default-500">
+            <p className="text-xs text-default-500 dark:text-gray-400">
               Need help? Contact system admin
             </p>
           </div>
@@ -209,7 +209,7 @@ const Login: React.FC = () => {
 
         {/* Bottom branding */}
         <div className="text-center mt-6">
-          <p className="text-sm text-default-500">Tien Hock ERP System</p>
+          <p className="text-sm text-default-500 dark:text-gray-400">Tien Hock ERP System</p>
         </div>
       </div>
     </div>
