@@ -19,7 +19,6 @@ import JournalEntryPage from "./Accounting/JournalEntryPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 
 // Payroll Settings imports
-import JobLocationMappingsPage from "./Payroll/Settings/JobLocationMappingsPage";
 import LocationAccountMappingsPage from "./Payroll/Settings/LocationAccountMappingsPage";
 
 // Invoice related imports
@@ -208,18 +207,11 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: PinjamListPage,
   });
 
-  // Settings section
+  // Settings section - Job Location Mappings moved to Catalogue > Location
   payrollSubItems.push({
     name: "Settings",
-    path: "/payroll/settings/job-location-mappings",
-    component: JobLocationMappingsPage,
-    subItems: [
-      {
-        name: "Location Account Mappings",
-        path: "/payroll/settings/location-account-mappings",
-        component: LocationAccountMappingsPage,
-      },
-    ],
+    path: "/payroll/settings/location-account-mappings",
+    component: LocationAccountMappingsPage,
   });
 
   return payrollSubItems;

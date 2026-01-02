@@ -1,30 +1,15 @@
 // src/routes/catalogue/job-location-mappings.js
 import { Router } from "express";
 
-// Location code to name mapping
-const LOCATION_MAP = {
-  "01": "DIRECTOR'S REMUNERATION",
-  "02": "OFFICE",
-  "03": "SALESMAN",
-  "04": "IKUT LORI",
-  "06": "JAGA BOILER",
-  "07": "MESIN & SANGKUT MEE",
-  "08": "PACKING MEE",
-  "09": "MESIN BIHUN",
-  "10": "SANGKUT BIHUN",
-  "11": "PACKING BIHUN",
-  "13": "TUKANG SAPU",
-  "14": "KILANG KERJA LUAR",
-  "16": "COMM-MESIN MEE",
-  "17": "COMM-MESIN BIHUN",
-  "18": "COMM-KILANG",
-  "19": "COMM-LORI",
-  "20": "COMM-BOILER",
-  "21": "COMM-FORKLIFT/CASE",
-  "22": "KILANG HABUK",
-  "23": "CUTI TAHUNAN",
-  "24": "SPECIAL OT",
-};
+// Helper function to fetch location map from database
+async function getLocationMap(pool) {
+  const result = await pool.query("SELECT id, name FROM locations ORDER BY id");
+  const locationMap = {};
+  result.rows.forEach((row) => {
+    locationMap[row.id] = row.name;
+  });
+  return locationMap;
+}
 
 export default function (pool) {
   const router = Router();
@@ -32,36 +17,35 @@ export default function (pool) {
   // GET / - Get all job-location mappings with job names
   router.get("/", async (req, res) => {
     try {
+      // Fetch location map from DB
+      const locationMap = await getLocationMap(pool);
+
       const query = `
         SELECT
           jlm.id,
           jlm.job_id,
           j.name as job_name,
           jlm.location_code,
+          l.name as location_name,
           jlm.is_active,
           jlm.created_at,
           jlm.updated_at
         FROM job_location_mappings jlm
         LEFT JOIN jobs j ON jlm.job_id = j.id
+        LEFT JOIN locations l ON jlm.location_code = l.id
         ORDER BY jlm.location_code, jlm.job_id
       `;
       const result = await pool.query(query);
 
-      // Add location names to the response
-      const mappings = result.rows.map((row) => ({
-        ...row,
-        location_name: LOCATION_MAP[row.location_code] || row.location_code,
-      }));
-
       // Create byJob lookup
       const byJob = {};
-      mappings.forEach((m) => {
+      result.rows.forEach((m) => {
         byJob[m.job_id] = m.location_code;
       });
 
       // Create byLocation lookup
       const byLocation = {};
-      mappings.forEach((m) => {
+      result.rows.forEach((m) => {
         if (!byLocation[m.location_code]) {
           byLocation[m.location_code] = [];
         }
@@ -69,10 +53,10 @@ export default function (pool) {
       });
 
       res.json({
-        mappings,
+        mappings: result.rows,
         byJob,
         byLocation,
-        locationMap: LOCATION_MAP,
+        locationMap,
       });
     } catch (error) {
       console.error("Error fetching job location mappings:", error);
@@ -115,11 +99,13 @@ export default function (pool) {
           jlm.job_id,
           j.name as job_name,
           jlm.location_code,
+          l.name as location_name,
           jlm.is_active,
           jlm.created_at,
           jlm.updated_at
         FROM job_location_mappings jlm
         LEFT JOIN jobs j ON jlm.job_id = j.id
+        LEFT JOIN locations l ON jlm.location_code = l.id
         WHERE jlm.job_id = $1
       `;
       const result = await pool.query(query, [jobId]);
@@ -128,12 +114,7 @@ export default function (pool) {
         return res.status(404).json({ message: "Job location mapping not found" });
       }
 
-      const mapping = {
-        ...result.rows[0],
-        location_name: LOCATION_MAP[result.rows[0].location_code] || result.rows[0].location_code,
-      };
-
-      res.json(mapping);
+      res.json(result.rows[0]);
     } catch (error) {
       console.error("Error fetching job location mapping:", error);
       res.status(500).json({
@@ -153,14 +134,19 @@ export default function (pool) {
       });
     }
 
-    // Validate location code
-    if (!LOCATION_MAP[location_code]) {
-      return res.status(400).json({
-        message: `Invalid location_code. Must be one of: ${Object.keys(LOCATION_MAP).join(", ")}`,
-      });
-    }
-
     try {
+      // Validate location code exists in DB
+      const locationCheck = await pool.query(
+        "SELECT id, name FROM locations WHERE id = $1",
+        [location_code]
+      );
+      if (locationCheck.rows.length === 0) {
+        const locationMap = await getLocationMap(pool);
+        return res.status(400).json({
+          message: `Invalid location_code. Must be one of: ${Object.keys(locationMap).join(", ")}`,
+        });
+      }
+
       await pool.query("BEGIN");
 
       // Check if job exists
@@ -193,7 +179,7 @@ export default function (pool) {
 
       const mapping = {
         ...result.rows[0],
-        location_name: LOCATION_MAP[location_code],
+        location_name: locationCheck.rows[0].name,
       };
 
       res.status(201).json({
@@ -221,14 +207,24 @@ export default function (pool) {
       });
     }
 
-    // Validate location code if provided
-    if (location_code && !LOCATION_MAP[location_code]) {
-      return res.status(400).json({
-        message: `Invalid location_code. Must be one of: ${Object.keys(LOCATION_MAP).join(", ")}`,
-      });
-    }
-
     try {
+      let locationName = null;
+
+      // Validate location code if provided
+      if (location_code) {
+        const locationCheck = await pool.query(
+          "SELECT id, name FROM locations WHERE id = $1",
+          [location_code]
+        );
+        if (locationCheck.rows.length === 0) {
+          const locationMap = await getLocationMap(pool);
+          return res.status(400).json({
+            message: `Invalid location_code. Must be one of: ${Object.keys(locationMap).join(", ")}`,
+          });
+        }
+        locationName = locationCheck.rows[0].name;
+      }
+
       await pool.query("BEGIN");
 
       // Check if mapping exists
@@ -257,7 +253,7 @@ export default function (pool) {
             message: "Job location mapping created successfully",
             mapping: {
               ...result.rows[0],
-              location_name: LOCATION_MAP[location_code],
+              location_name: locationName,
             },
           });
         } else {
@@ -293,11 +289,20 @@ export default function (pool) {
 
       const result = await pool.query(updateQuery, values);
 
+      // Fetch the location name for response
+      if (!locationName && result.rows[0].location_code) {
+        const locResult = await pool.query(
+          "SELECT name FROM locations WHERE id = $1",
+          [result.rows[0].location_code]
+        );
+        locationName = locResult.rows[0]?.name || result.rows[0].location_code;
+      }
+
       await pool.query("COMMIT");
 
       const mapping = {
         ...result.rows[0],
-        location_name: LOCATION_MAP[result.rows[0].location_code],
+        location_name: locationName,
       };
 
       res.json({
@@ -359,24 +364,28 @@ export default function (pool) {
       });
     }
 
-    // Validate all entries
-    for (const entry of mappings) {
-      const { job_id, location_code } = entry;
-      if (!job_id || !location_code) {
-        return res.status(400).json({
-          message: "All entries must have job_id and location_code",
-          invalid_entry: entry,
-        });
-      }
-      if (!LOCATION_MAP[location_code]) {
-        return res.status(400).json({
-          message: `Invalid location_code: ${location_code}`,
-          invalid_entry: entry,
-        });
-      }
-    }
-
     try {
+      // Fetch valid location codes from DB
+      const locationMap = await getLocationMap(pool);
+      const validLocationCodes = Object.keys(locationMap);
+
+      // Validate all entries
+      for (const entry of mappings) {
+        const { job_id, location_code } = entry;
+        if (!job_id || !location_code) {
+          return res.status(400).json({
+            message: "All entries must have job_id and location_code",
+            invalid_entry: entry,
+          });
+        }
+        if (!validLocationCodes.includes(location_code)) {
+          return res.status(400).json({
+            message: `Invalid location_code: ${location_code}. Valid codes are: ${validLocationCodes.join(", ")}`,
+            invalid_entry: entry,
+          });
+        }
+      }
+
       await pool.query("BEGIN");
 
       const results = [];
@@ -400,7 +409,7 @@ export default function (pool) {
           const result = await pool.query(upsertQuery, [job_id, location_code, is_active]);
           results.push({
             ...result.rows[0],
-            location_name: LOCATION_MAP[location_code],
+            location_name: locationMap[location_code],
           });
         } catch (error) {
           errors.push({
