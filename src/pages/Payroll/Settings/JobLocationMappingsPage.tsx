@@ -9,7 +9,6 @@ import {
   IconCheck,
   IconAlertTriangle,
   IconMapPin,
-  IconLink,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -19,6 +18,7 @@ import {
 } from "@headlessui/react";
 import { useJobLocationMappings } from "../../../utils/catalogue/useJobLocationMappings";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
+import { api } from "@/routes/utils/api";
 
 // Settings navigation tabs
 const SettingsTabs: React.FC = () => {
