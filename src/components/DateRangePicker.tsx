@@ -122,9 +122,9 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // Size-based classes
   const inputClasses = clsx(
-    "rounded-lg border bg-default-50 dark:bg-gray-700 text-center font-medium text-default-900 dark:text-gray-100 transition-colors outline-none",
+    "rounded-lg border bg-default-50 dark:bg-gray-900/50 text-center font-medium text-default-900 dark:text-gray-100 transition-colors outline-none",
     size === "sm" ? "pr-2 py-1.5 text-xs" : "pr-3 py-2 text-sm",
-    isDateRangeFocused ? "border-default-500 dark:border-gray-500" : "border-default-300 dark:border-gray-600"
+    isDateRangeFocused ? "border-default-500 dark:border-gray-400" : "border-default-300 dark:border-gray-600"
   );
 
   return (
