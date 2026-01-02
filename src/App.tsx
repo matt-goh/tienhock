@@ -16,6 +16,7 @@ import Navbar from "./components/Navbar/Navbar";
 import "./index.css";
 import LoadingSpinner from "./components/LoadingSpinner";
 import HomePage from "./pages/HomePage";
+import GreenTargetDashboardPage from "./pages/GreenTarget/GreenTargetDashboardPage";
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -68,7 +69,7 @@ const Layout: React.FC = () => {
               path="/greentarget"
               element={
                 <ProtectedRoute>
-                  <HomePage />
+                  <GreenTargetDashboardPage />
                 </ProtectedRoute>
               }
             />
