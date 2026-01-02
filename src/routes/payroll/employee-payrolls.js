@@ -201,10 +201,44 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     };
 
     // --- Main Calculation Logic ---
-    const workGrossPay = payrollItems.reduce((sum, item) => sum + item.amount, 0);
-    const leaveGrossPay = leaveRecords.reduce((sum, record) => sum + record.amount_paid, 0);
-    const commissionGrossPay = commissionRecords.reduce((sum, record) => sum + record.amount, 0);
-    const grossPay = workGrossPay + leaveGrossPay + commissionGrossPay;
+    // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
+    // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
+    const consolidateItems = (items) => {
+      const groups = new Map();
+      items.forEach(item => {
+        const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+        if (groups.has(key)) {
+          const group = groups.get(key);
+          group.totalQuantity += item.quantity;
+          group.originalAmountSum += item.amount;
+        } else {
+          groups.set(key, {
+            rate: item.rate,
+            rate_unit: item.rate_unit,
+            totalQuantity: item.quantity,
+            originalAmountSum: item.amount,
+          });
+        }
+      });
+      let totalCents = 0;
+      groups.forEach(group => {
+        if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
+          totalCents += Math.round(group.originalAmountSum * 100);
+        } else {
+          const roundedRate = Math.round(group.rate * 100) / 100;
+          totalCents += Math.round(roundedRate * group.totalQuantity * 100);
+        }
+      });
+      return totalCents;
+    };
+
+    const workGrossPayCents = consolidateItems(payrollItems);
+    const workGrossPay = workGrossPayCents / 100;
+    const leaveGrossPayCents = leaveRecords.reduce((sum, record) => sum + Math.round(record.amount_paid * 100), 0);
+    const leaveGrossPay = leaveGrossPayCents / 100;
+    const commissionGrossPayCents = commissionRecords.reduce((sum, record) => sum + Math.round(record.amount * 100), 0);
+    const commissionGrossPay = commissionGrossPayCents / 100;
+    const grossPay = Math.round((workGrossPay + leaveGrossPay + commissionGrossPay) * 100) / 100;
 
     const groupedItems = payrollItems.reduce(
       (acc, item) => {
@@ -216,11 +250,12 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       { Base: [], Tambahan: [], Overtime: [] }
     );
 
-    const epfGrossPay =
-      (groupedItems.Base?.reduce((s, i) => s + i.amount, 0) || 0) +
-      (groupedItems.Tambahan?.reduce((s, i) => s + i.amount, 0) || 0) +
-      leaveGrossPay +
-      commissionGrossPay;
+    // Calculate EPF gross pay using CONSOLIDATED approach
+    const epfGrossPayCents = consolidateItems(groupedItems.Base || []) +
+      consolidateItems(groupedItems.Tambahan || []) +
+      Math.round(leaveGrossPay * 100) +
+      Math.round(commissionGrossPay * 100);
+    const epfGrossPay = epfGrossPayCents / 100;
 
     const age = Math.floor(
       (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
@@ -754,18 +789,71 @@ export default function (pool) {
             ])
       ]);
 
+      // Parse items
+      const items = itemsResult.rows.map((item) => ({
+        ...item,
+        rate: parseFloat(item.rate),
+        quantity: parseFloat(item.quantity),
+        amount: parseFloat(item.amount),
+        is_manual: !!item.is_manual,
+      }));
+
+      // Parse leave and commission records
+      const leaveRecords = leaveRecordsResult.rows.map((record) => ({
+        ...record,
+        days_taken: parseFloat(record.days_taken),
+        amount_paid: parseFloat(record.amount_paid || 0),
+      }));
+      const commissionRecords = commissionsResult.rows.map((record) => ({
+        ...record,
+        amount: parseFloat(record.amount)
+      }));
+
+      // Recalculate gross_pay using CONSOLIDATED approach (matches frontend display)
+      const consolidateItemsAPI = (itemsList) => {
+        const groups = new Map();
+        itemsList.forEach(item => {
+          const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+          if (groups.has(key)) {
+            const group = groups.get(key);
+            group.totalQuantity += item.quantity;
+            group.originalAmountSum += item.amount;
+          } else {
+            groups.set(key, {
+              rate: item.rate,
+              rate_unit: item.rate_unit,
+              totalQuantity: item.quantity,
+              originalAmountSum: item.amount,
+            });
+          }
+        });
+        let totalCents = 0;
+        groups.forEach(group => {
+          if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
+            totalCents += Math.round(group.originalAmountSum * 100);
+          } else {
+            const roundedRate = Math.round(group.rate * 100) / 100;
+            totalCents += Math.round(roundedRate * group.totalQuantity * 100);
+          }
+        });
+        return totalCents;
+      };
+
+      const workGrossPayCents = consolidateItemsAPI(items);
+      const leaveGrossPayCents = leaveRecords.reduce((sum, r) => sum + Math.round(r.amount_paid * 100), 0);
+      const commissionGrossPayCents = commissionRecords.reduce((sum, r) => sum + Math.round(r.amount * 100), 0);
+      const recalculatedGrossPay = (workGrossPayCents + leaveGrossPayCents + commissionGrossPayCents) / 100;
+
+      // Recalculate net_pay based on recalculated gross_pay
+      const totalDeductions = deductionsResult.rows.reduce((sum, d) => sum + parseFloat(d.employee_amount || 0), 0);
+      const recalculatedNetPay = Math.round((recalculatedGrossPay - totalDeductions) * 100) / 100;
+
       // Format comprehensive response
       const response = {
         ...payrollData,
-        gross_pay: parseFloat(payrollData.gross_pay),
-        net_pay: parseFloat(payrollData.net_pay),
-        items: itemsResult.rows.map((item) => ({
-          ...item,
-          rate: parseFloat(item.rate),
-          quantity: parseFloat(item.quantity),
-          amount: parseFloat(item.amount),
-          is_manual: !!item.is_manual,
-        })),
+        gross_pay: recalculatedGrossPay,
+        net_pay: recalculatedNetPay,
+        items,
         deductions: deductionsResult.rows.map((deduction) => ({
           ...deduction,
           employee_amount: parseFloat(deduction.employee_amount),
@@ -773,19 +861,12 @@ export default function (pool) {
           wage_amount: parseFloat(deduction.wage_amount),
           rate_info: deduction.rate_info || {},
         })),
-        leave_records: leaveRecordsResult.rows.map((record) => ({
-          ...record,
-          days_taken: parseFloat(record.days_taken),
-          amount_paid: parseFloat(record.amount_paid || 0),
-        })),
+        leave_records: leaveRecords,
         mid_month_payroll: midMonthResult.rows.length > 0 ? {
           ...midMonthResult.rows[0],
           amount: parseFloat(midMonthResult.rows[0].amount)
         } : null,
-        commission_records: commissionsResult.rows.map((record) => ({
-          ...record,
-          amount: parseFloat(record.amount)
-        }))
+        commission_records: commissionRecords
       };
 
       res.json(response);
@@ -903,18 +984,71 @@ export default function (pool) {
             ])
       ]);
 
+      // Parse items
+      const items = itemsResult.rows.map((item) => ({
+        ...item,
+        rate: parseFloat(item.rate),
+        quantity: parseFloat(item.quantity),
+        amount: parseFloat(item.amount),
+        is_manual: !!item.is_manual,
+      }));
+
+      // Parse leave and commission records
+      const leaveRecords = leaveRecordsResult.rows.map((record) => ({
+        ...record,
+        days_taken: parseFloat(record.days_taken),
+        amount_paid: parseFloat(record.amount_paid || 0),
+      }));
+      const commissionRecords = commissionsResult.rows.map((record) => ({
+        ...record,
+        amount: parseFloat(record.amount)
+      }));
+
+      // Recalculate gross_pay using CONSOLIDATED approach (matches frontend display)
+      const consolidateItemsAPI = (itemsList) => {
+        const groups = new Map();
+        itemsList.forEach(item => {
+          const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+          if (groups.has(key)) {
+            const group = groups.get(key);
+            group.totalQuantity += item.quantity;
+            group.originalAmountSum += item.amount;
+          } else {
+            groups.set(key, {
+              rate: item.rate,
+              rate_unit: item.rate_unit,
+              totalQuantity: item.quantity,
+              originalAmountSum: item.amount,
+            });
+          }
+        });
+        let totalCents = 0;
+        groups.forEach(group => {
+          if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
+            totalCents += Math.round(group.originalAmountSum * 100);
+          } else {
+            const roundedRate = Math.round(group.rate * 100) / 100;
+            totalCents += Math.round(roundedRate * group.totalQuantity * 100);
+          }
+        });
+        return totalCents;
+      };
+
+      const workGrossPayCents = consolidateItemsAPI(items);
+      const leaveGrossPayCents = leaveRecords.reduce((sum, r) => sum + Math.round(r.amount_paid * 100), 0);
+      const commissionGrossPayCents = commissionRecords.reduce((sum, r) => sum + Math.round(r.amount * 100), 0);
+      const recalculatedGrossPay = (workGrossPayCents + leaveGrossPayCents + commissionGrossPayCents) / 100;
+
+      // Recalculate net_pay based on recalculated gross_pay
+      const totalDeductions = deductionsResult.rows.reduce((sum, d) => sum + parseFloat(d.employee_amount || 0), 0);
+      const recalculatedNetPay = Math.round((recalculatedGrossPay - totalDeductions) * 100) / 100;
+
       // Format comprehensive response
       const response = {
         ...payrollData,
-        gross_pay: parseFloat(payrollData.gross_pay),
-        net_pay: parseFloat(payrollData.net_pay),
-        items: itemsResult.rows.map((item) => ({
-          ...item,
-          rate: parseFloat(item.rate),
-          quantity: parseFloat(item.quantity),
-          amount: parseFloat(item.amount),
-          is_manual: !!item.is_manual,
-        })),
+        gross_pay: recalculatedGrossPay,
+        net_pay: recalculatedNetPay,
+        items,
         deductions: deductionsResult.rows.map((deduction) => ({
           ...deduction,
           employee_amount: parseFloat(deduction.employee_amount),
@@ -922,19 +1056,12 @@ export default function (pool) {
           wage_amount: parseFloat(deduction.wage_amount),
           rate_info: deduction.rate_info || {},
         })),
-        leave_records: leaveRecordsResult.rows.map((record) => ({
-          ...record,
-          days_taken: parseFloat(record.days_taken),
-          amount_paid: parseFloat(record.amount_paid || 0),
-        })),
+        leave_records: leaveRecords,
         mid_month_payroll: midMonthResult.rows.length > 0 ? {
           ...midMonthResult.rows[0],
           amount: parseFloat(midMonthResult.rows[0].amount)
         } : null,
-        commission_records: commissionsResult.rows.map((record) => ({
-          ...record,
-          amount: parseFloat(record.amount)
-        }))
+        commission_records: commissionRecords
       };
 
       res.json(response);

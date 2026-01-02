@@ -12,6 +12,8 @@ import {
   IconHammer,
   IconCalendarEvent,
   IconCirclePlus,
+  IconList,
+  IconListDetails,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -23,6 +25,9 @@ import {
   deletePayrollItem,
   groupItemsByType,
   getMonthName,
+  consolidatePayrollItems,
+  groupConsolidatedItemsByType,
+  ConsolidatedPayrollItem,
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -82,6 +87,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [commissionRecords, setCommissionRecords] = useState<
     CommissionRecord[]
   >([]);
+  const [viewMode, setViewMode] = useState<"consolidated" | "detailed">(
+    "consolidated"
+  );
 
   useEffect(() => {
     fetchEmployeePayrollComprehensive();
@@ -211,6 +219,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     }))
   );
 
+  // Consolidated items for the consolidated view
+  const consolidatedItems = consolidatePayrollItems(payroll.items);
+  const groupedConsolidatedItems = groupConsolidatedItemsByType(consolidatedItems);
+
   // Detect if this is a combined job payroll (multiple job types)
   const uniqueJobTypes = [
     ...new Set(payroll.items.map((item) => item.job_type).filter(Boolean)),
@@ -233,17 +245,29 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       }, {} as Record<string, ReturnType<typeof groupItemsByType>>)
     : null;
 
-  // Calculate totals for each group
-  const baseTotal = groupedItems["Base"].reduce(
-    (sum, item) => sum + item.amount,
+  // Consolidated items by job type for combined payrolls
+  const consolidatedItemsByJob = isCombinedPayroll
+    ? uniqueJobTypes.reduce((acc, jobType) => {
+        const jobItems = payroll.items.filter(
+          (item) => item.job_type === jobType
+        );
+        const consolidated = consolidatePayrollItems(jobItems);
+        acc[jobType as string] = groupConsolidatedItemsByType(consolidated);
+        return acc;
+      }, {} as Record<string, ReturnType<typeof groupConsolidatedItemsByType>>)
+    : null;
+
+  // Calculate totals for each group - use consolidated items for consistency with recalculated amounts
+  const baseTotal = groupedConsolidatedItems["Base"].reduce(
+    (sum, item) => sum + item.total_amount,
     0
   );
-  const tambahanTotal = groupedItems["Tambahan"].reduce(
-    (sum, item) => sum + item.amount,
+  const tambahanTotal = groupedConsolidatedItems["Tambahan"].reduce(
+    (sum, item) => sum + item.total_amount,
     0
   );
-  const overtimeTotal = groupedItems["Overtime"].reduce(
-    (sum, item) => sum + item.amount,
+  const overtimeTotal = groupedConsolidatedItems["Overtime"].reduce(
+    (sum, item) => sum + item.total_amount,
     0
   );
 
@@ -255,6 +279,128 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       MAINTEN: "Maintenance",
     };
     return jobTypeMap[jobType] || jobType;
+  };
+
+  // Helper to get sorted items by date for detailed view with day separators
+  const getSortedItemsWithSeparators = (items: PayrollItem[]) => {
+    const sorted = [...items].sort((a, b) => {
+      if (!a.source_date && !b.source_date) return 0;
+      if (!a.source_date) return 1;
+      if (!b.source_date) return -1;
+      return a.source_date.localeCompare(b.source_date);
+    });
+    return sorted;
+  };
+
+  // Helper to render consolidated table row
+  const renderConsolidatedRow = (item: ConsolidatedPayrollItem, index: number) => (
+    <tr key={`${item.pay_code_id}-${item.rate}-${index}`} className="hover:bg-default-50">
+      <td className="px-3 py-2">
+        <span
+          className="text-sm text-default-900"
+          title={`${item.description} (${item.pay_code_id})`}
+        >
+          {item.description}{" "}
+          <span className="text-default-500">({item.pay_code_id})</span>
+          {item.item_count > 1 && (
+            <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-500">
+              {item.item_count} entries
+            </span>
+          )}
+        </span>
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+        {item.rate_unit === "Percent"
+          ? `${item.rate}%`
+          : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+        {item.total_quantity}
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
+        {formatCurrency(item.total_amount)}
+      </td>
+    </tr>
+  );
+
+  // Helper to render detailed table row with optional day separator
+  const renderDetailedRow = (
+    item: PayrollItem,
+    index: number,
+    items: PayrollItem[],
+    showDeleteButton: boolean = false
+  ) => {
+    const prevItem = index > 0 ? items[index - 1] : null;
+    const isNewDay = prevItem && prevItem.source_date !== item.source_date && item.source_date;
+    const colCount = showDeleteButton && isEditable ? 6 : 5;
+
+    return (
+      <React.Fragment key={item.id}>
+        {isNewDay && (
+          <tr className="bg-default-100">
+            <td colSpan={colCount} className="px-3 py-1.5 text-xs font-semibold text-default-600 border-t-2 border-default-300">
+              {formatSourceDate(item.source_date)}
+            </td>
+          </tr>
+        )}
+        <tr className="hover:bg-default-50">
+        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+          {item.source_date ? (
+            getWorkLogUrl(item) ? (
+              <Link
+                to={getWorkLogUrl(item)!}
+                className="text-sky-600 hover:underline"
+              >
+                {formatSourceDate(item.source_date)}
+              </Link>
+            ) : (
+              formatSourceDate(item.source_date)
+            )
+          ) : (
+            "-"
+          )}
+        </td>
+        <td className="px-3 py-2">
+          <span
+            className="text-sm text-default-900"
+            title={`${item.description} (${item.pay_code_id})`}
+          >
+            {item.description}{" "}
+            <span className="text-default-500">({item.pay_code_id})</span>
+            {item.is_manual && (
+              <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-600">
+                Manual
+              </span>
+            )}
+          </span>
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+          {item.rate_unit === "Percent"
+            ? `${item.rate}%`
+            : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+          {item.quantity}
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
+          {formatCurrency(item.amount)}
+        </td>
+        {showDeleteButton && isEditable && (
+          <td className="px-3 py-2 whitespace-nowrap text-center">
+            <button
+              onClick={() => {
+                setItemToDelete({ ...item, id: item.id || 0 });
+                setShowDeleteDialog(true);
+              }}
+              className="text-rose-600 hover:text-rose-800"
+            >
+              <IconTrash size={16} />
+            </button>
+          </td>
+        )}
+        </tr>
+      </React.Fragment>
+    );
   };
 
   return (
@@ -270,6 +416,34 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             <p className="text-sm text-default-500 mt-1">
               {getMonthName(payroll.month)} {payroll.year}
             </p>
+          </div>
+          <div className="h-6 w-px bg-default-300"></div>
+          {/* View Mode Toggle */}
+          <div className="flex rounded-lg border border-default-300 overflow-hidden">
+            <button
+              onClick={() => setViewMode("consolidated")}
+              className={`px-3 py-1.5 flex items-center gap-1.5 text-sm ${
+                viewMode === "consolidated"
+                  ? "bg-sky-500 text-white"
+                  : "bg-white text-default-600 hover:bg-default-50"
+              }`}
+              title="Summary View - Shows totals grouped by item"
+            >
+              <IconList size={16} />
+              Summary
+            </button>
+            <button
+              onClick={() => setViewMode("detailed")}
+              className={`px-3 py-1.5 flex items-center gap-1.5 text-sm ${
+                viewMode === "detailed"
+                  ? "bg-sky-500 text-white"
+                  : "bg-white text-default-600 hover:bg-default-50"
+              }`}
+              title="Detailed View - Shows per-day breakdown"
+            >
+              <IconListDetails size={16} />
+              Detailed
+            </button>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-2 md:mt-0 w-full md:w-auto">
@@ -840,16 +1014,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           // Combined Payroll: Group by Job Type first
           uniqueJobTypes.map((jobType) => {
             const jobGroupedItems = itemsByJob[jobType as string];
-            const jobBaseTotal = jobGroupedItems["Base"].reduce(
-              (sum, item) => sum + item.amount,
+            const jobConsolidatedItems = consolidatedItemsByJob?.[jobType as string];
+            // Use consolidated items for totals - consistent with recalculated amounts
+            const jobBaseTotal = (jobConsolidatedItems?.["Base"] || []).reduce(
+              (sum, item) => sum + item.total_amount,
               0
             );
-            const jobTambahanTotal = jobGroupedItems["Tambahan"].reduce(
-              (sum, item) => sum + item.amount,
+            const jobTambahanTotal = (jobConsolidatedItems?.["Tambahan"] || []).reduce(
+              (sum, item) => sum + item.total_amount,
               0
             );
-            const jobOvertimeTotal = jobGroupedItems["Overtime"].reduce(
-              (sum, item) => sum + item.amount,
+            const jobOvertimeTotal = (jobConsolidatedItems?.["Overtime"] || []).reduce(
+              (sum, item) => sum + item.total_amount,
               0
             );
             const jobTotal = jobBaseTotal + jobTambahanTotal + jobOvertimeTotal;
@@ -866,7 +1042,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </div>
 
                 {/* Base Pay for this job */}
-                {jobGroupedItems["Base"].length > 0 && (
+                {((viewMode === "consolidated" && (jobConsolidatedItems?.["Base"]?.length ?? 0) > 0) ||
+                  (viewMode === "detailed" && jobGroupedItems["Base"].length > 0)) && (
                   <div className="mb-4 border rounded-lg overflow-hidden bg-white">
                     <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-100">
                       <h4 className="text-md font-semibold text-amber-800 flex items-center gap-2">
@@ -878,12 +1055,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
-                            <th
-                              scope="col"
-                              className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
-                            >
-                              Date
-                            </th>
+                            {viewMode === "detailed" && (
+                              <th
+                                scope="col"
+                                className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
+                              >
+                                Date
+                              </th>
+                            )}
                             <th
                               scope="col"
                               className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase"
@@ -900,7 +1079,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
                             >
-                              Qty
+                              {viewMode === "consolidated" ? "Total Qty" : "Qty"}
                             </th>
                             <th
                               scope="col"
@@ -911,55 +1090,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-default-200">
-                          {jobGroupedItems["Base"].map((item) => (
-                            <tr key={item.id} className="hover:bg-default-50">
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.source_date ? (
-                                  getWorkLogUrl(item) ? (
-                                    <Link
-                                      to={getWorkLogUrl(item)!}
-                                      className="text-sky-600 hover:underline"
-                                    >
-                                      {formatSourceDate(item.source_date)}
-                                    </Link>
-                                  ) : (
-                                    formatSourceDate(item.source_date)
-                                  )
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span
-                                  className="text-sm text-default-900"
-                                  title={`${item.description} (${item.pay_code_id})`}
-                                >
-                                  {item.description}{" "}
-                                  <span className="text-default-500">
-                                    ({item.pay_code_id})
-                                  </span>
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.rate_unit === "Percent"
-                                  ? `${item.rate}%`
-                                  : `${formatCurrency(item.rate)}/${
-                                      item.rate_unit
-                                    }`}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.quantity}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                                {formatCurrency(item.amount)}
-                              </td>
-                            </tr>
-                          ))}
+                          {viewMode === "consolidated"
+                            ? jobConsolidatedItems?.["Base"]?.map((item, index) =>
+                                renderConsolidatedRow(item, index)
+                              )
+                            : getSortedItemsWithSeparators(jobGroupedItems["Base"]).map(
+                                (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                              )}
                         </tbody>
                         <tfoot className="bg-default-50">
                           <tr>
                             <td
-                              colSpan={4}
+                              colSpan={viewMode === "detailed" ? 4 : 3}
                               className="px-3 py-2 text-right text-sm font-medium text-default-600"
                             >
                               Total Base
@@ -975,7 +1117,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 )}
 
                 {/* Tambahan Pay for this job */}
-                {jobGroupedItems["Tambahan"].length > 0 && (
+                {((viewMode === "consolidated" && (jobConsolidatedItems?.["Tambahan"]?.length ?? 0) > 0) ||
+                  (viewMode === "detailed" && jobGroupedItems["Tambahan"].length > 0)) && (
                   <div className="mb-4 border rounded-lg overflow-hidden bg-white">
                     <div className="px-4 py-1.5 bg-violet-50 border-b border-violet-100">
                       <h4 className="text-md font-semibold text-violet-800 flex items-center gap-2">
@@ -987,12 +1130,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
-                            <th
-                              scope="col"
-                              className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
-                            >
-                              Date
-                            </th>
+                            {viewMode === "detailed" && (
+                              <th
+                                scope="col"
+                                className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
+                              >
+                                Date
+                              </th>
+                            )}
                             <th
                               scope="col"
                               className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase"
@@ -1009,7 +1154,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
                             >
-                              Qty
+                              {viewMode === "consolidated" ? "Total Qty" : "Qty"}
                             </th>
                             <th
                               scope="col"
@@ -1017,7 +1162,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             >
                               Amount
                             </th>
-                            {isEditable && (
+                            {viewMode === "detailed" && isEditable && (
                               <th
                                 scope="col"
                                 className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-12"
@@ -1026,76 +1171,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-default-200">
-                          {jobGroupedItems["Tambahan"].map((item) => (
-                            <tr key={item.id} className="hover:bg-default-50">
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.source_date ? (
-                                  getWorkLogUrl(item) ? (
-                                    <Link
-                                      to={getWorkLogUrl(item)!}
-                                      className="text-sky-600 hover:underline"
-                                    >
-                                      {formatSourceDate(item.source_date)}
-                                    </Link>
-                                  ) : (
-                                    formatSourceDate(item.source_date)
-                                  )
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span
-                                  className="text-sm text-default-900"
-                                  title={`${item.description} (${item.pay_code_id})`}
-                                >
-                                  {item.description}{" "}
-                                  <span className="text-default-500">
-                                    ({item.pay_code_id})
-                                  </span>
-                                  {item.is_manual && (
-                                    <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-600">
-                                      Manual
-                                    </span>
-                                  )}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.rate_unit === "Percent"
-                                  ? `${item.rate}%`
-                                  : `${formatCurrency(item.rate)}/${
-                                      item.rate_unit
-                                    }`}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.quantity}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                                {formatCurrency(item.amount)}
-                              </td>
-                              {isEditable && (
-                                <td className="px-3 py-2 whitespace-nowrap text-center">
-                                  <button
-                                    onClick={() => {
-                                      setItemToDelete({
-                                        ...item,
-                                        id: item.id || 0,
-                                      });
-                                      setShowDeleteDialog(true);
-                                    }}
-                                    className="text-rose-600 hover:text-rose-800"
-                                  >
-                                    <IconTrash size={16} />
-                                  </button>
-                                </td>
+                          {viewMode === "consolidated"
+                            ? jobConsolidatedItems?.["Tambahan"]?.map((item, index) =>
+                                renderConsolidatedRow(item, index)
+                              )
+                            : getSortedItemsWithSeparators(jobGroupedItems["Tambahan"]).map(
+                                (item, index, arr) => renderDetailedRow(item, index, arr, true)
                               )}
-                            </tr>
-                          ))}
                         </tbody>
                         <tfoot className="bg-default-50">
                           <tr>
                             <td
-                              colSpan={4}
+                              colSpan={viewMode === "detailed" ? 4 : 3}
                               className="px-3 py-2 text-right text-sm font-medium text-default-600"
                             >
                               Total Tambahan
@@ -1103,7 +1190,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <td className="px-3 py-2 text-right text-sm font-semibold">
                               {formatCurrency(jobTambahanTotal)}
                             </td>
-                            {isEditable && <td></td>}
+                            {viewMode === "detailed" && isEditable && <td></td>}
                           </tr>
                         </tfoot>
                       </table>
@@ -1112,7 +1199,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 )}
 
                 {/* Overtime Pay for this job */}
-                {jobGroupedItems["Overtime"].length > 0 && (
+                {((viewMode === "consolidated" && (jobConsolidatedItems?.["Overtime"]?.length ?? 0) > 0) ||
+                  (viewMode === "detailed" && jobGroupedItems["Overtime"].length > 0)) && (
                   <div className="mb-4 border rounded-lg overflow-hidden bg-white">
                     <div className="px-4 py-1.5 bg-orange-50 border-b border-orange-100">
                       <h4 className="text-md font-semibold text-orange-800 flex items-center gap-2">
@@ -1124,12 +1212,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       <table className="min-w-full divide-y divide-default-200">
                         <thead className="bg-default-50">
                           <tr>
-                            <th
-                              scope="col"
-                              className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
-                            >
-                              Date
-                            </th>
+                            {viewMode === "detailed" && (
+                              <th
+                                scope="col"
+                                className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
+                              >
+                                Date
+                              </th>
+                            )}
                             <th
                               scope="col"
                               className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase"
@@ -1146,7 +1236,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
                             >
-                              Qty
+                              {viewMode === "consolidated" ? "Total Qty" : "Qty"}
                             </th>
                             <th
                               scope="col"
@@ -1157,55 +1247,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-default-200">
-                          {jobGroupedItems["Overtime"].map((item) => (
-                            <tr key={item.id} className="hover:bg-default-50">
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.source_date ? (
-                                  getWorkLogUrl(item) ? (
-                                    <Link
-                                      to={getWorkLogUrl(item)!}
-                                      className="text-sky-600 hover:underline"
-                                    >
-                                      {formatSourceDate(item.source_date)}
-                                    </Link>
-                                  ) : (
-                                    formatSourceDate(item.source_date)
-                                  )
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="px-3 py-2">
-                                <span
-                                  className="text-sm text-default-900"
-                                  title={`${item.description} (${item.pay_code_id})`}
-                                >
-                                  {item.description}{" "}
-                                  <span className="text-default-500">
-                                    ({item.pay_code_id})
-                                  </span>
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.rate_unit === "Percent"
-                                  ? `${item.rate}%`
-                                  : `${formatCurrency(item.rate)}/${
-                                      item.rate_unit
-                                    }`}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                                {item.quantity}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                                {formatCurrency(item.amount)}
-                              </td>
-                            </tr>
-                          ))}
+                          {viewMode === "consolidated"
+                            ? jobConsolidatedItems?.["Overtime"]?.map((item, index) =>
+                                renderConsolidatedRow(item, index)
+                              )
+                            : getSortedItemsWithSeparators(jobGroupedItems["Overtime"]).map(
+                                (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                              )}
                         </tbody>
                         <tfoot className="bg-default-50">
                           <tr>
                             <td
-                              colSpan={4}
+                              colSpan={viewMode === "detailed" ? 4 : 3}
                               className="px-3 py-2 text-right text-sm font-medium text-default-600"
                             >
                               Total Overtime
@@ -1226,7 +1279,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           // Single Job Payroll: Original layout with compact tables
           <>
             {/* Base Pay Items */}
-            {groupedItems["Base"].length > 0 && (
+            {((viewMode === "consolidated" && groupedConsolidatedItems["Base"].length > 0) ||
+              (viewMode === "detailed" && groupedItems["Base"].length > 0)) && (
               <div className="mb-4 border rounded-lg overflow-hidden bg-white">
                 <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-100">
                   <h3 className="text-md font-semibold text-amber-800 flex items-center gap-2">
@@ -1238,12 +1292,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
-                        >
-                          Date
-                        </th>
+                        {viewMode === "detailed" && (
+                          <th
+                            scope="col"
+                            className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
+                          >
+                            Date
+                          </th>
+                        )}
                         <th
                           scope="col"
                           className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase"
@@ -1260,7 +1316,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
                         >
-                          Qty
+                          {viewMode === "consolidated" ? "Total Qty" : "Qty"}
                         </th>
                         <th
                           scope="col"
@@ -1271,55 +1327,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-default-200">
-                      {groupedItems["Base"].map((item) => (
-                        <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.source_date ? (
-                              getWorkLogUrl(item) ? (
-                                <Link
-                                  to={getWorkLogUrl(item)!}
-                                  className="text-sky-600 hover:underline"
-                                >
-                                  {formatSourceDate(item.source_date)}
-                                </Link>
-                              ) : (
-                                formatSourceDate(item.source_date)
-                              )
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className="text-sm text-default-900"
-                              title={`${item.description} (${item.pay_code_id})`}
-                            >
-                              {item.description}{" "}
-                              <span className="text-default-500">
-                                ({item.pay_code_id})
-                              </span>
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.rate_unit === "Percent"
-                              ? `${item.rate}%`
-                              : `${formatCurrency(item.rate)}/${
-                                  item.rate_unit
-                                }`}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.quantity}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                            {formatCurrency(item.amount)}
-                          </td>
-                        </tr>
-                      ))}
+                      {viewMode === "consolidated"
+                        ? groupedConsolidatedItems["Base"].map((item, index) =>
+                            renderConsolidatedRow(item, index)
+                          )
+                        : getSortedItemsWithSeparators(groupedItems["Base"]).map(
+                            (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                          )}
                     </tbody>
                     <tfoot className="bg-default-50">
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={viewMode === "detailed" ? 4 : 3}
                           className="px-3 py-2 text-right text-sm font-medium text-default-600"
                         >
                           Total Base Pay
@@ -1368,7 +1387,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             )}
 
             {/* Tambahan Pay Items */}
-            {groupedItems["Tambahan"].length > 0 && (
+            {((viewMode === "consolidated" && groupedConsolidatedItems["Tambahan"].length > 0) ||
+              (viewMode === "detailed" && groupedItems["Tambahan"].length > 0)) && (
               <div className="mb-4 border rounded-lg overflow-hidden bg-white">
                 <div className="px-4 py-2 bg-violet-50 border-b border-violet-100">
                   <h3 className="text-md font-semibold text-violet-800 flex items-center gap-2">
@@ -1380,12 +1400,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
-                        >
-                          Date
-                        </th>
+                        {viewMode === "detailed" && (
+                          <th
+                            scope="col"
+                            className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
+                          >
+                            Date
+                          </th>
+                        )}
                         <th
                           scope="col"
                           className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase"
@@ -1402,7 +1424,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
                         >
-                          Qty
+                          {viewMode === "consolidated" ? "Total Qty" : "Qty"}
                         </th>
                         <th
                           scope="col"
@@ -1410,7 +1432,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         >
                           Amount
                         </th>
-                        {isEditable && (
+                        {viewMode === "detailed" && isEditable && (
                           <th
                             scope="col"
                             className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-12"
@@ -1419,76 +1441,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-default-200">
-                      {groupedItems["Tambahan"].map((item) => (
-                        <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.source_date ? (
-                              getWorkLogUrl(item) ? (
-                                <Link
-                                  to={getWorkLogUrl(item)!}
-                                  className="text-sky-600 hover:underline"
-                                >
-                                  {formatSourceDate(item.source_date)}
-                                </Link>
-                              ) : (
-                                formatSourceDate(item.source_date)
-                              )
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className="text-sm text-default-900"
-                              title={`${item.description} (${item.pay_code_id})`}
-                            >
-                              {item.description}{" "}
-                              <span className="text-default-500">
-                                ({item.pay_code_id})
-                              </span>
-                              {item.is_manual && (
-                                <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-600">
-                                  Manual
-                                </span>
-                              )}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.rate_unit === "Percent"
-                              ? `${item.rate}%`
-                              : `${formatCurrency(item.rate)}/${
-                                  item.rate_unit
-                                }`}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.quantity}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                            {formatCurrency(item.amount)}
-                          </td>
-                          {isEditable && (
-                            <td className="px-3 py-2 whitespace-nowrap text-center">
-                              <button
-                                onClick={() => {
-                                  setItemToDelete({
-                                    ...item,
-                                    id: item.id || 0,
-                                  });
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-rose-600 hover:text-rose-800"
-                              >
-                                <IconTrash size={16} />
-                              </button>
-                            </td>
+                      {viewMode === "consolidated"
+                        ? groupedConsolidatedItems["Tambahan"].map((item, index) =>
+                            renderConsolidatedRow(item, index)
+                          )
+                        : getSortedItemsWithSeparators(groupedItems["Tambahan"]).map(
+                            (item, index, arr) => renderDetailedRow(item, index, arr, true)
                           )}
-                        </tr>
-                      ))}
                     </tbody>
                     <tfoot className="bg-default-50">
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={viewMode === "detailed" ? 4 : 3}
                           className="px-3 py-2 text-right text-sm font-medium text-default-600"
                         >
                           Total Tambahan Pay
@@ -1496,7 +1460,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <td className="px-3 py-2 text-right text-sm font-semibold">
                           {formatCurrency(tambahanTotal)}
                         </td>
-                        {isEditable && <td></td>}
+                        {viewMode === "detailed" && isEditable && <td></td>}
                       </tr>
                     </tfoot>
                   </table>
@@ -1505,7 +1469,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             )}
 
             {/* Overtime Pay Items */}
-            {groupedItems["Overtime"].length > 0 && (
+            {((viewMode === "consolidated" && groupedConsolidatedItems["Overtime"].length > 0) ||
+              (viewMode === "detailed" && groupedItems["Overtime"].length > 0)) && (
               <div className="mb-4 border rounded-lg overflow-hidden bg-white">
                 <div className="px-4 py-2 bg-orange-50 border-b border-orange-100">
                   <h3 className="text-md font-semibold text-orange-800 flex items-center gap-2">
@@ -1517,12 +1482,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <table className="min-w-full divide-y divide-default-200">
                     <thead className="bg-default-50">
                       <tr>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
-                        >
-                          Date
-                        </th>
+                        {viewMode === "detailed" && (
+                          <th
+                            scope="col"
+                            className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
+                          >
+                            Date
+                          </th>
+                        )}
                         <th
                           scope="col"
                           className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase"
@@ -1539,7 +1506,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase"
                         >
-                          Qty
+                          {viewMode === "consolidated" ? "Total Qty" : "Qty"}
                         </th>
                         <th
                           scope="col"
@@ -1550,55 +1517,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-default-200">
-                      {groupedItems["Overtime"].map((item) => (
-                        <tr key={item.id} className="hover:bg-default-50">
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.source_date ? (
-                              getWorkLogUrl(item) ? (
-                                <Link
-                                  to={getWorkLogUrl(item)!}
-                                  className="text-sky-600 hover:underline"
-                                >
-                                  {formatSourceDate(item.source_date)}
-                                </Link>
-                              ) : (
-                                formatSourceDate(item.source_date)
-                              )
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className="text-sm text-default-900"
-                              title={`${item.description} (${item.pay_code_id})`}
-                            >
-                              {item.description}{" "}
-                              <span className="text-default-500">
-                                ({item.pay_code_id})
-                              </span>
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.rate_unit === "Percent"
-                              ? `${item.rate}%`
-                              : `${formatCurrency(item.rate)}/${
-                                  item.rate_unit
-                                }`}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-                            {item.quantity}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-                            {formatCurrency(item.amount)}
-                          </td>
-                        </tr>
-                      ))}
+                      {viewMode === "consolidated"
+                        ? groupedConsolidatedItems["Overtime"].map((item, index) =>
+                            renderConsolidatedRow(item, index)
+                          )
+                        : getSortedItemsWithSeparators(groupedItems["Overtime"]).map(
+                            (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                          )}
                     </tbody>
                     <tfoot className="bg-default-50">
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={viewMode === "detailed" ? 4 : 3}
                           className="px-3 py-2 text-right text-sm font-medium text-default-600"
                         >
                           Total Overtime Pay
