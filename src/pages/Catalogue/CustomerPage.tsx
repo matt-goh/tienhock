@@ -129,7 +129,7 @@ const CustomerPage: React.FC = () => {
             <span className="block truncate pl-2">{selectedSalesman}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-default-400 dark:text-gray-500 dark:text-gray-400"
+                className="h-5 w-5 text-default-400 dark:text-gray-400"
                 aria-hidden="true"
               />
             </span>
@@ -181,9 +181,9 @@ const CustomerPage: React.FC = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               i === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -292,7 +292,7 @@ const CustomerPage: React.FC = () => {
         <div className="flex space-x-3">
           <div className="relative">
             <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-500 dark:text-gray-400"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-400"
               size={22}
             />
             <input
@@ -304,7 +304,7 @@ const CustomerPage: React.FC = () => {
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500 dark:text-gray-400 hover:text-default-700 dark:text-gray-200 dark:hover:text-gray-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
                 title="Clear search"
               >
@@ -361,7 +361,7 @@ const CustomerPage: React.FC = () => {
       {filteredCustomers.length > 0 && (
         <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -369,7 +369,7 @@ const CustomerPage: React.FC = () => {
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >

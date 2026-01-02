@@ -67,14 +67,14 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
 
   // Size-based classes
   const buttonClasses = clsx(
-    "rounded-lg border border-default-300 transition-colors",
+    "rounded-lg border border-default-300 dark:border-gray-600 transition-colors",
     size === "sm" ? "p-1.5 h-[34px]" : "p-2 h-[40px]"
   );
 
   const iconSize = size === "sm" ? 16 : 20;
 
   const displayClasses = clsx(
-    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors whitespace-nowrap",
+    "flex-1 rounded-lg border border-default-300 dark:border-gray-600 text-center font-medium text-default-900 dark:text-gray-100 transition-colors whitespace-nowrap",
     size === "sm" ? "px-3 py-1.5 h-[34px] text-xs" : "px-4 py-2 h-[40px] text-sm"
   );
 
@@ -84,7 +84,7 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
   return (
     <div className={clsx("space-y-2", className)}>
       {label && (
-        <label className="block text-sm font-medium text-default-700">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
           {label}
         </label>
       )}
@@ -92,7 +92,7 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
         {/* Previous Year Button */}
         <button
           onClick={() => navigateYear("prev")}
-          className={clsx(buttonClasses, "text-default-600 hover:bg-default-50")}
+          className={clsx(buttonClasses, "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700")}
           title="Previous year"
           aria-label="Previous year"
         >
@@ -101,7 +101,7 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
 
         {/* Year Display - Clickable when not current year */}
         {isCurrentYear ? (
-          <div className={clsx(displayClasses, "bg-default-50")}>
+          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-700")}>
             {selectedYear}
           </div>
         ) : (
@@ -109,7 +109,7 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
             onClick={goToCurrentYear}
             className={clsx(
               displayClasses,
-              "bg-default-50 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 cursor-pointer"
+              "bg-default-50 dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900 hover:border-sky-300 dark:hover:border-sky-600 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
             title="Click to go to current year"
             aria-label="Go to current year"
@@ -125,8 +125,8 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
           className={clsx(
             buttonClasses,
             isNextDisabled
-              ? "cursor-not-allowed text-default-300"
-              : "text-default-600 hover:bg-default-50"
+              ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
           )}
           title="Next year"
           aria-label="Next year"
@@ -144,8 +144,8 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
             className={clsx(
               buttonClasses,
               isCurrentYear
-                ? "cursor-not-allowed text-default-300"
-                : "text-default-600 hover:bg-default-50"
+                ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
             )}
           >
             <IconChevronsRight size={iconSize} />

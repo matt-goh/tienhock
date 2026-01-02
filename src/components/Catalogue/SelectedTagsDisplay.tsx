@@ -21,21 +21,21 @@ const SelectedTagsDisplay: React.FC<SelectedTagsDisplayProps> = ({
 
   return (
     <div className={`mt-2 ${className}`}>
-      <div className="text-xs text-default-500 mb-1">Selected {label}:</div>
+      <div className="text-xs text-default-500 dark:text-gray-400 mb-1">Selected {label}:</div>
       <div className="flex flex-wrap gap-1.5">
         {selectedItems.map((item, index) =>
           navigable ? (
             <Link
               key={index}
               to={`/catalogue/job?id=${item}`}
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800"
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300"
             >
               {item}
             </Link>
           ) : (
             <span
               key={index}
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800"
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300"
             >
               {item}
             </span>

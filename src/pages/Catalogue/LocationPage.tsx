@@ -119,7 +119,7 @@ const LocationPage: React.FC = () => {
   // Error state
   if (error) {
     return (
-      <div className="mt-20 flex w-full items-center justify-center text-rose-600">
+      <div className="mt-20 flex w-full items-center justify-center text-rose-600 dark:text-rose-400">
         Error loading locations: {error.message}
       </div>
     );
@@ -140,7 +140,7 @@ const LocationPage: React.FC = () => {
           {/* Search */}
           <div className="relative w-full md:w-64">
             <IconSearch
-              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
+              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400 dark:text-gray-400"
               stroke={1.5}
             />
             <input
@@ -153,7 +153,7 @@ const LocationPage: React.FC = () => {
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-300"
               >
                 ×
               </button>

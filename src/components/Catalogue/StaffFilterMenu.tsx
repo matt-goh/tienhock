@@ -72,10 +72,10 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
         Filter
       </Button>
       {isOpen && (
-        <div className="absolute space-y-1 right-0 mt-2 w-64 text-default-700 text-sm font-medium rounded-md bg-white shadow-lg focus:outline-none z-10">
+        <div className="absolute space-y-1 right-0 mt-2 w-64 text-default-700 dark:text-gray-200 text-sm font-medium rounded-md bg-white dark:bg-gray-800 shadow-lg focus:outline-none z-10 border border-default-200 dark:border-gray-700">
           <div className="px-1 pt-1">
             <button
-              className="group flex justify-between w-full items-center rounded-md px-2.5 py-2.5 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 text-default-700"
+              className="group flex justify-between w-full items-center rounded-md px-2.5 py-2.5 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200 text-default-700 dark:text-gray-200"
               onClick={() =>
                 handleFilterChange("showResigned", !currentFilters.showResigned)
               }
@@ -116,11 +116,11 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                     className={`flex px-2.5 py-2.5 items-center justify-between rounded-md ${
                       !currentFilters.applyJobFilter
                         ? ""
-                        : "hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+                        : "hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200"
                     }`}
                   >
                     <ComboboxButton
-                      className={`w-full text-left text-default-900 focus:outline-none ${
+                      className={`w-full text-left text-default-900 dark:text-gray-100 focus:outline-none ${
                         !currentFilters.applyJobFilter
                           ? "opacity-50 cursor-not-allowed"
                           : ""
@@ -130,7 +130,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                       <IconChevronDown
                         stroke={2}
                         size={18}
-                        className="ml-2 text-default-500"
+                        className="ml-2 text-default-500 dark:text-gray-400"
                       />
                     </ComboboxButton>
                     <button
@@ -165,9 +165,9 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                   >
-                    <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none">
+                    <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none">
                       {uniqueJobOptions.length === 0 ? (
-                        <div className="relative cursor-default select-none py-2 px-4 text-default-700">
+                        <div className="relative cursor-default select-none py-2 px-4 text-default-700 dark:text-gray-300">
                           No jobs found.
                         </div>
                       ) : (
@@ -176,7 +176,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                             key={option.id}
                             className={({ active }) =>
                               `relative cursor-pointer select-none py-2 px-4 ${
-                                active ? "bg-default-100" : "text-default-900"
+                                active ? "bg-default-100 dark:bg-gray-700" : "text-default-900 dark:text-gray-100"
                               }`
                             }
                             value={option.id}
@@ -191,7 +191,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                                   {option.name}
                                 </span>
                                 {selected ? (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                                     <IconCheck stroke={2} size={22} />
                                   </span>
                                 ) : null}
@@ -212,7 +212,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                 {currentFilters.jobFilter.map((job) => (
                   <span
                     key={job}
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 cursor-pointer"
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 cursor-pointer"
                     onClick={() =>
                       handleJobSelection(
                         currentFilters.jobFilter
@@ -228,7 +228,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                     }
                   >
                     {job}
-                    <button className="ml-1 text-sky-600 hover:text-sky-800">
+                    <button className="ml-1 text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300">
                       <IconX size={14} />
                     </button>
                   </span>

@@ -81,8 +81,8 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
-                <div className="flex items-center gap-3 text-amber-600 mb-4">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400 mb-4">
                   <IconAlertTriangle size={24} />
                   <DialogTitle
                     as="h3"
@@ -93,28 +93,28 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
                 </div>
 
                 <div className="mb-6">
-                  <h4 className="text-sm font-medium text-default-700 mb-2">
+                  <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                     Payroll Summary
                   </h4>
-                  <div className="bg-default-50 border border-default-200 rounded-lg p-4">
+                  <div className="bg-default-50 dark:bg-gray-900/50 border border-default-200 dark:border-gray-700 rounded-lg p-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-default-500">Period</p>
-                        <p className="font-medium text-default-800">
+                        <p className="text-sm text-default-500 dark:text-gray-400">Period</p>
+                        <p className="font-medium text-default-800 dark:text-gray-100">
                           {payrollMonth} {payrollYear}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-default-500">Employees</p>
-                        <p className="font-medium text-default-800">
+                        <p className="text-sm text-default-500 dark:text-gray-400">Employees</p>
+                        <p className="font-medium text-default-800 dark:text-gray-100">
                           {employeeCount}
                         </p>
                       </div>
                       <div className="col-span-2">
-                        <p className="text-sm text-default-500">
+                        <p className="text-sm text-default-500 dark:text-gray-400">
                           Total Gross Pay
                         </p>
-                        <p className="font-medium text-default-800">
+                        <p className="font-medium text-default-800 dark:text-gray-100">
                           {formatCurrency(totalGrossPay)}
                         </p>
                       </div>
@@ -123,8 +123,8 @@ const FinalizePayrollDialog: React.FC<FinalizePayrollDialogProps> = ({
                 </div>
 
                 <div className="mb-6">
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                    <p className="text-amber-800 text-sm">
+                  <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
+                    <p className="text-amber-800 dark:text-amber-200 text-sm">
                       Finalizing a payroll locks it for normal editing. While
                       you can still revert it to the Processing state if needed,
                       finalizing indicates that this payroll data is approved

@@ -355,7 +355,7 @@ const AccountCodeFormPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-6">
         <BackButton onClick={() => navigate("/accounting/account-codes")} />
-        <div className="mt-4 p-4 border border-red-300 bg-red-50 text-red-700 rounded">
+        <div className="mt-4 p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
           Error: {error}
         </div>
       </div>
@@ -364,12 +364,12 @@ const AccountCodeFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow-sm border border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
         {/* Header */}
-        <div className="px-6 py-3 border-b border-default-200">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <IconFolder size={24} className="text-amber-500" />
             <div>
               <h1 className="text-xl font-semibold text-default-900">
@@ -387,8 +387,8 @@ const AccountCodeFormPage: React.FC = () => {
         {/* Form */}
         <div className="relative">
           {isSaving && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
-              <div className="flex items-center space-x-3 bg-white px-6 py-4 rounded-lg shadow-lg border border-default-200">
+            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
                 <span className="text-sm font-medium text-default-700">
                   Saving account code...
@@ -461,9 +461,9 @@ const AccountCodeFormPage: React.FC = () => {
                         <ListboxButton
                           id="parent_code-button"
                           className={clsx(
-                            "relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm text-default-900 dark:text-gray-100",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                            isSaving ? "bg-gray-50 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
+                            isSaving ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
                           )}
                         >
                           <span className="block truncate">
@@ -480,9 +480,9 @@ const AccountCodeFormPage: React.FC = () => {
                           leaveTo="opacity-0"
                           afterLeave={() => setParentSearchQuery("")}
                         >
-                          <ListboxOptions className="absolute z-10 w-full rounded-md bg-white text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm mt-1 flex flex-col">
+                          <ListboxOptions className="absolute z-10 w-full rounded-md bg-white dark:bg-gray-800 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm mt-1 flex flex-col">
                             {/* Search Input */}
-                            <div className="flex-shrink-0 bg-white px-2 py-2 border-b border-gray-200 rounded-t-md">
+                            <div className="flex-shrink-0 bg-white dark:bg-gray-800 px-2 py-2 border-b border-gray-200 dark:border-gray-700 rounded-t-md">
                               <div className="relative">
                                 <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                 <input
@@ -490,7 +490,7 @@ const AccountCodeFormPage: React.FC = () => {
                                   value={parentSearchQuery}
                                   onChange={(e) => setParentSearchQuery(e.target.value)}
                                   placeholder="Search accounts..."
-                                  className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                                  className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
                                   onClick={(e) => e.stopPropagation()}
                                   onKeyDown={(e) => e.stopPropagation()}
                                 />
@@ -533,7 +533,7 @@ const AccountCodeFormPage: React.FC = () => {
 
                               {/* Load More Button */}
                               {hasMoreParentOptions && (
-                                <div className="border-t border-gray-200 p-2 mt-1">
+                                <div className="border-t border-gray-200 dark:border-gray-700 p-2 mt-1">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -541,7 +541,7 @@ const AccountCodeFormPage: React.FC = () => {
                                       e.stopPropagation();
                                       handleParentLoadMore();
                                     }}
-                                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 flex items-center justify-center"
+                                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-200 flex items-center justify-center"
                                   >
                                     <IconChevronDown size={16} className="mr-1.5" />
                                     <span>
@@ -623,14 +623,14 @@ const AccountCodeFormPage: React.FC = () => {
                     }
                     disabled={isSaving}
                     placeholder="Optional notes about this account..."
-                    className="block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 dark:text-gray-400 disabled:cursor-not-allowed"
+                    className="block w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
 
               {/* Info Section for Edit Mode */}
               {isEditMode && (
-                <div className="p-4 bg-default-50 rounded-lg border border-default-200">
+                <div className="p-4 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
                   <h4 className="text-sm font-medium text-default-700 mb-2">
                     Account Information
                   </h4>
@@ -653,7 +653,7 @@ const AccountCodeFormPage: React.FC = () => {
             </div>
 
             {/* Form Actions */}
-            <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200">
+            <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200 dark:border-gray-700">
               {isEditMode && !isSystem && (
                 <Button
                   type="button"

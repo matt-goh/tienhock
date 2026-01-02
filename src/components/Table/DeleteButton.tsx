@@ -32,7 +32,7 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
       <div className="absolute top-[-58px] right-[38px]" style={style}>
         <button
           onClick={() => setIsOpen(true)}
-          className="px-4 py-2 text-rose-500 font-medium border-2 border-rose-400 hover:border-rose-500 active:border-rose-600 bg-white hover:bg-rose-500 active:bg-rose-600 hover:text-default-100 active:text-default-200 rounded-full transition-colors duration-200"
+          className="px-4 py-2 text-rose-500 dark:text-rose-400 font-medium border-2 border-rose-400 dark:border-rose-500 hover:border-rose-500 dark:hover:border-rose-400 active:border-rose-600 bg-white dark:bg-gray-800 hover:bg-rose-500 dark:hover:bg-rose-600 active:bg-rose-600 dark:active:bg-rose-700 hover:text-default-100 dark:hover:text-white active:text-default-200 rounded-full transition-colors duration-200"
         >
           Delete
         </button>

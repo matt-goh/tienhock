@@ -86,8 +86,8 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
     <>
       <tr
         className={clsx(
-          "group cursor-pointer border-b border-default-100 transition-colors",
-          isSelected ? "bg-sky-50" : "hover:bg-default-50"
+          "group cursor-pointer border-b border-default-100 dark:border-gray-700 transition-colors",
+          isSelected ? "bg-sky-50 dark:bg-sky-900/30" : "hover:bg-default-50 dark:hover:bg-gray-700"
         )}
         onClick={handleRowClick}
       >
@@ -113,13 +113,13 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
 
         {/* Employee Name */}
         <td className="px-3 py-2">
-          <span className="font-medium text-default-700">
+          <span className="font-medium text-default-700 dark:text-gray-200">
             {employeePayroll.employee_name || "Unknown"}
           </span>
         </td>
 
         {/* Employee ID */}
-        <td className="px-3 py-2 text-default-500 text-sm">
+        <td className="px-3 py-2 text-default-500 dark:text-gray-400 text-sm">
           {employeePayroll.employee_job_mapping &&
           Object.keys(employeePayroll.employee_job_mapping).length > 1 ? (
             <div className="flex flex-col gap-0.5">
@@ -133,17 +133,17 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
         </td>
 
         {/* Section */}
-        <td className="px-3 py-2 text-default-600 text-sm">
+        <td className="px-3 py-2 text-default-600 dark:text-gray-300 text-sm">
           {employeePayroll.section || "-"}
         </td>
 
         {/* Gross Pay */}
-        <td className="px-3 py-2 text-right font-medium text-default-700">
+        <td className="px-3 py-2 text-right font-medium text-default-700 dark:text-gray-200">
           {formatCurrency(parseFloat(employeePayroll.gross_pay.toString()))}
         </td>
 
         {/* Net Pay */}
-        <td className="px-3 py-2 text-right font-medium text-emerald-600">
+        <td className="px-3 py-2 text-right font-medium text-emerald-600 dark:text-emerald-400">
           {formatCurrency(parseFloat(employeePayroll.net_pay.toString()))}
         </td>
 
@@ -153,8 +153,8 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
             className={clsx(
               "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
               payrollStatus === "Finalized"
-                ? "bg-amber-100 text-amber-700"
-                : "bg-sky-100 text-sky-700"
+                ? "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300"
+                : "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
             )}
           >
             {payrollStatus === "Finalized" && (
@@ -169,16 +169,16 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
           className="p-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 group-hover:rounded-lg group-hover:border group-hover:border-sky-100 transition-opacity">
+          <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 group-hover:rounded-lg group-hover:border group-hover:border-sky-100 dark:group-hover:border-sky-800 transition-opacity">
             {/* Print Button */}
             <button
               onClick={handlePrint}
               disabled={isPrinting}
               className={clsx(
-                "w-full h-full flex items-center justify-center py-2 px-3 transition-colors rounded-lg border border-sky-100",
+                "w-full h-full flex items-center justify-center py-2 px-3 transition-colors rounded-lg border border-sky-100 dark:border-sky-800",
                 isPrinting
-                  ? "text-default-400 cursor-wait"
-                  : "hover:bg-sky-100 text-sky-600"
+                  ? "text-default-400 dark:text-gray-500 cursor-wait"
+                  : "hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-600 dark:text-sky-400"
               )}
               title="Print Payslip"
             >

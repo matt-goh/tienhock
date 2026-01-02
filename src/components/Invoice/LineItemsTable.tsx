@@ -168,7 +168,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
           }
           handleItemChange(rowIndex, field, finalValue);
         }}
-        className="w-full py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-right text-sm"
+        className="w-full py-1 border border-transparent hover:border-default-300 dark:hover:border-gray-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent dark:text-gray-100 text-right text-sm"
         disabled={
           readOnly ||
           (itemCode === "LESS" &&
@@ -223,7 +223,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
       >
         <div className="relative">
           <ComboboxInput
-            className="w-full px-2 py-1 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-sm" // Added text-sm
+            className="w-full px-2 py-1 border border-transparent hover:border-default-300 dark:hover:border-gray-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent dark:text-gray-100 text-sm" // Added text-sm
             displayValue={(prod: ProductItem | null) =>
               prod?.description || item.description || ""
             }
@@ -232,12 +232,12 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
           />
           {!readOnly && (
             <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
-              <IconChevronDown size={16} className="text-gray-400" />
+              <IconChevronDown size={16} className="text-gray-400 dark:text-gray-500" />
             </ComboboxButton>
           )}
-          <ComboboxOptions className="absolute z-30 mt-1 w-full min-w-[350px] max-h-60 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm border border-default-200">
+          <ComboboxOptions className="absolute z-30 mt-1 w-full min-w-[350px] max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm border border-default-200 dark:border-gray-700">
             {filteredProducts.length === 0 && query !== "" ? (
-              <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                 Nothing found.
               </div>
             ) : (
@@ -247,7 +247,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                   value={prod}
                   className={({ active }) =>
                     `relative cursor-pointer select-none py-2 pl-4 pr-4 ${
-                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                      active ? "bg-sky-100 dark:bg-sky-900 text-sky-900 dark:text-sky-100" : "text-gray-900 dark:text-gray-100"
                     }`
                   }
                 >
@@ -293,7 +293,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
 
     if (!isEditable) {
       return (
-        <span className="px-2 py-1 text-sm text-gray-900">{value || ""}</span>
+        <span className="px-2 py-1 text-sm text-gray-900 dark:text-gray-100">{value || ""}</span>
       );
     }
 
@@ -307,7 +307,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
         onBlur={(e) => {
           handleItemChange(rowIndex, "description", e.target.value);
         }}
-        className="w-full py-1 px-2 border border-transparent hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent text-sm"
+        className="w-full py-1 px-2 border border-transparent hover:border-default-300 dark:hover:border-gray-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded bg-transparent dark:text-gray-100 text-sm"
         placeholder="Enter custom description..."
         disabled={readOnly}
       />
@@ -317,7 +317,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
   // --- Table Rendering ---
   return (
     <div>
-      <table className="min-w-full divide-y divide-gray-200 border border-default-200 rounded-lg table-fixed">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg table-fixed">
         <colgroup>
           <col className="w-[10%]" />
           {/* Code */}
@@ -338,51 +338,51 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
           {!readOnly && <col className="w-[40px]" />}
           {/* Delete */}
         </colgroup>
-        <thead className="bg-gray-50">
+        <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
-            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               ID
             </th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Product
             </th>
-            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               QTY
             </th>
-            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Price
             </th>
-            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               FOC
             </th>
-            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               RTN
             </th>
-            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-5 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Tax
             </th>
-            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Total
             </th>
             {!readOnly && (
-              <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+              <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
             )}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           {items.map((item, index) =>
             item.issubtotal ? (
               <tr
                 key={item.uid || `subtotal-${index}`}
-                className="bg-gray-100 font-medium group"
+                className="bg-gray-100 dark:bg-gray-700 font-medium group"
               >
                 <td
                   colSpan={7}
-                  className="px-3 py-1.5 text-right text-sm text-gray-700"
+                  className="px-3 py-1.5 text-right text-sm text-gray-700 dark:text-gray-300"
                 >
                   Subtotal:
                 </td>
-                <td className="px-3 py-1.5 text-right text-sm text-gray-900">
+                <td className="px-3 py-1.5 text-right text-sm text-gray-900 dark:text-gray-100">
                   {parseFloat(item.total || "0").toFixed(2)}
                 </td>
                 {!readOnly && (
@@ -400,11 +400,11 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                 )}
               </tr>
             ) : (
-              <tr key={item.uid || index} className="hover:bg-gray-50 group">
-                <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-500 align-middle">
+              <tr key={item.uid || index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 group">
+                <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 align-middle">
                   {item.code}
                 </td>
-                <td className="px-1 py-1 text-sm text-gray-900 align-middle">
+                <td className="px-1 py-1 text-sm text-gray-900 dark:text-gray-100 align-middle">
                   {item.code === "OTH" ? (
                     <div className="space-y-1">
                       <ProductComboboxCell rowIndex={index} item={item} />
@@ -420,7 +420,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     </div>
                   )}
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
+                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="quantity"
@@ -428,7 +428,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     itemCode={item.code}
                   />
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
+                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="price"
@@ -436,7 +436,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     itemCode={item.code}
                   />
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
+                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="freeProduct"
@@ -445,7 +445,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     min={0}
                   />
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
+                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="returnProduct"
@@ -453,7 +453,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     itemCode={item.code} // Pass itemCode
                   />
                 </td>
-                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 align-middle">
+                <td className="px-1 py-1 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 align-middle">
                   <NumericInputCell
                     rowIndex={index}
                     field="tax"
@@ -461,7 +461,7 @@ const LineItemsTable: React.FC<LineItemsTableProps> = ({
                     itemCode={item.code}
                   />
                 </td>
-                <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900 text-right align-middle">
+                <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-right align-middle">
                   {parseFloat(item.total || "0").toFixed(2)}
                 </td>
                 {!readOnly && (

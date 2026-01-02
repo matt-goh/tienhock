@@ -78,7 +78,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-3 w-auto opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-3 w-auto opacity-0 transition-opacity duration-200"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -87,10 +87,10 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <div className="text-sm font-medium text-default-700 mb-1">
+            <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
               Linked Pay Codes
             </div>
-            <div className="text-sm text-default-600">
+            <div className="text-sm text-default-600 dark:text-gray-300">
               <ul className="space-y-2 mt-1">
                 {linkedFields.map((field, index) => {
                   const payCodeInfo = getPayCodeInfo(field.linkedPayCode || "");
@@ -106,7 +106,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                           >
                             <Link
                               to={`/catalogue/pay-codes?desc=${field.linkedPayCode}`}
-                              className="hover:text-sky-600 hover:underline"
+                              className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                             >
                               {payCodeInfo?.description || field.linkedPayCode}
                             </Link>
@@ -114,7 +114,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                         </span>
                       </div>
                       {payCodeInfo && (
-                        <div className="ml-4 mt-1 text-xs text-default-500">
+                        <div className="ml-4 mt-1 text-xs text-default-500 dark:text-gray-400">
                           <div>
                             Rate unit:{" "}
                             <span className="font-medium">
