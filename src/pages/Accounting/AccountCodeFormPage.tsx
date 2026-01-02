@@ -370,12 +370,12 @@ const AccountCodeFormPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
-            <IconFolder size={24} className="text-amber-500" />
+            <IconFolder size={24} className="text-amber-500 dark:text-amber-400" />
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode ? "Edit Account Code" : "Add New Account Code"}
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
                   ? `Editing account ${formData.code}`
                   : "Create a new account in the chart of accounts"}
@@ -390,7 +390,7 @@ const AccountCodeFormPage: React.FC = () => {
             <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
               <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
-                <span className="text-sm font-medium text-default-700">
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
                   Saving account code...
                 </span>
               </div>
@@ -401,7 +401,7 @@ const AccountCodeFormPage: React.FC = () => {
             <div className="p-6 space-y-6">
               {/* Basic Info Section */}
               <div className="space-y-4">
-                <h3 className="text-base font-medium text-default-700 border-b border-default-200 pb-2">
+                <h3 className="text-base font-medium text-default-700 dark:text-gray-300 border-b border-default-200 dark:border-gray-700 pb-2">
                   Basic Information
                 </h3>
 
@@ -447,7 +447,7 @@ const AccountCodeFormPage: React.FC = () => {
                   <div className="space-y-2">
                     <label
                       htmlFor="parent_code-button"
-                      className="block text-sm font-medium text-default-700"
+                      className="block text-sm font-medium text-default-700 dark:text-gray-300"
                     >
                       Parent Account
                     </label>
@@ -561,7 +561,7 @@ const AccountCodeFormPage: React.FC = () => {
 
               {/* Additional Settings Section */}
               <div className="space-y-4">
-                <h3 className="text-base font-medium text-default-700 border-b border-default-200 pb-2">
+                <h3 className="text-base font-medium text-default-700 dark:text-gray-300 border-b border-default-200 dark:border-gray-700 pb-2">
                   Additional Settings
                 </h3>
 
@@ -589,7 +589,7 @@ const AccountCodeFormPage: React.FC = () => {
                         disabled={isSaving || isSystem}
                         className="w-4 h-4 rounded border-default-300 text-sky-600 focus:ring-sky-500"
                       />
-                      <span className="text-sm text-default-700">
+                      <span className="text-sm text-default-700 dark:text-gray-300">
                         Active Account
                       </span>
                     </label>
@@ -609,7 +609,7 @@ const AccountCodeFormPage: React.FC = () => {
                 <div>
                   <label
                     htmlFor="notes"
-                    className="block text-sm font-medium text-default-700 mb-2"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2"
                   >
                     Notes
                   </label>
@@ -631,19 +631,19 @@ const AccountCodeFormPage: React.FC = () => {
               {/* Info Section for Edit Mode */}
               {isEditMode && (
                 <div className="p-4 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
-                  <h4 className="text-sm font-medium text-default-700 mb-2">
+                  <h4 className="text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
                     Account Information
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-default-500">Child Accounts: </span>
-                      <span className="font-medium text-default-700">
+                      <span className="text-default-500 dark:text-gray-400">Child Accounts: </span>
+                      <span className="font-medium text-default-700 dark:text-gray-300">
                         {childrenCount}
                       </span>
                     </div>
                     <div>
-                      <span className="text-default-500">System Account: </span>
-                      <span className="font-medium text-default-700">
+                      <span className="text-default-500 dark:text-gray-400">System Account: </span>
+                      <span className="font-medium text-default-700 dark:text-gray-300">
                         {isSystem ? "Yes" : "No"}
                       </span>
                     </div>

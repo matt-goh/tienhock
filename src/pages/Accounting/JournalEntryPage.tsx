@@ -202,7 +202,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
               >
                 <span>{opt.name}</span>
                 {opt.id === value && (
-                  <IconCheck size={16} className="text-sky-600 flex-shrink-0" />
+                  <IconCheck size={16} className="text-sky-600 dark:text-sky-400 flex-shrink-0" />
                 )}
               </div>
             ))
@@ -634,12 +634,12 @@ const JournalEntryPage: React.FC = () => {
             <div className="flex items-center gap-4">
               <BackButton onClick={handleBackClick} />
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
-              <IconFileText size={24} className="text-sky-500" />
+              <IconFileText size={24} className="text-sky-500 dark:text-sky-400" />
               <div>
-                <h1 className="text-xl font-semibold text-default-900">
+                <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                   {isEditMode ? "Edit Journal Entry" : "New Journal Entry"}
                 </h1>
-                <p className="mt-1 text-sm text-default-500">
+                <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                   {isEditMode
                     ? `Editing entry ${formData.reference_no}`
                     : "Create a new journal entry"}
@@ -666,7 +666,7 @@ const JournalEntryPage: React.FC = () => {
             <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
               <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
-                <span className="text-sm font-medium text-default-700">
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
                   Saving journal entry...
                 </span>
               </div>
@@ -743,25 +743,25 @@ const JournalEntryPage: React.FC = () => {
                 <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg">
                   <thead className="bg-default-100 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-12">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-12">
                         #
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-96">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-96">
                         Account Code
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
                         Reference
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Description
                       </th>
-                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
                         Debit ($)
                       </th>
-                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
                         Credit ($)
                       </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-12"></th>
+                      <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-12"></th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -775,7 +775,7 @@ const JournalEntryPage: React.FC = () => {
                         }`}
                         onClick={() => setSelectedLineIndex(index)}
                       >
-                        <td className="px-3 py-2 text-sm text-default-600">
+                        <td className="px-3 py-2 text-sm text-default-600 dark:text-gray-400">
                           {String(line.line_number).padStart(2, "0")}
                         </td>
                         <td className="px-3 py-2">
@@ -878,7 +878,7 @@ const JournalEntryPage: React.FC = () => {
                                 e.stopPropagation();
                                 removeLine(index);
                               }}
-                              className="text-rose-500 hover:text-rose-700"
+                              className="text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300"
                               title="Remove line"
                             >
                               <IconTrash size={18} />
@@ -895,7 +895,7 @@ const JournalEntryPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={addLine}
-                            className="flex items-center gap-1 text-sm text-sky-600 hover:text-sky-800"
+                            className="flex items-center gap-1 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
                           >
                             <IconPlus size={16} />
                             Add Line
@@ -903,12 +903,12 @@ const JournalEntryPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 dark:text-gray-100 border border-transparent">
                           {totals.totalDebit.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 dark:text-gray-100 border border-transparent">
                           {totals.totalCredit.toFixed(2)}
                         </div>
                       </td>

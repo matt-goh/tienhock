@@ -383,7 +383,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                   <div className="w-16 h-16 bg-sky-100 dark:bg-sky-900/50 rounded-full flex items-center justify-center animate-bounce">
                     <IconCalendarEvent size={32} className="text-sky-600 dark:text-sky-400" />
                   </div>
-                  <div className="absolute -inset-1 bg-sky-200 rounded-full animate-ping opacity-20"></div>
+                  <div className="absolute -inset-1 bg-sky-200 dark:bg-sky-800 rounded-full animate-ping opacity-20"></div>
                 </div>
 
                 <div className="text-center space-y-3 w-full">

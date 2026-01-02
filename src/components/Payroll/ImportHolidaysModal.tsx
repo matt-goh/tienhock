@@ -282,8 +282,8 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                 ) : (
                   <div className="mt-4">
                     {duplicateCount > 0 && (
-                      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start">
-                        <IconAlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 mr-2" />
+                      <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start">
+                        <IconAlertTriangle className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5 mr-2" />
                         <div>
                           <p className="text-sm text-amber-800">
                             {duplicateCount} duplicate

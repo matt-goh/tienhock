@@ -207,7 +207,7 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                 </DialogTitle>
 
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     Select pay codes to associate with this employee.
                   </p>
                 </div>
@@ -217,27 +217,27 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                     <input
                       type="text"
                       placeholder="Search pay codes..."
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
 
-                  <div className="max-h-96 overflow-y-auto border border-default-200 rounded-lg">
+                  <div className="max-h-96 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
                     {isProcessing ? (
                       <div className="flex justify-center items-center py-10">
                         <LoadingSpinner size="sm" hideText />
                       </div>
                     ) : visiblePayCodes.length === 0 ? (
-                      <div className="py-4 px-3 text-center text-sm text-default-500">
+                      <div className="py-4 px-3 text-center text-sm text-default-500 dark:text-gray-400">
                         No pay codes found
                       </div>
                     ) : (
-                      <ul className="divide-y divide-default-200">
+                      <ul className="divide-y divide-default-200 dark:divide-gray-700">
                         {visiblePayCodes.map((payCode) => (
                           <li
                             key={payCode.id}
-                            className="px-3 py-2 hover:bg-default-50 cursor-pointer"
+                            className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                             onClick={() => handleTogglePayCode(payCode.id)}
                           >
                             <Checkbox
@@ -246,7 +246,7 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                               label={
                                 <div>
                                   <div
-                                    className="font-medium text-default-800"
+                                    className="font-medium text-default-800 dark:text-gray-100"
                                     onClick={() =>
                                       handleTogglePayCode(payCode.id)
                                     }
@@ -254,7 +254,7 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                                     {payCode.description}
                                   </div>
                                   <div
-                                    className="text-xs text-default-500"
+                                    className="text-xs text-default-500 dark:text-gray-400"
                                     onClick={() =>
                                       handleTogglePayCode(payCode.id)
                                     }
@@ -265,8 +265,8 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                                 </div>
                               }
                               size={20}
-                              checkedColor="text-sky-600"
-                              uncheckedColor="text-default-400"
+                              checkedColor="text-sky-600 dark:text-sky-400"
+                              uncheckedColor="text-default-400 dark:text-gray-500"
                             />
                           </li>
                         ))}
@@ -274,11 +274,11 @@ const AssociatePayCodesWithEmployeeModal: React.FC<
                     )}
                     {/* Load More Button */}
                     {hasMoreItems && (
-                      <div className="border-t border-gray-200 p-2">
+                      <div className="border-t border-gray-200 dark:border-gray-700 p-2">
                         <button
                           type="button"
                           onClick={handleLoadMore}
-                          className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
+                          className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
                           disabled={isProcessing}
                         >
                           <IconChevronDown size={16} className="mr-1.5" />

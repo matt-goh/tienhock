@@ -319,10 +319,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                 <div className="mt-2">
                   <div className="grid grid-cols-4 gap-4 mb-4">
                     <div>
-                      <p className="text-sm text-gray-500">Job</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Job</p>
                       <SafeLink
                         to={`/catalogue/job?id=${jobType}`}
-                        className="font-medium hover:underline hover:text-sky-600"
+                        className="font-medium text-default-900 dark:text-gray-100 hover:underline hover:text-sky-600 dark:hover:text-sky-400"
                         hasUnsavedChanges={hasUnsavedChanges}
                         onNavigateAttempt={onNavigateAttempt}
                       >
@@ -330,10 +330,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       </SafeLink>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         {(isSalesman || isSalesmanIkut) && locationType ? "Location" : "Hours"}
                       </p>
-                      <p className="font-medium">
+                      <p className="font-medium text-default-900 dark:text-gray-100">
                         {(isSalesman || isSalesmanIkut) && locationType ? (
                           <span className="flex items-center">
                             {locationType}
@@ -344,21 +344,21 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Day Type</p>
-                      <p className="font-medium">{dayType}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Day Type</p>
+                      <p className="font-medium text-default-900 dark:text-gray-100">{dayType}</p>
                     </div>
                     <div className="flex w-full items-center">
                       <div className="relative w-full">
                         <input
                           type="text"
-                          className="w-full p-2 pl-4 border border-gray-300 rounded-full text-sm"
+                          className="w-full p-2 pl-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-full text-sm"
                           placeholder="Search activities..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
                         {searchTerm && (
                           <button
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                             onClick={() => setSearchTerm("")}
                             title="Clear search"
                           >
@@ -378,38 +378,38 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                   ) : (
                     <>
                       <div className="mt-4">
-                        <div className="overflow-x-auto border rounded-lg">
+                        <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
                           {/* Table wrapper with max height and scrollbar */}
                           <div className="max-h-[30rem] overflow-y-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50 sticky top-0 z-10">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                              <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                                 <tr>
-                                  <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase flex items-center tracking-wider">
+                                  <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase flex items-center tracking-wider">
                                     <Checkbox
                                       checked={selectAll}
                                       onChange={handleSelectAll}
                                       size={20}
-                                      checkedColor="text-sky-600"
+                                      checkedColor="text-sky-600 dark:text-sky-400"
                                       ariaLabel="Select all activities"
                                     />
                                   </th>
-                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Pay Code & Details
                                   </th>
-                                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Units
                                   </th>
-                                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Amount
                                   </th>
                                 </tr>
                               </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
+                              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 {activities.length === 0 ? (
                                   <tr>
                                     <td
                                       colSpan={4}
-                                      className="px-3 py-3 text-center text-sm text-gray-500"
+                                      className="px-3 py-3 text-center text-sm text-gray-500 dark:text-gray-400"
                                     >
                                       No pay codes available for this job.
                                     </td>
@@ -435,7 +435,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         <tr>
                                           <td
                                             colSpan={4}
-                                            className="px-3 py-3 text-center text-sm text-gray-500"
+                                            className="px-3 py-3 text-center text-sm text-gray-500 dark:text-gray-400"
                                           >
                                             No results found for "{searchTerm}".
                                           </td>
@@ -456,7 +456,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                             key={activity.payCodeId}
                                             className={`${
                                               activity.isSelected
-                                                ? "bg-sky-50"
+                                                ? "bg-sky-50 dark:bg-sky-900/30"
                                                 : ""
                                             } cursor-pointer`}
                                             onClick={(e) => {
@@ -480,14 +480,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   )
                                                 }
                                                 size={20}
-                                                checkedColor="text-sky-600"
+                                                checkedColor="text-sky-600 dark:text-sky-400"
                                                 className="align-middle"
                                               />
                                             </td>
                                             <td className="px-3 py-3 truncate">
                                               <div className="flex flex-col">
                                                 <span
-                                                  className="text-sm font-medium text-gray-900 w-fit"
+                                                  className="text-sm font-medium text-gray-900 dark:text-gray-100 w-fit"
                                                   title={`${activity.description} (${activity.payCodeId})`}
                                                 >
                                                   <SafeLink
@@ -499,7 +499,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                       onNavigateAttempt ||
                                                       (() => {})
                                                     }
-                                                    className="hover:text-sky-600 hover:underline"
+                                                    className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                                                     onClick={(e) =>
                                                       e.stopPropagation()
                                                     }
@@ -512,12 +512,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                         )}...`
                                                       : activity.description}
                                                   </SafeLink>
-                                                  <span className="ml-1.5 text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+                                                  <span className="ml-1.5 text-xs text-default-500 dark:text-gray-400 rounded-full bg-default-100 dark:bg-gray-700 px-2 py-0.5 flex-shrink-0">
                                                     {activity.payCodeId}
                                                   </span>
                                                   {activity.payType ===
                                                     "Overtime" && (
-                                                    <span className="ml-2 text-xs text-amber-600">
+                                                    <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
                                                       (OT)
                                                     </span>
                                                   )}
@@ -549,7 +549,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   {/* Add the source badges HERE */}
                                                   {activity.source ===
                                                     "employee" && (
-                                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
+                                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
                                                       <IconUser
                                                         size={10}
                                                         className="mr-0.5"
@@ -559,7 +559,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   )}
                                                   {activity.source ===
                                                     "job" && (
-                                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
                                                       <IconBriefcase
                                                         size={10}
                                                         className="mr-0.5"
@@ -575,7 +575,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                           activity.payCodeId
                                                         )
                                                     ) && (
-                                                      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                                      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
                                                         <IconPackage
                                                           size={10}
                                                           className="mr-0.5"
@@ -584,7 +584,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                       </span>
                                                     )}
                                                 </span>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
                                                   {activity.payType} •{" "}
                                                   {activity.rateUnit}
                                                   {activity.rateUnit !==
@@ -619,7 +619,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                       "Hour" &&
                                                     activity.rateUnit !==
                                                       "Fixed" && (
-                                                      <span className="text-default-500 ml-2">
+                                                      <span className="text-default-500 dark:text-gray-400 ml-2">
                                                         •{" "}
                                                         {activity.unitsProduced}{" "}
                                                         {activity.rateUnit ===
@@ -632,7 +632,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     "Overtime" &&
                                                     activity.rateUnit ===
                                                       "Hour" && (
-                                                      <span className="ml-1 text-amber-600">
+                                                      <span className="ml-1 text-amber-600 dark:text-amber-400">
                                                         (Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
                                                       </span>
                                                     )}
@@ -653,9 +653,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     jobConfig?.replaceUnits ? (
                                                     <input
                                                       type="number"
-                                                      className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                      className={`w-16 text-center border border-gray-300 dark:border-gray-600 rounded p-1 pl-4 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 ${
                                                         !activity.isSelected
-                                                          ? "bg-gray-100 cursor-not-allowed"
+                                                          ? "bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
                                                           : ""
                                                       }`}
                                                       value={
@@ -681,10 +681,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     /* Standard input for non-salesman units */
                                                     <input
                                                       type="number"
-                                                      className={`w-16 text-center border border-gray-300 rounded p-1 pl-4 text-sm ${
+                                                      className={`w-16 text-center border border-gray-300 dark:border-gray-600 rounded p-1 pl-4 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 ${
                                                         activity.isContextLinked
-                                                          ? "bg-gray-100 cursor-not-allowed"
-                                                          : "disabled:bg-gray-100"
+                                                          ? "bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
+                                                          : "disabled:bg-gray-100 dark:disabled:bg-gray-700"
                                                       }`}
                                                       value={
                                                         activity.unitsProduced?.toString() ||
@@ -720,21 +720,21 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   )}
                                                 </div>
                                               ) : (
-                                                <span className="text-sm text-gray-500">
+                                                <span className="text-sm text-gray-500 dark:text-gray-400">
                                                   —
                                                 </span>
                                               )}
                                             </td>
                                             <td className="px-3 py-3 text-right">
                                               {activity.isSelected ? (
-                                                <span className="text-sm font-medium text-gray-900">
+                                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                                   RM
                                                   {activity.calculatedAmount.toFixed(
                                                     2
                                                   )}
                                                 </span>
                                               ) : (
-                                                <span className="text-sm text-gray-400">
+                                                <span className="text-sm text-gray-400 dark:text-gray-500">
                                                   RM0.00
                                                 </span>
                                               )}
@@ -748,11 +748,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                               </tbody>
                             </table>
                           </div>
-                          <div className="bg-gray-50 border-t border-gray-200">
+                          <div className="bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
                             <div className="px-3 py-3 flex justify-between">
-                              <div className="text-sm font-medium text-gray-900 flex items-center">
+                              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center">
                                 <span>Total</span>
-                                <span className="ml-2 px-2 py-0.5 bg-sky-100 text-sky-700 rounded-full text-xs">
+                                <span className="ml-2 px-2 py-0.5 bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-full text-xs">
                                   {
                                     activities.filter((a) => a.isSelected)
                                       .length
@@ -760,7 +760,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                   activities
                                 </span>
                               </div>
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                 RM{totalAmount.toFixed(2)}
                               </span>
                             </div>

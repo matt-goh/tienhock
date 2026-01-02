@@ -89,7 +89,7 @@ const CustomersUsingProductTooltip: React.FC<
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex items-center ${className}`}
+        className={`text-default-400 dark:text-gray-500 hover:text-default-600 cursor-help inline-flex items-center ${className}`}
       >
         <IconInfoCircle size={16} />
         {totalCount > 0 && (
@@ -138,7 +138,7 @@ const CustomersUsingProductTooltip: React.FC<
               {customersUsingProduct.length > 0 && (
                 <div>
                   <div className="flex items-center mb-2">
-                    <IconUser size={16} className="text-sky-600 mr-2" />
+                    <IconUser size={16} className="text-sky-600 dark:text-sky-400 mr-2" />
                     <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                       Customers ({customersUsingProduct.length})
                     </span>

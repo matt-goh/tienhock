@@ -512,8 +512,8 @@ const ECarumanPage: React.FC = () => {
               onClick={() => handleDownload("epf")}
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <IconBuildingBank size={20} className="text-blue-600" />
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <IconBuildingBank size={20} className="text-blue-600 dark:text-blue-400" />
                 </div>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">EPF / KWSP</h3>
                 {preview.missing_epf_no && preview.missing_epf_no.count > 0 && (
@@ -522,7 +522,7 @@ const ECarumanPage: React.FC = () => {
                       e.stopPropagation();
                       setShowMissingEPFDialog(true);
                     }}
-                    className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium hover:bg-amber-200 transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/70 transition-colors"
                     title="Click to view employees with missing EPF numbers"
                   >
                     <IconAlertTriangle size={14} />
@@ -531,9 +531,9 @@ const ECarumanPage: React.FC = () => {
                 )}
                 <div className="ml-auto">
                   {loadingType === "epf" ? (
-                    <IconLoader2 size={20} className="animate-spin text-blue-600" />
+                    <IconLoader2 size={20} className="animate-spin text-blue-600 dark:text-blue-400" />
                   ) : (
-                    <IconFileDownload size={20} className="text-gray-400" />
+                    <IconFileDownload size={20} className="text-gray-400 dark:text-gray-500" />
                   )}
                 </div>
               </div>
@@ -613,16 +613,16 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-blue-50 sticky bottom-0">
+                      <tfoot className="bg-blue-50 dark:bg-blue-900/30 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
-                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t">
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.epf.totals.salary.toFixed(2)}
                           </td>
-                          <td className="px-2 py-1.5 text-right text-blue-600 font-mono border-t">
+                          <td className="px-2 py-1.5 text-right text-blue-600 dark:text-blue-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.epf.totals.em_share}
                           </td>
-                          <td className="px-2 py-1.5 text-right text-blue-600 font-mono border-t">
+                          <td className="px-2 py-1.5 text-right text-blue-600 dark:text-blue-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.epf.totals.emp_share}
                           </td>
                         </tr>
@@ -641,15 +641,15 @@ const ECarumanPage: React.FC = () => {
               onClick={() => handleDownload("socso")}
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <IconShieldCheck size={20} className="text-green-600" />
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <IconShieldCheck size={20} className="text-green-600 dark:text-green-400" />
                 </div>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">SOCSO / PERKESO</h3>
                 <div className="ml-auto">
                   {loadingType === "socso" ? (
-                    <IconLoader2 size={20} className="animate-spin text-green-600" />
+                    <IconLoader2 size={20} className="animate-spin text-green-600 dark:text-green-400" />
                   ) : (
-                    <IconFileDownload size={20} className="text-gray-400" />
+                    <IconFileDownload size={20} className="text-gray-400 dark:text-gray-500" />
                   )}
                 </div>
               </div>
@@ -721,16 +721,16 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-green-50 sticky bottom-0">
+                      <tfoot className="bg-green-50 dark:bg-green-900/30 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
-                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t">
+                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.socso.totals.salary.toFixed(2)}
                           </td>
-                          <td className="px-2 py-1.5 text-right text-green-600 font-mono border-t">
+                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.socso.totals.socso_employer.toFixed(2)}
                           </td>
-                          <td className="px-2 py-1.5 text-right text-green-600 font-mono border-t">
+                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.socso.totals.socso_employee.toFixed(2)}
                           </td>
                         </tr>
@@ -749,15 +749,15 @@ const ECarumanPage: React.FC = () => {
               onClick={() => handleDownload("sip")}
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <IconUmbrella size={20} className="text-purple-600" />
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <IconUmbrella size={20} className="text-purple-600 dark:text-purple-400" />
                 </div>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">SIP / EIS</h3>
                 <div className="ml-auto">
                   {loadingType === "sip" ? (
-                    <IconLoader2 size={20} className="animate-spin text-purple-600" />
+                    <IconLoader2 size={20} className="animate-spin text-purple-600 dark:text-purple-400" />
                   ) : (
-                    <IconFileDownload size={20} className="text-gray-400" />
+                    <IconFileDownload size={20} className="text-gray-400 dark:text-gray-500" />
                   )}
                 </div>
               </div>
@@ -829,16 +829,16 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-purple-50 sticky bottom-0">
+                      <tfoot className="bg-purple-50 dark:bg-purple-900/30 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
-                          <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
+                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                          <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.sip.totals.eis_employer.toFixed(2)}
                           </td>
-                          <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
+                          <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.sip.totals.eis_employee.toFixed(2)}
                           </td>
-                          <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
+                          <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.sip.totals.sip_total.toFixed(2)}
                           </td>
                         </tr>
@@ -857,15 +857,15 @@ const ECarumanPage: React.FC = () => {
               onClick={() => handleDownload("income_tax")}
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <IconReceipt size={20} className="text-amber-600" />
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                  <IconReceipt size={20} className="text-amber-600 dark:text-amber-400" />
                 </div>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">Income Tax / PCB</h3>
                 <div className="ml-auto">
                   {loadingType === "income_tax" ? (
-                    <IconLoader2 size={20} className="animate-spin text-amber-600" />
+                    <IconLoader2 size={20} className="animate-spin text-amber-600 dark:text-amber-400" />
                   ) : (
-                    <IconFileDownload size={20} className="text-gray-400" />
+                    <IconFileDownload size={20} className="text-gray-400 dark:text-gray-500" />
                   )}
                 </div>
               </div>
@@ -919,10 +919,10 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-amber-50 sticky bottom-0">
+                      <tfoot className="bg-amber-50 dark:bg-amber-900/30 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
-                          <td className="px-2 py-1.5 text-right text-amber-600 font-mono border-t">
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                          <td className="px-2 py-1.5 text-right text-amber-600 dark:text-amber-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.income_tax.totals.pcb_amount.toFixed(2)}
                           </td>
                         </tr>
