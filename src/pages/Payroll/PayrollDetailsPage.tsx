@@ -293,35 +293,67 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   // Helper to render consolidated table row
-  const renderConsolidatedRow = (item: ConsolidatedPayrollItem, index: number) => (
-    <tr key={`${item.pay_code_id}-${item.rate}-${index}`} className="hover:bg-default-50">
-      <td className="px-3 py-2">
-        <span
-          className="text-sm text-default-900"
-          title={`${item.description} (${item.pay_code_id})`}
-        >
-          {item.description}{" "}
-          <span className="text-default-500">({item.pay_code_id})</span>
-          {item.item_count > 1 && (
-            <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-500">
-              {item.item_count} entries
-            </span>
-          )}
-        </span>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-        {item.rate_unit === "Percent"
-          ? `${item.rate}%`
-          : `${formatCurrency(item.rate)}/${item.rate_unit}`}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-        {item.total_quantity}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-        {formatCurrency(item.total_amount)}
-      </td>
-    </tr>
-  );
+  const renderConsolidatedRow = (item: ConsolidatedPayrollItem, index: number) => {
+    // Find the original item for deletion (only for single manual items)
+    const canDelete = item.is_manual && item.item_count === 1 && isEditable;
+    const originalItem = canDelete
+      ? payroll.items.find(
+          (i) =>
+            i.pay_code_id === item.pay_code_id &&
+            i.rate === item.rate &&
+            i.rate_unit === item.rate_unit &&
+            i.is_manual
+        )
+      : null;
+
+    return (
+      <tr key={`${item.pay_code_id}-${item.rate}-${index}`} className="hover:bg-default-50">
+        <td className="px-3 py-2">
+          <span
+            className="text-sm text-default-900"
+            title={`${item.description} (${item.pay_code_id})`}
+          >
+            {item.description}{" "}
+            <span className="text-default-500">({item.pay_code_id})</span>
+            {item.item_count > 1 && (
+              <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-500">
+                {item.item_count} entries
+              </span>
+            )}
+            {item.is_manual && (
+              <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 text-default-600">
+                Manual
+              </span>
+            )}
+          </span>
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+          {item.rate_unit === "Percent"
+            ? `${item.rate}%`
+            : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+          {item.total_quantity}
+        </td>
+        <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
+          {formatCurrency(item.total_amount)}
+        </td>
+        {canDelete && originalItem && (
+          <td className="px-3 py-2 whitespace-nowrap text-center">
+            <button
+              onClick={() => {
+                setItemToDelete({ ...originalItem, id: originalItem.id || 0 });
+                setShowDeleteDialog(true);
+              }}
+              className="text-rose-600 hover:text-rose-800"
+            >
+              <IconTrash size={16} />
+            </button>
+          </td>
+        )}
+      </tr>
+    );
+  };
 
   // Helper to render detailed table row with optional day separator
   const renderDetailedRow = (
@@ -1162,7 +1194,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             >
                               Amount
                             </th>
-                            {viewMode === "detailed" && isEditable && (
+                            {isEditable && (
+                              viewMode === "detailed" ||
+                              (viewMode === "consolidated" && jobConsolidatedItems?.["Tambahan"]?.some(item => item.is_manual && item.item_count === 1))
+                            ) && (
                               <th
                                 scope="col"
                                 className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-12"
@@ -1190,7 +1225,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <td className="px-3 py-2 text-right text-sm font-semibold">
                               {formatCurrency(jobTambahanTotal)}
                             </td>
-                            {viewMode === "detailed" && isEditable && <td></td>}
+                            {isEditable && (
+                              viewMode === "detailed" ||
+                              (viewMode === "consolidated" && jobConsolidatedItems?.["Tambahan"]?.some(item => item.is_manual && item.item_count === 1))
+                            ) && <td></td>}
                           </tr>
                         </tfoot>
                       </table>
@@ -1432,7 +1470,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         >
                           Amount
                         </th>
-                        {viewMode === "detailed" && isEditable && (
+                        {isEditable && (
+                          viewMode === "detailed" ||
+                          (viewMode === "consolidated" && groupedConsolidatedItems["Tambahan"].some(item => item.is_manual && item.item_count === 1))
+                        ) && (
                           <th
                             scope="col"
                             className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-12"
@@ -1460,7 +1501,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <td className="px-3 py-2 text-right text-sm font-semibold">
                           {formatCurrency(tambahanTotal)}
                         </td>
-                        {viewMode === "detailed" && isEditable && <td></td>}
+                        {isEditable && (
+                          viewMode === "detailed" ||
+                          (viewMode === "consolidated" && groupedConsolidatedItems["Tambahan"].some(item => item.is_manual && item.item_count === 1))
+                        ) && <td></td>}
                       </tr>
                     </tfoot>
                   </table>
