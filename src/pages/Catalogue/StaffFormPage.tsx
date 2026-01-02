@@ -66,6 +66,7 @@ const StaffFormPage: React.FC = () => {
     birthdate: "",
     address: "",
     job: [],
+    location: [],
     dateJoined: "",
     icNo: "",
     bankAccountNumber: "",
