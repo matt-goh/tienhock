@@ -9,7 +9,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import backupRouter from "./admin/backup.js";
 
 // User routes
-import sidebarRouter from "./user/sidebar.js";
+import bookmarksRouter from "./user/bookmarks.js";
 
 // Catalogue routes
 import customerValidationRouter from "./catalogue/customer-validation.js";
@@ -146,7 +146,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/backup", backupRouter(pool));
 
   // User routes
-  app.use("/api/bookmarks", sidebarRouter(pool));
+  app.use("/api/bookmarks", bookmarksRouter(pool));
 
   // Accounting routes
   app.use("/api/debtors", debtorsRouter(pool));
