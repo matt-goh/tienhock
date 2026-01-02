@@ -242,3 +242,10 @@ ON CONFLICT (product_id, pay_code_id) DO NOTHING;
 -- WHERE p.type IN ('MEE', 'BH')
 -- GROUP BY p.id, p.description, p.type
 -- ORDER BY p.type, p.id;
+
+-- ============================================
+-- 4. Fix payroll_items work_log_type column size
+-- ============================================
+-- The work_log_type column was varchar(10) but needs to accommodate
+-- values like 'production_bonus' (16 chars)
+ALTER TABLE payroll_items ALTER COLUMN work_log_type TYPE varchar(20);
