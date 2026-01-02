@@ -405,20 +405,26 @@ export default function (pool) {
       const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
       // 2. Fetch all required data in parallel
-      const [
-        dailyLogsResult,
-        monthlyLogsResult,
-        manualItemsResult,
-        staffsResult,
-        jobsResult,
-        epfRatesResult,
-        socsoRatesResult,
-        sipRatesResult,
-        incomeTaxRatesResult,
-        holidaysResult,
-        productionEntriesResult,
-        productPayCodeMappingsResult,
-      ] = await Promise.all([
+      let dailyLogsResult, monthlyLogsResult, manualItemsResult, staffsResult,
+          jobsResult, epfRatesResult, socsoRatesResult, sipRatesResult,
+          incomeTaxRatesResult, holidaysResult, productionEntriesResult,
+          productPayCodeMappingsResult;
+
+      try {
+        [
+          dailyLogsResult,
+          monthlyLogsResult,
+          manualItemsResult,
+          staffsResult,
+          jobsResult,
+          epfRatesResult,
+          socsoRatesResult,
+          sipRatesResult,
+          incomeTaxRatesResult,
+          holidaysResult,
+          productionEntriesResult,
+          productPayCodeMappingsResult,
+        ] = await Promise.all([
         // Daily work logs with activities
         client.query(`
           SELECT dwl.id, dwl.log_date, dwle.employee_id, dwle.job_id, dwle.total_hours,
@@ -495,8 +501,8 @@ export default function (pool) {
 
         // Holidays for the payroll period (for production entry day type calculation)
         client.query(`
-          SELECT date FROM holidays
-          WHERE date BETWEEN $1 AND $2
+          SELECT holiday_date FROM holiday_calendar
+          WHERE holiday_date BETWEEN $1 AND $2
         `, [startDate, endDate]),
 
         // Production entries for MEE_PACKING and BH_PACKING workers
@@ -521,7 +527,11 @@ export default function (pool) {
           JOIN pay_codes pc ON ppc.pay_code_id = pc.id
           WHERE pc.is_active = true
         `),
-      ]);
+        ]);
+      } catch (fetchError) {
+        console.error("Error fetching payroll data:", fetchError);
+        throw fetchError;
+      }
 
       // Build lookup maps
       const staffsMap = new Map(staffsResult.rows.map(s => [s.id, s]));
@@ -621,7 +631,7 @@ export default function (pool) {
 
       // Build holidays lookup set for fast checking
       const holidayDates = new Set(
-        holidaysResult.rows.map(h => formatDateToYMD(h.date))
+        holidaysResult.rows.map(h => formatDateToYMD(h.holiday_date))
       );
 
       // Helper to determine day type (biasa, ahad, umum)
@@ -1163,7 +1173,12 @@ export default function (pool) {
           });
 
         } catch (error) {
+          console.error("Error processing employee:", employeeJobCombos[0].employeeId, error);
           errors.push({ employeeId: employeeJobCombos[0].employeeId, error: error.message });
+          // If this is a SQL error, the transaction is aborted - stop processing
+          if (error.code) {
+            throw error;
+          }
         }
       }
 
