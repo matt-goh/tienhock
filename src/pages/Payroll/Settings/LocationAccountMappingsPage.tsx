@@ -42,8 +42,8 @@ const SettingsTabs: React.FC = () => {
               onClick={() => navigate(tab.path)}
               className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                 isActive
-                  ? "border-sky-500 text-sky-600"
-                  : "border-transparent text-default-500 hover:text-default-700 hover:border-default-300"
+                  ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                  : "border-transparent text-default-500 hover:text-default-700 hover:border-default-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600"
               }`}
             >
               {tab.name}
@@ -297,7 +297,7 @@ const LocationAccountMappingsPage: React.FC = () => {
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <IconSearch
-            className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
+            className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400 dark:text-gray-500"
             stroke={1.5}
           />
           <input
@@ -412,7 +412,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                 <tr key={mapping.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sky-700 font-medium">
+                      <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
                         {mapping.location_id}
                       </span>
                       <span className="text-default-600 dark:text-gray-300">{mapping.location_name}</span>
@@ -434,7 +434,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <IconLink size={14} className="text-default-400" />
+                      <IconLink size={14} className="text-default-400 dark:text-gray-500" />
                       <span className="font-mono text-default-700 dark:text-gray-200">{mapping.account_code}</span>
                       {mapping.account_description && (
                         <span className="text-default-500 dark:text-gray-400 text-xs">
@@ -447,8 +447,8 @@ const LocationAccountMappingsPage: React.FC = () => {
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         mapping.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
                       }`}
                     >
                       {mapping.is_active ? "Active" : "Inactive"}
