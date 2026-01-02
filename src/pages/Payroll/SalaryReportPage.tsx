@@ -24,9 +24,9 @@ import YearNavigator from "../../components/YearNavigator";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
-  generateSalaryReportPDF,
-  SalaryReportPDFData,
-} from "../../utils/payroll/SalaryReportPDF";
+  generatePinjamReportPDF,
+  PinjamReportPDFData,
+} from "../../utils/payroll/PinjamReportPDF";
 import {
   generateBankReportPDF,
   BankReportPDFData,
@@ -40,17 +40,14 @@ const LOCATION_MAP: { [key: string]: string } = {
   "02": "OFFICE",
   "03": "SALESMAN",
   "04": "IKUT LORI",
-  "05": "PENGANGKUTAN HABUK",
   "06": "JAGA BOILER",
   "07": "MESIN & SANGKUT MEE",
   "08": "PACKING MEE",
   "09": "MESIN BIHUN",
   "10": "SANGKUT BIHUN",
   "11": "PACKING BIHUN",
-  "12": "PEKEBUN",
   "13": "TUKANG SAPU",
   "14": "KILANG KERJA LUAR",
-  "15": "OTHER SABARINA",
   "16": "COMM-MESIN MEE",
   "17": "COMM-MESIN BIHUN",
   "18": "COMM-KILANG",
@@ -74,18 +71,15 @@ const LOCATION_ORDER: LocationOrderItem[] = [
   { type: "location", id: "02" },
   { type: "location", id: "03" },
   { type: "location", id: "04" },
-  { type: "location", id: "05" },
   { type: "location", id: "06" },
   { type: "location", id: "07" },
   { type: "location", id: "08" },
   { type: "location", id: "09" },
   { type: "location", id: "10" },
   { type: "location", id: "11" },
-  { type: "location", id: "12" },
   { type: "location", id: "13" },
   { type: "header", text: "KERJA LUAR MAINTENANCE" },
   { type: "location", id: "14" },
-  { type: "location", id: "15" },
   { type: "header", text: "COMMISSION" },
   { type: "location", id: "16" },
   { type: "location", id: "17" },
@@ -325,7 +319,7 @@ const SalaryReportPage: React.FC = () => {
         toast.success(`Bank report ${actionText} successfully`);
       } else {
         // Generate Pinjam (Salary) Report PDF
-        const pdfData: SalaryReportPDFData = {
+        const pdfData: PinjamReportPDFData = {
           year: reportData.year,
           month: reportData.month,
           data: reportData.data,
@@ -333,7 +327,7 @@ const SalaryReportPage: React.FC = () => {
           summary: reportData.summary,
         };
 
-        await generateSalaryReportPDF(pdfData, action);
+        await generatePinjamReportPDF(pdfData, action);
         const actionText =
           action === "download" ? "downloaded" : "generated for printing";
         toast.success(`Pinjam report ${actionText} successfully`);
