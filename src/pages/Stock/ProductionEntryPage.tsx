@@ -1,6 +1,5 @@
 // src/pages/Stock/ProductionEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
@@ -19,11 +18,10 @@ import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMap
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 const ProductionEntryPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-
   // Get initial values from URL params or defaults
   const getInitialDate = () => {
-    const dateParam = searchParams.get("date");
+    const params = new URLSearchParams(window.location.search);
+    const dateParam = params.get("date");
     if (dateParam) {
       // Validate the date format
       const parsed = new Date(dateParam);
@@ -35,7 +33,8 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   const getInitialProduct = () => {
-    return searchParams.get("product") || null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("product") || null;
   };
 
   // State
@@ -49,18 +48,6 @@ const ProductionEntryPage: React.FC = () => {
     Record<string, number>
   >({});
   const [showMappingModal, setShowMappingModal] = useState(false);
-
-  // Update URL params when date or product changes
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (selectedDate) {
-      params.set("date", selectedDate);
-    }
-    if (selectedProductId) {
-      params.set("product", selectedProductId);
-    }
-    setSearchParams(params, { replace: true });
-  }, [selectedDate, selectedProductId, setSearchParams]);
 
   // Compute hasUnsavedChanges by comparing entries with originalEntries
   const hasUnsavedChanges = useMemo(() => {
