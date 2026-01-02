@@ -24,43 +24,16 @@ import YearNavigator from "../../components/YearNavigator";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
-  generateSalaryReportPDF,
-  SalaryReportPDFData,
-} from "../../utils/payroll/SalaryReportPDF";
+  generatePinjamReportPDF,
+  PinjamReportPDFData,
+} from "../../utils/payroll/PinjamReportPDF";
 import {
   generateBankReportPDF,
   BankReportPDFData,
 } from "../../utils/payroll/BankReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
 import toast from "react-hot-toast";
-
-// Location mapping with proper order
-const LOCATION_MAP: { [key: string]: string } = {
-  "01": "DIRECTOR'S REMUNERATION",
-  "02": "OFFICE",
-  "03": "SALESMAN",
-  "04": "IKUT LORI",
-  "05": "PENGANGKUTAN HABUK",
-  "06": "JAGA BOILER",
-  "07": "MESIN & SANGKUT MEE",
-  "08": "PACKING MEE",
-  "09": "MESIN BIHUN",
-  "10": "SANGKUT BIHUN",
-  "11": "PACKING BIHUN",
-  "12": "PEKEBUN",
-  "13": "TUKANG SAPU",
-  "14": "KILANG KERJA LUAR",
-  "15": "OTHER SABARINA",
-  "16": "COMM-MESIN MEE",
-  "17": "COMM-MESIN BIHUN",
-  "18": "COMM-KILANG",
-  "19": "COMM-LORI",
-  "20": "COMM-BOILER",
-  "21": "COMM-FORKLIFT/CASE",
-  "22": "KILANG HABUK",
-  "23": "CUTI TAHUNAN",
-  "24": "SPECIAL OT",
-};
 
 // Location order with headers
 interface LocationOrderItem {
@@ -74,18 +47,15 @@ const LOCATION_ORDER: LocationOrderItem[] = [
   { type: "location", id: "02" },
   { type: "location", id: "03" },
   { type: "location", id: "04" },
-  { type: "location", id: "05" },
   { type: "location", id: "06" },
   { type: "location", id: "07" },
   { type: "location", id: "08" },
   { type: "location", id: "09" },
   { type: "location", id: "10" },
   { type: "location", id: "11" },
-  { type: "location", id: "12" },
   { type: "location", id: "13" },
   { type: "header", text: "KERJA LUAR MAINTENANCE" },
   { type: "location", id: "14" },
-  { type: "location", id: "15" },
   { type: "header", text: "COMMISSION" },
   { type: "location", id: "16" },
   { type: "location", id: "17" },
@@ -235,6 +205,16 @@ const SalaryReportPage: React.FC = () => {
   // Staff data
   const { staffs } = useStaffsCache();
 
+  // Location data from cache - build LOCATION_MAP from DB data
+  const { locations } = useLocationsCache();
+  const LOCATION_MAP = useMemo(() => {
+    const map: { [key: string]: string } = {};
+    locations.forEach((loc) => {
+      map[loc.id] = loc.name;
+    });
+    return map;
+  }, [locations]);
+
   // Bank table data - now comes directly from API
   const bankTableData = useMemo(() => {
     if (!reportData?.bank_data) return [];
@@ -325,7 +305,7 @@ const SalaryReportPage: React.FC = () => {
         toast.success(`Bank report ${actionText} successfully`);
       } else {
         // Generate Pinjam (Salary) Report PDF
-        const pdfData: SalaryReportPDFData = {
+        const pdfData: PinjamReportPDFData = {
           year: reportData.year,
           month: reportData.month,
           data: reportData.data,
@@ -333,7 +313,7 @@ const SalaryReportPage: React.FC = () => {
           summary: reportData.summary,
         };
 
-        await generateSalaryReportPDF(pdfData, action);
+        await generatePinjamReportPDF(pdfData, action);
         const actionText =
           action === "download" ? "downloaded" : "generated for printing";
         toast.success(`Pinjam report ${actionText} successfully`);

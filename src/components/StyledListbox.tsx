@@ -46,11 +46,11 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
     <div className={className}>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <ListboxButton className={`w-full ${roundedClass} ${sizeClasses} border border-default-300 bg-white pl-3 pr-10 text-left focus:outline-none focus:border-default-500 h-[40px]`}>
+          <ListboxButton className={`w-full ${roundedClass} ${sizeClasses} border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500 h-[40px]`}>
             <span className="block truncate">{displayValue}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-default-400"
+                className="h-5 w-5 text-default-400 dark:text-gray-400"
                 aria-hidden="true"
               />
             </span>
@@ -61,15 +61,15 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <ListboxOptions className={`absolute z-[100] w-full p-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg ${anchor === "top" ? "bottom-full mb-1" : "mt-1"}`}>
+            <ListboxOptions className={`absolute z-[100] w-full p-1 border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg ${anchor === "top" ? "bottom-full mb-1" : "mt-1"}`}>
               {options.map((option) => (
                 <ListboxOption
                   key={option.id}
                   className={({ active }) =>
                     `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                       active
-                        ? "bg-default-100 text-default-900"
-                        : "text-default-900"
+                        ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                        : "text-default-900 dark:text-gray-100"
                     }`
                   }
                   value={option.id}
@@ -84,7 +84,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
                         {option.name}
                       </span>
                       {selected && (
-                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                           <IconCheck className="h-5 w-5" aria-hidden="true" />
                         </span>
                       )}

@@ -64,8 +64,8 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
       className={clsx(
         "rounded-lg overflow-hidden border transition-shadow duration-200",
         isExpanded
-          ? "shadow-md border-default-200"
-          : "shadow-sm border-default-200 hover:shadow"
+          ? "shadow-md border-default-200 dark:border-gray-700"
+          : "shadow-sm border-default-200 dark:border-gray-700 hover:shadow"
       )}
     >
       {/* Group Header */}
@@ -73,8 +73,8 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
         className={clsx(
           "flex items-center cursor-pointer transition-colors duration-150",
           isExpanded
-            ? "bg-gradient-to-r from-sky-50 to-white"
-            : "bg-white hover:bg-default-50"
+            ? "bg-gradient-to-r from-sky-50 dark:from-sky-900/30 to-white dark:to-gray-800"
+            : "bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700"
         )}
         onClick={onToggleExpand}
       >
@@ -107,15 +107,15 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
               )}
             />
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-default-800">
+              <span className="font-semibold text-default-800 dark:text-gray-100">
                 {displayJobType}
               </span>
               {isGrouped && (
-                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
                   Combined
                 </span>
               )}
-              <span className="text-sm text-default-500">
+              <span className="text-sm text-default-500 dark:text-gray-400">
                 ({employees.length}{" "}
                 {employees.length === 1 ? "employee" : "employees"})
               </span>
@@ -127,14 +127,14 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
             {/* Pay Totals */}
             <div className="hidden sm:flex items-center gap-4 text-sm">
               <div className="text-right">
-                <span className="text-default-400 mr-1">Gross:</span>
-                <span className="font-medium text-default-700">
+                <span className="text-default-400 dark:text-gray-500 mr-1">Gross:</span>
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {formatCurrency(groupGrossPay)}
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-default-400 mr-1">Net:</span>
-                <span className="font-medium text-emerald-600">
+                <span className="text-default-400 dark:text-gray-500 mr-1">Net:</span>
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(groupNetPay)}
                 </span>
               </div>
@@ -145,8 +145,8 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
               className={clsx(
                 "p-1 rounded-full transition-colors",
                 isExpanded
-                  ? "bg-sky-100 text-sky-600"
-                  : "bg-default-100 text-default-500"
+                  ? "bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400"
+                  : "bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400"
               )}
             >
               {isExpanded ? (
@@ -161,14 +161,14 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
 
       {/* Table Content */}
       {isExpanded && (
-        <div className="border-t border-default-100">
+        <div className="border-t border-default-100 dark:border-gray-700">
           <table className="min-w-full">
-            <thead className="bg-default-50">
+            <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase w-10">
+                <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-10">
                   {/* Checkbox column */}
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase">
+                <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                   Name
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase w-28">
@@ -177,21 +177,21 @@ const PayrollJobGroupTable: React.FC<PayrollJobGroupTableProps> = ({
                 <th className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase w-24">
                   Section
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase w-28">
+                <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
                   Gross
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-default-500 uppercase w-28">
+                <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
                   Net
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-default-500 uppercase w-24">
                   Status
                 </th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-default-500 uppercase w-20">
+                <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-20">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white">
+            <tbody className="bg-white dark:bg-gray-800">
               {employees.map((employeePayroll) => (
                 <EmployeePayrollTableRow
                   key={employeePayroll.id}

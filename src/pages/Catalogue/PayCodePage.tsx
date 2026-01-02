@@ -289,7 +289,7 @@ const PayCodePage: React.FC = () => {
       <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Job:</span>
       <Listbox value={selectedJob} onChange={setSelectedJob}>
         <div className="relative">
-          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
+          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
             <span className="block truncate">
               {selectedJob === "All"
                 ? "All Jobs"
@@ -387,7 +387,7 @@ const PayCodePage: React.FC = () => {
       <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Type:</span>
       <Listbox value={selectedType} onChange={setSelectedType}>
         <div className="relative">
-          <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
+          <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
             <span className="block truncate">{selectedType}</span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown size={20} className="text-gray-400" />
@@ -555,7 +555,7 @@ const PayCodePage: React.FC = () => {
             <input
               type="text"
               placeholder="Search ID or description..." // Updated placeholder
-              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

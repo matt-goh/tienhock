@@ -39,23 +39,23 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
       {/* Use grid for precise alignment */}
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 w-full max-w-xs text-sm">
         {/* Subtotal Row */}
-        <label className="text-gray-600 text-right self-center">
+        <label className="text-gray-600 dark:text-gray-400 text-right self-center">
           Subtotal:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-2 text-gray-800 font-medium">RM</span>
-          <div className="w-[75px] py-0.5 pr-4 text-right font-medium text-gray-800">
+          <span className="mr-2 text-gray-800 dark:text-gray-200 font-medium">RM</span>
+          <div className="w-[75px] py-0.5 pr-4 text-right font-medium text-gray-800 dark:text-gray-200">
             {formatCurrency(subtotal)}
           </div>
         </div>
 
         {/* Tax Row */}
-        <label className="text-gray-600 text-right self-center">
+        <label className="text-gray-600 dark:text-gray-400 text-right self-center">
           Total Tax:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-2 text-gray-800 font-medium">RM</span>
-          <div className="w-[75px] py-0.5 pr-4 text-right font-medium text-gray-800">
+          <span className="mr-2 text-gray-800 dark:text-gray-200 font-medium">RM</span>
+          <div className="w-[75px] py-0.5 pr-4 text-right font-medium text-gray-800 dark:text-gray-200">
             {formatCurrency(taxTotal)}
           </div>
         </div>
@@ -63,12 +63,12 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
         {/* Rounding Row */}
         <label
           htmlFor="rounding-input"
-          className="text-gray-600 text-right self-center"
+          className="text-gray-600 dark:text-gray-400 text-right self-center"
         >
           Rounding:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-2 text-gray-800 font-medium">RM</span>
+          <span className="mr-2 text-gray-800 dark:text-gray-200 font-medium">RM</span>
           <input
             id="rounding-input"
             type="number"
@@ -79,9 +79,9 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
               const finalValue = parseFloat(e.target.value) || 0;
               onRoundingChange(finalValue);
             }}
-            className={`w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800 ${
+            className={`w-[75px] py-0.5 border border-transparent bg-transparent text-right font-medium text-gray-800 dark:text-gray-200 ${
               !readOnly
-                ? "hover:border-default-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded"
+                ? "hover:border-default-300 dark:hover:border-gray-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded"
                 : ""
             }`}
             disabled={readOnly}
@@ -89,15 +89,15 @@ const InvoiceTotals: React.FC<InvoiceTotalsProps> = ({
         </div>
 
         {/* Divider */}
-        <div className="col-span-2 border-t border-gray-300 mt-1 mb-1"></div>
+        <div className="col-span-2 border-t border-gray-300 dark:border-gray-600 mt-1 mb-1"></div>
 
         {/* Grand Total Row */}
-        <label className="font-semibold text-base text-gray-900 text-right self-center">
+        <label className="font-semibold text-base text-gray-900 dark:text-gray-100 text-right self-center">
           Total Payable:
         </label>
         <div className="flex items-center justify-end">
-          <span className="mr-2 font-semibold text-base text-gray-900">RM</span>
-          <div className="w-[75px] py-0.5 pr-4 text-right font-semibold text-base text-gray-900">
+          <span className="mr-2 font-semibold text-base text-gray-900 dark:text-gray-100">RM</span>
+          <div className="w-[75px] py-0.5 pr-4 text-right font-semibold text-base text-gray-900 dark:text-gray-100">
             {formatCurrency(grandTotal)}
           </div>
         </div>

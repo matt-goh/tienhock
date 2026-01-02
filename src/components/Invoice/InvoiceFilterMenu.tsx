@@ -227,17 +227,17 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <div className="relative bg-white rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
+            <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
               <div className="flex justify-between items-center mb-5">
                 <DialogTitle
                   as="h3"
-                  className="text-xl font-semibold text-default-800"
+                  className="text-xl font-semibold text-default-800 dark:text-gray-100"
                 >
                   Filter Invoices
                 </DialogTitle>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-2 rounded-full hover:bg-default-100 text-default-500 hover:text-default-700 transition-colors"
+                  className="p-2 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 text-default-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200 transition-colors"
                 >
                   <IconX size={18} />
                 </button>
@@ -246,7 +246,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
               <div className="space-y-4">
                 {/* Salesman Filter */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">
                     Salesperson
                   </label>
                   <Combobox
@@ -257,7 +257,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                     <div className="relative">
                       <div className="flex items-center">
                         <div className="relative w-full">
-                          <ComboboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 rounded-lg flex items-center justify-between">
+                          <ComboboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
                             <span className="block truncate">
                               {pendingFilters.salespersonId &&
                               pendingFilters.salespersonId.length > 0
@@ -265,7 +265,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                                 : "Select salesman"}
                             </span>
                             <IconChevronDown
-                              className="text-default-400 ml-2"
+                              className="text-default-400 dark:text-gray-500 ml-2"
                               size={18}
                             />
                           </ComboboxButton>
@@ -276,9 +276,9 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             leaveFrom="opacity-100"
                             leaveTo="opacity-0"
                           >
-                            <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-sm">
+                            <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none text-sm">
                               {cachedSalesmanOptions.length === 0 ? (
-                                <div className="relative cursor-default select-none py-2 px-4 text-default-500">
+                                <div className="relative cursor-default select-none py-2 px-4 text-default-500 dark:text-gray-400">
                                   No salesmen found
                                 </div>
                               ) : (
@@ -288,8 +288,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                                     className={({ active }) =>
                                       `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
                                         active
-                                          ? "bg-sky-100 text-sky-900"
-                                          : "text-default-900"
+                                          ? "bg-sky-100 dark:bg-sky-900 text-sky-900 dark:text-sky-100"
+                                          : "text-default-900 dark:text-gray-100"
                                       }`
                                     }
                                     value={option.id}
@@ -306,7 +306,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                                           {option.name}
                                         </span>
                                         {selected ? (
-                                          <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sky-600">
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-sky-600 dark:text-sky-400">
                                             <IconCheck size={18} stroke={2.5} />
                                           </span>
                                         ) : null}
@@ -329,12 +329,12 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                         {pendingFilters.salespersonId.map((name) => (
                           <span
                             key={name}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800"
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300"
                           >
                             {name}
                             <button
                               type="button"
-                              className="ml-1 p-0.5 text-sky-600 hover:text-sky-800 rounded-full hover:bg-sky-200 focus:outline-none"
+                              className="ml-1 p-0.5 text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-200 rounded-full hover:bg-sky-200 dark:hover:bg-sky-800 focus:outline-none"
                               onClick={() => removePendingSalesman(name)}
                             >
                               <IconX size={12} stroke={2.5} />
@@ -347,7 +347,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
                 {/* Customer Filter */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">
                     Customer
                   </label>
                   <CustomerCombobox
@@ -382,7 +382,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
                 {/* Payment Type Filter */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-200">
                     Payment Type
                   </label>
                   <div className="flex items-center">
@@ -393,7 +393,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                       }
                     >
                       <div className="relative w-full">
-                        <ListboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 rounded-lg flex items-center justify-between">
+                        <ListboxButton className="w-full text-left py-2 pl-3 pr-4 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg flex items-center justify-between">
                           <span className="block truncate">
                             {pendingFilters.paymentType === "Cash"
                               ? "Cash Sales"
@@ -413,7 +413,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                           leaveFrom="opacity-100"
                           leaveTo="opacity-0"
                         >
-                          <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-sm">
+                          <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none text-sm">
                             {[
                               { id: null, name: "All Types" },
                               { id: "Cash", name: "Cash Sales" },
@@ -424,8 +424,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                                 className={({ active }) =>
                                   `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
                                     active
-                                      ? "bg-sky-100 text-sky-900"
-                                      : "text-default-900"
+                                      ? "bg-sky-100 dark:bg-sky-900 text-sky-900 dark:text-sky-100"
+                                      : "text-default-900 dark:text-gray-100"
                                   }`
                                 }
                                 value={option.id}
@@ -457,7 +457,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
                 {/* Invoice Status Filter */}
                 <div>
-                  <label className="block text-sm font-medium">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                     Invoice Status
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -497,18 +497,18 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             />
                           ) : (
                             <IconSquare
-                              className={`${"text-default-300"} transition-colors`}
+                              className="text-default-300 dark:text-gray-600 transition-colors"
                               size={20}
                             />
                           )}
                         </div>
-                        <span className={`ml-2`}>{status.name}</span>
+                        <span className="ml-2 text-gray-700 dark:text-gray-300">{status.name}</span>
                       </label>
                     ))}
                   </div>
                   {/* E-Invoice Status Filter */}
                   <div>
-                    <label className="block text-sm font-medium">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                       E-Invoice Status
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -556,7 +556,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                               />
                             )}
                           </div>
-                          <span className={`ml-2`}>{status.name}</span>
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">{status.name}</span>
                         </label>
                       ))}
                     </div>
@@ -564,7 +564,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
 
                   {/* Consolidation Filter */}
                   <div>
-                    <label className="block text-sm font-medium mb-2">
+                    <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
                       Consolidation Status
                     </label>
                     <div className="flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-6">
@@ -582,8 +582,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
                               pendingFilters.consolidation === "all"
-                                ? "border-sky-500 bg-white"
-                                : "border-default-300 bg-white"
+                                ? "border-sky-500 bg-white dark:bg-gray-700"
+                                : "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                             }`}
                           >
                             {pendingFilters.consolidation === "all" && (
@@ -591,7 +591,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="text-default-700">All</span>
+                        <span className="text-default-700 dark:text-gray-300">All</span>
                       </label>
                       <label className="inline-flex items-center cursor-pointer">
                         <div className="relative flex items-center">
@@ -612,8 +612,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
                               pendingFilters.consolidation === "individual"
-                                ? "border-sky-500 bg-white"
-                                : "border-default-300 bg-white"
+                                ? "border-sky-500 bg-white dark:bg-gray-700"
+                                : "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                             }`}
                           >
                             {pendingFilters.consolidation === "individual" && (
@@ -621,7 +621,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="text-default-700">Individual</span>
+                        <span className="text-default-700 dark:text-gray-300">Individual</span>
                       </label>
                       <label className="inline-flex items-center cursor-pointer">
                         <div className="relative flex items-center">
@@ -642,8 +642,8 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
                               pendingFilters.consolidation === "consolidated"
-                                ? "border-sky-500 bg-white"
-                                : "border-default-300 bg-white"
+                                ? "border-sky-500 bg-white dark:bg-gray-700"
+                                : "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                             }`}
                           >
                             {pendingFilters.consolidation ===
@@ -652,7 +652,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
                             )}
                           </div>
                         </div>
-                        <span className="text-default-700">Consolidated</span>
+                        <span className="text-default-700 dark:text-gray-300">Consolidated</span>
                       </label>
                     </div>
                   </div>

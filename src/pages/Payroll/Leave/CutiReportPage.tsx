@@ -819,7 +819,7 @@ const CutiReportPage: React.FC = () => {
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-full leading-5 bg-white placeholder-default-500 dark:placeholder:text-gray-400 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-gray-700 dark:text-gray-100"
+                  className="block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-full leading-5 bg-white placeholder-default-500 dark:placeholder:text-gray-400 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-transparent dark:text-gray-100"
                   placeholder="Search employees by name, ID, or job..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

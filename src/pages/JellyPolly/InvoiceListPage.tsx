@@ -1520,7 +1520,7 @@ const InvoiceListPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full h-[40px] pl-11 pr-10 bg-white dark:bg-gray-800 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm dark:bg-gray-700 dark:text-gray-100"
+                  className="w-full h-[40px] pl-11 pr-10 bg-white dark:bg-gray-700 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm dark:text-gray-100"
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onBlur={handleSearchBlur}

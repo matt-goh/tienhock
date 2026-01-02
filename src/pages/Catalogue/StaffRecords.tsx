@@ -248,7 +248,7 @@ const StaffRecords = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-default-50 dark:bg-gray-900/50 dark:bg-gray-800 border-b border-default-200 dark:border-gray-700">
+            <thead className="bg-default-50 dark:bg-gray-800 border-b border-default-200 dark:border-gray-700">
               <tr>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Employee Name
@@ -299,7 +299,7 @@ const StaffRecords = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700 dark:divide-gray-700 dark:divide-gray-700">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
               {activeEmployees.map((employee: Employee, index: number) => {
                 const birthDateParts = formatDate(employee.birthdate);
 
@@ -370,7 +370,7 @@ const StaffRecords = () => {
 
       {activeEmployees.length === 0 && (
         <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
-          <IconUsers size={48} className="mx-auto text-default-300 mb-4" />
+          <IconUsers size={48} className="mx-auto text-default-300 dark:text-gray-600 mb-4" />
           <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-1">
             No active staff members found
           </h3>

@@ -19,7 +19,6 @@ import JournalEntryPage from "./Accounting/JournalEntryPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 
 // Payroll Settings imports
-import JobLocationMappingsPage from "./Payroll/Settings/JobLocationMappingsPage";
 import LocationAccountMappingsPage from "./Payroll/Settings/LocationAccountMappingsPage";
 
 // Invoice related imports
@@ -84,6 +83,7 @@ import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
+import LocationPage from "./Catalogue/LocationPage";
 
 // Function to generate payroll subitems for each job type
 const generatePayrollSubItems = (): SidebarItem[] => {
@@ -207,18 +207,11 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: PinjamListPage,
   });
 
-  // Settings section
+  // Settings section - Job Location Mappings moved to Catalogue > Location
   payrollSubItems.push({
     name: "Settings",
-    path: "/payroll/settings/job-location-mappings",
-    component: JobLocationMappingsPage,
-    subItems: [
-      {
-        name: "Location Account Mappings",
-        path: "/payroll/settings/location-account-mappings",
-        component: LocationAccountMappingsPage,
-      },
-    ],
+    path: "/payroll/settings/location-account-mappings",
+    component: LocationAccountMappingsPage,
   });
 
   return payrollSubItems;
@@ -434,13 +427,7 @@ export const TienHockNavData: SidebarItem[] = [
       {
         name: "Location",
         path: "/catalogue/location",
-        component: () => (
-          <BasicPage
-            title="Location Catalogue"
-            apiEndpoint="locations"
-            tableKey="catalogueLocation"
-          />
-        ),
+        component: LocationPage,
       },
       {
         name: "Bank",

@@ -230,7 +230,7 @@ export default function NavbarDropdown({
                 }`}
               >
                 {isBookmarked ? (
-                  <IconBookmarkFilled size={16} className="text-sky-500" />
+                  <IconBookmarkFilled size={16} className="text-sky-500 dark:text-sky-400" />
                 ) : (
                   <IconBookmark size={16} className="text-default-400 dark:text-gray-500" />
                 )}

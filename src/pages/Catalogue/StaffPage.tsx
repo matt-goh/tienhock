@@ -380,7 +380,7 @@ const StaffPage = () => {
             <input
               type="text"
               placeholder="Search name, ID or phone..."
-              className="w-full pl-10 pr-10 py-2.5 border border-default-300 dark:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm dark:bg-gray-700 dark:text-gray-100"
+              className="w-full pl-10 pr-10 py-2.5 border border-default-300 dark:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm dark:bg-transparent dark:text-gray-100"
               value={searchTerm}
               onChange={handleSearchChange}
             />

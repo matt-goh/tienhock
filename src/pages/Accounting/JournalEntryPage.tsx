@@ -171,24 +171,24 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder="Search account..."
-          className="w-full px-2 py-1.5 text-sm border border-default-300 rounded-l focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+          className="w-full px-2 py-1.5 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-l focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
         />
         <button
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
-          className="px-2 border border-l-0 border-default-300 rounded-r bg-default-50 hover:bg-default-100 disabled:bg-gray-50 disabled:cursor-not-allowed"
+          className="px-2 border border-l-0 border-default-300 dark:border-gray-600 rounded-r bg-default-50 dark:bg-gray-700 hover:bg-default-100 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
         >
-          <IconChevronDown size={16} className="text-default-500" />
+          <IconChevronDown size={16} className="text-default-500 dark:text-gray-400" />
         </button>
       </div>
       {isOpen && !disabled && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white border border-default-200 rounded-lg shadow-lg"
+          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-lg"
         >
           {displayedOptions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-default-500">
+            <div className="px-3 py-2 text-sm text-default-500 dark:text-gray-400">
               No accounts found
             </div>
           ) : (
@@ -196,13 +196,13 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
               <div
                 key={opt.id}
                 onClick={() => handleSelect(opt.id.toString())}
-                className={`px-3 py-2 text-sm cursor-pointer hover:bg-sky-50 flex items-center justify-between gap-2 ${
-                  opt.id === value ? "bg-sky-100 text-sky-900" : ""
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/50 flex items-center justify-between gap-2 ${
+                  opt.id === value ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200" : "text-default-900 dark:text-gray-100"
                 }`}
               >
                 <span>{opt.name}</span>
                 {opt.id === value && (
-                  <IconCheck size={16} className="text-sky-600 flex-shrink-0" />
+                  <IconCheck size={16} className="text-sky-600 dark:text-sky-400 flex-shrink-0" />
                 )}
               </div>
             ))
@@ -210,7 +210,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
 
           {/* Load More Button - at the bottom of options list */}
           {hasMoreOptions && (
-            <div className="border-t border-gray-200 p-2">
+            <div className="border-t border-gray-200 dark:border-gray-700 p-2">
               <button
                 type="button"
                 onClick={(e) => {
@@ -218,7 +218,7 @@ const AccountCodeCell: React.FC<AccountCodeCellProps> = ({
                   e.stopPropagation();
                   handleLoadMore();
                 }}
-                className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 flex items-center justify-center"
+                className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-200 flex items-center justify-center"
               >
                 <IconChevronDown size={16} className="mr-1.5" />
                 <span>
@@ -618,7 +618,7 @@ const JournalEntryPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-6">
         <BackButton onClick={() => navigate("/accounting/journal-entries")} />
-        <div className="mt-4 p-4 border border-red-300 bg-red-50 text-red-700 rounded">
+        <div className="mt-4 p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
           Error: {error}
         </div>
       </div>
@@ -627,19 +627,19 @@ const JournalEntryPage: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <div className="bg-white rounded-lg shadow-sm border border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
         {/* Header */}
-        <div className="px-6 py-3 border-b border-default-200">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <BackButton onClick={handleBackClick} />
-              <div className="h-6 w-px bg-default-300"></div>
-              <IconFileText size={24} className="text-sky-500" />
+              <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
+              <IconFileText size={24} className="text-sky-500 dark:text-sky-400" />
               <div>
-                <h1 className="text-xl font-semibold text-default-900">
+                <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                   {isEditMode ? "Edit Journal Entry" : "New Journal Entry"}
                 </h1>
-                <p className="mt-1 text-sm text-default-500">
+                <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                   {isEditMode
                     ? `Editing entry ${formData.reference_no}`
                     : "Create a new journal entry"}
@@ -650,8 +650,8 @@ const JournalEntryPage: React.FC = () => {
               <span
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
                   entryStatus === "cancelled"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-green-100 text-green-800"
+                    ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                    : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
                 }`}
               >
                 {entryStatus === "cancelled" ? "Cancelled" : "Active"}
@@ -663,10 +663,10 @@ const JournalEntryPage: React.FC = () => {
         {/* Form */}
         <div className="relative">
           {isSaving && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
-              <div className="flex items-center space-x-3 bg-white px-6 py-4 rounded-lg shadow-lg border border-default-200">
+            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
-                <span className="text-sm font-medium text-default-700">
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
                   Saving journal entry...
                 </span>
               </div>
@@ -675,7 +675,7 @@ const JournalEntryPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} noValidate>
             {/* Entry Header */}
-            <div className="p-6 space-y-4 border-b border-default-200">
+            <div className="p-6 space-y-4 border-b border-default-200 dark:border-gray-700">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                 {/* Reference Number */}
                 <FormInput
@@ -740,42 +740,42 @@ const JournalEntryPage: React.FC = () => {
             {/* Line Items Table */}
             <div className="p-6">
               <div className="overflow-visible">
-                <table className="min-w-full divide-y divide-default-200 border border-default-200 rounded-lg">
-                  <thead className="bg-default-100">
+                <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg">
+                  <thead className="bg-default-100 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-12">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-12">
                         #
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-96">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-96">
                         Account Code
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
                         Reference
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Description
                       </th>
-                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
                         Debit ($)
                       </th>
-                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                      <th className="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
                         Credit ($)
                       </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-12"></th>
+                      <th className="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-12"></th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-default-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                     {formData.lines.map((line, index) => (
                       <tr
                         key={index}
                         className={`${
                           selectedLineIndex === index
-                            ? "bg-sky-50"
-                            : "hover:bg-default-50"
+                            ? "bg-sky-50 dark:bg-sky-900/20"
+                            : "hover:bg-default-50 dark:hover:bg-gray-700"
                         }`}
                         onClick={() => setSelectedLineIndex(index)}
                       >
-                        <td className="px-3 py-2 text-sm text-default-600">
+                        <td className="px-3 py-2 text-sm text-default-600 dark:text-gray-400">
                           {String(line.line_number).padStart(2, "0")}
                         </td>
                         <td className="px-3 py-2">
@@ -801,7 +801,7 @@ const JournalEntryPage: React.FC = () => {
                             }
                             disabled={isSaving}
                             placeholder="Chq No"
-                            className="w-full px-2 py-1.5 text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                            className="w-full px-2 py-1.5 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -817,7 +817,7 @@ const JournalEntryPage: React.FC = () => {
                             }
                             disabled={isSaving}
                             placeholder="Description"
-                            className="w-full px-2 py-1.5 text-sm border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                            className="w-full px-2 py-1.5 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -842,7 +842,7 @@ const JournalEntryPage: React.FC = () => {
                             }
                             disabled={isSaving}
                             placeholder="0.00"
-                            className="w-full px-2 py-1.5 text-sm text-right border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                            className="w-full px-2 py-1.5 text-sm text-right border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -867,7 +867,7 @@ const JournalEntryPage: React.FC = () => {
                             }
                             disabled={isSaving}
                             placeholder="0.00"
-                            className="w-full px-2 py-1.5 text-sm text-right border border-default-300 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                            className="w-full px-2 py-1.5 text-sm text-right border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -878,7 +878,7 @@ const JournalEntryPage: React.FC = () => {
                                 e.stopPropagation();
                                 removeLine(index);
                               }}
-                              className="text-rose-500 hover:text-rose-700"
+                              className="text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300"
                               title="Remove line"
                             >
                               <IconTrash size={18} />
@@ -888,14 +888,14 @@ const JournalEntryPage: React.FC = () => {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-default-50">
+                  <tfoot className="bg-default-50 dark:bg-gray-900/50">
                     <tr>
                       <td colSpan={4} className="px-3 py-3">
                         {!false && (
                           <button
                             type="button"
                             onClick={addLine}
-                            className="flex items-center gap-1 text-sm text-sky-600 hover:text-sky-800"
+                            className="flex items-center gap-1 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
                           >
                             <IconPlus size={16} />
                             Add Line
@@ -903,12 +903,12 @@ const JournalEntryPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 dark:text-gray-100 border border-transparent">
                           {totals.totalDebit.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 border border-transparent">
+                        <div className="w-full pl-2 pr-[23px] py-1.5 text-sm text-right font-semibold text-default-900 dark:text-gray-100 border border-transparent">
                           {totals.totalCredit.toFixed(2)}
                         </div>
                       </td>
@@ -920,7 +920,7 @@ const JournalEntryPage: React.FC = () => {
 
               {/* Balance Check */}
               {Math.abs(totals.totalDebit - totals.totalCredit) > 0.01 && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
                   <strong>Out of Balance:</strong> Debits (
                   {totals.totalDebit.toFixed(2)}) do not equal Credits (
                   {totals.totalCredit.toFixed(2)}). Difference:{" "}
@@ -930,7 +930,7 @@ const JournalEntryPage: React.FC = () => {
 
               {/* Account Description */}
               {selectedAccountDescription && (
-                <div className="mt-4 p-3 bg-sky-50 border border-sky-200 rounded-lg text-sky-700 text-sm">
+                <div className="mt-4 p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700 rounded-lg text-sky-700 dark:text-sky-300 text-sm">
                   <strong>Selected Account:</strong>{" "}
                   {selectedAccountDescription}
                 </div>
@@ -938,7 +938,7 @@ const JournalEntryPage: React.FC = () => {
             </div>
 
             {/* Form Actions */}
-            <div className="p-6 flex justify-between items-center border-t border-default-200">
+            <div className="p-6 flex justify-between items-center border-t border-default-200 dark:border-gray-700">
               <div>
                 {isEditMode && entryStatus !== "cancelled" && (
                   <Button

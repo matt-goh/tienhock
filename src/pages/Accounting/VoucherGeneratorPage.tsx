@@ -266,27 +266,27 @@ const VoucherGeneratorPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.salary)}</div>
-                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.salary || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.salary || "N/A"}</div>
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.epf_employer)}</div>
-                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.epf_employer || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.epf_employer || "N/A"}</div>
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.socso_employer)}</div>
-                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.socso_employer || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.socso_employer || "N/A"}</div>
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.sip_employer)}</div>
-                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.sip_employer || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.sip_employer || "N/A"}</div>
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.pcb)}</div>
-                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.accrual_pcb || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.accrual_pcb || "N/A"}</div>
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.net_salary)}</div>
-                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.accrual_salary || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.accrual_salary || "N/A"}</div>
                         </td>
                       </tr>
                     ))}
@@ -295,7 +295,7 @@ const VoucherGeneratorPage: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
-                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500" />
+                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500 dark:text-amber-400" />
                 <p>No director salary data for this month</p>
               </div>
             )}
@@ -394,19 +394,19 @@ const VoucherGeneratorPage: React.FC = () => {
                           </td>
                           <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.salary)}</div>
-                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.salary || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.salary || "-"}</div>
                           </td>
                           <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.epf_employer)}</div>
-                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.epf_employer || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.epf_employer || "-"}</div>
                           </td>
                           <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.socso_employer)}</div>
-                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.socso_employer || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.socso_employer || "-"}</div>
                           </td>
                           <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.sip_employer)}</div>
-                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.sip_employer || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-400">{loc.accounts.sip_employer || "-"}</div>
                           </td>
                           <td className="px-4 py-2 text-sm text-center">
                             {missingMappings.length > 0 ? (
@@ -462,7 +462,7 @@ const VoucherGeneratorPage: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
-                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500" />
+                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500 dark:text-amber-400" />
                 <p>No staff salary data for this month</p>
               </div>
             )}

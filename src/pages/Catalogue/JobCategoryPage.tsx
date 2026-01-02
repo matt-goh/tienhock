@@ -314,7 +314,7 @@ const JobCategoryPage: React.FC = () => {
     return (
       <div className="flex items-center justify-between pt-3 border-t border-default-200 dark:border-gray-700">
         <div>
-          <p className="text-sm text-default-600 dark:text-gray-300 dark:text-gray-400">
+          <p className="text-sm text-default-600 dark:text-gray-400">
             Showing{" "}
             <span className="font-medium">
               {(currentPage - 1) * itemsPerPage + 1}
@@ -461,7 +461,7 @@ const JobCategoryPage: React.FC = () => {
 
       {/* Content Area - Table/List */}
       <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-        <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 dark:divide-gray-700 dark:divide-gray-700">
+        <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
           <thead className="bg-default-100 dark:bg-gray-800">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
@@ -490,7 +490,7 @@ const JobCategoryPage: React.FC = () => {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-default-200 dark:divide-gray-700 dark:divide-gray-700 dark:divide-gray-700 bg-white dark:bg-gray-800">
+          <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
             {paginatedJobCategories.length > 0 ? (
               paginatedJobCategories.map((category) => (
                 <tr
@@ -525,7 +525,7 @@ const JobCategoryPage: React.FC = () => {
                           e.stopPropagation(); // Prevent row click
                           handleEditClick(category);
                         }}
-                        className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300"
+                        className="text-sky-600 dark:text-sky-400 hover:text-sky-800dark:hover:text-sky-300"
                         title="Edit"
                       >
                         <IconPencil size={18} />

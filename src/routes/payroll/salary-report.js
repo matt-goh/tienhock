@@ -229,8 +229,9 @@ export default function (pool) {
         setengah_bulan: 0, jumlah: 0, jumlah_digenapkan: 0, setelah_digenapkan: 0
       };
 
-      // Initialize all locations
-      const allLocations = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24"];
+      // Fetch all locations from database
+      const locationsResult = await pool.query("SELECT id FROM locations ORDER BY id");
+      const allLocations = locationsResult.rows.map(r => r.id);
       allLocations.forEach(loc => {
         locationData[loc] = {
           location: loc,

@@ -257,7 +257,7 @@ const getMonthName = (month: number): string => {
 };
 
 // Interfaces
-export interface SalaryReportData {
+export interface PinjamReportData {
   no: number;
   staff_id: string;
   staff_name: string;
@@ -269,10 +269,10 @@ export interface SalaryReportData {
   mid_month_amount: number;
 }
 
-export interface SalaryReportPDFData {
+export interface PinjamReportPDFData {
   year: number;
   month: number;
-  data: SalaryReportData[];
+  data: PinjamReportData[];
   total_records: number;
   summary: {
     total_gaji_genap: number;
@@ -282,8 +282,8 @@ export interface SalaryReportPDFData {
 }
 
 // PDF Components
-const SalaryRow: React.FC<{
-  employee: SalaryReportData;
+const PinjamRow: React.FC<{
+  employee: PinjamReportData;
 }> = ({ employee }) => (
   <View style={styles.tableRow} wrap={false}>
     <Text style={styles.colNo}>{employee.no}</Text>
@@ -310,14 +310,14 @@ const SalaryRow: React.FC<{
   </View>
 );
 
-const SalaryReportPDF: React.FC<{
-  data: SalaryReportPDFData;
+const PinjamReportPDF: React.FC<{
+  data: PinjamReportPDFData;
   companyName?: string;
 }> = ({ data, companyName = TIENHOCK_INFO.name }) => {
-  const reportTitle = `${getMonthName(data.month)} ${data.year} Salary Report`;
+  const reportTitle = `${getMonthName(data.month)} ${data.year} Pinjam Report`;
 
   return (
-    <Document title={`Salary Report ${getMonthName(data.month)} ${data.year}`}>
+    <Document title={`Pinjam Report ${getMonthName(data.month)} ${data.year}`}>
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -340,7 +340,7 @@ const SalaryReportPDF: React.FC<{
           </View>
 
           {data.data.map((employee) => (
-            <SalaryRow
+            <PinjamRow
               key={employee.staff_id}
               employee={employee}
             />
@@ -349,7 +349,7 @@ const SalaryReportPDF: React.FC<{
 
         {/* Enhanced Footer Summary */}
         <View style={styles.footerSection}>
-          <Text style={styles.footerTitle}>Salary Report Summary</Text>
+          <Text style={styles.footerTitle}>Pinjam Report Summary</Text>
 
           {/* Main Summary Row */}
           <View style={styles.footerMainRow}>
@@ -393,15 +393,15 @@ const SalaryReportPDF: React.FC<{
 };
 
 // PDF Generation Function
-export const generateSalaryReportPDF = async (
-  data: SalaryReportPDFData,
+export const generatePinjamReportPDF = async (
+  data: PinjamReportPDFData,
   action: "download" | "print"
 ) => {
   try {
-    const doc = <SalaryReportPDF data={data} />;
+    const doc = <PinjamReportPDF data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
 
-    const fileName = `Salary_Report_${getMonthName(data.month)}_${
+    const fileName = `Pinjam_Report_${getMonthName(data.month)}_${
       data.year
     }.pdf`;
 
@@ -445,4 +445,4 @@ export const generateSalaryReportPDF = async (
   }
 };
 
-export default SalaryReportPDF;
+export default PinjamReportPDF;
