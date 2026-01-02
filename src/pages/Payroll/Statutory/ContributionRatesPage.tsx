@@ -15,12 +15,12 @@ const ContributionRatesPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800">
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
           Contribution Rates
         </h1>
       </div>
 
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-4">
         <Tab
           labels={["EPF Rates", "SOCSO Rates", "SIP Rates", "Income Tax Rates"]}
           tabWidth="w-40"

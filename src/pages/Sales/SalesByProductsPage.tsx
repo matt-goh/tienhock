@@ -653,7 +653,7 @@ const SalesByProductsPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Summary section */}
-      <div className="bg-white rounded-lg border shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Summary</h2>
@@ -693,7 +693,7 @@ const SalesByProductsPage: React.FC = () => {
               />
             </div>
           </div>
-          <div className="text-lg text-right font-bold text-default-700">
+          <div className="text-lg text-right font-bold text-default-700 dark:text-gray-200">
             Total Sales: {formatCurrency(summary.totalSales)}
           </div>
         </div>
@@ -703,13 +703,13 @@ const SalesByProductsPage: React.FC = () => {
             {topProductSummary.map((product) => (
               <div
                 key={product.id}
-                className="bg-default-100/75 rounded-lg p-3 border-l-4 overflow-hidden flex-shrink-0"
+                className="bg-default-100 dark:bg-gray-800/75 rounded-lg p-3 border-l-4 overflow-hidden flex-shrink-0"
                 style={{
                   borderColor: categoryColors[product.type] || "#a0aec0",
                 }}
               >
                 <div
-                  className="text-base text-default-500 font-medium truncate"
+                  className="text-base text-default-500 dark:text-gray-400 font-medium truncate"
                   title={`${
                     product.description
                   } • ${product.quantity.toLocaleString()} units`}
@@ -721,7 +721,7 @@ const SalesByProductsPage: React.FC = () => {
                 <div className="text-lg font-bold mt-1">
                   {formatCurrency(product.totalSales)}
                 </div>
-                <div className="text-sm text-default-500 font-medium mt-1"></div>
+                <div className="text-sm text-default-500 dark:text-gray-400 font-medium mt-1"></div>
               </div>
             ))}
           </div>
@@ -738,19 +738,19 @@ const SalesByProductsPage: React.FC = () => {
       ) : (
         <>
           {/* Detailed product sales table */}
-          <div className="bg-white rounded-lg border shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
             <h2 className="text-lg font-semibold mb-4">
               Product Sales Details
             </h2>
             {filteredAndSortedData.length > 0 ? (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 {/* Added fixed height and vertical scroll */}
-                <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-100 sticky top-0">
+                <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                  <thead className="bg-default-100 dark:bg-gray-800 sticky top-0">
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
@@ -765,7 +765,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("description")}
                       >
                         <div className="flex items-center">
@@ -780,7 +780,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("type")}
                       >
                         <div className="flex items-center">
@@ -795,7 +795,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("foc")}
                       >
                         <div className="flex items-center justify-end">
@@ -810,7 +810,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("returns")}
                       >
                         <div className="flex items-center justify-end">
@@ -825,7 +825,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("quantity")}
                       >
                         <div className="flex items-center justify-end">
@@ -840,7 +840,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 uppercase tracking-wider cursor-pointer"
+                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("totalSales")}
                       >
                         <div className="flex items-center justify-end">
@@ -855,19 +855,19 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-default-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                     {filteredAndSortedData.map((product) => (
-                      <tr key={product.id} className="hover:bg-default-100/75">
-                        <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900">
+                      <tr key={product.id} className="hover:bg-default-100 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900 dark:text-gray-100">
                           {product.id}
                         </td>
                         <td
-                          className="px-6 py-4 whitespace-nowrap text-base text-default-700 truncate max-w-xs"
+                          className="px-6 py-4 whitespace-nowrap text-base text-default-700 dark:text-gray-200 truncate max-w-xs"
                           title={product.description}
                         >
                           {product.description}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-default-700 dark:text-gray-200">
                           <span
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                             style={{
@@ -880,13 +880,13 @@ const SalesByProductsPage: React.FC = () => {
                             {product.type}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
                           {product.foc.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
                           {product.returns.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
                           {product.quantity.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-base text-right font-medium">
@@ -895,7 +895,7 @@ const SalesByProductsPage: React.FC = () => {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-default-100 sticky bottom-0">
+                  <tfoot className="bg-default-100 dark:bg-gray-800 sticky bottom-0">
                     <tr>
                       <td
                         colSpan={5}
@@ -921,7 +921,7 @@ const SalesByProductsPage: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <div className="border border-dashed border-default-300 rounded p-4 text-center text-default-500">
+              <div className="border border-dashed border-default-300 dark:border-gray-600 rounded p-4 text-center text-default-500 dark:text-gray-400">
                 No data to display. Please select a different month or check if
                 sales data exists.
               </div>
@@ -931,7 +931,7 @@ const SalesByProductsPage: React.FC = () => {
           {/* Dashboard content - Three separate doughnut charts without legends */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* BH Products Doughnut Chart */}
-            <div className="bg-white rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Bihun Products Distribution
               </h2>
@@ -980,14 +980,14 @@ const SalesByProductsPage: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
+                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
                   No Bihun products data available
                 </div>
               )}
             </div>
 
             {/* MEE Products Doughnut Chart */}
-            <div className="bg-white rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Mee Products Distribution
               </h2>
@@ -1036,14 +1036,14 @@ const SalesByProductsPage: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
+                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
                   No Mee products data available
                 </div>
               )}
             </div>
 
             {/* OTH Products Doughnut Chart */}
-            <div className="bg-white rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Other Products Distribution
               </h2>
@@ -1092,7 +1092,7 @@ const SalesByProductsPage: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 rounded">
+                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
                   No Other products data available
                 </div>
               )}
@@ -1100,7 +1100,7 @@ const SalesByProductsPage: React.FC = () => {
           </div>
 
           {/* Product Mix Analysis Chart */}
-          <div className="bg-white rounded-lg border shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
               <div className="flex items-center gap-3">
@@ -1228,7 +1228,7 @@ const SalesByProductsPage: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-80 flex flex-col items-center justify-center border border-dashed border-default-300 rounded text-default-500">
+              <div className="h-80 flex flex-col items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded text-default-500 dark:text-gray-400">
                 {selectedChartProducts.length === 0
                   ? "Generate Chart to view product mix trends for the past 12 months"
                   : "No data available for selected products. Try selecting different products or a different time period."}

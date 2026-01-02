@@ -131,7 +131,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -145,10 +145,10 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900"
+                  className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
                   {isEditMode ? "Edit Holiday" : "Add Holiday"}
                 </DialogTitle>
@@ -176,7 +176,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
                   />
 
                   {error && (
-                    <p className="text-sm text-red-600 text-center">{error}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
                   )}
 
                   <div className="mt-6 flex justify-end space-x-3">

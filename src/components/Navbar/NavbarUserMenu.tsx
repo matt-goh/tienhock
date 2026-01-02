@@ -7,13 +7,14 @@ import {
   IconDatabaseExport,
 } from "@tabler/icons-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 import { useState, useRef, useEffect } from "react";
 import BackupModal from "../BackupModal";
 
 export default function NavbarUserMenu() {
   const { user, logout } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -50,9 +51,9 @@ export default function NavbarUserMenu() {
     }
   };
 
-  const toggleDarkMode = (e: React.MouseEvent) => {
+  const handleToggleDarkMode = (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsDarkMode(!isDarkMode);
+    toggleDarkMode();
   };
 
   const handleBackupClick = () => {
@@ -70,24 +71,24 @@ export default function NavbarUserMenu() {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-default-100 active:bg-default-200 transition-colors duration-200">
+        <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200">
           <IconUserCircle
-            className="text-default-600"
+            className="text-default-600 dark:text-gray-400"
             size={24}
             stroke={1.5}
           />
-          <span className="hidden sm:block text-sm font-medium text-default-700 max-w-[100px] truncate">
+          <span className="hidden sm:block text-sm font-medium text-default-700 dark:text-gray-200 max-w-[100px] truncate">
             {user?.id || "User"}
           </span>
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 z-50 mt-2 w-56 bg-white border border-default-200 rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute right-0 z-50 mt-2 w-56 bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-100">
             <div className="px-1 py-1">
               {/* Dark Mode Toggle */}
               <div
-                onClick={toggleDarkMode}
-                className="h-9 group flex w-full items-center justify-between rounded-md px-2 text-sm text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200 cursor-pointer"
+                onClick={handleToggleDarkMode}
+                className="h-9 group flex w-full items-center justify-between rounded-md px-2 text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200 cursor-pointer"
               >
                 <div className="flex items-center">
                   <IconMoon className="mr-2 h-5 w-5" stroke={1.5} />
@@ -95,9 +96,9 @@ export default function NavbarUserMenu() {
                 </div>
                 <Switch
                   checked={isDarkMode}
-                  onChange={() => setIsDarkMode(!isDarkMode)}
+                  onChange={toggleDarkMode}
                   className={`${
-                    isDarkMode ? "bg-default-400" : "bg-default-200"
+                    isDarkMode ? "bg-sky-500" : "bg-default-200 dark:bg-gray-600"
                   } relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200`}
                 >
                   <span
@@ -110,7 +111,7 @@ export default function NavbarUserMenu() {
 
               {/* Backup Option */}
               <button
-                className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 hover:bg-default-100 active:bg-default-200 transition-colors duration-200"
+                className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200"
                 onClick={handleBackupClick}
               >
                 <IconDatabaseExport
@@ -122,7 +123,7 @@ export default function NavbarUserMenu() {
 
               {/* Logout Option */}
               <button
-                className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors duration-200"
+                className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 dark:active:bg-red-900/50 transition-colors duration-200"
                 onClick={handleLogout}
               >
                 <IconLogout className="mr-2 h-5 w-5" stroke={1.5} />

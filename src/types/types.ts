@@ -420,7 +420,6 @@ export interface Employee {
   address: string;
   job: string[];
   jobType?: string;
-  location: string[];
   dateJoined: string;
   icNo: string;
   bankAccountNumber: string;
@@ -446,8 +445,6 @@ export type FilterOptions = {
   showResigned?: boolean;
   jobFilter?: string[] | null;
   applyJobFilter?: boolean;
-  locationFilter: string[] | null;
-  applyLocationFilter: boolean;
   nationality?: string;
   gender?: string;
   race?: string;
@@ -634,6 +631,30 @@ export interface JobPayCodeDetails
   override_rate_biasa: number | null;
   override_rate_ahad: number | null;
   override_rate_umum: number | null;
+}
+
+export interface ProductPayCodeDetails {
+  id: string;
+  pay_code_id: string;
+  description: string;
+  pay_type: PayType;
+  rate_unit: RateUnit;
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+  is_active: boolean;
+  requires_units_input: boolean;
+}
+
+export interface JobLocationMapping {
+  id: number;
+  job_id: string;
+  job_name: string;
+  location_code: string;
+  location_name: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EmployeePayroll {

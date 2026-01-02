@@ -2826,12 +2826,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm px-6 py-3">
-        <div className="flex justify-between items-center pb-3 mb-4 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
+        <div className="flex justify-between items-center pb-3 mb-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBack} />
-            <div className="h-6 w-px bg-default-300"></div>
-            <h1 className="text-lg font-semibold text-default-800">
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
+            <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {mode === "edit"
                 ? `Edit ${jobConfig?.name} Entry`
                 : `${jobConfig?.name} Entry`}
@@ -2861,7 +2861,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         <div className="mb-4 flex flex-wrap items-end gap-4">
           {/* Date */}
           <div>
-            <label htmlFor="logDate" className="block text-sm font-medium text-default-700 mb-1">
+            <label htmlFor="logDate" className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
               Date
             </label>
             <input
@@ -2871,7 +2871,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               value={formData.logDate}
               onChange={handleDateChange}
               required
-              className="px-3 py-2 text-sm border border-default-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+              className="px-3 py-2 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
             />
           </div>
 
@@ -2879,12 +2879,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           <span
             className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
               formData.dayType === "Umum"
-                ? "bg-red-100 text-red-700 border border-red-200"
+                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
                 : formData.dayType === "Ahad"
-                ? "bg-amber-100 text-amber-700 border border-amber-200"
+                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
                 : new Date(formData.logDate).getDay() === 6
-                ? "bg-sky-100 text-sky-700 border border-sky-200"
-                : "bg-default-100 text-default-700 border border-default-200"
+                ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800"
+                : "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200 border border-default-200 dark:border-gray-600"
             }`}
           >
             {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
@@ -2929,7 +2929,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         {/* Show Context Form below if more than 3 fields */}
         {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
           <div className="mb-4">
-            <span className="text-sm font-medium text-default-700 mb-3">
+            <span className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3">
               Production Details
             </span>
             <DynamicContextForm
@@ -2942,7 +2942,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         )}
 
         {/* Employees Section */}
-        <div className="border-t border-default-200 pt-4">
+        <div className="border-t border-default-200 dark:border-gray-700 pt-4">
           {/* Employee Selection Table */}
           {loadingStaffs || loadingJobs ? (
             <div className="flex justify-center items-center h-48">
@@ -2951,10 +2951,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           ) : (
             <>
               {/* Main Employee Table */}
-              <div className="bg-white rounded-lg border shadow-sm">
+              <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm">
                 <div>
-                  <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-50">
+                  <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                    <thead className="bg-default-50 dark:bg-gray-900/50">
                       <tr>
                         <th scope="col" className="px-6 py-1 text-left">
                           <Checkbox
@@ -2972,46 +2972,46 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
                           ID
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
                           Name
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
                           Job
                         </th>
                         {jobConfig?.id === "SALESMAN" ? (
                           <th
                             scope="col"
-                            className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                            className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
                             Location
                           </th>
                         ) : (
                           <th
                             scope="col"
-                            className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                            className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
                             Hours
                           </th>
                         )}
                         <th
                           scope="col"
-                          className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                          className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-default-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {(jobConfig?.id === "SALESMAN"
                         ? salesmanEmployees
                         : expandedEmployees
@@ -3037,12 +3037,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             }}
                             className={`transition-colors duration-150 ${
                               isSaving || leaveEmployees[row.id]?.selected
-                                ? "bg-default-50 cursor-not-allowed"
-                                : "cursor-pointer hover:bg-default-50"
+                                ? "bg-default-50 dark:bg-gray-700/50 cursor-not-allowed"
+                                : "cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700"
                             } ${
                               isSelected
-                                ? "bg-sky-50 hover:bg-sky-100"
-                                : "bg-white"
+                                ? "bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50"
+                                : "bg-white dark:bg-gray-800"
                             }`}
                           >
                             <td
@@ -3069,18 +3069,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 }
                               />
                             </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700">
+                            <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
                               <SafeLink
                                 to={`/catalogue/staff/${row.id}`}
                                 hasUnsavedChanges={hasUnsavedChanges}
                                 onNavigateAttempt={safeNavigate}
-                                className="hover:underline hover:text-sky-600"
+                                className="hover:underline hover:text-sky-600 dark:text-sky-400"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {row.id}
                               </SafeLink>
                             </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900">
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                               <span className="font-medium">{row.name}</span>
                               {(() => {
                                 // Only show followed employees that are actually selected
@@ -3094,7 +3094,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
                                 if (selectedFollowers.length > 0) {
                                   return (
-                                    <span className="text-xs text-default-500 block mt-1">
+                                    <span className="text-xs text-default-500 dark:text-gray-400 block mt-1">
                                       (Followed by{" "}
                                       {selectedFollowers
                                         .map((ikutEmployeeId) => {
@@ -3112,12 +3112,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 return null;
                               })()}
                             </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700">
+                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                               <SafeLink
                                 to={`/catalogue/job?id=${row.jobType}`}
                                 hasUnsavedChanges={hasUnsavedChanges}
                                 onNavigateAttempt={safeNavigate}
-                                className="hover:underline hover:text-sky-600"
+                                className="hover:underline hover:text-sky-600 dark:text-sky-400"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {row.jobName}
@@ -3143,8 +3143,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         onClick={(e) => e.stopPropagation()}
                                         className={`relative w-full pl-3 py-1.5 text-left rounded-md border ${
                                           !isSelected
-                                            ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
-                                            : "bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                            ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
+                                            : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500"
                                         }`}
                                       >
                                         <span className="flex items-center">
@@ -3167,7 +3167,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         </span>
                                         <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                           <IconChevronDown
-                                            className="w-4 h-4 text-default-400"
+                                            className="w-4 h-4 text-default-400 dark:text-gray-500"
                                             aria-hidden="true"
                                           />
                                         </span>
@@ -3178,14 +3178,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         leaveFrom="opacity-100"
                                         leaveTo="opacity-0"
                                       >
-                                        <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                        <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
                                           <ListboxOption
                                             value="Local"
                                             className={({ active }) =>
                                               `${
                                                 active
-                                                  ? "bg-sky-100 text-sky-900"
-                                                  : "text-default-700"
+                                                  ? "bg-sky-100 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100"
+                                                  : "text-default-700 dark:text-gray-200"
                                               } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
                                             }
                                           >
@@ -3232,8 +3232,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                             className={({ active }) =>
                                               `${
                                                 active
-                                                  ? "bg-amber-100 text-amber-900"
-                                                  : "text-default-700"
+                                                  ? "bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100"
+                                                  : "text-default-700 dark:text-gray-200"
                                               } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
                                             }
                                           >
@@ -3295,11 +3295,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     }
                                     onBlur={() => handleHoursBlur(row.rowKey)}
                                     onClick={(e) => e.stopPropagation()}
-                                    className={`max-w-[80px] py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed ${
+                                    className={`max-w-[80px] py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
                                       hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) &&
                                       jobConfig?.requiresOvertimeCalc
-                                        ? "border-amber-400 bg-amber-50"
-                                        : "border-default-300"
+                                        ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
+                                        : "border-default-300 dark:border-gray-600"
                                     }`}
                                     step="0.5"
                                     min="0"
@@ -3343,10 +3343,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               {/* SALESMAN_IKUT Table - Only show for SALESMAN job type */}
               {jobConfig?.id === "SALESMAN" &&
                 salesmanIkutEmployees.length > 0 && (
-                  <div className="bg-white rounded-lg border shadow-sm mt-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm mt-4">
                     <div>
-                      <table className="min-w-full divide-y divide-default-200">
-                        <thead className="bg-default-50">
+                      <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                        <thead className="bg-default-50 dark:bg-gray-900/50">
                           <tr>
                             <th scope="col" className="px-6 py-1 text-left">
                               <Checkbox
@@ -3407,49 +3407,49 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               ID
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               Name
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               Job
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               Muat Mee (Bag)
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               Muat Bihun (Bag)
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-center text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               Ikut
                             </th>
                             <th
                               scope="col"
-                              className="px-6 py-1 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                              className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                             >
                               Actions
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-default-200">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                           {salesmanIkutEmployees.map((row, index) => {
                             const isSelected =
                               employeeSelectionState.selectedJobs[
@@ -3509,26 +3509,26 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     }
                                   />
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700">
+                                <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
                                   <SafeLink
                                     to={`/catalogue/staff/${row.id}`}
                                     hasUnsavedChanges={hasUnsavedChanges}
                                     onNavigateAttempt={safeNavigate}
-                                    className="hover:underline hover:text-sky-600"
+                                    className="hover:underline hover:text-sky-600 dark:text-sky-400"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.id}
                                   </SafeLink>
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700">
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                                   {row.name}
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700">
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                                   <SafeLink
                                     to={`/catalogue/job?id=${row.jobType}`}
                                     hasUnsavedChanges={hasUnsavedChanges}
                                     onNavigateAttempt={safeNavigate}
-                                    className="hover:underline hover:text-sky-600"
+                                    className="hover:underline hover:text-sky-600 dark:text-sky-400"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     {row.jobName}
@@ -3551,7 +3551,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         )
                                       }
                                       onClick={(e) => e.stopPropagation()}
-                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
                                       min="0"
                                       disabled={!isSelected}
                                       placeholder={isSelected ? "0" : "-"}
@@ -3577,7 +3577,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         )
                                       }
                                       onClick={(e) => e.stopPropagation()}
-                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 disabled:text-default-400 disabled:cursor-not-allowed border-default-300"
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
                                       min="0"
                                       disabled={!isSelected}
                                       placeholder={isSelected ? "0" : "-"}
@@ -3734,14 +3734,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           )}
         </div>
 
-        <div className="border-t border-default-200 pt-2 mt-4">
-          <h2 className="text-lg font-semibold text-default-700 mb-2">
+        <div className="border-t border-default-200 dark:border-gray-700 pt-2 mt-4">
+          <h2 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
             Leave & Absence Recording
           </h2>
-          <div className="bg-white rounded-lg border shadow-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm">
             {availableForLeave.length === 0 ? (
               <div className="text-center py-10 px-6">
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-default-500 dark:text-gray-400">
                   No employees available for leave.
                 </p>
                 <p className="text-xs text-default-400 mt-1">
@@ -3749,8 +3749,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 </p>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-default-200 table-fixed">
-                <thead className="bg-default-50">
+              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 table-fixed">
+                <thead className="bg-default-50 dark:bg-gray-900/50">
                   <tr>
                     <th scope="col" className="w-16 px-6 py-2 text-left">
                       <Checkbox
@@ -3765,25 +3765,25 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     </th>
                     <th
                       scope="col"
-                      className="w-1/3 px-6 py-2 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-1/3 px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
                       Employee
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-2 text-left text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
                       Leave Type
                     </th>
                     <th
                       scope="col"
-                      className="w-48 px-6 py-2 text-right text-xs font-medium text-default-500 uppercase tracking-wider"
+                      className="w-48 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-default-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {availableForLeave.map((employee) => {
                     const leaveOptions = [
                       { id: "cuti_sakit", name: "Cuti Sakit" },
@@ -3843,10 +3843,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         <td className="w-1/3 px-6 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div>
-                              <div className="text-sm font-medium text-default-900 truncate">
+                              <div className="text-sm font-medium text-default-900 dark:text-gray-100 truncate">
                                 {employee.name}
                               </div>
-                              <div className="text-xs text-default-500">
+                              <div className="text-xs text-default-500 dark:text-gray-400">
                                 {employee.id}
                               </div>
                             </div>
@@ -3930,7 +3930,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 >
                                   <ListboxOptions
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="absolute z-50 w-full py-1 bottom-full mb-1 overflow-auto text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                                    className="absolute z-50 w-full py-1 bottom-full mb-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
                                     {leaveOptions.map((option) => (
                                       <ListboxOption
                                         key={option.id}

@@ -143,10 +143,10 @@ const VoucherGeneratorPage: React.FC = () => {
       {/* Header */}
       <div className="mb-4 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-default-800">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Payroll Voucher Generator
           </h1>
-          <p className="text-sm text-default-500 mt-1">
+          <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
             Generate JVDR (Director's Remuneration) and JVSL (Staff Salary) journal vouchers
           </p>
         </div>
@@ -179,18 +179,18 @@ const VoucherGeneratorPage: React.FC = () => {
       ) : previewData ? (
         <div className="space-y-6">
           {/* JVDR Section */}
-          <div className="bg-white rounded-lg border border-default-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-default-200 bg-purple-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-purple-50 dark:bg-purple-900/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
                     JVDR
                   </span>
                   <div>
-                    <h2 className="text-lg font-semibold text-default-800">
+                    <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
                       Director's Remuneration
                     </h2>
-                    <p className="text-sm text-default-500">
+                    <p className="text-sm text-default-500 dark:text-gray-400">
                       Reference: {previewData.jvdr.reference}
                     </p>
                   </div>
@@ -232,61 +232,61 @@ const VoucherGeneratorPage: React.FC = () => {
 
             {previewData.jvdr.locations.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-50">
+                <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                  <thead className="bg-default-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         Location
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         Salary (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         EPF (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         SOCSO (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         SIP (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         PCB (CR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         Net Salary (CR)
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-default-200 bg-white">
+                  <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                     {previewData.jvdr.locations.map((loc) => (
-                      <tr key={loc.location_id} className="hover:bg-default-50">
-                        <td className="px-4 py-2 text-sm font-medium text-default-800">
+                      <tr key={loc.location_id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-2 text-sm font-medium text-default-800 dark:text-gray-200">
                           {loc.location_id} - Director
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.salary)}</div>
-                          <div className="text-xs text-default-400">{loc.accounts.salary || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.salary || "N/A"}</div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.epf_employer)}</div>
-                          <div className="text-xs text-default-400">{loc.accounts.epf_employer || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.epf_employer || "N/A"}</div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.socso_employer)}</div>
-                          <div className="text-xs text-default-400">{loc.accounts.socso_employer || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.socso_employer || "N/A"}</div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.sip_employer)}</div>
-                          <div className="text-xs text-default-400">{loc.accounts.sip_employer || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.sip_employer || "N/A"}</div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.pcb)}</div>
-                          <div className="text-xs text-default-400">{loc.accounts.accrual_pcb || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.accrual_pcb || "N/A"}</div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.net_salary)}</div>
-                          <div className="text-xs text-default-400">{loc.accounts.accrual_salary || "N/A"}</div>
+                          <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.accrual_salary || "N/A"}</div>
                         </td>
                       </tr>
                     ))}
@@ -294,7 +294,7 @@ const VoucherGeneratorPage: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <div className="p-8 text-center text-default-500">
+              <div className="p-8 text-center text-default-500 dark:text-gray-400">
                 <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500" />
                 <p>No director salary data for this month</p>
               </div>
@@ -302,18 +302,18 @@ const VoucherGeneratorPage: React.FC = () => {
           </div>
 
           {/* JVSL Section */}
-          <div className="bg-white rounded-lg border border-default-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-default-200 bg-blue-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                     JVSL
                   </span>
                   <div>
-                    <h2 className="text-lg font-semibold text-default-800">
+                    <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
                       Staff Salary Wages
                     </h2>
-                    <p className="text-sm text-default-500">
+                    <p className="text-sm text-default-500 dark:text-gray-400">
                       Reference: {previewData.jvsl.reference}
                     </p>
                   </div>
@@ -355,30 +355,30 @@ const VoucherGeneratorPage: React.FC = () => {
 
             {previewData.jvsl.locations.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-50">
+                <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                  <thead className="bg-default-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         Location
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         Salary (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         EPF (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         SOCSO (DR)
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         SIP (DR)
                       </th>
-                      <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
                         Missing Mappings
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-default-200 bg-white">
+                  <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                     {previewData.jvsl.locations.map((loc) => {
                       const missingMappings = [
                         !loc.accounts.salary && loc.salary > 0 ? "Salary" : null,
@@ -388,34 +388,34 @@ const VoucherGeneratorPage: React.FC = () => {
                       ].filter(Boolean);
 
                       return (
-                        <tr key={loc.location_id} className="hover:bg-default-50">
-                          <td className="px-4 py-2 text-sm font-medium text-default-800">
+                        <tr key={loc.location_id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                          <td className="px-4 py-2 text-sm font-medium text-default-800 dark:text-gray-200">
                             {loc.location_id}
                           </td>
-                          <td className="px-4 py-2 text-sm text-right font-mono">
+                          <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.salary)}</div>
-                            <div className="text-xs text-default-400">{loc.accounts.salary || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.salary || "-"}</div>
                           </td>
-                          <td className="px-4 py-2 text-sm text-right font-mono">
+                          <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.epf_employer)}</div>
-                            <div className="text-xs text-default-400">{loc.accounts.epf_employer || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.epf_employer || "-"}</div>
                           </td>
-                          <td className="px-4 py-2 text-sm text-right font-mono">
+                          <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.socso_employer)}</div>
-                            <div className="text-xs text-default-400">{loc.accounts.socso_employer || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.socso_employer || "-"}</div>
                           </td>
-                          <td className="px-4 py-2 text-sm text-right font-mono">
+                          <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.sip_employer)}</div>
-                            <div className="text-xs text-default-400">{loc.accounts.sip_employer || "-"}</div>
+                            <div className="text-xs text-default-400 dark:text-gray-500 dark:text-gray-400">{loc.accounts.sip_employer || "-"}</div>
                           </td>
                           <td className="px-4 py-2 text-sm text-center">
                             {missingMappings.length > 0 ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
                                 <IconAlertCircle size={12} />
                                 {missingMappings.join(", ")}
                               </span>
                             ) : (
-                              <IconCheck size={16} className="mx-auto text-green-600" />
+                              <IconCheck size={16} className="mx-auto text-green-600 dark:text-green-400" />
                             )}
                           </td>
                         </tr>
@@ -423,36 +423,36 @@ const VoucherGeneratorPage: React.FC = () => {
                     })}
                   </tbody>
                   {previewData.jvsl.totals && (
-                    <tfoot className="bg-default-100">
+                    <tfoot className="bg-default-100 dark:bg-gray-900/50">
                       <tr className="font-medium">
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-4 py-2 text-sm text-default-800 dark:text-gray-200">
                           TOTAL (Credit to Accruals)
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(previewData.jvsl.totals.salary)}</div>
-                          <div className="text-xs text-default-500">
+                          <div className="text-xs text-default-500 dark:text-gray-400">
                             {previewData.jvsl.totals.accrual_accounts.accrual_salary || "ACW_SAL"}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(previewData.jvsl.totals.epf_employer)}</div>
-                          <div className="text-xs text-default-500">
+                          <div className="text-xs text-default-500 dark:text-gray-400">
                             {previewData.jvsl.totals.accrual_accounts.accrual_epf || "ACW_EPF"}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(previewData.jvsl.totals.socso_employer)}</div>
-                          <div className="text-xs text-default-500">
+                          <div className="text-xs text-default-500 dark:text-gray-400">
                             {previewData.jvsl.totals.accrual_accounts.accrual_socso || "ACW_SC"}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono">
+                        <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(previewData.jvsl.totals.sip_employer)}</div>
-                          <div className="text-xs text-default-500">
+                          <div className="text-xs text-default-500 dark:text-gray-400">
                             {previewData.jvsl.totals.accrual_accounts.accrual_sip || "ACW_SIP"}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-center">
+                        <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
                           PCB: {formatCurrency(previewData.jvsl.totals.pcb)}
                         </td>
                       </tr>
@@ -461,7 +461,7 @@ const VoucherGeneratorPage: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <div className="p-8 text-center text-default-500">
+              <div className="p-8 text-center text-default-500 dark:text-gray-400">
                 <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500" />
                 <p>No staff salary data for this month</p>
               </div>
@@ -469,16 +469,16 @@ const VoucherGeneratorPage: React.FC = () => {
           </div>
 
           {/* Help Text */}
-          <div className="p-4 bg-default-50 rounded-lg border border-default-200">
-            <h3 className="text-sm font-medium text-default-700 mb-2">Notes:</h3>
-            <ul className="text-sm text-default-600 space-y-1 list-disc list-inside">
+          <div className="p-4 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
+            <h3 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">Notes:</h3>
+            <ul className="text-sm text-default-600 dark:text-gray-300 space-y-1 list-disc list-inside">
               <li>DR = Debit entry, CR = Credit entry</li>
               <li>Missing account codes will skip that entry during generation</li>
               <li>
                 Manage account mappings in{" "}
                 <button
                   onClick={() => navigate("/accounting/location-account-mappings")}
-                  className="text-sky-600 hover:text-sky-800 underline"
+                  className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 underline"
                 >
                   Location Account Mappings
                 </button>
@@ -488,7 +488,7 @@ const VoucherGeneratorPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="p-8 text-center text-default-500">
+        <div className="p-8 text-center text-default-500 dark:text-gray-400">
           No preview data available
         </div>
       )}

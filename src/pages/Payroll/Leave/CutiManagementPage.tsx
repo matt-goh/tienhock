@@ -14,10 +14,10 @@ const CutiManagementPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <div>
-          <h1 className="text-xl font-semibold text-default-800">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Leave Management
           </h1>
-          <p className="mt-1 text-sm text-default-600">
+          <p className="mt-1 text-sm text-default-600 dark:text-gray-300">
             Manage employee leave and holidays.
           </p>
         </div>

@@ -1,6 +1,6 @@
 // src/pages/Payroll/PayrollPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconChevronsDown,
   IconChevronsUp,
@@ -42,9 +42,25 @@ import PayrollUnifiedTable from "../../components/Payroll/PayrollUnifiedTable";
 
 const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Initialize with current month
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
+  // Initialize with URL params or current month
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
+
+    if (yearParam && monthParam) {
+      const year = parseInt(yearParam);
+      const month = parseInt(monthParam);
+
+      // Validate the params
+      if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
+        return new Date(year, month - 1); // month is 0-indexed in Date
+      }
+    }
+
+    return new Date();
+  });
   const [payroll, setPayroll] = useState<MonthlyPayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -76,6 +92,50 @@ const PayrollPage: React.FC = () => {
   const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
     MissingIncomeTaxEmployee[]
   >([]);
+
+  // Handler to update selected month and URL params
+  const handleMonthChange = useCallback((newMonth: Date) => {
+    setSelectedMonth(newMonth);
+
+    const year = newMonth.getFullYear();
+    const month = newMonth.getMonth() + 1; // Convert to 1-indexed
+
+    setSearchParams({ year: year.toString(), month: month.toString() });
+  }, [setSearchParams]);
+
+  // Set initial URL params if not present
+  useEffect(() => {
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
+
+    if (!yearParam || !monthParam) {
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth() + 1;
+      setSearchParams({ year: year.toString(), month: month.toString() }, { replace: true });
+    }
+  }, []); // Run only on mount
+
+  // Sync URL params to state (handles browser back/forward)
+  useEffect(() => {
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
+
+    if (yearParam && monthParam) {
+      const year = parseInt(yearParam);
+      const month = parseInt(monthParam);
+
+      if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
+        const urlDate = new Date(year, month - 1);
+        const currentDate = selectedMonth;
+
+        // Only update if different
+        if (urlDate.getFullYear() !== currentDate.getFullYear() ||
+            urlDate.getMonth() !== currentDate.getMonth()) {
+          setSelectedMonth(urlDate);
+        }
+      }
+    }
+  }, [searchParams]);
 
   // Fetch payroll when selected month changes
   useEffect(() => {
@@ -453,11 +513,11 @@ const PayrollPage: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Processing":
-        return "bg-sky-100 text-sky-700";
+        return "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300";
       case "Finalized":
-        return "bg-amber-100 text-amber-700";
+        return "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300";
       default:
-        return "bg-default-100 text-default-700";
+        return "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200";
     }
   };
 
@@ -492,12 +552,12 @@ const PayrollPage: React.FC = () => {
     const displayMonth = selectedMonth.getMonth() + 1;
     return (
       <div className="space-y-4">
-        <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
           {/* Header with Month Navigator */}
-          <div className="px-6 py-4 border-b border-default-100 bg-default-50/50">
+          <div className="px-6 py-4 border-b border-default-100 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50">
             <MonthNavigator
               selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
+              onChange={handleMonthChange}
               showGoToCurrentButton={false}
             />
           </div>
@@ -505,17 +565,17 @@ const PayrollPage: React.FC = () => {
           {/* Empty State Content */}
           <div className="flex flex-col items-center justify-center py-16 px-6">
             {/* Icon Container */}
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center mb-6 shadow-sm">
-              <IconCash size={36} className="text-sky-400" strokeWidth={1.5} />
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-900/30 dark:to-sky-800/30 flex items-center justify-center mb-6 shadow-sm">
+              <IconCash size={36} className="text-sky-400 dark:text-sky-300" strokeWidth={1.5} />
             </div>
 
             {/* Text Content */}
-            <h3 className="text-lg font-semibold text-default-700 mb-2">
+            <h3 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
               No Payroll Yet
             </h3>
-            <p className="text-default-400 text-center max-w-sm mb-6">
+            <p className="text-default-400 dark:text-gray-400 text-center max-w-sm mb-6">
               There's no payroll record for{" "}
-              <span className="font-medium text-default-600">
+              <span className="font-medium text-default-600 dark:text-gray-300">
                 {getMonthName(displayMonth)} {displayYear}
               </span>
               . Create one to start processing employee payments.
@@ -550,21 +610,21 @@ const PayrollPage: React.FC = () => {
     <div className="space-y-3">
       {/* Processing Progress Display */}
       {isProcessing && (
-        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
+        <div className="bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 rounded-lg p-4">
           <div className="flex items-center mb-3">
-            <IconClock className="text-sky-500 mr-3" size={24} />
+            <IconClock className="text-sky-500 dark:text-sky-400 mr-3" size={24} />
             <div className="flex-1">
-              <h3 className="font-medium text-sky-800">Processing Payroll</h3>
-              <p className="text-sm text-sky-600">
+              <h3 className="font-medium text-sky-800 dark:text-sky-200">Processing Payroll</h3>
+              <p className="text-sm text-sky-600 dark:text-sky-400">
                 {processingProgress.stage ||
                   "Please wait while employee payrolls are being calculated..."}
               </p>
             </div>
           </div>
           {processingProgress.total > 0 && (
-            <div className="w-full bg-sky-200 rounded-full h-2">
+            <div className="w-full bg-sky-200 dark:bg-sky-900 rounded-full h-2">
               <div
-                className="bg-sky-500 h-2 rounded-full transition-all duration-500 ease-out"
+                className="bg-sky-500 dark:bg-sky-400 h-2 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${processingProgress.current}%` }}
               />
             </div>
@@ -580,36 +640,36 @@ const PayrollPage: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
             <MonthNavigator
               selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
+              onChange={handleMonthChange}
               showGoToCurrentButton={false}
               size="sm"
             />
             {/* Compact Stats */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
               <div className="flex items-center gap-1.5">
-                <IconUsers size={16} className="text-sky-600" />
-                <span className="font-medium text-default-700">
+                <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {payroll.employeePayrolls.length}
                 </span>
-                <span className="text-default-400">employees</span>
+                <span className="text-default-400 dark:text-gray-400">employees</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconBriefcase size={16} className="text-amber-600" />
-                <span className="font-medium text-default-700">
+                <IconBriefcase size={16} className="text-amber-600 dark:text-amber-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {Object.keys(groupedEmployees).length}
                 </span>
-                <span className="text-default-400">kerja</span>
+                <span className="text-default-400 dark:text-gray-400">kerja</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconCash size={16} className="text-emerald-600" />
-                <span className="font-semibold text-emerald-700">
+                <IconCash size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                   {formatCurrency(totals.grossPay)}
                 </span>
-                <span className="text-default-400">total</span>
+                <span className="text-default-400 dark:text-gray-400">total</span>
               </div>
-              <span className="text-default-300">|</span>
+              <span className="text-default-300 dark:text-gray-600">|</span>
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                   payroll.status
@@ -624,11 +684,11 @@ const PayrollPage: React.FC = () => {
               </span>
               {payroll.status === "Processing" && (
                 <>
-                  <span className="text-default-300">•</span>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
                   <button
                     onClick={handleProcessAll}
                     disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 text-default-400 hover:text-sky-600 transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
                     title="Re-process payroll"
                   >
                     <IconRefresh
@@ -643,11 +703,11 @@ const PayrollPage: React.FC = () => {
                         : "Process"}
                     </span>
                   </button>
-                  <span className="text-default-300">•</span>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
                   <button
                     onClick={() => setShowFinalizeDialog(true)}
                     disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 text-default-400 hover:text-amber-600 transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
                     title="Finalize payroll"
                   >
                     <IconLock size={14} />
@@ -657,8 +717,8 @@ const PayrollPage: React.FC = () => {
               )}
               {payroll.status === "Finalized" && (
                 <>
-                  <span className="text-default-300">•</span>
-                  <span className="text-default-500">
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <span className="text-default-500 dark:text-gray-400">
                     Finalized{" "}
                     {payroll.updated_at
                       ? formatDistanceToNow(new Date(payroll.updated_at), {
@@ -666,13 +726,13 @@ const PayrollPage: React.FC = () => {
                         })
                       : ""}
                   </span>
-                  <span className="text-default-300">•</span>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
                   <button
                     onClick={() => {
                       setNewStatus("Processing");
                       setIsStatusDialogOpen(true);
                     }}
-                    className="inline-flex items-center gap-1.5 text-default-400 hover:text-amber-600 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
                     title="Revert to Processing"
                   >
                     <IconRefresh size={14} />
@@ -717,11 +777,11 @@ const PayrollPage: React.FC = () => {
                 placeholder="Search employees..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-3 py-1 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 w-[154px]"
+                className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 w-[154px] placeholder-gray-400 dark:placeholder-gray-500"
               />
               {searchTerm && (
                 <button
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
                   onClick={() => setSearchTerm("")}
                   title="Clear search"
                 >
@@ -739,8 +799,8 @@ const PayrollPage: React.FC = () => {
         </div>
 
         {Object.keys(groupedEmployees).length === 0 ? (
-          <div className="text-center py-8 border rounded-lg">
-            <p className="text-default-500">No employee payrolls found.</p>
+          <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+            <p className="text-default-500 dark:text-gray-400">No employee payrolls found.</p>
             {payroll.status === "Processing" && (
               <Button
                 onClick={handleProcessAll}

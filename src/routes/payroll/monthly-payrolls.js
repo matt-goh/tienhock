@@ -122,12 +122,23 @@ export default function (pool) {
       AND mwl.status = 'Submitted'
     `;
 
-      const [dailyResult, monthlyResult] = await Promise.all([
+      // Query production entries for MEE_PACKING and BH_PACKING workers
+      const productionEligibleQuery = `
+      SELECT DISTINCT pe.worker_id as employee_id,
+        CASE WHEN p.type = 'MEE' THEN 'MEE_PACKING' ELSE 'BH_PACKING' END as job_id
+      FROM production_entries pe
+      JOIN products p ON pe.product_id = p.id
+      WHERE pe.entry_date BETWEEN $1 AND $2
+      AND pe.bags_packed > 0
+    `;
+
+      const [dailyResult, monthlyResult, productionResult] = await Promise.all([
         pool.query(dailyEligibleQuery, [startDate, endDate]),
         pool.query(monthlyEligibleQuery, [month, year]),
+        pool.query(productionEligibleQuery, [startDate, endDate]),
       ]);
 
-      // Group employees by job type (combine daily and monthly results)
+      // Group employees by job type (combine daily, monthly, and production results)
       const jobEmployeeMap = {};
 
       // Add daily log employees
@@ -140,6 +151,14 @@ export default function (pool) {
 
       // Add monthly log employees
       monthlyResult.rows.forEach((row) => {
+        if (!jobEmployeeMap[row.job_id]) {
+          jobEmployeeMap[row.job_id] = new Set();
+        }
+        jobEmployeeMap[row.job_id].add(row.employee_id);
+      });
+
+      // Add production entry workers (MEE_PACKING and BH_PACKING)
+      productionResult.rows.forEach((row) => {
         if (!jobEmployeeMap[row.job_id]) {
           jobEmployeeMap[row.job_id] = new Set();
         }
@@ -386,17 +405,26 @@ export default function (pool) {
       const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
       // 2. Fetch all required data in parallel
-      const [
-        dailyLogsResult,
-        monthlyLogsResult,
-        manualItemsResult,
-        staffsResult,
-        jobsResult,
-        epfRatesResult,
-        socsoRatesResult,
-        sipRatesResult,
-        incomeTaxRatesResult,
-      ] = await Promise.all([
+      let dailyLogsResult, monthlyLogsResult, manualItemsResult, staffsResult,
+          jobsResult, epfRatesResult, socsoRatesResult, sipRatesResult,
+          incomeTaxRatesResult, holidaysResult, productionEntriesResult,
+          productPayCodeMappingsResult;
+
+      try {
+        [
+          dailyLogsResult,
+          monthlyLogsResult,
+          manualItemsResult,
+          staffsResult,
+          jobsResult,
+          epfRatesResult,
+          socsoRatesResult,
+          sipRatesResult,
+          incomeTaxRatesResult,
+          holidaysResult,
+          productionEntriesResult,
+          productPayCodeMappingsResult,
+        ] = await Promise.all([
         // Daily work logs with activities
         client.query(`
           SELECT dwl.id, dwl.log_date, dwle.employee_id, dwle.job_id, dwle.total_hours,
@@ -470,7 +498,40 @@ export default function (pool) {
         client.query("SELECT * FROM socso_rates WHERE is_active = true ORDER BY wage_from"),
         client.query("SELECT * FROM sip_rates WHERE is_active = true ORDER BY wage_from"),
         client.query("SELECT * FROM income_tax_rates WHERE is_active = true ORDER BY wage_from"),
-      ]);
+
+        // Holidays for the payroll period (for production entry day type calculation)
+        client.query(`
+          SELECT holiday_date FROM holiday_calendar
+          WHERE holiday_date BETWEEN $1 AND $2
+        `, [startDate, endDate]),
+
+        // Production entries for MEE_PACKING and BH_PACKING workers
+        client.query(`
+          SELECT pe.entry_date, pe.product_id, pe.worker_id, pe.bags_packed,
+            p.type as product_type, p.description as product_description
+          FROM production_entries pe
+          JOIN products p ON pe.product_id = p.id
+          WHERE pe.entry_date BETWEEN $1 AND $2
+            AND pe.bags_packed > 0
+          ORDER BY pe.worker_id, pe.entry_date
+        `, [startDate, endDate]),
+
+        // Product to pay code mappings
+        client.query(`
+          SELECT ppc.product_id, ppc.pay_code_id,
+            pc.description, pc.pay_type, pc.rate_unit,
+            CAST(pc.rate_biasa AS NUMERIC(10,2)) as rate_biasa,
+            CAST(pc.rate_ahad AS NUMERIC(10,2)) as rate_ahad,
+            CAST(pc.rate_umum AS NUMERIC(10,2)) as rate_umum
+          FROM product_pay_codes ppc
+          JOIN pay_codes pc ON ppc.pay_code_id = pc.id
+          WHERE pc.is_active = true
+        `),
+        ]);
+      } catch (fetchError) {
+        console.error("Error fetching payroll data:", fetchError);
+        throw fetchError;
+      }
 
       // Build lookup maps
       const staffsMap = new Map(staffsResult.rows.map(s => [s.id, s]));
@@ -548,6 +609,223 @@ export default function (pool) {
             work_log_type: 'monthly',
           });
         });
+      });
+
+      // Process production entries for MEE_PACKING and BH_PACKING workers
+      // Build product to pay code mappings lookup
+      const productPayCodeMap = {};
+      productPayCodeMappingsResult.rows.forEach(mapping => {
+        if (!productPayCodeMap[mapping.product_id]) {
+          productPayCodeMap[mapping.product_id] = [];
+        }
+        productPayCodeMap[mapping.product_id].push({
+          pay_code_id: mapping.pay_code_id,
+          description: mapping.description,
+          pay_type: mapping.pay_type,
+          rate_unit: mapping.rate_unit,
+          rate_biasa: parseFloat(mapping.rate_biasa) || 0,
+          rate_ahad: parseFloat(mapping.rate_ahad) || 0,
+          rate_umum: parseFloat(mapping.rate_umum) || 0,
+        });
+      });
+
+      // Build holidays lookup set for fast checking
+      const holidayDates = new Set(
+        holidaysResult.rows.map(h => formatDateToYMD(h.holiday_date))
+      );
+
+      // Helper to determine day type (biasa, ahad, umum)
+      const getDayType = (dateStr) => {
+        const formattedDate = formatDateToYMD(dateStr);
+
+        // Check if it's a public holiday first
+        if (holidayDates.has(formattedDate)) return 'umum';
+
+        // Check if it's Sunday
+        const date = new Date(dateStr);
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek === 0) return 'ahad';
+
+        return 'biasa';
+      };
+
+      // Helper to find the Base production pay code (PBH_*, PM_*, PWE_*, WE_*, WE-* prefixes)
+      const findBasePayCode = (payCodesForProduct) => {
+        // First, try to find a Base pay code with production prefix
+        // Note: WE codes use both underscore (WE_) and dash (WE-)
+        const productionPrefixes = ['PBH_', 'PM_', 'PWE_', 'WE_', 'WE-'];
+        const baseProductionCode = payCodesForProduct.find(
+          pc => pc.pay_type === 'Base' && pc.rate_unit === 'Bag' &&
+                productionPrefixes.some(prefix => pc.pay_code_id.startsWith(prefix))
+        );
+        if (baseProductionCode) return baseProductionCode;
+
+        // Fallback to any Base pay code with Bag rate_unit
+        const anyBaseCode = payCodesForProduct.find(
+          pc => pc.pay_type === 'Base' && pc.rate_unit === 'Bag'
+        );
+        if (anyBaseCode) return anyBaseCode;
+
+        // Last resort: any pay code with Bag rate_unit
+        return payCodesForProduct.find(pc => pc.rate_unit === 'Bag');
+      };
+
+      // Helper to find threshold bonus pay codes
+      const findThresholdBonusCodes = (payCodesForProduct, productType) => {
+        // For BH products, look for FULL_B* codes (ME-Q specific) or FULL_* codes
+        // For MEE products, look for FULL_* codes
+        const bonus70Prefixes = productType === 'BH'
+          ? ['FULL_B', 'FULL_']
+          : ['FULL_'];
+
+        const bonus70Code = payCodesForProduct.find(
+          pc => pc.pay_type === 'Tambahan' && pc.rate_unit === 'Bag' &&
+                (pc.description.includes('>70') || pc.description.includes('>100')) &&
+                !pc.description.includes('>140')
+        );
+
+        const bonus140Code = payCodesForProduct.find(
+          pc => pc.pay_type === 'Tambahan' && pc.rate_unit === 'Bag' &&
+                pc.description.includes('>140')
+        );
+
+        return { bonus70Code, bonus140Code };
+      };
+
+      // Track daily totals per worker for threshold bonus calculation
+      const dailyTotalsPerWorker = {};
+
+      // Process production entries into payroll items
+      productionEntriesResult.rows.forEach(entry => {
+        const productType = entry.product_type;
+        const jobType = productType === 'MEE' ? 'MEE_PACKING' : 'BH_PACKING';
+        const key = `${entry.worker_id}-${jobType}`;
+        const dateStr = formatDateToYMD(entry.entry_date);
+
+        if (!workLogsByEmployeeJob[key]) {
+          workLogsByEmployeeJob[key] = { employeeId: entry.worker_id, jobType: jobType, items: [] };
+        }
+
+        // Track daily totals for threshold bonus calculation
+        const dailyKey = `${entry.worker_id}-${dateStr}-${productType}`;
+        if (!dailyTotalsPerWorker[dailyKey]) {
+          dailyTotalsPerWorker[dailyKey] = {
+            workerId: entry.worker_id,
+            date: dateStr,
+            productType: productType,
+            jobType: jobType,
+            totalBags: 0,
+            productIds: new Set(),
+          };
+        }
+        dailyTotalsPerWorker[dailyKey].totalBags += entry.bags_packed;
+        dailyTotalsPerWorker[dailyKey].productIds.add(entry.product_id);
+
+        // Get pay codes for this product
+        const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
+
+        // Find the Base production pay code
+        const basePayCode = findBasePayCode(payCodesForProduct);
+
+        if (basePayCode) {
+          const dayType = getDayType(entry.entry_date);
+          let rate = dayType === 'ahad' ? basePayCode.rate_ahad :
+                     dayType === 'umum' ? basePayCode.rate_umum :
+                     basePayCode.rate_biasa;
+
+          // If Base code doesn't have ahad/umum rates, check for special Sunday/Holiday codes
+          if ((dayType === 'ahad' || dayType === 'umum') && rate === 0) {
+            // Look for a Sunday/Holiday specific Tambahan code
+            const holidayCode = payCodesForProduct.find(
+              pc => pc.pay_type === 'Tambahan' && pc.rate_unit === 'Bag' &&
+                    (pc.description.includes('UMUM') || pc.description.includes('AHAD'))
+            );
+            if (holidayCode && holidayCode.rate_biasa > 0) {
+              rate = holidayCode.rate_biasa;
+            } else {
+              // Fallback to biasa rate
+              rate = basePayCode.rate_biasa;
+            }
+          }
+
+          // Only add if we have a valid rate
+          if (rate > 0) {
+            const amount = entry.bags_packed * rate;
+
+            workLogsByEmployeeJob[key].items.push({
+              pay_code_id: basePayCode.pay_code_id,
+              description: `${basePayCode.description} - ${entry.product_id}`,
+              pay_type: basePayCode.pay_type || 'Base',
+              rate: rate,
+              rate_unit: 'Bag',
+              quantity: entry.bags_packed,
+              amount: amount,
+              source_date: dateStr,
+              work_log_id: null,
+              work_log_type: 'production',
+            });
+          }
+        }
+      });
+
+      // Apply threshold bonuses based on daily totals
+      // Threshold for BH: >70 bags/day for first bonus, >140 for second
+      // Threshold for MEE: >100 bags/day for first bonus (based on pay code descriptions)
+      Object.values(dailyTotalsPerWorker).forEach(dailyData => {
+        const { workerId, date, productType, jobType, totalBags, productIds } = dailyData;
+        const key = `${workerId}-${jobType}`;
+
+        // Get threshold based on product type
+        const threshold1 = productType === 'BH' ? 70 : 100;
+        const threshold2 = 140;
+
+        // Only apply bonus if threshold is met
+        if (totalBags > threshold1) {
+          // Get pay codes from the first product to find bonus codes
+          const firstProductId = productIds.values().next().value;
+          const payCodesForProduct = productPayCodeMap[firstProductId] || [];
+          const { bonus70Code, bonus140Code } = findThresholdBonusCodes(payCodesForProduct, productType);
+
+          // Apply first tier bonus (>70 for BH, >100 for MEE)
+          if (bonus70Code && totalBags > threshold1 && totalBags <= threshold2) {
+            const bonusRate = bonus70Code.rate_biasa;
+            if (bonusRate > 0) {
+              const bonusAmount = totalBags * bonusRate;
+              workLogsByEmployeeJob[key].items.push({
+                pay_code_id: bonus70Code.pay_code_id,
+                description: `${bonus70Code.description} (${totalBags} bags)`,
+                pay_type: 'Tambahan',
+                rate: bonusRate,
+                rate_unit: 'Bag',
+                quantity: totalBags,
+                amount: bonusAmount,
+                source_date: date,
+                work_log_id: null,
+                work_log_type: 'production_bonus',
+              });
+            }
+          }
+
+          // Apply second tier bonus (>140)
+          if (bonus140Code && totalBags > threshold2) {
+            const bonusRate = bonus140Code.rate_biasa;
+            if (bonusRate > 0) {
+              const bonusAmount = totalBags * bonusRate;
+              workLogsByEmployeeJob[key].items.push({
+                pay_code_id: bonus140Code.pay_code_id,
+                description: `${bonus140Code.description} (${totalBags} bags)`,
+                pay_type: 'Tambahan',
+                rate: bonusRate,
+                rate_unit: 'Bag',
+                quantity: totalBags,
+                amount: bonusAmount,
+                source_date: date,
+                work_log_id: null,
+                work_log_type: 'production_bonus',
+              });
+            }
+          }
+        }
       });
 
       // 4. Group selected employees by name (same logic as frontend)
@@ -638,8 +916,41 @@ export default function (pool) {
           const manualItems = manualItemsByEmployee[primaryEmployee.employeeId] || [];
           manualItems.forEach(item => combinedItems.push(item));
 
-          // Calculate gross pay
-          const workGrossPay = combinedItems.reduce((sum, item) => sum + item.amount, 0);
+          // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
+          // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
+          // This ensures database gross_pay matches the consolidated view exactly
+          const consolidatedGroups = new Map();
+          combinedItems.forEach(item => {
+            const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+            if (consolidatedGroups.has(key)) {
+              const group = consolidatedGroups.get(key);
+              group.totalQuantity += item.quantity;
+              group.originalAmountSum += item.amount; // Keep for Percent/Fixed
+            } else {
+              consolidatedGroups.set(key, {
+                rate: item.rate,
+                rate_unit: item.rate_unit,
+                totalQuantity: item.quantity,
+                originalAmountSum: item.amount,
+              });
+            }
+          });
+
+          // Calculate gross pay from consolidated groups
+          let workGrossPayCents = 0;
+          consolidatedGroups.forEach(group => {
+            let amountCents;
+            if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
+              // Keep original summed amount for special rate units
+              amountCents = Math.round(group.originalAmountSum * 100);
+            } else {
+              // Calculate from consolidated: roundedRate × totalQuantity
+              const roundedRate = Math.round(group.rate * 100) / 100;
+              amountCents = Math.round(roundedRate * group.totalQuantity * 100);
+            }
+            workGrossPayCents += amountCents;
+          });
+          const workGrossPay = workGrossPayCents / 100;
 
           // Fetch leave and commission records for this employee
           const [leaveResult, commissionResult] = await Promise.all([
@@ -895,7 +1206,12 @@ export default function (pool) {
           });
 
         } catch (error) {
+          console.error("Error processing employee:", employeeJobCombos[0].employeeId, error);
           errors.push({ employeeId: employeeJobCombos[0].employeeId, error: error.message });
+          // If this is a SQL error, the transaction is aborted - stop processing
+          if (error.code) {
+            throw error;
+          }
         }
       }
 

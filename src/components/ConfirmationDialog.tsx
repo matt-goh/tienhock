@@ -54,7 +54,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <DialogPanel className="fixed inset-0 bg-black opacity-30" />
+            <DialogPanel className="fixed inset-0 bg-black opacity-30 dark:opacity-50" />
           </TransitionChild>
 
           <span
@@ -74,24 +74,24 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             leaveTo="opacity-0 scale-95"
           >
             <DialogPanel
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <DialogTitle
                 as="h3"
-                className="text-lg font-medium leading-6 text-default-900"
+                className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
               >
                 {title}
               </DialogTitle>
               <div className="mt-2">
-                <p className="text-sm text-default-500">{message}</p>
+                <p className="text-sm text-default-500 dark:text-gray-400">{message}</p>
               </div>
 
               <div className="mt-4 flex justify-end space-x-2">
                 {!hideCancelButton && (
                   <button
                     type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 bg-default-100 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-700 border border-transparent rounded-full hover:bg-default-200 dark:hover:bg-gray-600 active:bg-default-300 dark:active:bg-gray-500 focus:outline-none"
                     onClick={onClose}
                   >
                     Cancel

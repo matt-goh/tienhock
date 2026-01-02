@@ -101,7 +101,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="text-default-400 hover:text-default-600 cursor-help inline-flex items-center ml-2"
+        className="text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex items-center ml-2"
       >
         <IconInfoCircle size={14} />
       </span>
@@ -109,7 +109,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-4 w-96 transform opacity-0 transition-opacity duration-200 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -121,7 +121,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
             onMouseLeave={handleMouseLeave}
           >
             <div className="flex-shrink-0">
-              <div className="text-sm font-medium text-default-700 mb-2 flex justify-between items-center">
+              <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
                 <span
                   className="truncate"
                   title={`Linked Payments: ${paymentReference}`}
@@ -129,13 +129,13 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                   Linked Payments
                 </span>
                 <span
-                  className="text-xs text-default-500 truncate"
+                  className="text-xs text-default-500 dark:text-gray-400 truncate"
                   title={`Total: ${totalCount} other invoices`}
                 >
                   ({totalCount} other invoices)
                 </span>
               </div>
-              <div className="border-t border-default-200"></div>
+              <div className="border-t border-default-200 dark:border-gray-700"></div>
             </div>
 
             <div className="flex-grow overflow-y-auto pt-2 space-y-2 min-h-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
@@ -148,7 +148,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                   {otherLinkedPayments.map((paymentInfo) => (
                     <div
                       key={paymentInfo.payment_id}
-                      className="py-2 px-2 bg-sky-50 rounded border border-sky-200 cursor-pointer hover:bg-sky-100 transition-colors duration-200"
+                      className="py-2 px-2 bg-sky-50 dark:bg-sky-900/20 rounded border border-sky-200 dark:border-sky-800 cursor-pointer hover:bg-sky-100 transition-colors duration-200"
                       title={`View invoice ${paymentInfo.invoice_id}`}
                       onClick={() =>
                         navigate(`/sales/invoice/${paymentInfo.invoice_id}`)
@@ -159,7 +159,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                           <div className="font-medium text-sm truncate">
                             Invoice: {paymentInfo.invoice_id}
                           </div>
-                          <div className="text-xs text-default-500 truncate">
+                          <div className="text-xs text-default-500 dark:text-gray-400 truncate">
                             {paymentInfo.customer_name}
                           </div>
                         </div>
@@ -173,7 +173,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-center text-default-500 text-sm py-4">
+                <div className="text-center text-default-500 dark:text-gray-400 text-sm py-4">
                   No linked invoices found for this payment reference.
                 </div>
               )}

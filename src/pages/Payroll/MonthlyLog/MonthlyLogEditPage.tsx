@@ -59,7 +59,7 @@ const MonthlyLogEditPage: React.FC<MonthlyLogEditPageProps> = ({ jobType }) => {
   if (!workLog) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500">Monthly work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">Monthly work log not found</p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
           Back to List
         </Button>

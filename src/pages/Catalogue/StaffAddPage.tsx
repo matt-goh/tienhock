@@ -367,16 +367,16 @@ const StaffAddPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow-sm border border-default-200">
-        <div className="px-6 py-4 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 Add New Staff
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
                 anda selesai.
               </p>
@@ -432,8 +432,8 @@ const StaffAddPage: React.FC = () => {
                   {renderListbox("department", "Department", departmentOptions)}
                   {renderInput("kwspNumber", "KWSP Number")}
                 </div>
-                <div className="border-t border-default-200 pt-6 mt-6">
-                  <h3 className="text-base font-medium text-default-800 mb-4">
+                <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
+                  <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-4">
                     Income Tax Information
                   </h3>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -475,7 +475,7 @@ const StaffAddPage: React.FC = () => {
               </div>
             </Tab>
           </div>
-          <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200">
+          <div className="p-6 flex justify-end items-center space-x-3 border-t border-default-200 dark:border-gray-700">
             <Button
               type="submit"
               variant="boldOutline"

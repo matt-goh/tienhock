@@ -58,14 +58,14 @@ function TableHeader({
 
   return (
     <tr
-      className="bg-default-100"
+      className="bg-default-100 dark:bg-gray-800"
       onMouseEnter={onHeaderRowMouseEnter}
       onMouseLeave={onHeaderRowMouseLeave}
     >
       {headerGroup.headers.map((header: any, index: number) => (
         <th
           key={header.id}
-          className={`px-6 py-2 text-base leading-4 font-bold text-default-600 uppercase tracking-wider group ${getHeaderClass(
+          className={`px-6 py-2 text-base leading-4 font-bold text-default-600 dark:text-gray-300 uppercase tracking-wider group ${getHeaderClass(
             header.id,
             columns.find((col) => col.id === header.id)?.type || "string"
           )} ${index === 0 ? "rounded-tl-lg" : ""} ${
@@ -91,7 +91,7 @@ function TableHeader({
                     e.stopPropagation();
                     handleSelectAll && handleSelectAll();
                   }}
-                  className="p-2 rounded-full hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
+                  className="p-2 rounded-full hover:bg-default-200 dark:hover:bg-gray-700 active:bg-default-300 dark:active:bg-gray-600 transition-colors duration-200"
                 >
                   {isAllSelectedGlobal ? (
                     <IconSquareCheckFilled
@@ -110,7 +110,7 @@ function TableHeader({
                       width={20}
                       height={20}
                       stroke={2}
-                      className="text-default-400"
+                      className="text-default-400 dark:text-gray-500"
                     />
                   )}
                 </button>

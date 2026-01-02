@@ -316,18 +316,24 @@ export default function (pool) {
         return res.status(400).json({ message: "Invalid year or month" });
       }
 
-      // Get salary data by location from employee_payrolls joined with staffs
-      // This matches how salary-report.js fetches data
+      // Get salary data by location from employee_payrolls using job-based location mapping
       const salaryQuery = `
-        WITH employee_data AS (
+        WITH job_location_map AS (
+          SELECT job_id, location_code
+          FROM job_location_mappings
+          WHERE is_active = true
+        ),
+        employee_data AS (
           SELECT
             ep.employee_id,
-            s.location as locations,
+            ep.job_type,
+            COALESCE(jlm.location_code, '02') as location_id,
             ep.gross_pay,
             ep.net_pay
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
+          LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
         ),
         deductions_data AS (
@@ -344,7 +350,7 @@ export default function (pool) {
         employee_summary AS (
           SELECT
             ed.employee_id,
-            ed.locations,
+            ed.location_id,
             ed.gross_pay,
             ed.net_pay,
             COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
@@ -352,31 +358,6 @@ export default function (pool) {
             COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
             COALESCE((SELECT SUM(employee_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
           FROM employee_data ed
-        ),
-        location_unnested AS (
-          SELECT
-            employee_id,
-            jsonb_array_elements_text(locations) as location_id,
-            gross_pay,
-            net_pay,
-            epf_employer,
-            socso_employer,
-            sip_employer,
-            pcb
-          FROM employee_summary
-          WHERE locations IS NOT NULL AND jsonb_array_length(locations) > 0
-          UNION ALL
-          SELECT
-            employee_id,
-            '02' as location_id,
-            gross_pay,
-            net_pay,
-            epf_employer,
-            socso_employer,
-            sip_employer,
-            pcb
-          FROM employee_summary
-          WHERE locations IS NULL OR jsonb_array_length(locations) = 0
         )
         SELECT
           location_id,
@@ -386,7 +367,7 @@ export default function (pool) {
           SUM(sip_employer) as total_sip_majikan,
           SUM(pcb) as total_pcb,
           SUM(net_pay) as total_gaji_bersih
-        FROM location_unnested
+        FROM employee_summary
         GROUP BY location_id
         ORDER BY location_id
       `;
@@ -531,17 +512,24 @@ export default function (pool) {
         jvsl: null,
       };
 
-      // Get salary data by location from employee_payrolls joined with staffs
+      // Get salary data by location from employee_payrolls using job-based location mapping
       const salaryQuery = `
-        WITH employee_data AS (
+        WITH job_location_map AS (
+          SELECT job_id, location_code
+          FROM job_location_mappings
+          WHERE is_active = true
+        ),
+        employee_data AS (
           SELECT
             ep.employee_id,
-            s.location as locations,
+            ep.job_type,
+            COALESCE(jlm.location_code, '02') as location_id,
             ep.gross_pay,
             ep.net_pay
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
+          LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
         ),
         deductions_data AS (
@@ -558,7 +546,7 @@ export default function (pool) {
         employee_summary AS (
           SELECT
             ed.employee_id,
-            ed.locations,
+            ed.location_id,
             ed.gross_pay,
             ed.net_pay,
             COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
@@ -566,31 +554,6 @@ export default function (pool) {
             COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
             COALESCE((SELECT SUM(employee_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
           FROM employee_data ed
-        ),
-        location_unnested AS (
-          SELECT
-            employee_id,
-            jsonb_array_elements_text(locations) as location_id,
-            gross_pay,
-            net_pay,
-            epf_employer,
-            socso_employer,
-            sip_employer,
-            pcb
-          FROM employee_summary
-          WHERE locations IS NOT NULL AND jsonb_array_length(locations) > 0
-          UNION ALL
-          SELECT
-            employee_id,
-            '02' as location_id,
-            gross_pay,
-            net_pay,
-            epf_employer,
-            socso_employer,
-            sip_employer,
-            pcb
-          FROM employee_summary
-          WHERE locations IS NULL OR jsonb_array_length(locations) = 0
         )
         SELECT
           location_id,
@@ -600,7 +563,7 @@ export default function (pool) {
           SUM(sip_employer) as total_sip_majikan,
           SUM(pcb) as total_pcb,
           SUM(net_pay) as total_gaji_bersih
-        FROM location_unnested
+        FROM employee_summary
         GROUP BY location_id
         ORDER BY location_id
       `;

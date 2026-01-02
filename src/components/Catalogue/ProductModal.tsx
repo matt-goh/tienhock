@@ -109,7 +109,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-black bg-opacity-25" />
+            <div className="fixed inset-0 bg-black/50 dark:bg-black/70" />
           </TransitionChild>
 
           <span
@@ -128,18 +128,18 @@ const ProductModal: React.FC<ProductModalProps> = ({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <DialogPanel className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+            <DialogPanel className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
               <div className="flex items-center justify-between mb-4">
                 <DialogTitle
                   as="h3"
-                  className="text-lg font-medium leading-6 text-default-900"
+                  className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
                   {mode === "create" ? "Create Product" : "Edit Product"}
                 </DialogTitle>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="text-default-400 hover:text-default-600"
+                  className="text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
                 >
                   <IconX size={20} />
                 </button>

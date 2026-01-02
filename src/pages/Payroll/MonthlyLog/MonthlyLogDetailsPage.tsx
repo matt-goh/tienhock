@@ -221,7 +221,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   if (!workLog) {
     return (
       <div className="flex justify-center items-center h-96">
-        <p className="text-default-500">Work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">Work log not found</p>
       </div>
     );
   }
@@ -247,19 +247,19 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   return (
     <div className="space-y-3">
       {/* Compact Header */}
-      <div className="bg-white rounded-lg border border-default-200 px-4 py-3">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 px-4 py-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           {/* Left: Back + Title + Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-3">
               <BackButton onClick={handleBack} />
-              <div className="h-6 w-px bg-default-300"></div>
+              <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
               <div>
-                <h1 className="text-xl font-semibold text-default-800">
+                <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
                   {jobConfig?.name} - {getMonthName(workLog.log_month)}{" "}
                   {workLog.log_year}
                 </h1>
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-default-500 dark:text-gray-400">
                   Section: {workLog.section}
                 </p>
               </div>
@@ -267,44 +267,44 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
 
             {/* Inline Stats */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm sm:ml-3">
-              <span className="text-default-300 hidden sm:inline">|</span>
+              <span className="text-default-300 dark:text-gray-600 hidden sm:inline">|</span>
               <div className="flex items-center gap-1.5">
-                <IconUsers size={16} className="text-sky-600" />
-                <span className="font-medium text-default-700">
+                <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.employeeEntries.length}
                 </span>
-                <span className="text-default-400">employees</span>
+                <span className="text-default-400 dark:text-gray-400">employees</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconClock size={16} className="text-emerald-600" />
-                <span className="font-medium text-default-700">
+                <IconClock size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {totalRegularHours.toFixed(1)}
                 </span>
-                <span className="text-default-400">hrs</span>
+                <span className="text-default-400 dark:text-gray-400">hrs</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconClockPlay size={16} className="text-amber-600" />
-                <span className="font-medium text-default-700">
+                <IconClockPlay size={16} className="text-amber-600 dark:text-amber-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {totalOvertimeHours.toFixed(1)}
                 </span>
-                <span className="text-default-400">OT hrs</span>
+                <span className="text-default-400 dark:text-gray-400">OT hrs</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconBeach size={16} className="text-rose-500" />
-                <span className="font-medium text-default-700">
+                <IconBeach size={16} className="text-rose-500 dark:text-rose-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.leaveRecords.length}
                 </span>
-                <span className="text-default-400">leave days</span>
+                <span className="text-default-400 dark:text-gray-400">leave days</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                   workLog.status === "Processed"
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-sky-100 text-sky-700"
+                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+                    : "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
                 }`}
               >
                 {workLog.status === "Processed" && (
@@ -335,23 +335,23 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
       </div>
 
       {/* Employee Work Hours */}
-      <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
         {/* Section Header - Sky */}
-        <div className="px-4 py-2.5 bg-sky-50 border-b border-sky-100">
+        <div className="px-4 py-2.5 bg-sky-50 dark:bg-sky-900/30 border-b border-sky-100 dark:border-sky-800">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-sky-800 flex items-center gap-2">
-              <IconUsers size={16} className="text-sky-600" />
+            <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-2">
+              <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
               Employee Work Hours
             </h3>
-            <div className="flex items-center gap-3 text-xs text-sky-700">
+            <div className="flex items-center gap-3 text-xs text-sky-700 dark:text-sky-300">
               <span className="font-medium">
                 {workLog.employeeEntries.length} employees
               </span>
-              <span className="text-sky-300">•</span>
+              <span className="text-sky-300 dark:text-sky-600">•</span>
               <span className="font-medium">
                 {totalRegularHours.toFixed(1)} reg hrs
               </span>
-              <span className="text-sky-300">•</span>
+              <span className="text-sky-300 dark:text-sky-600">•</span>
               <span className="font-medium">
                 {totalOvertimeHours.toFixed(1)} OT hrs
               </span>
@@ -362,23 +362,23 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
         {workLog.employeeEntries.length > 0 ? (
           <div className="max-h-full overflow-y-auto">
             <table className="min-w-full">
-              <thead className="bg-default-50 sticky top-0 z-10">
+              <thead className="bg-default-50 dark:bg-gray-900/50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 uppercase">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase">
                     Employee
                   </th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-600 uppercase w-24">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-24">
                     Hours
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 uppercase">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase">
                     Activities
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-default-600 uppercase w-28">
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-28">
                     Amount
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-100">
+              <tbody className="divide-y divide-default-200 dark:divide-gray-700">
                 {workLog.employeeEntries.map((entry) => {
                   const employeeTotal = entry.activities.reduce(
                     (sum, activity) => sum + activity.calculated_amount,
@@ -417,26 +417,26 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                   return (
                     <tr
                       key={entry.id}
-                      className="hover:bg-default-50 transition-colors align-top"
+                      className="hover:bg-default-50 dark:hover:bg-gray-700 transition-colors align-top"
                     >
                       <td className="px-4 py-3">
                         <Link
                           to={`/catalogue/staff/${entry.employee_id}`}
-                          className="text-sky-600 hover:text-sky-800 font-medium"
+                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 font-medium"
                         >
                           {entry.employee_name}
                         </Link>
-                        <p className="text-sm text-default-500">
+                        <p className="text-sm text-default-500 dark:text-gray-400">
                           {entry.employee_id} • {entry.job_name}
                         </p>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="text-sm">
-                          <p className="font-medium text-default-800">
+                          <p className="font-medium text-default-800 dark:text-gray-100">
                             {entry.total_hours.toFixed(1)}
                           </p>
                           {entry.overtime_hours > 0 && (
-                            <p className="text-default-500 text-xs">
+                            <p className="text-default-500 dark:text-gray-400 text-xs">
                               +{entry.overtime_hours.toFixed(1)} OT
                             </p>
                           )}
@@ -446,7 +446,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                         <div className="space-y-1">
                           {displayContextLinked.length > 0 && (
                             <div>
-                              <p className="text-xs font-medium text-sky-600 mb-1">
+                              <p className="text-xs font-medium text-sky-600 dark:text-sky-400 mb-1">
                                 Production Activities
                               </p>
                               <div className="space-y-1">
@@ -459,17 +459,17 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                       <span className="font-medium">
                                         {activity.description}
                                       </span>
-                                      <span className="text-default-500 ml-2">
+                                      <span className="text-default-500 dark:text-gray-400 ml-2">
                                         ({activity.pay_type})
                                       </span>
-                                      <span className="text-default-500 ml-2">
+                                      <span className="text-default-500 dark:text-gray-400 ml-2">
                                         •{" "}
                                         {activity.rate_unit === "Percent"
                                           ? `${activity.rate_used}%`
                                           : `RM${activity.rate_used}`}
                                       </span>
                                       {activity.hours_applied !== null && (
-                                        <span className="text-default-500 ml-2">
+                                        <span className="text-default-500 dark:text-gray-400 ml-2">
                                           • {activity.hours_applied} hrs
                                         </span>
                                       )}
@@ -486,7 +486,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                           {displayRegular.length > 0 && (
                             <div>
                               {displayContextLinked.length > 0 && (
-                                <p className="text-xs font-medium text-default-600 mb-1 mt-2">
+                                <p className="text-xs font-medium text-default-600 dark:text-gray-300 mb-1 mt-2">
                                   Standard Activities
                                 </p>
                               )}
@@ -500,27 +500,27 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                       <span className="font-medium">
                                         {activity.description}
                                       </span>
-                                      <span className="text-default-500 ml-2">
+                                      <span className="text-default-500 dark:text-gray-400 ml-2">
                                         ({activity.pay_type})
                                       </span>
                                       {activity.source === "employee" && (
-                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
                                           Staff
                                         </span>
                                       )}
                                       {activity.source === "job" && (
-                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
                                           Job
                                         </span>
                                       )}
-                                      <span className="text-default-500 ml-2">
+                                      <span className="text-default-500 dark:text-gray-400 ml-2">
                                         •{" "}
                                         {activity.rate_unit === "Percent"
                                           ? `${activity.rate_used}%`
                                           : `RM${activity.rate_used}`}
                                       </span>
                                       {activity.hours_applied !== null && (
-                                        <span className="text-default-500 ml-2">
+                                        <span className="text-default-500 dark:text-gray-400 ml-2">
                                           • {activity.hours_applied} hrs
                                         </span>
                                       )}
@@ -537,7 +537,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                           {needsExpansion && (
                             <button
                               onClick={() => toggleExpansion(String(entry.id))}
-                              className="text-sm font-medium text-sky-600 hover:text-sky-800 flex items-center"
+                              className="text-sm font-medium text-sky-600 dark:text-sky-400 hover:text-sky-800 flex items-center"
                             >
                               {isExpanded
                                 ? "Show Less"
@@ -550,7 +550,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                           )}
 
                           {entry.activities.length === 0 && (
-                            <span className="text-sm text-default-400">
+                            <span className="text-sm text-default-400 dark:text-gray-500">
                               No activities
                             </span>
                           )}
@@ -563,15 +563,15 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                   );
                 })}
               </tbody>
-              <tfoot className="bg-sky-50 border-t-2 border-sky-200">
+              <tfoot className="bg-sky-50 dark:bg-sky-900/30 border-t-2 border-sky-200 dark:border-sky-800">
                 <tr>
                   <td
                     colSpan={3}
-                    className="px-4 py-3 text-right font-semibold text-sky-800"
+                    className="px-4 py-3 text-right font-semibold text-sky-800 dark:text-sky-300"
                   >
                     Total Employee Pay
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-sky-900">
+                  <td className="px-4 py-3 text-right font-bold text-sky-900 dark:text-sky-200">
                     {formatCurrency(totalAmount)}
                   </td>
                 </tr>
@@ -579,22 +579,22 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
             </table>
           </div>
         ) : (
-          <div className="p-8 text-center text-default-500">
+          <div className="p-8 text-center text-default-500 dark:text-gray-400">
             No employee entries found.
           </div>
         )}
       </div>
 
       {/* Leave Records */}
-      <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
         {/* Section Header - Rose */}
-        <div className="px-4 py-2.5 bg-rose-50 border-b border-rose-100">
+        <div className="px-4 py-2.5 bg-rose-50 dark:bg-rose-900/30 border-b border-rose-100 dark:border-rose-800">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-rose-800 flex items-center gap-2">
-              <IconBeach size={16} className="text-rose-600" />
+            <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
+              <IconBeach size={16} className="text-rose-600 dark:text-rose-400" />
               Leave Records
             </h3>
-            <span className="text-xs font-medium text-rose-700">
+            <span className="text-xs font-medium text-rose-700 dark:text-rose-300">
               {workLog.leaveRecords.length} leave days
             </span>
           </div>
@@ -602,15 +602,15 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
 
         {workLog.leaveRecords.length > 0 ? (
           <table className="min-w-full">
-            <thead className="bg-default-50">
+            <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 uppercase">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase">
                   Employee
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 uppercase w-32">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
                   Date
                 </th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 uppercase w-32">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
                   Type
                 </th>
               </tr>
@@ -619,20 +619,20 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               {workLog.leaveRecords.map((record) => (
                 <tr
                   key={record.id}
-                  className="hover:bg-default-50 transition-colors"
+                  className="hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <td className="px-4 py-3">
                     <Link
                       to={`/catalogue/staff/${record.employee_id}`}
-                      className="text-sky-600 hover:text-sky-800 font-medium"
+                      className="text-sky-600 dark:text-sky-400 hover:text-sky-800 font-medium"
                     >
                       {record.employee_name}
                     </Link>
-                    <p className="text-sm text-default-500">
+                    <p className="text-sm text-default-500 dark:text-gray-400">
                       {record.employee_id}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-default-700">
+                  <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                     {format(new Date(record.leave_date), "dd MMM yyyy")}
                   </td>
                   <td className="px-4 py-3">
@@ -650,10 +650,10 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
           </table>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="w-12 h-12 rounded-full bg-default-100 flex items-center justify-center mb-3">
+            <div className="w-12 h-12 rounded-full bg-default-100 dark:bg-gray-800 flex items-center justify-center mb-3">
               <IconCalendarEvent size={24} className="text-default-400" />
             </div>
-            <p className="text-default-500 text-sm">
+            <p className="text-default-500 dark:text-gray-400 text-sm">
               No leave records for this month
             </p>
           </div>
