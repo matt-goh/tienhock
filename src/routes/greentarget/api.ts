@@ -9,6 +9,11 @@ import {
 } from "../../utils/greenTarget/cacheUtils";
 
 export const greenTargetApi = {
+  // Dashboard endpoints
+  getDashboardMetrics: () => api.get("/greentarget/api/dashboard"),
+  getDashboardActivities: (limit: number = 10) =>
+    api.get(`/greentarget/api/dashboard/activities?limit=${limit}`),
+
   // Customer endpoints
   getCustomers: async () => {
     // Try to get from cache first

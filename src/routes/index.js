@@ -75,6 +75,7 @@ import greenTargetRentalRouter from "./greentarget/rentals.js";
 import greenTargetInvoiceRouter from "./greentarget/invoices.js";
 import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
+import greenTargetDashboardRouter from "./greentarget/dashboard.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -179,6 +180,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/stock", stockRouter(pool));
 
   // Green Target routes
+  app.use("/greentarget/api/dashboard", greenTargetDashboardRouter(pool));
   app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));
   app.use("/greentarget/api/locations", greenTargetLocationRouter(pool));
   app.use("/greentarget/api/dumpsters", greenTargetDumpsterRouter(pool));
