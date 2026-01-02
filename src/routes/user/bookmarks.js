@@ -1,4 +1,4 @@
-// src/routes/sidebar.js
+// src/routes/user/bookmarks.js
 import { Router } from 'express';
 
 export default function(pool) {
