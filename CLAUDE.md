@@ -142,6 +142,10 @@ This is a comprehensive ERP system supporting three companies:
 - Tailwind CSS with custom color palette
 - Segoe UI font family
 - Responsive design with desktop optimization
+- **Dark Mode**: Fully implemented across the application
+  - Toggle available in navbar user menu
+  - State managed via `ThemeContext.tsx`
+  - Uses Tailwind's `dark:` variant with `class` strategy
 
 ### File Structure Patterns
 - **Pages**: Organized by company and functionality in `src/pages/`
