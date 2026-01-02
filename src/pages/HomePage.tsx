@@ -182,10 +182,10 @@ const HomePage: React.FC = () => {
         company: {
           id: "tienhock",
           name: "Tien Hock",
-          logo: <TienHockLogo width={32} height={32} />,
-          color: "text-sky-700",
-          bgColor: "bg-sky-50",
-          borderColor: "border-sky-200",
+          logo: <TienHockLogo width={36} height={36} />,
+          color: "text-sky-600",
+          bgColor: "bg-gradient-to-r from-sky-50 via-sky-50 to-blue-50",
+          borderColor: "border-sky-100",
         },
         items: buildTienHockItems(),
       },
@@ -193,10 +193,10 @@ const HomePage: React.FC = () => {
         company: {
           id: "greentarget",
           name: "Green Target",
-          logo: <GreenTargetLogo width={32} height={32} />,
-          color: "text-emerald-700",
-          bgColor: "bg-emerald-50",
-          borderColor: "border-emerald-200",
+          logo: <GreenTargetLogo width={36} height={36} />,
+          color: "text-emerald-600",
+          bgColor: "bg-gradient-to-r from-emerald-50 via-emerald-50 to-teal-50",
+          borderColor: "border-emerald-100",
         },
         items: buildGreenTargetItems(),
       },
@@ -204,10 +204,10 @@ const HomePage: React.FC = () => {
         company: {
           id: "jellypolly",
           name: "Jelly Polly",
-          logo: <TienHockLogo width={32} height={32} />,
-          color: "text-rose-700",
-          bgColor: "bg-rose-50",
-          borderColor: "border-rose-200",
+          logo: <TienHockLogo width={36} height={36} />,
+          color: "text-rose-600",
+          bgColor: "bg-gradient-to-r from-rose-50 via-rose-50 to-pink-50",
+          borderColor: "border-rose-100",
         },
         items: buildJellyPollyItems(),
       },
@@ -241,62 +241,67 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {companySections.map((section) => (
         <section
           key={section.company.id}
-          className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
         >
           {/* Company Header */}
           <div
-            className={`${section.company.borderColor} ${section.company.bgColor} border-b px-6 py-4`}
+            className={`${section.company.bgColor} px-5 py-3`}
           >
-            <div className="flex items-center space-x-3">
-              {section.company.logo}
-              <h2
-                className={`text-xl font-semibold ${section.company.color}`}
-              >
-                {section.company.name}
-              </h2>
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-white/60 rounded-lg shadow-sm backdrop-blur-sm">
+                {section.company.logo}
+              </div>
+              <div>
+                <h2
+                  className={`text-lg font-semibold ${section.company.color} tracking-tight`}
+                >
+                  {section.company.name}
+                </h2>
+              </div>
             </div>
           </div>
 
           {/* Items Container */}
-          <div className="p-6">
+          <div className="p-4">
             {section.company.id === "tienhock" ? (
               // Hierarchical Layout for Tien Hock
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                 {section.items.map((category) => {
                   const Icon = category.icon;
                   return (
                     <div
                       key={category.name}
-                      className="flex flex-col rounded-lg border border-gray-200 p-4"
+                      className="flex flex-col rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-sm hover:border-gray-200 transition-all duration-200"
                     >
-                      <div className="flex items-start space-x-3">
+                      <div className="flex items-start gap-3 p-3 pb-2">
                         {Icon && (
                           <div
-                            className={`${section.company.bgColor} p-2 rounded-lg`}
+                            className={`${section.company.bgColor} p-2 rounded-lg shadow-sm`}
                           >
                             <Icon
-                              size={24}
+                              size={20}
                               className={section.company.color}
                             />
                           </div>
                         )}
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 text-sm">
                             {category.name}
                           </h3>
                           {category.description && (
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 mt-0.5 leading-tight">
                               {category.description}
                             </p>
                           )}
                         </div>
                       </div>
-                      <div className="mt-4 pt-4 border-t border-gray-200 flex-grow">
-                        <div className="space-y-1.5">
+                      <div className="mx-3 border-t border-gray-100" />
+                      <div className="p-2 flex-grow">
+                        <div className="space-y-0.5">
                           {category.subItems && category.subItems.length > 0 ? (
                             category.subItems.map((subItem) => (
                               <button
@@ -307,17 +312,17 @@ const HomePage: React.FC = () => {
                                     subItem.path
                                   )
                                 }
-                                className="group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150"
+                                className="group flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150"
                               >
                                 <span>{subItem.name}</span>
                                 <IconChevronRight
-                                  size={16}
+                                  size={14}
                                   className="text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
                                 />
                               </button>
                             ))
                           ) : (
-                            <p className="px-2 py-1.5 text-sm text-gray-400 italic">
+                            <p className="px-2.5 py-1.5 text-sm text-gray-400 italic">
                               No items available.
                             </p>
                           )}
@@ -329,7 +334,7 @@ const HomePage: React.FC = () => {
               </div>
             ) : (
               // Card Layout for Green Target and Jelly Polly
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -338,29 +343,29 @@ const HomePage: React.FC = () => {
                       onClick={() =>
                         handleNavigate(section.company.id, item.path)
                       }
-                      className="group relative p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 text-left"
+                      className="group p-3 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-200 text-left"
                     >
-                      <div className="flex items-start space-x-3">
+                      <div className="flex items-start gap-2.5">
                         {Icon && (
                           <div
-                            className={`${section.company.bgColor} p-2 rounded-lg`}
+                            className={`${section.company.bgColor} p-1.5 rounded-lg shadow-sm`}
                           >
                             <Icon
-                              size={24}
+                              size={18}
                               className={section.company.color}
                             />
                           </div>
                         )}
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 flex items-center">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 text-sm flex items-center">
                             {item.name}
                             <IconChevronRight
-                              size={16}
-                              className="ml-1 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
+                              size={14}
+                              className="ml-1 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
                             />
                           </h3>
                           {item.description && (
-                            <p className="mt-1 text-sm text-gray-500">
+                            <p className="mt-0.5 text-xs text-gray-500 leading-tight">
                               {item.description}
                             </p>
                           )}
