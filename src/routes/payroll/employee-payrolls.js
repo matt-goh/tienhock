@@ -79,6 +79,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     );
     const payrollItems = itemsRes.rows.map((item) => ({
       ...item,
+      rate: parseFloat(item.rate),
+      quantity: parseFloat(item.quantity),
       amount: parseFloat(item.amount),
     }));
 
@@ -204,19 +206,35 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
     // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
     const consolidateItems = (items) => {
+      // Defensive: Validate and clean input
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return 0;
+      }
+
       const groups = new Map();
       items.forEach(item => {
-        const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+        // Defensive: Validate numeric fields
+        const rate = parseFloat(item.rate);
+        const quantity = parseFloat(item.quantity);
+        const amount = parseFloat(item.amount);
+
+        // Defensive: Skip invalid items
+        if (isNaN(rate) || isNaN(quantity) || isNaN(amount)) {
+          console.error('Invalid numeric values in payroll item:', item);
+          return; // Skip this item
+        }
+
+        const key = `${item.pay_code_id}_${rate}_${item.rate_unit}`;
         if (groups.has(key)) {
           const group = groups.get(key);
-          group.totalQuantity += item.quantity;
-          group.originalAmountSum += item.amount;
+          group.totalQuantity += quantity;      // Now guaranteed to be number
+          group.originalAmountSum += amount;    // Now guaranteed to be number
         } else {
           groups.set(key, {
-            rate: item.rate,
+            rate: rate,
             rate_unit: item.rate_unit,
-            totalQuantity: item.quantity,
-            originalAmountSum: item.amount,
+            totalQuantity: quantity,
+            originalAmountSum: amount,
           });
         }
       });
@@ -1444,7 +1462,34 @@ export default function (pool) {
       });
     }
 
+    // Parse and validate numeric values
+    const parsedRate = parseFloat(rate);
+    const parsedQuantity = parseFloat(quantity);
+    const parsedAmount = amount !== null ? parseFloat(amount) : null;
+
+    if (isNaN(parsedRate) || parsedRate < 0) {
+      return res.status(400).json({
+        message: "Invalid rate: must be a positive number",
+      });
+    }
+
+    if (isNaN(parsedQuantity) || parsedQuantity < 0) {
+      return res.status(400).json({
+        message: "Invalid quantity: must be a positive number",
+      });
+    }
+
+    if (parsedAmount !== null && isNaN(parsedAmount)) {
+      return res.status(400).json({
+        message: "Invalid amount: must be a number",
+      });
+    }
+
+    const client = await pool.connect();
+
     try {
+      await client.query("BEGIN");
+
       // Verify employee payroll exists and monthly payroll is not finalized
       const checkQuery = `
         SELECT ep.id, mp.status as payroll_status
@@ -1452,23 +1497,33 @@ export default function (pool) {
         JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         WHERE ep.id = $1
       `;
-      const checkResult = await pool.query(checkQuery, [id]);
+      const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ message: "Employee payroll not found" });
       }
 
       if (checkResult.rows[0].payroll_status === "Finalized") {
+        await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Cannot add items to a finalized payroll",
         });
       }
 
       // Calculate amount if not provided
-      let finalAmount = amount;
+      let finalAmount = parsedAmount;
       if (finalAmount === null) {
         // Simple calculation based on rate and quantity
-        finalAmount = rate * quantity;
+        finalAmount = parsedRate * parsedQuantity;
+      }
+
+      // Validate final amount
+      if (isNaN(finalAmount)) {
+        await client.query("ROLLBACK");
+        return res.status(500).json({
+          message: "Calculation error: resulting amount is invalid",
+        });
       }
 
       // Insert the new item
@@ -1481,17 +1536,19 @@ export default function (pool) {
         RETURNING *
       `;
 
-      const insertResult = await pool.query(insertQuery, [
+      const insertResult = await client.query(insertQuery, [
         id,
         pay_code_id,
         description,
-        rate,
+        parsedRate,
         rate_unit,
-        quantity,
+        parsedQuantity,
         finalAmount,
       ]);
 
-      // Recalculate totals and deductions
+      await client.query("COMMIT");
+
+      // Recalculate totals and deductions (uses its own transaction)
       await recalculateAndUpdatePayroll(pool, id);
 
       res.status(201).json({
@@ -1504,11 +1561,14 @@ export default function (pool) {
         },
       });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Error adding manual payroll item:", error);
       res.status(500).json({
         message: "Error adding manual payroll item",
         error: error.message,
       });
+    } finally {
+      client.release();
     }
   });
 
