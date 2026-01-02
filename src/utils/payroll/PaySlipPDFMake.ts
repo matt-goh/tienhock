@@ -390,13 +390,16 @@ const buildMainPayrollPage = (
       ));
     });
 
-    // Tambahan subtotal
-    tableBody.push([
-      { text: '', fillColor: '#f8f9fa', fontSize: 8 },
-      { text: '', fillColor: '#f8f9fa', fontSize: 8 },
-      { text: 'Subtotal', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
-      { text: formatCurrency(combinedTambahanTotal), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
-    ]);
+    // Tambahan subtotal - only show if more than one item total
+    const totalTambahanItems = (groupedItems.Tambahan?.length || 0) + leaveRecordsArray.length + commissionRecords.length;
+    if (totalTambahanItems > 1) {
+      tableBody.push([
+        { text: '', fillColor: '#f8f9fa', fontSize: 8 },
+        { text: '', fillColor: '#f8f9fa', fontSize: 8 },
+        { text: 'Subtotal', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+        { text: formatCurrency(combinedTambahanTotal), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+      ]);
+    }
   }
 
   // Overtime Items
@@ -605,6 +608,19 @@ const buildMainPayrollPage = (
         hLineWidth: (i: number, node: any) => {
           if (i === 0 || i === node.table.body.length) return 1; // Outer borders
           if (i === 1) return 1; // Below header
+
+          // Check row above the line (row i-1) for border below specific rows
+          const prevRow = node.table.body[i - 1];
+          if (prevRow && Array.isArray(prevRow)) {
+            const descCell = prevRow[2];
+            const descText = typeof descCell === 'object' ? descCell.text : descCell;
+            // Add border below Rate/Jam subtotal and Jumlah Gaji Kasar rows
+            if (typeof descText === 'string' &&
+                (descText.includes('Rate/Jam') || descText === 'Jumlah Gaji Kasar')) {
+              return 0.5;
+            }
+          }
+
           // Add thin line above rows with fillColor (subtotals, totals, category headers)
           const row = node.table.body[i];
           if (row && Array.isArray(row) && row[0]?.fillColor) {
@@ -765,12 +781,16 @@ const buildIndividualJobPage = (
       ));
     });
 
-    tableBody.push([
-      { text: '', fillColor: '#f8f9fa', fontSize: 8 },
-      { text: '', fillColor: '#f8f9fa', fontSize: 8 },
-      { text: 'Subtotal', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
-      { text: formatCurrency(combinedTambahanTotal), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
-    ]);
+    // Tambahan subtotal - only show if more than one item total
+    const totalTambahanItems = (groupedItems.Tambahan?.length || 0) + leaveRecordsArray.length + commissionRecords.length;
+    if (totalTambahanItems > 1) {
+      tableBody.push([
+        { text: '', fillColor: '#f8f9fa', fontSize: 8 },
+        { text: '', fillColor: '#f8f9fa', fontSize: 8 },
+        { text: 'Subtotal', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+        { text: formatCurrency(combinedTambahanTotal), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+      ]);
+    }
   }
 
   // Overtime Items
@@ -864,6 +884,19 @@ const buildIndividualJobPage = (
         hLineWidth: (i: number, node: any) => {
           if (i === 0 || i === node.table.body.length) return 1; // Outer borders
           if (i === 1) return 1; // Below header
+
+          // Check row above the line (row i-1) for border below specific rows
+          const prevRow = node.table.body[i - 1];
+          if (prevRow && Array.isArray(prevRow)) {
+            const descCell = prevRow[2];
+            const descText = typeof descCell === 'object' ? descCell.text : descCell;
+            // Add border below Rate/Jam subtotal and Gross Pay rows
+            if (typeof descText === 'string' &&
+                (descText.includes('Rate/Jam') || descText.includes('Gross Pay') || descText === 'Jumlah Gaji Kasar')) {
+              return 0.5;
+            }
+          }
+
           // Add thin line above rows with fillColor (subtotals, totals)
           const row = node.table.body[i];
           if (row && Array.isArray(row) && row[0]?.fillColor) {
