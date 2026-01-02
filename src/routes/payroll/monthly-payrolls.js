@@ -916,8 +916,41 @@ export default function (pool) {
           const manualItems = manualItemsByEmployee[primaryEmployee.employeeId] || [];
           manualItems.forEach(item => combinedItems.push(item));
 
-          // Calculate gross pay
-          const workGrossPay = combinedItems.reduce((sum, item) => sum + item.amount, 0);
+          // Calculate gross pay using CONSOLIDATED approach (matches frontend display)
+          // This groups items by pay_code+rate+rate_unit, sums quantities, then calculates once
+          // This ensures database gross_pay matches the consolidated view exactly
+          const consolidatedGroups = new Map();
+          combinedItems.forEach(item => {
+            const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+            if (consolidatedGroups.has(key)) {
+              const group = consolidatedGroups.get(key);
+              group.totalQuantity += item.quantity;
+              group.originalAmountSum += item.amount; // Keep for Percent/Fixed
+            } else {
+              consolidatedGroups.set(key, {
+                rate: item.rate,
+                rate_unit: item.rate_unit,
+                totalQuantity: item.quantity,
+                originalAmountSum: item.amount,
+              });
+            }
+          });
+
+          // Calculate gross pay from consolidated groups
+          let workGrossPayCents = 0;
+          consolidatedGroups.forEach(group => {
+            let amountCents;
+            if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
+              // Keep original summed amount for special rate units
+              amountCents = Math.round(group.originalAmountSum * 100);
+            } else {
+              // Calculate from consolidated: roundedRate × totalQuantity
+              const roundedRate = Math.round(group.rate * 100) / 100;
+              amountCents = Math.round(roundedRate * group.totalQuantity * 100);
+            }
+            workGrossPayCents += amountCents;
+          });
+          const workGrossPay = workGrossPayCents / 100;
 
           // Fetch leave and commission records for this employee
           const [leaveResult, commissionResult] = await Promise.all([

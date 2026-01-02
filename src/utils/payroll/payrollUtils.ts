@@ -342,7 +342,117 @@ export const deletePayrollItem = async (itemId: number) => {
   }
 };
 
-// Add these to src/utils/payroll/payrollUtils.ts
+/**
+ * Consolidated payroll item after grouping identical items together
+ */
+export interface ConsolidatedPayrollItem {
+  pay_code_id: string;
+  description: string;
+  pay_type: string;
+  rate: number;
+  rate_unit: string;
+  total_quantity: number;
+  total_amount: number;
+  item_count: number; // How many items were consolidated
+  is_manual: boolean;
+  job_type?: string;
+}
+
+/**
+ * Consolidates payroll items by grouping identical items together
+ * Groups by: pay_code_id + rate + rate_unit
+ * @param items Array of payroll items
+ * @returns Array of consolidated items with totals
+ */
+export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayrollItem[] => {
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return [];
+  }
+
+  // Create a map to group items by their unique key
+  const groupMap = new Map<string, ConsolidatedPayrollItem>();
+
+  items.forEach((item) => {
+    // Create unique key from pay_code_id + rate + rate_unit
+    const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+
+    if (groupMap.has(key)) {
+      // Add to existing group
+      const existing = groupMap.get(key)!;
+      existing.total_quantity += item.quantity;
+      existing.total_amount += item.amount;
+      existing.item_count += 1;
+      // Keep is_manual as true if any item is manual
+      if (item.is_manual) {
+        existing.is_manual = true;
+      }
+    } else {
+      // Create new group
+      groupMap.set(key, {
+        pay_code_id: item.pay_code_id,
+        description: item.description,
+        pay_type: item.pay_type,
+        rate: item.rate,
+        rate_unit: item.rate_unit,
+        total_quantity: item.quantity,
+        total_amount: item.amount,
+        item_count: 1,
+        is_manual: item.is_manual,
+        job_type: item.job_type,
+      });
+    }
+  });
+
+  // Recalculate amounts from rate × quantity for display consistency
+  // This ensures consolidated amounts match rate × total_quantity exactly
+  groupMap.forEach((item) => {
+    // Skip Percent and Fixed rate units - they have special calculation logic
+    if (item.rate_unit !== 'Percent' && item.rate_unit !== 'Fixed') {
+      item.total_amount = Math.round(item.rate * item.total_quantity * 100) / 100;
+    }
+  });
+
+  // Convert map to array and sort by pay_type, then description
+  return Array.from(groupMap.values()).sort((a, b) => {
+    // First sort by pay_type
+    if (a.pay_type !== b.pay_type) {
+      const typeOrder = { Base: 0, Tambahan: 1, Overtime: 2 };
+      return (typeOrder[a.pay_type as keyof typeof typeOrder] || 3) -
+             (typeOrder[b.pay_type as keyof typeof typeOrder] || 3);
+    }
+    // Then sort by description
+    return a.description.localeCompare(b.description);
+  });
+};
+
+/**
+ * Groups consolidated payroll items by pay type (Base, Tambahan, Overtime)
+ * @param items Array of consolidated payroll items
+ * @returns Object with items grouped by pay type
+ */
+export const groupConsolidatedItemsByType = (items: ConsolidatedPayrollItem[]) => {
+  const grouped: Record<string, ConsolidatedPayrollItem[]> = {
+    Base: [],
+    Tambahan: [],
+    Overtime: [],
+  };
+
+  if (!items || !Array.isArray(items)) {
+    return grouped;
+  }
+
+  items.forEach((item) => {
+    if (item.pay_type === "Overtime") {
+      grouped["Overtime"].push(item);
+    } else if (item.pay_type === "Tambahan") {
+      grouped["Tambahan"].push(item);
+    } else {
+      grouped["Base"].push(item);
+    }
+  });
+
+  return grouped;
+};
 
 /**
  * Groups payroll items by pay type (Base, Tambahan, Overtime)
