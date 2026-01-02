@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 10. Use rm instead of del when deleting files.
 11. To access the dev database, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
 12. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
+13. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
 
 ## Architecture Overview
 
