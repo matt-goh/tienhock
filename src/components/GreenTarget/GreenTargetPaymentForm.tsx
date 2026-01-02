@@ -324,14 +324,14 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
 
   return (
     <div className="fixed -top-4 inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {payment ? "Edit Payment" : "Record New Payment"}
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             disabled={isSubmitting}
           >
             <IconX size={20} />
@@ -345,7 +345,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {/* Payment Details */}
             <div className="mb-4">
-              <h4 className="text-md font-medium text-gray-900 mb-4">
+              <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">
                 Payment Details
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -412,13 +412,13 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
             {/* Selected Invoices */}
             {selectedInvoices.length > 0 && (
               <div className="mb-4">
-                <h4 className="text-md font-medium text-gray-900 mb-2">
+                <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Selected Invoices ({selectedInvoices.length})
                   {selectedInvoices.some(
                     ({ invoice, amountToPay }) =>
                       amountToPay > invoice.current_balance
                   ) && (
-                    <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                    <span className="ml-2 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full">
                       {
                         selectedInvoices.filter(
                           ({ invoice, amountToPay }) =>
@@ -429,7 +429,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                     </span>
                   )}
                 </h4>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                   <div className="space-y-2">
                     {selectedInvoices.map(({ invoice, amountToPay }) => {
                       const isOverpayment = amountToPay > invoice.current_balance;
@@ -442,21 +442,21 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                           key={invoice.invoice_id}
                           className={`flex items-center justify-between p-2 rounded border transition-colors ${
                             isOverpayment
-                              ? "bg-purple-50 border-purple-200"
-                              : "bg-white border-gray-200"
+                              ? "bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800"
+                              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                           }`}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 text-sm">
                               <span className="font-medium">{invoice.invoice_number}</span>
-                              <span className="text-gray-600 truncate">
+                              <span className="text-gray-600 dark:text-gray-400 truncate">
                                 {invoice.customer_name} ({invoice.customer_id})
                               </span>
-                              <span className="text-gray-500 text-xs">
+                              <span className="text-gray-500 dark:text-gray-400 text-xs">
                                 Bal: {formatCurrency(invoice.current_balance)}
                               </span>
                               {isOverpayment && (
-                                <span className="text-purple-600 text-xs font-medium">
+                                <span className="text-purple-600 dark:text-purple-400 text-xs font-medium">
                                   Overpaid: {formatCurrency(overpaidAmount)}
                                 </span>
                               )}
@@ -475,10 +475,10 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className={`w-24 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-sky-500 ${
+                                className={`w-24 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${
                                   isOverpayment
-                                    ? "border-purple-400 bg-purple-50"
-                                    : "border-gray-300"
+                                    ? "border-purple-400 dark:border-purple-600 bg-purple-50 dark:bg-purple-900/30"
+                                    : "border-gray-300 dark:border-gray-600"
                                 }`}
                                 disabled={isSubmitting}
                               />
@@ -496,10 +496,10 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                       );
                     })}
                   </div>
-                  <div className="mt-3 pt-3 border-t border-gray-300">
+                  <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
                     <div className="flex justify-between items-center">
-                      <span className="font-medium text-gray-900">Total:</span>
-                      <span className="text-lg font-bold text-green-600">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Total:</span>
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">
                         {formatCurrency(totalPaymentAmount)}
                       </span>
                     </div>
@@ -571,9 +571,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg">
+          <div className="px-6 py-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
             <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 {selectedInvoices.length === 0 ? (
                   "Select invoices to pay"
                 ) : (

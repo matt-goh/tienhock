@@ -2617,7 +2617,7 @@ const InvoiceDetailsPage: React.FC = () => {
                             {payment.status !== "cancelled" && (
                               <button
                                 onClick={() => handleEditInternalRef(payment)}
-                                className="p-1 rounded-md text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 hover:text-sky-600 dark:text-sky-400"
+                                className="p-1 rounded-md text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 hover:text-sky-600 dark:hover:text-sky-400"
                                 title="Edit Internal Reference"
                               >
                                 <IconPencil size={14} />

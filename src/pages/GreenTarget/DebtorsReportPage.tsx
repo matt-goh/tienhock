@@ -165,7 +165,7 @@ const DebtorsReportPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search..."
-              className="pl-10 pr-4 py-2 border border-default-300 dark:border-gray-600 rounded-full focus:outline-none focus:border-default-500"
+              className="pl-10 pr-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full focus:outline-none focus:border-default-500 dark:focus:border-gray-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -207,7 +207,7 @@ const DebtorsReportPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg p-8 text-center">
           <IconAlertCircle
             size={48}
-            className="mx-auto mb-4 text-default-300"
+            className="mx-auto mb-4 text-default-300 dark:text-gray-600"
           />
           <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-1">
             No debtors found
@@ -288,7 +288,7 @@ const DebtorsReportPage: React.FC = () => {
                 {sortedDebtors.map((debtor) => (
                   <tr
                     key={debtor.customer_id}
-                    className="hover:bg-sky-50 cursor-pointer transition-colors"
+                    className="hover:bg-sky-50 dark:hover:bg-sky-900/20 cursor-pointer transition-colors"
                     onClick={() => handleViewInvoices(debtor.customer_id)}
                     title={`View invoices for ${debtor.name}`} // More descriptive title
                   >
@@ -311,14 +311,14 @@ const DebtorsReportPage: React.FC = () => {
                             >
                               <IconPhone
                                 size={16}
-                                className="mr-1.5 text-default-400 flex-shrink-0"
+                                className="mr-1.5 text-default-400 dark:text-gray-500 flex-shrink-0"
                               />
                               <span className="truncate">{phone}</span>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-default-400 text-sm italic">
+                        <span className="text-default-400 dark:text-gray-500 text-sm italic">
                           No phone number
                         </span>
                       )}
@@ -326,12 +326,12 @@ const DebtorsReportPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-900 dark:text-gray-100">
                       {formatCurrency(debtor.total_invoiced)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600 dark:text-green-400">
                       {formatCurrency(debtor.total_paid)}
                     </td>
                     <td
                       className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${
-                        debtor.has_overdue ? "text-red-600" : "text-amber-600"
+                        debtor.has_overdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
                       }`}
                     >
                       {formatCurrency(debtor.balance)}

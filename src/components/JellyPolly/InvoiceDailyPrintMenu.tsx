@@ -271,7 +271,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         createPortal(
           <div
             ref={tooltipRef}
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-0 w-96 opacity-0 flex flex-col"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-0 w-96 opacity-0 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -284,18 +284,18 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
           >
             {/* Header */}
             <div
-              className="flex-shrink-0 border-b border-default-200 px-4 py-3 bg-default-50 rounded-t-lg cursor-pointer"
+              className="flex-shrink-0 border-b border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-900/50 rounded-t-lg cursor-pointer"
               onClick={handleSelectAll}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-base font-medium text-default-800">
+                <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
                   Daily Invoice Print Selection
                 </h3>
-                <div className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded-full text-xs font-medium">
+                <div className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 rounded-full text-xs font-medium">
                   {selectedCount}/{salesmenOptions.length}
                 </div>
               </div>
-              <div className="flex items-center mt-2 text-sm text-sky-600 hover:text-sky-800">
+              <div className="flex items-center mt-2 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300">
                 <Checkbox
                   checked={allSelected}
                   onChange={handleSelectAll}
@@ -313,15 +313,15 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                 {salesmenOptions.map((salesman) => (
                   <div
                     key={salesman.id}
-                    className="flex items-center px-3 py-2.5 hover:bg-default-50 rounded-lg cursor-pointer transition-colors"
+                    className="flex items-center px-3 py-2.5 hover:bg-default-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
                     onClick={() => handleSalesmanToggle(salesman.id)}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-default-700">
+                      <div className="text-sm font-medium text-default-700 dark:text-gray-200">
                         {salesman.name}
                       </div>
                       {salesman.description && (
-                        <div className="text-xs text-default-500">
+                        <div className="text-xs text-default-500 dark:text-gray-400">
                           {salesman.description}
                         </div>
                       )}
@@ -339,8 +339,8 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex-shrink-0 border-t border-default-200 px-4 py-3 bg-default-50 rounded-b-lg">
-              <div className="text-sm text-default-600 mb-2">
+            <div className="flex-shrink-0 border-t border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-900/50 rounded-b-lg">
+              <div className="text-sm text-default-600 dark:text-gray-400 mb-2">
                 <span className="font-medium">Date Range:</span>{" "}
                 {formatDateRange()}
               </div>
@@ -375,7 +375,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       {isGenerating &&
         createPortal(
           <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 mx-4 max-w-sm w-full transform scale-105 animate-pulse-slow">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mx-4 max-w-sm w-full transform scale-105 animate-pulse-slow">
               <div className="flex flex-col items-center gap-6">
                 {/* Animated Icon */}
                 <div className="relative">
@@ -386,7 +386,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                 </div>
 
                 <div className="text-center space-y-3 w-full">
-                  <h3 className="text-xl font-semibold text-default-900">
+                  <h3 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                     Processing Daily Invoices
                   </h3>
 
@@ -397,12 +397,12 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                     </p>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-default-200 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-default-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                       <div className="h-2 bg-gradient-to-r from-sky-400 to-sky-600 rounded-full animate-pulse transition-all duration-300"></div>
                     </div>
                   </div>
 
-                  <p className="text-xs text-default-500 mt-2">
+                  <p className="text-xs text-default-500 dark:text-gray-400 mt-2">
                     Please wait while we gather the invoice data...
                   </p>
                 </div>

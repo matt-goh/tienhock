@@ -65,7 +65,7 @@ const EPFRatesTab: React.FC = () => {
 
   if (error) {
     return (
-      <div className="text-center py-8 text-rose-600">
+      <div className="text-center py-8 text-rose-600 dark:text-rose-400">
         Error loading EPF rates: {error.message}
       </div>
     );
@@ -77,59 +77,59 @@ const EPFRatesTab: React.FC = () => {
         {Object.entries(groupedRates)
           .reverse()
           .map(([type, rates]) => (
-            <div key={type} className="border rounded-lg overflow-hidden">
-              <div className="bg-default-50 px-4 py-3 border-b">
-                <h3 className="font-medium text-default-800">
+            <div key={type} className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <div className="bg-default-50 dark:bg-gray-900/50 px-4 py-3 border-b dark:border-gray-700">
+                <h3 className="font-medium text-default-800 dark:text-gray-100">
                   {getEmployeeTypeLabel(type)}
                 </h3>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-50">
+                <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                  <thead className="bg-default-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                         Wage Threshold
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                         Employee Rate
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                         Employer Rate
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                         Employer Fixed
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-default-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                     {rates.map((rate) => (
-                      <tr key={rate.id} className="hover:bg-default-50">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">
+                      <tr key={rate.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                           {rate.wage_threshold ? (
                             `≤ ${formatCurrency(rate.wage_threshold)}`
                           ) : (
-                            <span className="text-default-500">
+                            <span className="text-default-500 dark:text-gray-400">
                               No threshold
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900">
+                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900 dark:text-gray-100">
                           {formatPercentage(rate.employee_rate_percentage)}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900">
+                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900 dark:text-gray-100">
                           {formatPercentage(rate.employer_rate_percentage)}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900">
+                        <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900 dark:text-gray-100">
                           {formatCurrency(rate.employer_fixed_amount)}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleEditRate(rate)}
-                            className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-50"
+                            className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 p-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/50"
                             title="Edit Rate"
                           >
                             <IconEdit size={18} />

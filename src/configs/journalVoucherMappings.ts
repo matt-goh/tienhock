@@ -7,17 +7,14 @@ export const LOCATION_MAP: { [key: string]: string } = {
   "02": "OFFICE",
   "03": "SALESMAN",
   "04": "IKUT LORI",
-  "05": "PENGANGKUTAN HABUK",
   "06": "JAGA BOILER",
   "07": "MESIN & SANGKUT MEE",
   "08": "PACKING MEE",
   "09": "MESIN BIHUN",
   "10": "SANGKUT BIHUN",
   "11": "PACKING BIHUN",
-  "12": "PEKEBUN",
   "13": "TUKANG SAPU",
   "14": "KILANG KERJA LUAR",
-  "15": "OTHER SABARINA",
   "16": "COMM-MESIN MEE",
   "17": "COMM-MESIN BIHUN",
   "18": "COMM-KILANG",
@@ -82,12 +79,6 @@ export const LOCATION_ACCOUNT_MAPPINGS: { [key: string]: LocationAccountCodes } 
     socso_employer: "MBSC_IL",
     sip_employer: "MBSIP_IL",
   },
-  "05": { // Pengangkutan Habuk (Lori Habuk)
-    salary: "MBS_LH",
-    epf_employer: "MBE_LH",
-    socso_employer: "MBSC_LH",
-    sip_employer: "MBSIP_LH",
-  },
   "06": { // Jaga Boiler
     salary: "MBS_JB",
     epf_employer: "MBE_JB",
@@ -124,12 +115,6 @@ export const LOCATION_ACCOUNT_MAPPINGS: { [key: string]: LocationAccountCodes } 
     socso_employer: "MBSC_PB",
     sip_employer: "MBSIP_PB",
   },
-  "12": { // Pekebun
-    salary: "MBS_PK",
-    epf_employer: "MBE_PK",
-    socso_employer: "MBSC_PK",
-    sip_employer: "MBSIP_PK",
-  },
   "13": { // Tukang Sapu
     salary: "MBS_TS",
     epf_employer: "MBE_TS",
@@ -141,12 +126,6 @@ export const LOCATION_ACCOUNT_MAPPINGS: { [key: string]: LocationAccountCodes } 
     epf_employer: "MBE_M",
     socso_employer: "MBSC_M",
     sip_employer: "MBSIP_M",
-  },
-  "15": { // Other Sabarina - uses Sundry/Other account
-    salary: "MBS_OTH",
-    epf_employer: "MBE_OTH",
-    socso_employer: "MBSC_OTH",
-    sip_employer: "MBSIP_OTH",
   },
   // Commission locations (16-21) - typically no EPF/SOCSO/SIP
   "16": { // Comm-Mesin Mee

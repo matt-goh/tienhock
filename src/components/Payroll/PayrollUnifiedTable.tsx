@@ -48,15 +48,15 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
   formatCurrency,
 }) => {
   return (
-    <div className="border border-default-200 rounded-lg shadow-sm">
+    <div className="border border-default-200 dark:border-gray-700 rounded-lg shadow-sm">
       <div className="max-h-[calc(100vh-150px)] overflow-y-auto">
         <table className="min-w-full table-fixed">
-          <thead className="bg-default-100 sticky top-0 z-10">
+          <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
             <tr>
-            <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-10">
+            <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-10">
               {/* Checkbox column */}
             </th>
-            <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase">
+            <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
               Name
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-28">
@@ -65,21 +65,21 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
             <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-24">
               Section
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 uppercase w-28">
+            <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
               Gross
             </th>
-            <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 uppercase w-28">
+            <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
               Net
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-24">
               Status
             </th>
-            <th className="px-3 py-2.5 text-center text-xs font-medium text-default-500 uppercase w-20">
+            <th className="px-3 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-20">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white">
+        <tbody className="bg-white dark:bg-gray-800">
           {jobGroups.map(({ jobType, employees }) => {
             const isGrouped = jobType.startsWith("Grouped: ");
             const displayJobType = isGrouped
@@ -103,10 +103,10 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                 {/* Job Group Header Row */}
                 <tr
                   className={clsx(
-                    "group cursor-pointer transition-colors border-t border-default-200",
+                    "group cursor-pointer transition-colors border-t border-default-200 dark:border-gray-700",
                     isExpanded
-                      ? "bg-sky-50 hover:bg-sky-100"
-                      : "bg-default-50 hover:bg-default-100"
+                      ? "bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50"
+                      : "bg-default-50 dark:bg-gray-800/50 hover:bg-default-100 dark:hover:bg-gray-700"
                   )}
                   onClick={() => onToggleExpand(jobType)}
                 >
@@ -140,15 +140,15 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                           isGrouped ? "text-emerald-600" : "text-sky-600"
                         )}
                       />
-                      <span className="font-semibold text-default-800">
+                      <span className="font-semibold text-default-800 dark:text-gray-100">
                         {displayJobType}
                       </span>
                       {isGrouped && (
-                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
                           Combined
                         </span>
                       )}
-                      <span className="text-sm text-default-500">
+                      <span className="text-sm text-default-500 dark:text-gray-400">
                         ({employees.length}{" "}
                         {employees.length === 1 ? "employee" : "employees"})
                       </span>
@@ -157,14 +157,14 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
 
                   {/* Gross Total */}
                   <td className="px-3 py-2 text-right">
-                    <span className="text-sm font-medium text-default-700">
+                    <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                       {formatCurrency(groupGrossPay)}
                     </span>
                   </td>
 
                   {/* Net Total */}
                   <td className="px-3 py-2 text-right">
-                    <span className="text-sm font-semibold text-emerald-600">
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                       {formatCurrency(groupNetPay)}
                     </span>
                   </td>
@@ -178,8 +178,8 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                       className={clsx(
                         "inline-flex p-1 rounded-full transition-all opacity-0 group-hover:opacity-100",
                         isExpanded
-                          ? "bg-sky-200 text-sky-700"
-                          : "bg-default-200 text-default-500"
+                          ? "bg-sky-200 dark:bg-sky-800 text-sky-700 dark:text-sky-300"
+                          : "bg-default-200 dark:bg-gray-700 text-default-500 dark:text-gray-400"
                       )}
                     >
                       {isExpanded ? (

@@ -158,7 +158,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     <div className="">
       {/* Header and Add Button */}
       <div className="flex w-full items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-default-900">
+        <h3 className="text-lg font-medium text-default-900 dark:text-gray-100">
           Custom Pricing & Availability
         </h3>
         <Button
@@ -176,51 +176,51 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       </div>
 
       {customerProducts.length === 0 ? (
-        <div className="text-center py-8 border border-dashed border-default-200 rounded-lg bg-default-50">
-          <p className="text-default-500">No custom product price added.</p>
+        <div className="text-center py-8 border border-dashed border-default-200 dark:border-gray-700 rounded-lg bg-default-50 dark:bg-gray-900/50">
+          <p className="text-default-500 dark:text-gray-400">No custom product price added.</p>
         </div>
       ) : (
-        <div className="border border-default-200 rounded-lg">
-          <table className="min-w-full divide-y divide-default-200">
-            <thead className="bg-default-100">
+        <div className="border border-default-200 dark:border-gray-700 rounded-lg">
+          <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+            <thead className="bg-default-100 dark:bg-gray-800">
               <tr>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider w-[120px]"
+                  className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[120px]"
                 >
                   Product
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider flex-1"
+                  className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider flex-1"
                 >
                   Description
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider w-[160px]"
+                  className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[160px]"
                 >
                   Custom Price (RM)
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider w-[100px]"
+                  className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[100px]"
                 >
                   Available
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider w-[110px]"
+                  className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[110px]"
                 >
                   Action
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-default-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
               {customerProducts.map((product) => (
-                <tr key={product.uid} className="hover:bg-default-50">
+                <tr key={product.uid} className="hover:bg-default-50 dark:hover:bg-gray-700">
                   {/* Product Selection */}
-                  <td className="px-4 py-2 whitespace-nowrap text-sm text-default-700">
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                     {product.product_id || "N/A"}
                   </td>
                   {/* Description */}
@@ -251,9 +251,9 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                         handlePriceBlur(product.uid, e.target.value)
                       } // Finalize on blur
                       className={clsx(
-                        "w-full px-2 py-1.5 border border-default-300 rounded-md shadow-sm text-sm",
+                        "w-full px-2 py-1.5 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
-                        "disabled:bg-default-100 disabled:cursor-not-allowed"
+                        "disabled:bg-default-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                       )}
                       placeholder="0.00"
                       disabled={disabled}

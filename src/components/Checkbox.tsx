@@ -23,8 +23,8 @@ const Checkbox: React.FC<CheckboxProps> = ({
   checked,
   onChange,
   size = 20,
-  checkedColor = "text-blue-600",
-  uncheckedColor = "text-default-400",
+  checkedColor = "text-blue-600 dark:text-blue-400",
+  uncheckedColor = "text-default-400 dark:text-gray-400",
   disabled = false,
   label,
   labelPosition = "right",
@@ -48,13 +48,13 @@ const Checkbox: React.FC<CheckboxProps> = ({
 
   const buttonClasses = clsx(
     "flex items-center justify-center focus:outline-none transition-colors duration-200",
-    !disabled && "hover:bg-gray-100",
+    !disabled && "hover:bg-gray-100 dark:hover:bg-gray-700",
     buttonClassName
   );
 
   const labelClasses = clsx(
-    "text-sm font-medium text-default-700",
-    !disabled && "hover:text-default-900"
+    "text-sm font-medium text-default-700 dark:text-gray-200",
+    !disabled && "hover:text-default-900 dark:hover:text-gray-100"
   );
 
   const renderCheckbox = () => (
@@ -73,7 +73,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
           stroke={1.5}
           className={clsx(
             uncheckedColor,
-            !disabled && "hover:text-blue-500 transition-colors"
+            !disabled && "hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
           )}
           aria-hidden="true"
         />

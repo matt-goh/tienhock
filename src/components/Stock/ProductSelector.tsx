@@ -176,16 +176,16 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
   // Category colors
   const categoryColors: Record<string, string> = {
-    BH: "text-blue-600 bg-blue-50",
-    MEE: "text-green-600 bg-green-50",
-    JP: "text-orange-600 bg-orange-50",
-    OTH: "text-purple-600 bg-purple-50",
+    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50",
+    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50",
+    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/50",
+    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/50",
   };
 
   return (
     <div className={label ? "space-y-2" : ""}>
       {label && (
-        <label className="block text-sm font-medium text-default-700">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
@@ -198,10 +198,10 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
           <ComboboxButton as="div" className="relative w-full cursor-pointer">
             <ComboboxInput
               className={clsx(
-                "w-full rounded-lg border border-default-300 bg-white py-2 pl-10 pr-10",
-                "text-sm leading-5 text-default-900 cursor-pointer",
+                "w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-10 pr-10",
+                "text-sm leading-5 text-default-900 dark:text-gray-100 cursor-pointer",
                 "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
-                "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+                "disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"
               )}
               displayValue={() =>
                 selectedProduct
@@ -212,11 +212,11 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
               placeholder={isLoading ? "Loading products..." : placeholder}
             />
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <IconSearch className="h-4 w-4 text-default-400" />
+              <IconSearch className="h-4 w-4 text-default-400 dark:text-gray-400" />
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
-                className="h-5 w-5 text-default-400"
+                className="h-5 w-5 text-default-400 dark:text-gray-400"
                 aria-hidden="true"
               />
             </div>
@@ -225,12 +225,12 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
           <ComboboxOptions
             className={clsx(
               "absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg",
-              "bg-white pb-1 text-sm shadow-lg ring-1 ring-black/5",
+              "bg-white dark:bg-gray-800 pb-1 text-sm shadow-lg ring-1 ring-black/5 dark:ring-gray-600",
               "focus:outline-none"
             )}
           >
             {!hasResults && query !== "" ? (
-              <div className="relative cursor-default select-none px-4 py-2 text-default-500">
+              <div className="relative cursor-default select-none px-4 py-2 text-default-500 dark:text-gray-400">
                 No products found.
               </div>
             ) : (
@@ -242,7 +242,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     className={({ active }) =>
                       clsx(
                         "relative cursor-pointer select-none py-2 pl-10 pr-4",
-                        active ? "bg-sky-100 text-sky-900" : "text-default-500"
+                        active ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100" : "text-default-500 dark:text-gray-400"
                       )
                     }
                   >
@@ -255,7 +255,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 {/* Favorites category */}
                 {showCategories && filteredFavorites.length > 0 && (
                   <div>
-                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 bg-amber-50">
+                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50">
                       Favorites ({filteredFavorites.length})
                     </div>
                     {filteredFavorites.map((product) => (
@@ -266,8 +266,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                           clsx(
                             "relative cursor-pointer select-none py-2 pl-10 pr-10",
                             active
-                              ? "bg-sky-100 text-sky-900"
-                              : "text-default-900"
+                              ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                              : "text-default-900 dark:text-gray-100"
                           )
                         }
                       >
@@ -286,7 +286,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                 <span
                                   className={clsx(
                                     "block truncate text-xs",
-                                    active ? "text-sky-700" : "text-default-500"
+                                    active ? "text-sky-700 dark:text-sky-300" : "text-default-500 dark:text-gray-400"
                                   )}
                                 >
                                   {product.description}
@@ -328,7 +328,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                           <div
                             className={clsx(
                               "sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider",
-                              categoryColors[type] || "text-default-500 bg-default-50"
+                              categoryColors[type] || "text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900/50"
                             )}
                           >
                             {categoryLabels[type]} ({prods.length})
@@ -388,7 +388,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                       "absolute inset-y-0 right-0 flex items-center pr-3",
                                       favorites.has(product.id)
                                         ? "text-amber-500 hover:text-amber-600"
-                                        : "text-default-300 hover:text-amber-500"
+                                        : "text-default-300 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400"
                                     )}
                                   >
                                     {favorites.has(product.id) ? (
@@ -460,7 +460,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                   "absolute inset-y-0 right-0 flex items-center pr-3",
                                   favorites.has(product.id)
                                     ? "text-amber-500 hover:text-amber-600"
-                                    : "text-default-300 hover:text-amber-500"
+                                    : "text-default-300 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400"
                                 )}
                               >
                                 {favorites.has(product.id) ? (
