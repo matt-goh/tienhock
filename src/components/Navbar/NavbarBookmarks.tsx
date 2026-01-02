@@ -369,9 +369,9 @@ export default function NavbarBookmarks({
           `}
         >
           {bookmarks.length > 0 ? (
-            <IconBookmarkFilled size={18} className="text-sky-500" />
+            <IconBookmarkFilled size={18} className="text-sky-500 dark:text-sky-400" />
           ) : (
-            <IconBookmark size={18} />
+            <IconBookmark size={18} className="text-default-700 dark:text-gray-200" />
           )}
           <span className="hidden sm:inline">Bookmarks</span>
         </button>

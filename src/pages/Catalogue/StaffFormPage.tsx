@@ -493,7 +493,7 @@ const StaffFormPage: React.FC = () => {
                   {payCode.pay_type}
                 </span>
               )}
-              <span className="px-2 py-0.5 bg-default-200 text-default-700 dark:text-gray-200 rounded-full">
+              <span className="px-2 py-0.5 bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-200 rounded-full">
                 {payCode.rate_unit}
               </span>
               {payCode.override_rate_biasa !== null && (
@@ -569,7 +569,7 @@ const StaffFormPage: React.FC = () => {
                 type="button"
                 onClick={() => onBatchSetDefault(filteredPayCodes, true)}
                 disabled={isBatchLoading}
-                className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-200 text-emerald-800 hover:bg-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-300 dark:hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title="Set all as default"
               >
                 {isBatchLoading ? "..." : "All Default"}
@@ -578,7 +578,7 @@ const StaffFormPage: React.FC = () => {
                 type="button"
                 onClick={() => onBatchSetDefault(filteredPayCodes, false)}
                 disabled={isBatchLoading}
-                className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 text-default-700 dark:text-gray-200 hover:bg-default-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-200 hover:bg-default-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title="Clear all defaults"
               >
                 {isBatchLoading ? "..." : "Clear All"}

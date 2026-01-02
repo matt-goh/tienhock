@@ -32,32 +32,8 @@ import {
   BankReportPDFData,
 } from "../../utils/payroll/BankReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
 import toast from "react-hot-toast";
-
-// Location mapping with proper order
-const LOCATION_MAP: { [key: string]: string } = {
-  "01": "DIRECTOR'S REMUNERATION",
-  "02": "OFFICE",
-  "03": "SALESMAN",
-  "04": "IKUT LORI",
-  "06": "JAGA BOILER",
-  "07": "MESIN & SANGKUT MEE",
-  "08": "PACKING MEE",
-  "09": "MESIN BIHUN",
-  "10": "SANGKUT BIHUN",
-  "11": "PACKING BIHUN",
-  "13": "TUKANG SAPU",
-  "14": "KILANG KERJA LUAR",
-  "16": "COMM-MESIN MEE",
-  "17": "COMM-MESIN BIHUN",
-  "18": "COMM-KILANG",
-  "19": "COMM-LORI",
-  "20": "COMM-BOILER",
-  "21": "COMM-FORKLIFT/CASE",
-  "22": "KILANG HABUK",
-  "23": "CUTI TAHUNAN",
-  "24": "SPECIAL OT",
-};
 
 // Location order with headers
 interface LocationOrderItem {
@@ -228,6 +204,16 @@ const SalaryReportPage: React.FC = () => {
 
   // Staff data
   const { staffs } = useStaffsCache();
+
+  // Location data from cache - build LOCATION_MAP from DB data
+  const { locations } = useLocationsCache();
+  const LOCATION_MAP = useMemo(() => {
+    const map: { [key: string]: string } = {};
+    locations.forEach((loc) => {
+      map[loc.id] = loc.name;
+    });
+    return map;
+  }, [locations]);
 
   // Bank table data - now comes directly from API
   const bankTableData = useMemo(() => {

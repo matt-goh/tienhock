@@ -219,9 +219,9 @@ export default function NavbarMobileMenu({
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <IconBookmarkFilled size={20} className="text-sky-500" />
+                    <IconBookmarkFilled size={20} className="text-sky-500 dark:text-sky-400" />
                     <span className="font-medium text-default-800 dark:text-gray-100">Bookmarks</span>
-                    <span className="bg-sky-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    <span className="bg-sky-500 dark:bg-sky-600 text-white text-xs px-2 py-0.5 rounded-full">
                       {bookmarks.length}
                     </span>
                   </div>

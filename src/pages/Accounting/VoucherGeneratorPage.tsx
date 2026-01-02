@@ -295,7 +295,7 @@ const VoucherGeneratorPage: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
-                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500" />
+                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500 dark:text-amber-400" />
                 <p>No director salary data for this month</p>
               </div>
             )}
@@ -462,7 +462,7 @@ const VoucherGeneratorPage: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
-                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500" />
+                <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500 dark:text-amber-400" />
                 <p>No staff salary data for this month</p>
               </div>
             )}
