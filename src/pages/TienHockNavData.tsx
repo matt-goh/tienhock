@@ -84,6 +84,7 @@ import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
 import TaxPage from "./Catalogue/TaxPage";
 import BasicPage from "./Catalogue/BasicPage";
+import LocationPage from "./Catalogue/LocationPage";
 
 // Function to generate payroll subitems for each job type
 const generatePayrollSubItems = (): SidebarItem[] => {
@@ -434,13 +435,7 @@ export const TienHockNavData: SidebarItem[] = [
       {
         name: "Location",
         path: "/catalogue/location",
-        component: () => (
-          <BasicPage
-            title="Location Catalogue"
-            apiEndpoint="locations"
-            tableKey="catalogueLocation"
-          />
-        ),
+        component: LocationPage,
       },
       {
         name: "Bank",
