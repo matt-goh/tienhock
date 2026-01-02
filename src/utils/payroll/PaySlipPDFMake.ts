@@ -3,7 +3,7 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import { TDocumentDefinitions, Content, TableCell, ContentTable } from 'pdfmake/interfaces';
 import { EmployeePayroll, MidMonthPayroll } from '../../types/types';
-import { groupItemsByType, getMonthName, consolidatePayrollItems, groupConsolidatedItemsByType, ConsolidatedPayrollItem } from './payrollUtils';
+import { getMonthName, consolidatePayrollItems, groupConsolidatedItemsByType, ConsolidatedPayrollItem } from './payrollUtils';
 
 // Initialize pdfmake with fonts (uses bundled Roboto font which is similar to Helvetica)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
@@ -215,7 +215,6 @@ const buildMainPayrollPage = (
   month: number,
   monthName: string
 ): Content[] => {
-  const groupedItems = groupItemsByType(payroll.items || []) || { Base: [], Tambahan: [], Overtime: [] };
   const isGroupedPayroll = payroll.job_type && payroll.job_type.includes(', ');
   const jobTypes = isGroupedPayroll ? payroll.job_type.split(', ').map(job => job.trim()) : [payroll.job_type];
   const employeeJobMapping = payroll.employee_job_mapping || {};
@@ -237,14 +236,14 @@ const buildMainPayrollPage = (
   const overtimeItemsByJob = groupItemsByJobType(groupedConsolidatedItems.Overtime || [], isGroupedPayroll || false, jobTypes, employeeJobMapping);
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
-  const baseTotalAmount = (groupedConsolidatedItems.Base || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
+  const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
+  const baseTotalAmount = consolidatedBaseItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
   const tambahanTotalAmount = (groupedConsolidatedItems.Tambahan || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
   const overtimeTotalAmount = (groupedConsolidatedItems.Overtime || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
 
-  // Detect predominant rate unit for Base items (Hour vs Bag)
-  const baseItems = groupedItems.Base || [];
-  const bagBasedItems = baseItems.filter(item => item.rate_unit === 'Bag');
-  const hourBasedItems = baseItems.filter(item => item.rate_unit === 'Hour');
+  // Detect predominant rate unit for Base items (Hour vs Bag) - use consolidated items
+  const bagBasedItems = consolidatedBaseItems.filter(item => item.rate_unit === 'Bag');
+  const hourBasedItems = consolidatedBaseItems.filter(item => item.rate_unit === 'Hour');
   const isBagBased = bagBasedItems.length > hourBasedItems.length;
   const rateUnitLabel = isBagBased ? 'Bag' : 'Jam';
 
@@ -266,9 +265,12 @@ const buildMainPayrollPage = (
   const commissionTotalAmount = commissionRecords.reduce((sum, record) => sum + record.amount, 0);
   const combinedTambahanTotal = tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
 
-  // Calculate average rate (total amount / total quantity)
-  const totalBaseQuantity = baseItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-  const averageBaseRate = totalBaseQuantity > 0 ? baseTotalAmount / totalBaseQuantity : 0;
+  // Calculate effective hourly rate (total amount / hours worked)
+  // Note: When a worker performs multiple tasks during the same hours, each task shows the same quantity
+  // So we use the first item's quantity (or most common) as the actual hours worked, not the sum
+  const hourBasedItemsForRate = consolidatedBaseItems.filter(item => item.rate_unit === 'Hour');
+  const representativeHours = hourBasedItemsForRate.length > 0 ? hourBasedItemsForRate[0].total_quantity : 0;
+  const averageBaseRate = representativeHours > 0 ? baseTotalAmount / representativeHours : 0;
 
   // Mid-month and final calculations
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
@@ -324,11 +326,11 @@ const buildMainPayrollPage = (
   });
 
   // Base subtotal row (only for single-job payrolls; combined payrolls show per-job subtotals)
-  if (groupedItems.Base && groupedItems.Base.length > 0 && !isGroupedPayroll) {
+  if (consolidatedBaseItems.length > 0 && !isGroupedPayroll) {
     tableBody.push([
       { text: '', fillColor: '#f8f9fa', fontSize: 8 },
       { text: '', fillColor: '#f8f9fa', fontSize: 8 },
-      { text: `Rate/${rateUnitLabel} : ${averageBaseRate.toFixed(2)}`, bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+      { text: `Rate/${rateUnitLabel}: ${averageBaseRate.toFixed(2)}`, bold: true, fillColor: '#f8f9fa', fontSize: 8 },
       { text: formatCurrency(baseTotalAmount), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
     ]);
   }
@@ -674,7 +676,6 @@ const buildIndividualJobPage = (
   jobIndex: number,
   totalJobs: number
 ): Content[] => {
-  const groupedItems = groupItemsByType(individualJob.items || []) || { Base: [], Tambahan: [], Overtime: [] };
   const employeeJobMapping = payroll.employee_job_mapping || {};
 
   // Consolidate items for cleaner PDF output
@@ -691,14 +692,14 @@ const buildIndividualJobPage = (
   const jobEmployeeId = getEmployeeIdForJob(individualJob.job_type);
 
   // Calculate totals - use consolidated items for consistency with recalculated amounts
-  const baseTotalAmount = (groupedConsolidatedItems.Base || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
+  const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
+  const baseTotalAmount = consolidatedBaseItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
   const tambahanTotalAmount = (groupedConsolidatedItems.Tambahan || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
   const overtimeTotalAmount = (groupedConsolidatedItems.Overtime || []).reduce((sum, item) => sum + (item.total_amount || 0), 0);
 
-  // Detect predominant rate unit for Base items (Hour vs Bag)
-  const baseItems = groupedItems.Base || [];
-  const bagBasedItems = baseItems.filter(item => item.rate_unit === 'Bag');
-  const hourBasedItems = baseItems.filter(item => item.rate_unit === 'Hour');
+  // Detect predominant rate unit for Base items (Hour vs Bag) - use consolidated items
+  const bagBasedItems = consolidatedBaseItems.filter(item => item.rate_unit === 'Bag');
+  const hourBasedItems = consolidatedBaseItems.filter(item => item.rate_unit === 'Hour');
   const isBagBased = bagBasedItems.length > hourBasedItems.length;
   const rateUnitLabel = isBagBased ? 'Bag' : 'Jam';
 
@@ -720,9 +721,12 @@ const buildIndividualJobPage = (
   const commissionTotalAmount = commissionRecords.reduce((sum, record) => sum + (record.amount || 0), 0);
   const combinedTambahanTotal = tambahanTotalAmount + leaveTotalAmount + commissionTotalAmount;
 
-  // Calculate average rate (total amount / total quantity)
-  const totalBaseQuantity = baseItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-  const averageBaseRate = totalBaseQuantity > 0 ? baseTotalAmount / totalBaseQuantity : 0;
+  // Calculate effective hourly rate (total amount / hours worked)
+  // Note: When a worker performs multiple tasks during the same hours, each task shows the same quantity
+  // So we use the first item's quantity (or most common) as the actual hours worked, not the sum
+  const hourBasedItemsForRate = consolidatedBaseItems.filter(item => item.rate_unit === 'Hour');
+  const representativeHours = hourBasedItemsForRate.length > 0 ? hourBasedItemsForRate[0].total_quantity : 0;
+  const averageBaseRate = representativeHours > 0 ? baseTotalAmount / representativeHours : 0;
 
   // Build table body
   const tableBody: TableCell[][] = [];
@@ -736,7 +740,6 @@ const buildIndividualJobPage = (
   ]);
 
   // Base Pay Items - Using consolidated items for cleaner display
-  const consolidatedBaseItems = groupedConsolidatedItems.Base || [];
   consolidatedBaseItems.forEach(item => {
     const qtyLabel = item.rate_unit === 'Bag'
       ? `${item.total_quantity} Bag${item.total_quantity > 1 ? 's' : ''}`
@@ -752,11 +755,11 @@ const buildIndividualJobPage = (
   });
 
   // Base subtotal
-  if (groupedItems.Base && groupedItems.Base.length > 0) {
+  if (consolidatedBaseItems.length > 0) {
     tableBody.push([
       { text: '', fillColor: '#f8f9fa', fontSize: 8 },
       { text: '', fillColor: '#f8f9fa', fontSize: 8 },
-      { text: `Rate/${rateUnitLabel} : ${averageBaseRate.toFixed(2)}`, bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+      { text: `Rate/${rateUnitLabel}: ${averageBaseRate.toFixed(2)}`, bold: true, fillColor: '#f8f9fa', fontSize: 8 },
       { text: formatCurrency(baseTotalAmount), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
     ]);
   }
