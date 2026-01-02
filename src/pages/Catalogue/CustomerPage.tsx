@@ -125,7 +125,7 @@ const CustomerPage: React.FC = () => {
     <div className="flex items-center">
       <Listbox value={selectedSalesman} onChange={setSelectedSalesman}>
         <div className="relative">
-          <ListboxButton className="w-48 rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500">
+          <ListboxButton className="w-48 rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500">
             <span className="block truncate pl-2">{selectedSalesman}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
@@ -141,7 +141,7 @@ const CustomerPage: React.FC = () => {
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                     active
-                      ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                      ? "bg-default-100 dark:bg-gray-900/50 text-default-900 dark:text-gray-100"
                       : "text-default-900 dark:text-gray-100"
                   }`
                 }
@@ -298,7 +298,7 @@ const CustomerPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
+              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

@@ -122,7 +122,7 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
 
         {/* Date Display - Clickable when not today */}
         {isToday ? (
-          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-700")}>
+          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-900/50")}>
             {displayFormatter(selectedDate)}
           </div>
         ) : (
@@ -130,7 +130,7 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
             onClick={goToToday}
             className={clsx(
               displayClasses,
-              "bg-default-50 dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900 hover:border-sky-300 dark:hover:border-sky-600 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
+              "bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
             title="Click to go to today"
             aria-label="Go to today"

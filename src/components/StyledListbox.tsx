@@ -46,7 +46,7 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
     <div className={className}>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <ListboxButton className={`w-full ${roundedClass} ${sizeClasses} border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500 h-[40px]`}>
+          <ListboxButton className={`w-full ${roundedClass} ${sizeClasses} border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500 h-[40px]`}>
             <span className="block truncate">{displayValue}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
               <IconChevronDown
