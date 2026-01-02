@@ -2951,7 +2951,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           ) : (
             <>
               {/* Main Employee Table */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm">
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
                 <div>
                   <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                     <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -3343,7 +3343,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               {/* SALESMAN_IKUT Table - Only show for SALESMAN job type */}
               {jobConfig?.id === "SALESMAN" &&
                 salesmanIkutEmployees.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm mt-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm mt-4">
                     <div>
                       <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                         <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -3476,12 +3476,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 }}
                                 className={`transition-colors duration-150 ${
                                   isSaving || leaveEmployees[row.id]?.selected
-                                    ? "bg-default-50 cursor-not-allowed"
-                                    : "cursor-pointer hover:bg-default-50"
+                                    ? "bg-default-50 dark:bg-gray-700 cursor-not-allowed"
+                                    : "cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700"
                                 } ${
                                   isSelected
-                                    ? "bg-sky-50 hover:bg-sky-100"
-                                    : "bg-white"
+                                    ? "bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50"
+                                    : "bg-white dark:bg-gray-800"
                                 }`}
                               >
                                 <td
@@ -3551,7 +3551,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         )
                                       }
                                       onClick={(e) => e.stopPropagation()}
-                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
                                       min="0"
                                       disabled={!isSelected}
                                       placeholder={isSelected ? "0" : "-"}
@@ -3577,7 +3577,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         )
                                       }
                                       onClick={(e) => e.stopPropagation()}
-                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
                                       min="0"
                                       disabled={!isSelected}
                                       placeholder={isSelected ? "0" : "-"}
@@ -3598,7 +3598,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                       <div className="relative">
                                         <ListboxButton
                                           onClick={(e) => e.stopPropagation()}
-                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
+                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
                                         >
                                           <span className="block truncate text-sm">
                                             {selectedSalesman
@@ -3610,7 +3610,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           </span>
                                           <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                             <IconChevronDown
-                                              className="w-4 h-4 text-default-400"
+                                              className="w-4 h-4 text-default-400 dark:text-gray-500"
                                               aria-hidden="true"
                                             />
                                           </span>
@@ -3623,7 +3623,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         >
                                           <ListboxOptions
                                             onClick={(e) => e.stopPropagation()}
-                                            className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
+                                            className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
                                               isLastRow
                                                 ? "bottom-full mb-1"
                                                 : "mt-1"
@@ -3634,8 +3634,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                               className={({ active }) =>
                                                 `${
                                                   active
-                                                    ? "bg-default-100 text-default-900"
-                                                    : "text-default-700"
+                                                    ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                                                    : "text-default-700 dark:text-gray-200"
                                                 } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
                                               }
                                             >
@@ -3656,8 +3656,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                                   className={({ active }) =>
                                                     `${
                                                       active
-                                                        ? "bg-sky-100 text-sky-900"
-                                                        : "text-default-700"
+                                                        ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200"
+                                                        : "text-default-700 dark:text-gray-200"
                                                     } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
                                                   }
                                                 >
@@ -3738,7 +3738,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           <h2 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
             Leave & Absence Recording
           </h2>
-          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
             {availableForLeave.length === 0 ? (
               <div className="text-center py-10 px-6">
                 <p className="text-sm text-default-500 dark:text-gray-400">
@@ -3809,12 +3809,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         key={`leave-${employee.id}`}
                         className={`transition-colors duration-150 ${
                           isSaving
-                            ? "bg-default-50 cursor-not-allowed"
+                            ? "bg-default-50 dark:bg-gray-700 cursor-not-allowed"
                             : "cursor-pointer"
                         } ${
                           isSelected
-                            ? "bg-amber-50 hover:bg-amber-100/75"
-                            : "bg-white hover:bg-default-100"
+                            ? "bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100/75 dark:hover:bg-amber-900/50"
+                            : "bg-white dark:bg-gray-800 hover:bg-default-100 dark:hover:bg-gray-700"
                         }`}
                         onClick={() => {
                           if (isSaving) return;
@@ -3873,8 +3873,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     <span
                                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                         availability.remaining > 0
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-red-100 text-red-800"
+                                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                                       }`}
                                     >
                                       {leaveTypeName}: {availability.remaining}/
@@ -3903,8 +3903,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   onClick={(e) => e.stopPropagation()}
                                   className={`relative w-full pl-3 pr-8 py-2 text-left rounded-md border ${
                                     !isSelected || isSaving
-                                      ? "bg-default-100 text-default-400 cursor-not-allowed border-default-200"
-                                      : "bg-white text-default-700 border-default-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                      ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
+                                      : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
                                   }`}
                                 >
                                   <span className="block truncate text-sm">
@@ -3917,7 +3917,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                   </span>
                                   <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                     <IconChevronDown
-                                      className="w-4 h-4 text-default-400"
+                                      className="w-4 h-4 text-default-400 dark:text-gray-500"
                                       aria-hidden="true"
                                     />
                                   </span>
@@ -3938,8 +3938,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                         className={({ active }) =>
                                           `${
                                             active
-                                              ? "bg-amber-100 text-amber-900"
-                                              : "text-default-700"
+                                              ? "bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200"
+                                              : "text-default-700 dark:text-gray-200"
                                           } cursor-pointer select-none relative py-2 pl-3 pr-8`
                                         }
                                       >

@@ -493,8 +493,8 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
             </div> /* End Main Content Space */
           ) : (
             // Fallback for null results and not loading
-            <div className="flex flex-col items-center justify-center py-16 text-center text-default-500">
-              <IconAlertTriangle size={32} className="mb-3 text-amber-500" />
+            <div className="flex flex-col items-center justify-center py-16 text-center text-default-500 dark:text-gray-400">
+              <IconAlertTriangle size={32} className="mb-3 text-amber-500 dark:text-amber-400" />
               <p className="text-lg font-medium">No Results Available</p>
               <p className="text-sm">
                 Could not retrieve or process submission results.

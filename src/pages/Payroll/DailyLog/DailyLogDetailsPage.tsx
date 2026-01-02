@@ -246,9 +246,9 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
                 {workLog.shift === 1 ? (
-                  <IconSun size={16} className="text-amber-500" />
+                  <IconSun size={16} className="text-amber-500 dark:text-amber-400" />
                 ) : (
-                  <IconMoon size={16} className="text-indigo-500" />
+                  <IconMoon size={16} className="text-indigo-500 dark:text-indigo-400" />
                 )}
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.shift === 1 ? "Day" : "Night"}

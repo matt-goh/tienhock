@@ -33,9 +33,9 @@ interface NavbarMobileMenuProps {
 
 // Company theme colors
 const companyThemes: Record<string, { bg: string; text: string; border: string }> = {
-  tienhock: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" },
-  greentarget: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  jellypolly: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+  tienhock: { bg: "bg-sky-50 dark:bg-sky-900/30", text: "text-sky-700 dark:text-sky-300", border: "border-sky-200 dark:border-sky-800" },
+  greentarget: { bg: "bg-emerald-50 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-200 dark:border-emerald-800" },
+  jellypolly: { bg: "bg-rose-50 dark:bg-rose-900/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200 dark:border-rose-800" },
 };
 
 export default function NavbarMobileMenu({
@@ -145,9 +145,9 @@ export default function NavbarMobileMenu({
         leaveFrom="translate-x-0"
         leaveTo="-translate-x-full"
       >
-        <div className="fixed inset-y-0 left-0 z-50 w-[85%] max-w-[320px] bg-white shadow-xl flex flex-col">
+        <div className="fixed inset-y-0 left-0 z-50 w-[85%] max-w-[320px] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
           {/* Header */}
-          <div className={`flex items-center justify-between px-4 py-3 border-b border-default-200 ${theme.bg}`}>
+          <div className={`flex items-center justify-between px-4 py-3 border-b border-default-200 dark:border-gray-700 ${theme.bg}`}>
             <div className="flex items-center gap-3">
               {getCompanyLogo(activeCompany.id)}
               <span className={`font-bold text-lg ${theme.text}`}>{activeCompany.name}</span>
@@ -161,15 +161,15 @@ export default function NavbarMobileMenu({
           </div>
 
           {/* Company Switcher */}
-          <div className="border-b border-default-200">
+          <div className="border-b border-default-200 dark:border-gray-700">
             <button
               onClick={() => setShowCompanySwitcher(!showCompanySwitcher)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-default-600 hover:bg-default-50"
+              className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
             >
               <span>Switch Company</span>
               <IconChevronDown
                 size={16}
-                className={`text-default-400 transition-transform duration-200 ${showCompanySwitcher ? "rotate-180" : ""}`}
+                className={`text-default-400 dark:text-gray-500 transition-transform duration-200 ${showCompanySwitcher ? "rotate-180" : ""}`}
               />
             </button>
 
@@ -183,7 +183,7 @@ export default function NavbarMobileMenu({
               leaveFrom="max-h-[200px] opacity-100"
               leaveTo="max-h-0 opacity-0"
             >
-              <div className="overflow-hidden bg-default-50">
+              <div className="overflow-hidden bg-default-50 dark:bg-gray-900/50">
                 {companies.map((company) => {
                   const isActive = company.id === activeCompany.id;
                   const itemTheme = companyThemes[company.id] || companyThemes.tienhock;
@@ -192,7 +192,7 @@ export default function NavbarMobileMenu({
                       key={company.id}
                       onClick={() => handleCompanyChange(company)}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors ${
-                        isActive ? `${itemTheme.bg} ${itemTheme.text}` : "hover:bg-default-100 text-default-700"
+                        isActive ? `${itemTheme.bg} ${itemTheme.text}` : "hover:bg-default-100 dark:hover:bg-gray-700 text-default-700 dark:text-gray-200"
                       }`}
                     >
                       {getCompanyLogo(company.id, 20)}
@@ -215,19 +215,19 @@ export default function NavbarMobileMenu({
                 <button
                   onClick={() => setExpandedCategory(expandedCategory === "Bookmarks" ? null : "Bookmarks")}
                   className={`w-full flex items-center justify-between py-3 px-4 ${
-                    expandedCategory === "Bookmarks" ? "bg-sky-50" : "hover:bg-default-50"
+                    expandedCategory === "Bookmarks" ? "bg-sky-50 dark:bg-sky-900/30" : "hover:bg-default-50 dark:hover:bg-gray-700"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <IconBookmarkFilled size={20} className="text-sky-500" />
-                    <span className="font-medium text-default-800">Bookmarks</span>
-                    <span className="bg-sky-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    <IconBookmarkFilled size={20} className="text-sky-500 dark:text-sky-400" />
+                    <span className="font-medium text-default-800 dark:text-gray-100">Bookmarks</span>
+                    <span className="bg-sky-500 dark:bg-sky-600 text-white text-xs px-2 py-0.5 rounded-full">
                       {bookmarks.length}
                     </span>
                   </div>
                   <IconChevronRight
                     size={18}
-                    className={`text-default-400 transition-transform duration-200 ${
+                    className={`text-default-400 dark:text-gray-500 transition-transform duration-200 ${
                       expandedCategory === "Bookmarks" ? "rotate-90" : ""
                     }`}
                   />
@@ -241,7 +241,7 @@ export default function NavbarMobileMenu({
                   leaveFrom="max-h-[400px] opacity-100"
                   leaveTo="max-h-0 opacity-0"
                 >
-                  <div className="overflow-hidden bg-default-50">
+                  <div className="overflow-hidden bg-default-50 dark:bg-gray-900/50">
                     {bookmarks.map((bookmark) => {
                       const itemData = findNavItem(navData, bookmark.name);
                       if (!itemData || !itemData.path) return null;
@@ -252,8 +252,8 @@ export default function NavbarMobileMenu({
                           onClick={onClose}
                           className={`flex items-center py-2.5 px-4 pl-12 text-sm ${
                             isItemActive(itemData.path)
-                              ? "text-sky-700 bg-sky-50"
-                              : "text-default-600 hover:bg-default-100"
+                              ? "text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/30"
+                              : "text-default-600 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
                           }`}
                         >
                           {bookmark.name}
@@ -280,8 +280,8 @@ export default function NavbarMobileMenu({
                     onClick={onClose}
                     className={`flex items-center gap-3 py-3 px-4 ${
                       isItemActive(category.path)
-                        ? "bg-sky-50 text-sky-700"
-                        : "text-default-700 hover:bg-default-50"
+                        ? "bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
+                        : "text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                     }`}
                   >
                     {category.icon && <category.icon size={20} stroke={1.5} />}
@@ -297,16 +297,16 @@ export default function NavbarMobileMenu({
                     <button
                       onClick={() => setExpandedCategory(isExpanded ? null : category.name)}
                       className={`w-full flex items-center justify-between py-3 px-4 ${
-                        isExpanded ? "bg-default-50" : "hover:bg-default-50"
+                        isExpanded ? "bg-default-50 dark:bg-gray-900/50" : "hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         {category.icon && <category.icon size={20} stroke={1.5} />}
-                        <span className="font-medium text-default-800">{category.name}</span>
+                        <span className="font-medium text-default-800 dark:text-gray-100">{category.name}</span>
                       </div>
                       <IconChevronRight
                         size={18}
-                        className={`text-default-400 transition-transform duration-200 ${
+                        className={`text-default-400 dark:text-gray-500 transition-transform duration-200 ${
                           isExpanded ? "rotate-90" : ""
                         }`}
                       />
@@ -320,7 +320,7 @@ export default function NavbarMobileMenu({
                       leaveFrom="max-h-[600px] opacity-100"
                       leaveTo="max-h-0 opacity-0"
                     >
-                      <div className="overflow-hidden bg-default-50">
+                      <div className="overflow-hidden bg-default-50 dark:bg-gray-900/50">
                         {navigableItems.map((item) => (
                           <Link
                             key={item.path}
@@ -328,8 +328,8 @@ export default function NavbarMobileMenu({
                             onClick={onClose}
                             className={`flex items-center py-2.5 px-4 pl-12 text-sm ${
                               isItemActive(item.path)
-                                ? "text-sky-700 bg-sky-50"
-                                : "text-default-600 hover:bg-default-100"
+                                ? "text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/30"
+                                : "text-default-600 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
                             }`}
                           >
                             {item.name}
@@ -346,22 +346,22 @@ export default function NavbarMobileMenu({
           </div>
 
           {/* Footer - User Info & Logout */}
-          <div className="border-t border-default-200 p-4">
+          <div className="border-t border-default-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-default-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-default-600">
+                <div className="w-9 h-9 bg-default-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-medium text-default-600 dark:text-gray-300">
                     {user?.id?.charAt(0)?.toUpperCase() || "U"}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium text-default-800 text-sm">{user?.id || "User"}</p>
-                  <p className="text-xs text-default-500">Logged in</p>
+                  <p className="font-medium text-default-800 dark:text-gray-100 text-sm">{user?.id || "User"}</p>
+                  <p className="text-xs text-default-500 dark:text-gray-400">Logged in</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-sm font-medium"
               >
                 <IconLogout size={18} />
                 <span>Logout</span>

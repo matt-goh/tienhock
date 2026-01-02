@@ -63,7 +63,7 @@ const IncomeTaxRatesTab: React.FC = () => {
 
   if (error) {
     return (
-      <div className="text-center py-8 text-rose-600">
+      <div className="text-center py-8 text-rose-600 dark:text-rose-400">
         Error loading Income Tax rates: {error.message}
       </div>
     );
@@ -72,7 +72,7 @@ const IncomeTaxRatesTab: React.FC = () => {
   return (
     <div className="mt-4">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium text-default-800">
+        <h3 className="text-lg font-medium text-default-800 dark:text-gray-100">
           Income Tax Rates
         </h3>
         <Button
@@ -87,45 +87,45 @@ const IncomeTaxRatesTab: React.FC = () => {
         </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-default-200">
-            <thead className="bg-default-50">
+          <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+            <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                   Wage Range
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                   Base Rate
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-default-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
               {incomeTaxRates.map((rate) => (
                 <React.Fragment key={rate.id}>
                   {/* Main row */}
-                  <tr className="hover:bg-default-50">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900 font-medium">
+                  <tr className="hover:bg-default-50 dark:hover:bg-gray-700">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100 font-medium">
                       {formatWageRange(rate.wage_from, rate.wage_to)}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-default-900 dark:text-gray-100">
                       {formatCurrency(rate.base_rate)}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleEditRate(rate)}
-                          className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-50"
+                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 p-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/50"
                           title="Edit Rate"
                         >
                           <IconEdit size={18} />
                         </button>
                         <button
                           onClick={() => handleDeleteRate(rate.id)}
-                          className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50"
+                          className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/50"
                           title="Delete Rate"
                         >
                           <IconTrash size={18} />
@@ -134,12 +134,12 @@ const IncomeTaxRatesTab: React.FC = () => {
                     </td>
                   </tr>
                   {/* Spouse rates row */}
-                  <tr className="bg-default-25">
+                  <tr className="bg-default-25 dark:bg-gray-900/30">
                     <td colSpan={3} className="px-4 py-3">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Unemployed Spouse */}
-                        <div className="border border-default-200 rounded-lg pt-2 pb-4 bg-white">
-                          <h4 className="text-sm font-medium text-default-700 mb-3 text-center border-b border-default-200 pb-2">
+                        <div className="border border-default-200 dark:border-gray-700 rounded-lg pt-2 pb-4 bg-white dark:bg-gray-800">
+                          <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3 text-center border-b border-default-200 dark:border-gray-700 pb-2">
                             Spouse Unemployed
                           </h4>
                           <div className="grid grid-cols-6 gap-2 text-xs">
@@ -160,10 +160,10 @@ const IncomeTaxRatesTab: React.FC = () => {
                               },
                             ].map((item, index) => (
                               <div key={index} className="text-center">
-                                <div className="font-medium text-default-600">
+                                <div className="font-medium text-default-600 dark:text-gray-300">
                                   {item.label}
                                 </div>
-                                <div className="text-default-900">
+                                <div className="text-default-900 dark:text-gray-100">
                                   {Number(item.value ?? 0).toFixed(2)}
                                 </div>
                               </div>
@@ -171,8 +171,8 @@ const IncomeTaxRatesTab: React.FC = () => {
                           </div>
                         </div>
                         {/* Employed Spouse */}
-                        <div className="border border-default-200 rounded-lg pt-2 pb-4 bg-white">
-                          <h4 className="text-sm font-medium text-default-700 mb-3 text-center border-b border-default-200 pb-2">
+                        <div className="border border-default-200 dark:border-gray-700 rounded-lg pt-2 pb-4 bg-white dark:bg-gray-800">
+                          <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3 text-center border-b border-default-200 dark:border-gray-700 pb-2">
                             Spouse Employed
                           </h4>
                           <div className="grid grid-cols-6 gap-2 text-xs">
@@ -190,10 +190,10 @@ const IncomeTaxRatesTab: React.FC = () => {
                               { label: "K10", value: rate.employed_spouse_k10 },
                             ].map((item, index) => (
                               <div key={index} className="text-center">
-                                <div className="font-medium text-default-600">
+                                <div className="font-medium text-default-600 dark:text-gray-300">
                                   {item.label}
                                 </div>
-                                <div className="text-default-900">
+                                <div className="text-default-900 dark:text-gray-100">
                                   {Number(item.value ?? 0).toFixed(2)}
                                 </div>
                               </div>

@@ -87,12 +87,12 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
             onClick();
           }
         }}
-        className={`text-sky-600 hover:text-sky-900 disabled:text-default-300 disabled:cursor-not-allowed ${className}`}
+        className={`text-sky-600 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300 disabled:text-default-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed ${className}`}
         type="button"
         disabled={disabled}
       >
         {activities.length > 0 && (
-          <span className="mr-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-600 text-xs">
+          <span className="mr-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-300 text-xs">
             {activities.length}
           </span>
         )}
@@ -148,7 +148,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         to={`/catalogue/pay-codes?desc=${activity.payCodeId}`}
                         hasUnsavedChanges={hasUnsavedChanges}
                         onNavigateAttempt={onNavigateAttempt}
-                        className="hover:text-sky-600 hover:underline"
+                        className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
                         }}
@@ -156,7 +156,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         {activity.description}
                       </SafeLink>
                       {activity.payType === "Overtime" && (
-                        <span className="ml-2 text-xs text-amber-600">
+                        <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
                           (OT)
                         </span>
                       )}
@@ -217,7 +217,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       {activity.payType === "Overtime" &&
                         activity.rateUnit === "Hour" && (
                           <span
-                            className="text-amber-600 truncate"
+                            className="text-amber-600 dark:text-amber-400 truncate"
                             title={`(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
                           >
                             (Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
@@ -225,7 +225,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         )}
                     </div>
                   </div>
-                  <div className="font-medium text-default-900 whitespace-nowrap">
+                  <div className="font-medium text-default-900 dark:text-gray-100 whitespace-nowrap">
                     RM{activity.calculatedAmount.toFixed(2)}
                   </div>
                 </div>
@@ -236,7 +236,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
             <div className="flex-shrink-0">
               <div className="border-t border-default-200 dark:border-gray-700 pt-3 flex justify-between items-center">
                 <span className="font-medium text-default-800 dark:text-gray-100">Total</span>
-                <span className="font-semibold text-default-900 text-base">
+                <span className="font-semibold text-default-900 dark:text-gray-100 text-base">
                   RM{totalAmount.toFixed(2)}
                 </span>
               </div>

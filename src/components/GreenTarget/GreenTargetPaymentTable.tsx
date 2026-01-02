@@ -90,25 +90,25 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     switch (status) {
       case "pending":
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300">
             Pending
           </span>
         );
       case "overpaid":
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
+          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
             Overpaid
           </span>
         );
       case "cancelled":
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
+          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
             Cancelled
           </span>
         );
       default:
         return (
-          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">
             Settled
           </span>
         );
@@ -144,8 +144,8 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
 
   if (payments.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-        <p className="text-gray-500">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+        <p className="text-gray-500 dark:text-gray-400">
           No payments found for the selected filters.
         </p>
       </div>
@@ -154,40 +154,40 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Reference
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Internal Ref
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Invoice(s)
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Customer
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Method
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Amount
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {sortedGroupEntries.map(
               ([reference, paymentGroup]) => {
                 const isGrouped = paymentGroup.length > 1;
@@ -201,33 +201,33 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                   // Render grouped payments
                   return (
                     <React.Fragment key={reference}>
-                      <tr className="bg-gray-50">
+                      <tr className="bg-gray-50 dark:bg-gray-900/50">
                         <td className="px-6 py-3 whitespace-nowrap text-sm">
                           {formatDate(firstPayment.payment_date)}
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap">
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
                             {firstPayment.payment_reference}
                           </span>
-                          <span className="ml-2 text-xs text-gray-500">
+                          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                             ({paymentGroup.length} invoices)
                           </span>
                         </td>
                         <td
-                          className="px-6 py-3 text-sm text-gray-500"
+                          className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400"
                           colSpan={2}
                         >
                           Multiple invoices
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 capitalize">
                             {firstPayment.payment_method.replace("_", " ")}
                           </span>
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap">
                           {getStatusBadge(firstPayment.status)}
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600">
+                        <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                           {formatCurrency(totalAmount)}
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap text-center">
@@ -235,26 +235,26 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                         </td>
                       </tr>
                       {paymentGroup.map((payment) => (
-                        <tr key={payment.payment_id} className="bg-white">
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 pl-12">
+                        <tr key={payment.payment_id} className="bg-white dark:bg-gray-800">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 pl-12">
                             └
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             -
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-500">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">
                             {payment.internal_reference || "-"}
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap">
                             <button
                               onClick={() => onViewPayment(payment)}
-                              className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
+                              className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                             >
                               {payment.invoice_id}
                             </button>
                           </td>
                           <td
-                            className="px-6 py-3 whitespace-nowrap text-sm text-gray-900"
+                            className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
                             title={payment.customerid}
                           >
                             <div className="truncate max-w-60">
@@ -265,7 +265,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           <td className="px-6 py-3 whitespace-nowrap">
                             {getStatusBadge(payment.status)}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600">
+                          <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(payment.amount_paid)}
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap text-center">
@@ -319,23 +319,23 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                         {formatDate(payment.payment_date)}
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap">
-                        <span className="font-mono text-sm text-gray-600">
+                        <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
                           {payment.payment_reference || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-500">
+                      <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">
                         {payment.internal_reference || "-"}
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap">
                         <button
                           onClick={() => onViewPayment(payment)}
-                          className="text-sky-600 text-sm hover:text-sky-800 hover:underline"
+                          className="text-sky-600 dark:text-sky-400 text-sm hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                         >
                           {payment.invoice_id}
                         </button>
                       </td>
                       <td
-                        className="px-6 py-3 whitespace-nowrap text-sm text-gray-900"
+                        className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
                         title={payment.customerid}
                       >
                         <div className="truncate max-w-60">
@@ -343,14 +343,14 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                         </div>
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 capitalize">
                           {payment.payment_method.replace("_", " ")}
                         </span>
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap">
                         {getStatusBadge(payment.status)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600">
+                      <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(payment.amount_paid)}
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap text-center">

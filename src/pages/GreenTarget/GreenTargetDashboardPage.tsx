@@ -99,7 +99,7 @@ const DashboardPage: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-rose-50 text-rose-700 p-4 rounded-lg">
+        <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 p-4 rounded-lg">
           <p>{error}</p>
           <Button onClick={() => fetchDashboardData()} className="mt-4">
             Retry
@@ -138,8 +138,8 @@ const DashboardPage: React.FC = () => {
                 {Math.abs(metrics?.percentageChange || 0)}% from last month
               </div>
             </div>
-            <div className="bg-green-100 p-2 rounded-full">
-              <IconCash size={20} className="text-green-600" />
+            <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full">
+              <IconCash size={20} className="text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
@@ -156,7 +156,7 @@ const DashboardPage: React.FC = () => {
                 Out of {metrics?.totalRentals || 0} total
               </p>
             </div>
-            <div className="bg-sky-100 p-2 rounded-full">
+            <div className="bg-sky-100 dark:bg-sky-900/30 p-2 rounded-full">
               <IconTruck size={20} className="text-sky-600 dark:text-sky-400" />
             </div>
           </div>
@@ -174,8 +174,8 @@ const DashboardPage: React.FC = () => {
                 Out of {metrics?.totalInvoices || 0} total
               </p>
             </div>
-            <div className="bg-amber-100 p-2 rounded-full">
-              <IconFileInvoice size={20} className="text-amber-600" />
+            <div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full">
+              <IconFileInvoice size={20} className="text-amber-600 dark:text-amber-400" />
             </div>
           </div>
         </div>
@@ -192,8 +192,8 @@ const DashboardPage: React.FC = () => {
                 Out of {metrics?.totalDumpsters || 0} total
               </p>
             </div>
-            <div className="bg-indigo-100 p-2 rounded-full">
-              <IconBox size={20} className="text-indigo-600" />
+            <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-full">
+              <IconBox size={20} className="text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@ const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Quick Links Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
-          <h3 className="text-sm font-medium mb-2">Quick Actions</h3>
+          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100 mb-2">Quick Actions</h3>
           <div className="grid grid-cols-1 gap-2">
             <Button
               onClick={() => navigate("/greentarget/rentals/new")}
@@ -248,7 +248,7 @@ const DashboardPage: React.FC = () => {
             <Button
               onClick={() => navigate("/greentarget/reports/debtors")}
               icon={IconAlertCircle}
-              className="justify-start text-amber-600 border-amber-200 hover:bg-amber-50"
+              className="justify-start text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/30"
               variant="outline"
               size="sm"
             >
@@ -259,7 +259,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Secondary Metrics */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm lg:col-span-2">
-          <h3 className="text-sm font-medium mb-2">Business Overview</h3>
+          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100 mb-2">Business Overview</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
               <p className="text-default-500 dark:text-gray-400 text-xs">Total Customers</p>
@@ -299,7 +299,7 @@ const DashboardPage: React.FC = () => {
       {/* Recent Activity */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium">Recent Activity</h3>
+          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100">Recent Activity</h3>
           <Button
             onClick={() => navigate("/greentarget/rentals")}
             variant="outline"
@@ -315,7 +315,7 @@ const DashboardPage: React.FC = () => {
               No recent activity
             </p>
           ) : (
-            <div className="divide-y divide-default-100">
+            <div className="divide-y divide-default-100 dark:divide-gray-700">
               {recentActivities.map((activity) => (
                 <div
                   key={activity.id}
@@ -324,20 +324,20 @@ const DashboardPage: React.FC = () => {
                   <div
                     className={`rounded-full p-1.5 mr-3 ${
                       activity.type === "rental"
-                        ? "bg-sky-100"
+                        ? "bg-sky-100 dark:bg-sky-900/30"
                         : activity.type === "invoice"
-                        ? "bg-amber-100"
-                        : "bg-green-100"
+                        ? "bg-amber-100 dark:bg-amber-900/30"
+                        : "bg-green-100 dark:bg-green-900/30"
                     }`}
                   >
                     {activity.type === "rental" && (
                       <IconTruck size={16} className="text-sky-600 dark:text-sky-400" />
                     )}
                     {activity.type === "invoice" && (
-                      <IconFileInvoice size={16} className="text-amber-600" />
+                      <IconFileInvoice size={16} className="text-amber-600 dark:text-amber-400" />
                     )}
                     {activity.type === "payment" && (
-                      <IconCash size={16} className="text-green-600" />
+                      <IconCash size={16} className="text-green-600 dark:text-green-400" />
                     )}
                   </div>
 

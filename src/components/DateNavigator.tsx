@@ -88,14 +88,14 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
 
   // Size-based classes
   const buttonClasses = clsx(
-    "rounded-lg border border-default-300 transition-colors flex items-center justify-center",
+    "rounded-lg border border-default-300 dark:border-gray-600 transition-colors flex items-center justify-center",
     size === "sm" ? "p-1.5 h-[34px]" : "p-2 h-[40px]"
   );
 
   const iconSize = size === "sm" ? 16 : 20;
 
   const displayClasses = clsx(
-    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors whitespace-nowrap flex items-center justify-center",
+    "flex-1 rounded-lg border border-default-300 dark:border-gray-600 text-center font-medium text-default-900 dark:text-gray-100 transition-colors whitespace-nowrap flex items-center justify-center",
     size === "sm" ? "px-3 h-[34px] text-xs" : "px-4 h-[40px] text-sm"
   );
 
@@ -105,7 +105,7 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
   return (
     <div className={clsx("space-y-2", className)}>
       {label && (
-        <label className="block text-sm font-medium text-default-700">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
           {label}
         </label>
       )}
@@ -113,7 +113,7 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
         {/* Previous Day Button */}
         <button
           onClick={() => navigateDay("prev")}
-          className={clsx(buttonClasses, "text-default-600 hover:bg-default-50")}
+          className={clsx(buttonClasses, "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700")}
           title="Previous day"
           aria-label="Previous day"
         >
@@ -122,7 +122,7 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
 
         {/* Date Display - Clickable when not today */}
         {isToday ? (
-          <div className={clsx(displayClasses, "bg-default-50")}>
+          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-900/50")}>
             {displayFormatter(selectedDate)}
           </div>
         ) : (
@@ -130,7 +130,7 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
             onClick={goToToday}
             className={clsx(
               displayClasses,
-              "bg-default-50 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 cursor-pointer"
+              "bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
             title="Click to go to today"
             aria-label="Go to today"
@@ -146,8 +146,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
           className={clsx(
             buttonClasses,
             isNextDisabled
-              ? "cursor-not-allowed text-default-300"
-              : "text-default-600 hover:bg-default-50"
+              ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
           )}
           title="Next day"
           aria-label="Next day"
@@ -165,8 +165,8 @@ const DateNavigator: React.FC<DateNavigatorProps> = ({
             className={clsx(
               buttonClasses,
               isToday
-                ? "cursor-not-allowed text-default-300"
-                : "text-default-600 hover:bg-default-50"
+                ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
             )}
           >
             <IconChevronsRight size={iconSize} />

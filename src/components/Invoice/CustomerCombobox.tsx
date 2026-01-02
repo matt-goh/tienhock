@@ -82,7 +82,7 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
     <div className="space-y-2">
       <label
         htmlFor={`${name}-input`}
-        className="block text-sm font-medium text-default-700"
+        className="block text-sm font-medium text-default-700 dark:text-gray-200"
       >
         {label}
       </label>
@@ -96,17 +96,17 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
         <div className="relative">
           <div
             className={clsx(
-              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
+              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-left shadow-sm",
               "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500",
-              disabled ? "bg-gray-50" : ""
+              disabled ? "bg-gray-50 dark:bg-gray-800" : ""
             )}
           >
             <ComboboxInput
               as="input"
               id={`${name}-input`}
               className={clsx(
-                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0",
-                disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 dark:bg-transparent focus:ring-0",
+                disabled ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
               )}
               // Display value based on the internal selectedOption state
               displayValue={(option: SelectOption | null) =>
@@ -119,7 +119,7 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
             <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
                 size={20}
-                className="text-gray-400"
+                className="text-gray-400 dark:text-gray-500"
                 aria-hidden="true"
               />
             </ComboboxButton>
@@ -137,14 +137,14 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
               // }
             }}
           >
-            <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+            <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm">
               {isLoading && query !== "" && (
-                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                   Loading...
                 </div>
               )}
               {!isLoading && filteredOptions.length === 0 && query !== "" ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                   Nothing found.
                 </div>
               ) : (
@@ -153,7 +153,7 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                     key={option.id}
                     className={({ active }) =>
                       `relative cursor-pointer select-none py-2 pl-3 pr-10 ${
-                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                        active ? "bg-sky-100 dark:bg-sky-900 text-sky-900 dark:text-sky-100" : "text-gray-900 dark:text-gray-100"
                       }`
                     }
                     value={option} // Pass the whole option object
@@ -166,7 +166,7 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
                           }`}
                         >
                           {option.name}{" "}
-                          <span className="text-gray-500">({option.id})</span>
+                          <span className="text-gray-500 dark:text-gray-400">({option.id})</span>
                         </span>
                         {selected ? (
                           <span
@@ -184,11 +184,11 @@ export const CustomerCombobox: React.FC<ComboboxProps> = ({
               )}
               {/* Load More Button - Prettier Version */}
               {!isLoading && hasMore && (
-                <div className="border-t border-gray-200 p-2">
+                <div className="border-t border-gray-200 dark:border-gray-700 p-2">
                   <button
                     type="button"
                     onClick={onLoadMore}
-                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
+                    className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/50 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
                     disabled={isLoading}
                   >
                     <IconArrowDown size={16} className="mr-1.5" />

@@ -284,7 +284,7 @@ const AccountCodeListPage: React.FC = () => {
               ) : (
                 <IconFile
                   size={18}
-                  className="text-default-400 dark:text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0"
+                  className="text-default-400 dark:text-gray-400 mr-2 flex-shrink-0"
                 />
               )}
               <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
@@ -451,14 +451,14 @@ const AccountCodeListPage: React.FC = () => {
               onChange={setSelectedLedgerType}
             >
               <div className="relative">
-                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-gray-700 dark:text-gray-100">
+                <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
                   <span className="block truncate text-gray-900 dark:text-gray-100">
                     {selectedLedgerType === "All"
                       ? "All Types"
                       : selectedLedgerType}
                   </span>
                   <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <IconChevronDown size={20} className="text-gray-400 dark:text-gray-500 dark:text-gray-400" />
+                    <IconChevronDown size={20} className="text-gray-400 dark:text-gray-400" />
                   </span>
                 </ListboxButton>
                 <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
@@ -572,7 +572,7 @@ const AccountCodeListPage: React.FC = () => {
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
                 title="Clear search"
               >

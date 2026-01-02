@@ -105,7 +105,7 @@ const DeliveryOrderPage: React.FC = () => {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
               Delivery Order
             </h1>
@@ -127,18 +127,18 @@ const DeliveryOrderPage: React.FC = () => {
 
       <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-3xl mx-auto">
         {/* Delivery Order Header */}
-        <div className="mb-8 text-center border-b pb-4">
-          <h1 className="text-2xl font-bold mb-2">DELIVERY ORDER</h1>
-          <p className="text-lg font-semibold">{deliveryOrderData.do_number}</p>
+        <div className="mb-8 text-center border-b dark:border-gray-700 pb-4">
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100 mb-2">DELIVERY ORDER</h1>
+          <p className="text-lg font-semibold text-default-900 dark:text-gray-100">{deliveryOrderData.do_number}</p>
         </div>
 
         {/* Date and Rental Information */}
         <div className="flex justify-between mb-6">
           <div>
-            <p className="font-medium">
+            <p className="font-medium text-default-900 dark:text-gray-100">
               Date: {formatDate(deliveryOrderData.date)}
             </p>
-            <p className="font-medium">
+            <p className="font-medium text-default-900 dark:text-gray-100">
               Rental #: {deliveryOrderData.rental_id}
             </p>
           </div>
@@ -146,10 +146,10 @@ const DeliveryOrderPage: React.FC = () => {
 
         {/* Customer Information */}
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Customer Information</h2>
-          <div className="border rounded-lg p-4">
-            <p className="font-medium">{deliveryOrderData.customer}</p>
-            <p>
+          <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100 mb-2">Customer Information</h2>
+          <div className="border dark:border-gray-700 rounded-lg p-4">
+            <p className="font-medium text-default-900 dark:text-gray-100">{deliveryOrderData.customer}</p>
+            <p className="text-default-900 dark:text-gray-100">
               {deliveryOrderData.location !== "N/A"
                 ? deliveryOrderData.location
                 : "No specific location"}
@@ -159,13 +159,13 @@ const DeliveryOrderPage: React.FC = () => {
 
         {/* Dumpster Information */}
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Dumpster Information</h2>
-          <div className="border rounded-lg p-4">
-            <p>
+          <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100 mb-2">Dumpster Information</h2>
+          <div className="border dark:border-gray-700 rounded-lg p-4">
+            <p className="text-default-900 dark:text-gray-100">
               <span className="font-medium">Dumpster ID:</span>{" "}
               {deliveryOrderData.dumpster}
             </p>
-            <p>
+            <p className="text-default-900 dark:text-gray-100">
               <span className="font-medium">Driver:</span>{" "}
               {deliveryOrderData.driver}
             </p>
@@ -175,25 +175,25 @@ const DeliveryOrderPage: React.FC = () => {
         {/* Remarks */}
         {deliveryOrderData.remarks && (
           <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-2">Remarks</h2>
-            <div className="border rounded-lg p-4">
-              <p>{deliveryOrderData.remarks}</p>
+            <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100 mb-2">Remarks</h2>
+            <div className="border dark:border-gray-700 rounded-lg p-4">
+              <p className="text-default-900 dark:text-gray-100">{deliveryOrderData.remarks}</p>
             </div>
           </div>
         )}
 
         {/* Signatures */}
         <div className="mt-12 grid grid-cols-2 gap-8">
-          <div className="border-t pt-4">
-            <p className="text-center">Customer Signature</p>
+          <div className="border-t dark:border-gray-700 pt-4">
+            <p className="text-center text-default-900 dark:text-gray-100">Customer Signature</p>
           </div>
-          <div className="border-t pt-4">
-            <p className="text-center">Driver Signature</p>
+          <div className="border-t dark:border-gray-700 pt-4">
+            <p className="text-center text-default-900 dark:text-gray-100">Driver Signature</p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-12 pt-4 border-t text-center text-sm text-default-500 dark:text-gray-400">
+        <div className="mt-12 pt-4 border-t dark:border-gray-700 text-center text-sm text-default-500 dark:text-gray-400">
           <p>Green Target Waste Management Company</p>
         </div>
       </div>

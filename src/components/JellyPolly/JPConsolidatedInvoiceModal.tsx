@@ -480,8 +480,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       <div className="bg-white w-full max-w-7xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-default-200 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-default-800 flex items-center">
-            <IconFileSettings size={22} className="mr-2.5 text-sky-600" />
+          <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100 flex items-center">
+            <IconFileSettings size={22} className="mr-2.5 text-sky-600 dark:text-sky-400" />
             Consolidated e-Invoice Management
           </h2>
           <button

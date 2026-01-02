@@ -294,12 +294,12 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 mb-4">
+                  <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-3 mb-4">
                     <div className="flex gap-2">
                       <div className="flex-shrink-0">
-                        <IconInfoCircle className="h-5 w-5 text-sky-500" />
+                        <IconInfoCircle className="h-5 w-5 text-sky-500 dark:text-sky-400" />
                       </div>
-                      <div className="text-sm text-sky-700">
+                      <div className="text-sm text-sky-700 dark:text-sky-300">
                         <p>
                           Add a manual "Tambahan" item to this employee's
                           payroll. This is for additional pay not captured

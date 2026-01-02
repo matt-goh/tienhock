@@ -392,7 +392,7 @@ const DebtorsReportPage: React.FC = () => {
                 />
                 {searchTerm && (
                   <button
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200 dark:hover:text-gray-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     onClick={() => setSearchTerm("")}
                     title="Clear search"
                   >
@@ -631,31 +631,31 @@ const DebtorsReportPage: React.FC = () => {
                               <table className="min-w-full text-sm">
                                 <thead>
                                   <tr className="bg-gray-100 dark:bg-gray-900/50">
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                                       #
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                                       Invoice No.
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                                       Date
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">
                                       Amount
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                                       Payment Method
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                                       Reference
                                     </th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                                       Payment Date
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">
                                       Paid Amount
                                     </th>
-                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-200 dark:text-gray-300">
+                                    <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">
                                       Balance
                                     </th>
                                   </tr>

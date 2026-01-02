@@ -1002,7 +1002,7 @@ const InvoiceFormPage: React.FC = () => {
                             "p-4 cursor-pointer transition-colors relative",
                             isEditMode
                               ? "cursor-not-allowed"
-                              : "hover:bg-gray-50"
+                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
                           )}
                           style={
                             isSelected
@@ -1229,7 +1229,7 @@ const InvoiceFormPage: React.FC = () => {
                           size={20}
                         />
                       )}
-                      <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-200 group-hover:text-default-900 dark:text-gray-100">
+                      <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900 dark:text-gray-100">
                         Mark as Paid
                       </span>
                     </button>
@@ -1375,7 +1375,7 @@ const InvoiceFormPage: React.FC = () => {
                           size={20}
                         />
                       )}
-                      <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-200 group-hover:text-default-900 dark:text-gray-100">
+                      <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900 dark:text-gray-100">
                         Submit e-Invoice upon saving
                       </span>
                     </button>
