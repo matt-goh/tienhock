@@ -187,14 +187,14 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
   const getStatusBadge = (status: string) => {
     if (status === "Processed") {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
           <IconLock size={12} className="mr-1" />
           {status}
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
         {status}
       </span>
     );
@@ -230,13 +230,13 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
             </h1>
             {!isLoading && workLogs.length > 0 && (
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
-                <span className="text-default-300 hidden sm:inline">|</span>
+                <span className="text-default-300 dark:text-gray-600 hidden sm:inline">|</span>
                 <div className="flex items-center gap-1.5">
                   <IconCalendarEvent size={16} className="text-sky-600 dark:text-sky-400" />
                   <span className="font-medium text-default-700 dark:text-gray-200">
                     {summaryStats.totalRecords}
                   </span>
-                  <span className="text-default-400">records</span>
+                  <span className="text-default-400 dark:text-gray-400">records</span>
                 </div>
               </div>
             )}
@@ -268,8 +268,8 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
                 onClick={handleToggleAllMonths}
                 className={`px-3 h-[40px] text-xs font-medium rounded-lg border transition-colors ${
                   filters.month === null
-                    ? "bg-sky-100 text-sky-700 border-sky-300"
-                    : "bg-white text-default-600 border-default-300 hover:bg-default-50"
+                    ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-700"
+                    : "bg-white dark:bg-gray-700 text-default-600 dark:text-gray-200 border-default-300 dark:border-gray-600 hover:bg-default-50 dark:hover:bg-gray-600"
                 }`}
               >
                 All
@@ -326,7 +326,7 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-100 bg-white dark:bg-gray-800">
+              <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {workLogs.map((log) => (
                   <tr
                     key={log.id}
@@ -360,7 +360,7 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
                           <>
                             <button
                               onClick={() => handleEditLog(log)}
-                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-colors"
+                              className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-colors"
                               title="Edit"
                             >
                               <IconPencil size={16} />
@@ -370,7 +370,7 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
                                 setLogToDelete(log);
                                 setShowDeleteDialog(true);
                               }}
-                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition-colors"
+                              className="p-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
                               title="Delete"
                             >
                               <IconTrash size={16} />
@@ -388,13 +388,13 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
           <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="w-16 h-16 rounded-full bg-default-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-              <IconClipboardList size={32} className="text-default-400" />
+            <div className="w-16 h-16 rounded-full bg-default-100 dark:bg-gray-900/50 flex items-center justify-center mb-4">
+              <IconClipboardList size={32} className="text-default-400 dark:text-gray-500" />
             </div>
             <p className="text-default-600 dark:text-gray-300 font-medium mb-1">
               No records found
             </p>
-            <p className="text-default-400 text-sm text-center max-w-md">
+            <p className="text-default-400 dark:text-gray-500 text-sm text-center max-w-md">
               No {jobConfig?.name.toLowerCase()} monthly records found for the
               selected period. Click "New Entry" to add a monthly work log.
             </p>

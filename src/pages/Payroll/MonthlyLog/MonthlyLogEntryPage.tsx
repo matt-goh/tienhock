@@ -826,11 +826,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleCancel} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {mode === "edit" ? "Edit" : "New"} {jobConfig?.name} Monthly Entry
             </h1>
-            <div className="w-px h-6 bg-default-300" />
+            <div className="w-px h-6 bg-default-300 dark:bg-gray-600" />
             {mode === "edit" ? (
               <div className="px-4 py-2 bg-default-100 dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg text-sm font-medium text-default-700 dark:text-gray-200">
                 {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
@@ -1051,7 +1051,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white dark:bg-gray-800">
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       <span className="font-medium">{leave.employeeName}</span>
-                      <span className="text-default-400 ml-2">({leave.employeeId})</span>
+                      <span className="text-default-400 dark:text-gray-500 ml-2">({leave.employeeId})</span>
                     </td>
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       {format(new Date(leave.leaveDate), "dd MMM yyyy")}
@@ -1067,7 +1067,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     </td>
                     <td className="px-4 py-2 text-center">
                       {leave.isNew ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
                           New
                         </span>
                       ) : (
@@ -1099,7 +1099,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           </div>
         ) : (
           <div className="p-8 text-center text-default-500 dark:text-gray-400">
-            <IconCalendar size={32} className="mx-auto mb-2 text-default-300" />
+            <IconCalendar size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
             <p>No leave records for this month.</p>
             <p className="text-xs mt-1">Click "Add Leave" to record leave entries.</p>
           </div>
@@ -1326,8 +1326,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         return (
                           <div
                             key={employeeId}
-                            className={`flex items-center px-3 py-2 cursor-pointer hover:bg-default-50 ${
-                              isSelected ? "bg-sky-50" : ""
+                            className={`flex items-center px-3 py-2 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
+                              isSelected ? "bg-sky-50 dark:bg-sky-900/30" : ""
                             }`}
                             onClick={() => handleBulkSelectionToggle(employeeId)}
                           >

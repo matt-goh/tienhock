@@ -253,7 +253,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-3">
               <BackButton onClick={handleBack} />
-              <div className="h-6 w-px bg-default-300"></div>
+              <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
               <div>
                 <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
                   {jobConfig?.name} - {getMonthName(workLog.log_month)}{" "}
@@ -267,44 +267,44 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
 
             {/* Inline Stats */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm sm:ml-3">
-              <span className="text-default-300 hidden sm:inline">|</span>
+              <span className="text-default-300 dark:text-gray-600 hidden sm:inline">|</span>
               <div className="flex items-center gap-1.5">
                 <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.employeeEntries.length}
                 </span>
-                <span className="text-default-400">employees</span>
+                <span className="text-default-400 dark:text-gray-400">employees</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconClock size={16} className="text-emerald-600" />
+                <IconClock size={16} className="text-emerald-600 dark:text-emerald-400" />
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {totalRegularHours.toFixed(1)}
                 </span>
-                <span className="text-default-400">hrs</span>
+                <span className="text-default-400 dark:text-gray-400">hrs</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconClockPlay size={16} className="text-amber-600" />
+                <IconClockPlay size={16} className="text-amber-600 dark:text-amber-400" />
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {totalOvertimeHours.toFixed(1)}
                 </span>
-                <span className="text-default-400">OT hrs</span>
+                <span className="text-default-400 dark:text-gray-400">OT hrs</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconBeach size={16} className="text-rose-500" />
+                <IconBeach size={16} className="text-rose-500 dark:text-rose-400" />
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.leaveRecords.length}
                 </span>
-                <span className="text-default-400">leave days</span>
+                <span className="text-default-400 dark:text-gray-400">leave days</span>
               </div>
-              <span className="text-default-300">•</span>
+              <span className="text-default-300 dark:text-gray-600">•</span>
               <span
                 className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                   workLog.status === "Processed"
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-sky-100 text-sky-700"
+                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+                    : "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
                 }`}
               >
                 {workLog.status === "Processed" && (
@@ -337,21 +337,21 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
       {/* Employee Work Hours */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
         {/* Section Header - Sky */}
-        <div className="px-4 py-2.5 bg-sky-50 border-b border-sky-100">
+        <div className="px-4 py-2.5 bg-sky-50 dark:bg-sky-900/30 border-b border-sky-100 dark:border-sky-800">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-sky-800 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-2">
               <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
               Employee Work Hours
             </h3>
-            <div className="flex items-center gap-3 text-xs text-sky-700">
+            <div className="flex items-center gap-3 text-xs text-sky-700 dark:text-sky-300">
               <span className="font-medium">
                 {workLog.employeeEntries.length} employees
               </span>
-              <span className="text-sky-300">•</span>
+              <span className="text-sky-300 dark:text-sky-600">•</span>
               <span className="font-medium">
                 {totalRegularHours.toFixed(1)} reg hrs
               </span>
-              <span className="text-sky-300">•</span>
+              <span className="text-sky-300 dark:text-sky-600">•</span>
               <span className="font-medium">
                 {totalOvertimeHours.toFixed(1)} OT hrs
               </span>
@@ -378,7 +378,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-100">
+              <tbody className="divide-y divide-default-200 dark:divide-gray-700">
                 {workLog.employeeEntries.map((entry) => {
                   const employeeTotal = entry.activities.reduce(
                     (sum, activity) => sum + activity.calculated_amount,
@@ -504,12 +504,12 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                         ({activity.pay_type})
                                       </span>
                                       {activity.source === "employee" && (
-                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
                                           Staff
                                         </span>
                                       )}
                                       {activity.source === "job" && (
-                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
                                           Job
                                         </span>
                                       )}
@@ -550,7 +550,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                           )}
 
                           {entry.activities.length === 0 && (
-                            <span className="text-sm text-default-400">
+                            <span className="text-sm text-default-400 dark:text-gray-500">
                               No activities
                             </span>
                           )}
@@ -563,15 +563,15 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                   );
                 })}
               </tbody>
-              <tfoot className="bg-sky-50 border-t-2 border-sky-200">
+              <tfoot className="bg-sky-50 dark:bg-sky-900/30 border-t-2 border-sky-200 dark:border-sky-800">
                 <tr>
                   <td
                     colSpan={3}
-                    className="px-4 py-3 text-right font-semibold text-sky-800"
+                    className="px-4 py-3 text-right font-semibold text-sky-800 dark:text-sky-300"
                   >
                     Total Employee Pay
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-sky-900">
+                  <td className="px-4 py-3 text-right font-bold text-sky-900 dark:text-sky-200">
                     {formatCurrency(totalAmount)}
                   </td>
                 </tr>
@@ -588,13 +588,13 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
       {/* Leave Records */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
         {/* Section Header - Rose */}
-        <div className="px-4 py-2.5 bg-rose-50 border-b border-rose-100">
+        <div className="px-4 py-2.5 bg-rose-50 dark:bg-rose-900/30 border-b border-rose-100 dark:border-rose-800">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-rose-800 flex items-center gap-2">
-              <IconBeach size={16} className="text-rose-600" />
+            <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
+              <IconBeach size={16} className="text-rose-600 dark:text-rose-400" />
               Leave Records
             </h3>
-            <span className="text-xs font-medium text-rose-700">
+            <span className="text-xs font-medium text-rose-700 dark:text-rose-300">
               {workLog.leaveRecords.length} leave days
             </span>
           </div>
