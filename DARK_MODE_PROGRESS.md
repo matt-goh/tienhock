@@ -189,8 +189,8 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 - [x] Stock/StockAdjustmentEntryPage.tsx - Comprehensive dark mode (references, tabs, product tables, input fields)
 - [x] Stock/ProductionEntryPage.tsx - Fully updated with dark mode (date selector, product badges, favorites)
 
-### Priority 6: Payroll Pages (21 files - 10/21 DONE ⚡ IN PROGRESS)
-**Completed (10/21):**
+### Priority 6: Payroll Pages (21 files - 13/21 DONE ⚡ IN PROGRESS)
+**Completed (13/21):**
 - [x] Payroll/PayrollPage.tsx - Comprehensive dark mode update
 - [x] Payroll/PayrollDetailsPage.tsx - Comprehensive dark mode update (large file with all payroll items)
 - [x] Payroll/SalaryReportPage.tsx - Comprehensive dark mode update
@@ -201,12 +201,12 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 - [x] Payroll/DailyLog/DailyLogEntryPage.tsx - Comprehensive dark mode (4078 lines - large file)
 - [x] Payroll/DailyLog/DailyLogEditPage.tsx - Simple wrapper, dark mode added
 - [x] Payroll/DailyLog/DailyLogDetailsPage.tsx - Comprehensive dark mode with day types, status badges, tables
+- [x] Payroll/MonthlyLog/MonthlyLogListPage.tsx - Comprehensive dark mode (status badges, filters, action buttons, empty states)
+- [x] Payroll/MonthlyLog/MonthlyLogEntryPage.tsx - Comprehensive dark mode (leave badges, modals, bulk selections, dividers)
+- [x] Payroll/MonthlyLog/MonthlyLogDetailsPage.tsx - Comprehensive dark mode (section headers, stats, tables, badges, footers)
 
-**Remaining (11/21):**
-- [ ] Payroll/MonthlyLog/MonthlyLogListPage.tsx - **HAS SUBSTANTIAL DARK MODE** (needs review/completion)
-- [ ] Payroll/MonthlyLog/MonthlyLogEntryPage.tsx
+**Remaining (8/21):**
 - [ ] Payroll/MonthlyLog/MonthlyLogEditPage.tsx - Simple wrapper (minimal updates needed)
-- [ ] Payroll/MonthlyLog/MonthlyLogDetailsPage.tsx - **HAS SUBSTANTIAL DARK MODE** (needs review/completion)
 - [ ] Payroll/Leave/CutiManagementPage.tsx
 - [ ] Payroll/Leave/CutiReportPage.tsx
 - [ ] Payroll/Leave/HolidayCalendarPage.tsx
@@ -326,15 +326,15 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 - **Status:** Core UI components complete, feature components in progress
 
 ### Pages:
-- **Completed:** 34 pages
+- **Completed:** 37 pages
   - Catalogue: 10/10 ✅
   - Invoice: 5/5 ✅
   - Payment: 3/3 ✅
   - Sales: 3/3 ✅
   - Stock: 3/3 ✅
-  - Payroll: 10/21 ⚡
-- **Remaining:** ~50 pages
-  - Payroll: 11/21 (MonthlyLog, Leave, Settings, Statutory sections)
+  - Payroll: 13/21 ⚡
+- **Remaining:** ~47 pages
+  - Payroll: 8/21 (MonthlyLog, Leave, Settings, Statutory sections)
   - GreenTarget: 12+ pages
   - JellyPolly: 5+ pages
   - Accounting: 7 pages
@@ -347,7 +347,7 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 ✅ **Payment Section:** Complete (3/3 pages)
 ✅ **Sales Section:** Complete (3/3 pages)
 ✅ **Stock Section:** Complete (3/3 pages)
-⚡ **Payroll Section:** In Progress (10/21 pages - 48% complete)
+⚡ **Payroll Section:** In Progress (13/21 pages - 62% complete)
 📝 **Components:** High-priority shared components done, feature components pending
 🔜 **Next:** Complete remaining Payroll pages, then GreenTarget/JellyPolly/Accounting
 
@@ -357,8 +357,8 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 3. ~~Update Payment pages~~ ✅ COMPLETE
 4. ~~Update Sales pages~~ ✅ COMPLETE
 5. ~~Update Stock pages~~ ✅ COMPLETE
-6. ⚡ **IN PROGRESS:** Complete remaining Payroll pages (11/21 remaining)
-   - MonthlyLog section (4 files - 2 already have substantial dark mode)
+6. ⚡ **IN PROGRESS:** Complete remaining Payroll pages (8/21 remaining)
+   - MonthlyLog section (1 file - simple wrapper)
    - Leave section (3 files)
    - Settings section (2 files)
    - Statutory section (2 files)
@@ -370,7 +370,8 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 12. Final testing and adjustments
 
 ## Notes for Continuation
-- **Current Focus:** Payroll section is 48% complete (10/21 files)
-- **MonthlyLog Files:** MonthlyLogListPage and MonthlyLogDetailsPage already have substantial dark mode - just need review/completion
+- **Current Focus:** Payroll section is 62% complete (13/21 files)
+- **MonthlyLog Section:** ✅ Complete (3/4 files done - only simple wrapper MonthlyLogEditPage remaining)
+- **Recent Completions:** MonthlyLogListPage, MonthlyLogEntryPage, MonthlyLogDetailsPage - comprehensive dark mode with status badges, filters, modals, section headers, stats, tables
 - **Pattern Reference:** Use [InvoiceCard.tsx](src/components/Invoice/InvoiceCard.tsx) as the standard for selection rings (`ring-blue-500 dark:ring-blue-400`)
-- **Recent Fix:** InvoiceGrid.tsx background removed for consistency with parent container
+- **Next Focus:** Complete remaining MonthlyLogEditPage wrapper, then move to Leave section (3 files)
