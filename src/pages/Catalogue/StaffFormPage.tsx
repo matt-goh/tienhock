@@ -383,22 +383,22 @@ const StaffFormPage: React.FC = () => {
   // Color scheme for each pay type
   const payTypeColors: Record<PayType, { bg: string; border: string; headerBg: string; headerText: string }> = {
     Base: {
-      bg: "bg-emerald-50",
-      border: "border-emerald-200",
-      headerBg: "bg-emerald-100",
-      headerText: "text-emerald-700",
+      bg: "bg-emerald-50 dark:bg-emerald-900/30",
+      border: "border-emerald-200 dark:border-emerald-800",
+      headerBg: "bg-emerald-100 dark:bg-emerald-900/40",
+      headerText: "text-emerald-700 dark:text-emerald-300",
     },
     Tambahan: {
-      bg: "bg-amber-50",
-      border: "border-amber-200",
-      headerBg: "bg-amber-100",
-      headerText: "text-amber-700",
+      bg: "bg-amber-50 dark:bg-amber-900/30",
+      border: "border-amber-200 dark:border-amber-800",
+      headerBg: "bg-amber-100 dark:bg-amber-900/40",
+      headerText: "text-amber-700 dark:text-amber-300",
     },
     Overtime: {
-      bg: "bg-purple-50",
-      border: "border-purple-200",
-      headerBg: "bg-purple-100",
-      headerText: "text-purple-700",
+      bg: "bg-purple-50 dark:bg-purple-900/30",
+      border: "border-purple-200 dark:border-purple-800",
+      headerBg: "bg-purple-100 dark:bg-purple-900/40",
+      headerText: "text-purple-700 dark:text-purple-300",
     },
   };
 
@@ -434,13 +434,13 @@ const StaffFormPage: React.FC = () => {
             <div className="flex items-center gap-1.5 max-w-full">
               <Link
                 to={`/catalogue/pay-codes?desc=${payCode.id}`}
-                className="text-sm font-medium text-default-800 truncate hover:text-sky-600 hover:underline"
+                className="text-sm font-medium text-default-800 dark:text-gray-100 truncate hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                 onClick={(e) => e.stopPropagation()}
                 title={`${payCode.description} (${payCode.id})`}
               >
                 {payCode.description}
               </Link>
-              <span className="text-xs text-default-500 rounded-full bg-default-100 px-2 py-0.5 flex-shrink-0">
+              <span className="text-xs text-default-500 dark:text-gray-400 rounded-full bg-default-100 dark:bg-gray-800 px-2 py-0.5 flex-shrink-0">
                 {payCode.id}
               </span>
             </div>
@@ -449,14 +449,14 @@ const StaffFormPage: React.FC = () => {
           {/* Job name badge (for shared paycodes) */}
           {showJobName && jobName && (
             <div className="mt-1.5">
-              <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full font-medium">
+              <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 rounded-full font-medium">
                 {jobName}
               </span>
             </div>
           )}
 
           {/* Rates display */}
-          <div className="mt-1 text-xs text-default-600">
+          <div className="mt-1 text-xs text-default-600 dark:text-gray-300">
             <div className="flex gap-3 flex-wrap">
               <span>
                 Biasa: RM
@@ -492,16 +492,16 @@ const StaffFormPage: React.FC = () => {
                   {payCode.pay_type}
                 </span>
               )}
-              <span className="px-2 py-0.5 bg-default-200 text-default-700 rounded-full">
+              <span className="px-2 py-0.5 bg-default-200 text-default-700 dark:text-gray-200 rounded-full">
                 {payCode.rate_unit}
               </span>
               {payCode.override_rate_biasa !== null && (
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-medium">
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded-full font-medium">
                   Customized rate
                 </span>
               )}
               {payCode.is_default_setting && (
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-medium">
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-full font-medium">
                   Default
                 </span>
               )}
@@ -577,7 +577,7 @@ const StaffFormPage: React.FC = () => {
                 type="button"
                 onClick={() => onBatchSetDefault(filteredPayCodes, false)}
                 disabled={isBatchLoading}
-                className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 text-default-700 hover:bg-default-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-2 py-0.5 text-xs font-medium rounded bg-default-200 text-default-700 dark:text-gray-200 hover:bg-default-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title="Clear all defaults"
               >
                 {isBatchLoading ? "..." : "Clear All"}
@@ -1019,16 +1019,16 @@ const StaffFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow-sm border border-default-200">
-        <div className="px-6 py-3 border-b border-default-200 flex justify-between items-start">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-default-200 dark:border-gray-700">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex justify-between items-start">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 Edit {formData.name}'s Details
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
                   ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
                   : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
@@ -1039,7 +1039,7 @@ const StaffFormPage: React.FC = () => {
             {isEditMode && (
               <button
                 type="button"
-                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
+                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white dark:bg-gray-800 hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
                 onClick={handleDeleteClick}
               >
                 Delete
@@ -1090,9 +1090,9 @@ const StaffFormPage: React.FC = () => {
                   {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
                   {renderInput("dateJoined", "Date Joined", "date")}
                 </div>
-                <div className="border-t border-default-200 pt-6 mt-6">
+                <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-base font-medium text-default-800">
+                    <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
                       Associated Pay Codes
                     </h3>
                     <div className="flex items-center gap-2">
@@ -1104,11 +1104,11 @@ const StaffFormPage: React.FC = () => {
                           onChange={(e) =>
                             setPayCodeSearchQuery(e.target.value)
                           }
-                          className="px-3 py-1 border border-default-300 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
+                          className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 min-w-[200px]"
                         />
                         {payCodeSearchQuery && (
                           <button
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                             onClick={() => setPayCodeSearchQuery("")}
                             title="Clear search"
                           >
@@ -1121,8 +1121,8 @@ const StaffFormPage: React.FC = () => {
                         onClick={() => setPayCodeViewMode(payCodeViewMode === 'grouped' ? 'flat' : 'grouped')}
                         className={`flex items-center gap-1.5 px-3 py-1 border rounded-full text-sm font-medium transition-colors ${
                           payCodeViewMode === 'grouped'
-                            ? 'bg-sky-50 border-sky-300 text-sky-700 hover:bg-sky-100'
-                            : 'bg-default-50 border-default-300 text-default-700 hover:bg-default-100'
+                            ? 'bg-sky-50 dark:bg-sky-900/30 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50'
+                            : 'bg-default-50 dark:bg-gray-900/50 border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700'
                         }`}
                         title={payCodeViewMode === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
                       >
@@ -1142,7 +1142,7 @@ const StaffFormPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={areAllGroupsCollapsed ? expandAllGroups : collapseAllGroups}
-                          className="flex items-center gap-1.5 px-3 py-1 border border-default-300 rounded-full text-sm font-medium text-default-700 bg-default-50 hover:bg-default-100 transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1 border border-default-300 dark:border-gray-600 rounded-full text-sm font-medium text-default-700 dark:text-gray-200 bg-default-50 dark:bg-gray-900/50 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors"
                           title={areAllGroupsCollapsed ? 'Expand all groups' : 'Collapse all groups'}
                         >
                           {areAllGroupsCollapsed ? (
@@ -1180,7 +1180,7 @@ const StaffFormPage: React.FC = () => {
                     <div className="space-y-6">
                       {/* Employee-specific Pay Codes Section */}
                       <div>
-                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                        <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                           Employee-Specific Pay Codes
                         </h4>
                         {id && employeeMappings[id] && employeeMappings[id].length > 0 ? (
@@ -1227,7 +1227,7 @@ const StaffFormPage: React.FC = () => {
                             </div>
                           )
                         ) : (
-                          <div className="text-sm text-default-500 py-4">
+                          <div className="text-sm text-default-500 dark:text-gray-400 py-4">
                             No employee-specific pay codes
                           </div>
                         )}
@@ -1235,7 +1235,7 @@ const StaffFormPage: React.FC = () => {
 
                       {/* Job-linked Pay Codes Section */}
                       <div>
-                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                        <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                           Job-Linked Pay Codes
                         </h4>
                         {(() => {
@@ -1284,7 +1284,7 @@ const StaffFormPage: React.FC = () => {
                               </div>
                             )
                           ) : (
-                            <div className="text-sm text-default-500 py-4">
+                            <div className="text-sm text-default-500 dark:text-gray-400 py-4">
                               No job-linked pay codes
                             </div>
                           );
@@ -1293,7 +1293,7 @@ const StaffFormPage: React.FC = () => {
 
                       {/* Shared Pay Codes Section (duplicates) */}
                       <div>
-                        <h4 className="text-sm font-medium text-default-700 mb-2">
+                        <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                           Shared Pay Codes (Across Multiple Jobs)
                         </h4>
                         {(() => {
@@ -1343,7 +1343,7 @@ const StaffFormPage: React.FC = () => {
                               </div>
                             )
                           ) : (
-                            <div className="text-sm text-default-500 py-4">
+                            <div className="text-sm text-default-500 dark:text-gray-400 py-4">
                               No shared pay codes across multiple jobs
                             </div>
                           );
@@ -1364,8 +1364,8 @@ const StaffFormPage: React.FC = () => {
                   {renderListbox("department", "Department", departmentOptions)}
                   {renderInput("kwspNumber", "KWSP Number")}
                 </div>
-                <div className="border-t border-default-200 pt-6 mt-6">
-                  <h3 className="text-base font-medium text-default-800 mb-4">
+                <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
+                  <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-4">
                     Income Tax Information
                   </h3>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">

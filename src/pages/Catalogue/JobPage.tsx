@@ -49,17 +49,17 @@ const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
   return (
     <button
       onClick={() => onClick(job)}
-      className="block w-full p-4 border border-default-200 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white h-full min-h-[120px]" // Added min-h
+      className="block w-full p-4 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 dark:hover:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white dark:bg-gray-800 h-full min-h-[120px]" // Added min-h
     >
       <h3
-        className="text-base font-semibold text-default-800 truncate mb-1"
+        className="text-base font-semibold text-default-800 dark:text-gray-100 truncate mb-1"
         title={job.name}
       >
         {job.name}
       </h3>
-      <p className="text-xs text-default-500 uppercase mb-2">ID: {job.id}</p>
+      <p className="text-xs text-default-500 dark:text-gray-400 uppercase mb-2">ID: {job.id}</p>
       <p
-        className="text-sm text-default-600 line-clamp-2"
+        className="text-sm text-default-600 dark:text-gray-300 line-clamp-2"
         title={sectionDisplay}
       >
         <span className="font-medium">Section:</span> {sectionDisplay}
@@ -379,9 +379,9 @@ const JobPage: React.FC = () => {
     for (let i = startPage; i <= endPage; i++) pageNumbers.push(i);
     if (totalPayCodePages <= 1) return null;
     return (
-      <div className="flex items-center justify-between py-3 border-t border-default-200 mt-4">
+      <div className="flex items-center justify-between py-3 border-t border-default-200 dark:border-gray-700 mt-4">
         <div>
-          <p className="text-sm text-default-600">
+          <p className="text-sm text-default-600 dark:text-gray-300">
             Showing{" "}
             <span className="font-medium">
               {(currentPage - 1) * itemsPerPage + 1}
@@ -402,10 +402,10 @@ const JobPage: React.FC = () => {
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium ${
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                 currentPage === 1
-                  ? "text-default-300 cursor-not-allowed"
-                  : "text-default-500 hover:bg-default-50"
+                  ? "text-default-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-default-500 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
               <IconChevronLeft size={18} />
@@ -414,12 +414,12 @@ const JobPage: React.FC = () => {
               <>
                 <button
                   onClick={() => handlePageChange(1)}
-                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 >
                   1
                 </button>
                 {startPage > 2 && (
-                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-500 dark:text-gray-400">
                     ...
                   </span>
                 )}
@@ -431,8 +431,8 @@ const JobPage: React.FC = () => {
                 onClick={() => handlePageChange(num)}
                 className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                   currentPage === num
-                    ? "z-10 bg-sky-50 border-sky-500 text-sky-600"
-                    : "bg-white border-default-300 text-default-700 hover:bg-default-50"
+                    ? "z-10 bg-sky-50 dark:bg-sky-900/40 border-sky-500 dark:border-sky-600 text-sky-600 dark:text-sky-300"
+                    : "bg-white dark:bg-gray-800 border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 }`}
               >
                 {num}
@@ -441,13 +441,13 @@ const JobPage: React.FC = () => {
             {endPage < totalPayCodePages && (
               <>
                 {endPage < totalPayCodePages - 1 && (
-                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-500 dark:text-gray-400">
                     ...
                   </span>
                 )}
                 <button
                   onClick={() => handlePageChange(totalPayCodePages)}
-                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 >
                   {totalPayCodePages}
                 </button>
@@ -456,10 +456,10 @@ const JobPage: React.FC = () => {
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPayCodePages}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium ${
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                 currentPage === totalPayCodePages
-                  ? "text-default-300 cursor-not-allowed"
-                  : "text-default-500 hover:bg-default-50"
+                  ? "text-default-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-default-500 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
               <IconChevronRight size={18} />
@@ -473,7 +473,7 @@ const JobPage: React.FC = () => {
   // --- Main Render ---
   return (
     <div className="space-y-4">
-      <h1 className="text-center text-xl font-semibold text-default-800">
+      <h1 className="text-center text-xl font-semibold text-default-800 dark:text-gray-100">
         Job & Pay Codes
       </h1>
 
@@ -482,7 +482,7 @@ const JobPage: React.FC = () => {
         <>
           {/* --- Job Card Grid --- */}
           <div className="mb-6 text-center">
-            <h2 className="text-lg font-medium text-default-500 mb-4 -mt-2">
+            <h2 className="text-lg font-medium text-default-500 dark:text-gray-400 mb-4 -mt-2">
               Select a Job to Manage Pay Codes
             </h2>
           </div>
@@ -491,7 +491,7 @@ const JobPage: React.FC = () => {
               {/* Add New Job Card */}
               <button
                 onClick={handleAddJobClickInList}
-                className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-sky-400 rounded-lg text-sky-600 hover:bg-sky-50 transition-colors duration-150 h-full min-h-[120px]" // Added min-h
+                className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-sky-400 dark:border-sky-500 rounded-lg text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors duration-150 h-full min-h-[120px]" // Added min-h
                 aria-label="Add New Job"
               >
                 <IconPlus size={32} className="mb-2" />
@@ -510,7 +510,7 @@ const JobPage: React.FC = () => {
       {loadingJobs && !selectedJob && (
         <div className="flex justify-center items-center h-40">
           <LoadingSpinner />
-          <span className="ml-3 text-default-600">Loading jobs...</span>
+          <span className="ml-3 text-default-600 dark:text-gray-300">Loading jobs...</span>
         </div>
       )}
 
@@ -518,17 +518,17 @@ const JobPage: React.FC = () => {
       {selectedJob && (
         <>
           {/* --- Job Selection Combobox and Info (Only shows after selection) --- */}
-          <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
             <div className="md:flex-shrink-0">
               {/* Existing Job Combobox */}
-              <label className="block text-sm font-medium text-default-700 mb-1">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                 Select Job
               </label>
               <Field className="w-64">
                 <Combobox value={selectedJob} onChange={handleJobSelection}>
                   <div className="relative">
                     <ComboboxInput
-                      className="w-full cursor-default rounded-lg border border-default-300 bg-white py-1.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                      className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-1.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100"
                       displayValue={(job: Job | null) => job?.name || ""}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Select or search..."
@@ -539,16 +539,16 @@ const JobPage: React.FC = () => {
                     </ComboboxButton>
                   </div>
                   {/* Make options appear above other elements */}
-                  <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-64 overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                  <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-64 overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
                     <ComboboxOption
                       className={({ active }) =>
                         `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                          active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                          active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                         }`
                       }
                       value={undefined} // Triggers Add New Job
                     >
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                         <IconPlus size={18} />
                       </span>
                       Add New Job
@@ -557,14 +557,14 @@ const JobPage: React.FC = () => {
                       <hr className="my-1" />
                     )}
                     {loadingJobs && (
-                      <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                      <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-200">
                         Loading jobs...
                       </div>
                     )}
                     {!loadingJobs &&
                       filteredJobs.length === 0 &&
                       query !== "" && (
-                        <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                        <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-200">
                           No jobs found.
                         </div>
                       )}
@@ -576,7 +576,7 @@ const JobPage: React.FC = () => {
                             `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
                               active
                                 ? "bg-sky-100 text-sky-900"
-                                : "text-gray-900"
+                                : "text-gray-900 dark:text-gray-100"
                             }`
                           }
                           value={job}
@@ -593,7 +593,7 @@ const JobPage: React.FC = () => {
                                 {job.name}
                               </span>
                               {isSelected && (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                                   <IconCheck size={20} />
                                 </span>
                               )}
@@ -609,20 +609,20 @@ const JobPage: React.FC = () => {
             {/* Selected Job Info & Delete Button */}
             <div className="flex-1 flex flex-col md:flex-row md:items-center gap-4">
               <div className="flex flex-wrap gap-4 flex-1">
-                <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
-                  <p className="text-xs uppercase text-default-500 font-medium">
+                <div className="rounded-lg bg-default-50 dark:bg-gray-900/50 px-4 py-2 border border-default-200 dark:border-gray-700">
+                  <p className="text-xs uppercase text-default-500 dark:text-gray-400 font-medium">
                     ID
                   </p>
-                  <p className="text-default-800 font-semibold">
+                  <p className="text-default-800 dark:text-gray-100 font-semibold">
                     {selectedJob.id}
                   </p>
                 </div>
-                <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
-                  <p className="text-xs uppercase text-default-500 font-medium">
+                <div className="rounded-lg bg-default-50 dark:bg-gray-900/50 px-4 py-2 border border-default-200 dark:border-gray-700">
+                  <p className="text-xs uppercase text-default-500 dark:text-gray-400 font-medium">
                     Section
                   </p>
                   <p
-                    className="text-default-800 font-semibold max-w-xs truncate"
+                    className="text-default-800 dark:text-gray-100 font-semibold max-w-xs truncate"
                     title={
                       Array.isArray(selectedJob.section)
                         ? selectedJob.section.join(", ")
@@ -634,11 +634,11 @@ const JobPage: React.FC = () => {
                       : selectedJob.section || "N/A"}
                   </p>
                 </div>
-                <div className="rounded-lg bg-default-50 px-4 py-2 border border-default-200">
-                  <p className="text-xs uppercase text-default-500 font-medium">
+                <div className="rounded-lg bg-default-50 dark:bg-gray-900/50 px-4 py-2 border border-default-200 dark:border-gray-700">
+                  <p className="text-xs uppercase text-default-500 dark:text-gray-400 font-medium">
                     Name
                   </p>
-                  <p className="text-default-800 font-semibold">
+                  <p className="text-default-800 dark:text-gray-100 font-semibold">
                     {selectedJob.name}
                   </p>
                 </div>
@@ -659,8 +659,8 @@ const JobPage: React.FC = () => {
 
           {/* --- Staff Section --- */}
           {selectedJob && (
-            <div className="mb-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-sm font-medium text-default-700">
+            <div className="mb-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-medium text-default-700 dark:text-gray-200">
                 Staff Associated with this Job:
               </h3>
               {loadingStaffs ? (
@@ -673,14 +673,14 @@ const JobPage: React.FC = () => {
                     <Link
                       key={staff.id}
                       to={`/catalogue/staff/${staff.id}`}
-                      className="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-sm font-medium text-sky-800 hover:bg-sky-200 transition-colors"
+                      className="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/40 px-3 py-1 text-sm font-medium text-sky-800 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-900/60 transition-colors"
                     >
                       {staff.name}
                     </Link>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-default-500">
+                <p className="text-sm text-default-500 dark:text-gray-400">
                   No staff associated with this job
                 </p>
               )}
@@ -688,10 +688,10 @@ const JobPage: React.FC = () => {
           )}
 
           {/* --- Pay Codes Section (Only shows after selection) --- */}
-          <div className="rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+          <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
             {/* Header + Add Button + Search */}
             <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
-              <h2 className="text-lg font-semibold text-default-800">
+              <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
                 Pay Codes for "{selectedJob.name}"
               </h2>
               <div className="flex items-center gap-3">
@@ -704,7 +704,7 @@ const JobPage: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Search pay codes..."
-                    className="w-64 rounded-full border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-64 rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                     value={payCodeSearch}
                     onChange={(e) => {
                       setPayCodeSearch(e.target.value);
@@ -713,7 +713,7 @@ const JobPage: React.FC = () => {
                   />
                   {payCodeSearch && (
                     <button
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                       onClick={() => setPayCodeSearch("")}
                       title="Clear search"
                     >
@@ -743,36 +743,36 @@ const JobPage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-default-200">
-                  <thead className="bg-default-100">
+                <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                  <thead className="bg-default-100 dark:bg-gray-800">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Code
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Description
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Type
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Unit
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Biasa Rate
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Ahad Rate
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Umum Rate
                       </th>
-                      <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                      <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-default-200 bg-white">
+                  <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                     {paginatedPayCodes.length > 0 ? (
                       paginatedPayCodes.map((detail) => {
                         const displayBiasa = getDisplayRate(detail, "biasa");
@@ -781,59 +781,59 @@ const JobPage: React.FC = () => {
                         return (
                           <tr
                             key={detail.id} // Assuming detail.id is the pay code id
-                            className="hover:bg-default-50 cursor-pointer"
+                            className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                             onClick={() => handleEditRatesClick(detail)}
                           >
                             {/* Static Columns */}
-                            <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                            <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                               {detail.id}
                             </td>
                             <td
-                              className="px-4 py-3 text-sm text-default-700 max-w-xs truncate"
+                              className="px-4 py-3 text-sm text-default-700 dark:text-gray-200 max-w-xs truncate"
                               title={detail.description}
                             >
                               <Link
                                 to={`/catalogue/pay-codes?desc=${detail.pay_code_id}`}
-                                className="hover:text-sky-600 hover:underline"
+                                className="hover:text-sky-600 dark:text-sky-400 hover:underline"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {detail.description}
                               </Link>
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                            <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                               {detail.pay_type}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                            <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                               {detail.rate_unit}
                             </td>
                             {/* Read-only Rate Columns */}
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 dark:text-gray-200">
                               <span>{displayBiasa.toFixed(2)}</span>
                               {detail.override_rate_biasa !== null && (
                                 <span
-                                  className="ml-1 text-xs text-sky-600"
+                                  className="ml-1 text-xs text-sky-600 dark:text-sky-400"
                                   title="Override"
                                 >
                                   (O)
                                 </span>
                               )}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 dark:text-gray-200">
                               <span>{displayAhad.toFixed(2)}</span>
                               {detail.override_rate_ahad !== null && (
                                 <span
-                                  className="ml-1 text-xs text-sky-600"
+                                  className="ml-1 text-xs text-sky-600 dark:text-sky-400"
                                   title="Override"
                                 >
                                   (O)
                                 </span>
                               )}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700">
+                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-default-700 dark:text-gray-200">
                               <span>{displayUmum.toFixed(2)}</span>
                               {detail.override_rate_umum !== null && (
                                 <span
-                                  className="ml-1 text-xs text-sky-600"
+                                  className="ml-1 text-xs text-sky-600 dark:text-sky-400"
                                   title="Override"
                                 >
                                   (O)
@@ -845,7 +845,7 @@ const JobPage: React.FC = () => {
                               <div className="flex items-center justify-center space-x-2">
                                 {/* Edit button inside the clickable row */}
                                 <button
-                                  className="text-sky-600 hover:text-sky-800"
+                                  className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
                                   title="Edit Rates"
                                   // onClick is handled by the <tr> now
                                 >
@@ -858,7 +858,7 @@ const JobPage: React.FC = () => {
                                     setPayCodeToRemove(detail);
                                     setShowRemovePayCodeDialog(true);
                                   }}
-                                  className="text-rose-600 hover:text-rose-800"
+                                  className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
                                   title="Remove Pay Code"
                                 >
                                   <IconTrash size={18} />
@@ -872,7 +872,7 @@ const JobPage: React.FC = () => {
                       <tr>
                         <td
                           colSpan={8}
-                          className="px-6 py-10 text-center text-sm text-default-500"
+                          className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                         >
                           No pay codes assigned to this job.
                         </td>

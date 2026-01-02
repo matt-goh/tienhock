@@ -190,7 +190,7 @@ const SalesSummarySelectionTooltip: React.FC<
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={() => setIsVisible(true)}
-        className="flex items-center px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-full transition-colors"
+        className="flex items-center px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 rounded-full transition-colors"
         type="button"
       >
         <IconFileText size={18} className="mr-2" />
@@ -201,7 +201,7 @@ const SalesSummarySelectionTooltip: React.FC<
         createPortal(
           <div
             ref={tooltipRef}
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-0 w-96 opacity-0 flex flex-col"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-0 w-96 opacity-0 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -214,11 +214,11 @@ const SalesSummarySelectionTooltip: React.FC<
           >
             {/* Header */}
             <div
-              className="flex-shrink-0 border-b border-default-200 px-4 py-3 bg-default-50 rounded-t-lg cursor-pointer"
+              className="flex-shrink-0 border-b border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-800 rounded-t-lg cursor-pointer"
               onClick={handleSelectAll}
             >
               <div className="flex justify-between items-center">
-                <h3 className="text-base font-medium text-default-800">
+                <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
                   Sales Summary Selection
                 </h3>
                 <div className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded-full text-xs font-medium">
@@ -243,14 +243,14 @@ const SalesSummarySelectionTooltip: React.FC<
                 {SUMMARY_OPTIONS.map((option) => (
                   <div
                     key={option.id}
-                    className="flex items-center px-3 py-2.5 hover:bg-default-50 rounded-lg cursor-pointer transition-colors"
+                    className="flex items-center px-3 py-2.5 hover:bg-default-50 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors"
                     onClick={() => handleSummaryToggle(option.id)}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-default-700">
+                      <div className="text-sm font-medium text-default-700 dark:text-gray-200">
                         {option.name}
                       </div>
-                      <div className="text-xs text-default-500">
+                      <div className="text-xs text-default-500 dark:text-gray-400">
                         {option.description}
                       </div>
                     </div>
@@ -267,8 +267,8 @@ const SalesSummarySelectionTooltip: React.FC<
             </div>
 
             {/* Actions */}
-            <div className="flex-shrink-0 border-t border-default-200 px-4 py-3 bg-default-50 rounded-b-lg">
-              <div className="text-sm text-default-600 mb-2">
+            <div className="flex-shrink-0 border-t border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-800 rounded-b-lg">
+              <div className="text-sm text-default-600 dark:text-gray-300 mb-2">
                 {selectedMonth !== undefined && selectedYear
                   ? `Generating for: ${new Date(
                       selectedYear,
@@ -310,15 +310,15 @@ const SalesSummarySelectionTooltip: React.FC<
 
       {/* Loading Overlay */}
       {isGenerating && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl p-6 transform scale-110">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 transform scale-110">
             <div className="flex flex-col items-center gap-4">
               <LoadingSpinner size="lg" hideText />
               <div className="text-center">
                 <p className="text-lg font-medium text-default-900">
                   Generating Sales Summary
                 </p>
-                <p className="text-sm text-default-600 mt-1">
+                <p className="text-sm text-default-600 dark:text-gray-300 mt-1">
                   This may take a few moments...
                 </p>
               </div>

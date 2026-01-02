@@ -191,7 +191,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
       <div className="flex-1">
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-default-600 dark:text-gray-300"
         >
           {label}
         </label>
@@ -202,7 +202,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
           name={name}
           value={editRates[name]}
           onChange={handleInputChange}
-          className="mt-1 w-full rounded border border-default-300 p-1.5 text-right text-sm focus:border-sky-500 focus:ring-sky-500 disabled:bg-gray-100"
+          className="mt-1 w-full rounded border border-default-300 dark:border-gray-600 p-1.5 text-right text-sm focus:border-sky-500 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-800 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
           disabled={isSaving}
           placeholder={`Default: ${(defaultValue ?? 0).toFixed(2)}`}
         />
@@ -210,7 +210,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
       <button
         type="button"
         onClick={() => handleResetRate(name)}
-        className="mb-1 p-1 text-gray-500 hover:text-sky-600 disabled:text-gray-300"
+        className="mb-1 p-1 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 disabled:text-gray-300 dark:disabled:text-gray-600"
         title={`Reset ${label} to Default`}
         disabled={isSaving || editRates[name] === ""} // Disable if already empty
       >
@@ -223,25 +223,25 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <TransitionChild as={Fragment} /* Backdrop */>
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <TransitionChild as={Fragment} /* Panel */>
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
-                  className="text-lg font-semibold leading-6 text-gray-900"
+                  className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
                 >
                   Edit Rates for {payCodeDetail?.id}
                 </DialogTitle>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-default-600 dark:text-gray-300">
                   {payCodeDetail?.description}
                 </p>
 
                 {jobName && (
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-default-600 dark:text-gray-300">
                     Job: {jobName} ({jobId})
                   </p>
                 )}
@@ -270,14 +270,14 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                   {/* Checkbox for default setting */
                   /* Only show if payCodeDetail is not "Tambahan" */}
                   {payCodeDetail && payCodeDetail.pay_type !== "Tambahan" && (
-                    <div className="mt-4 border-t pt-4 border-gray-100">
+                    <div className="mt-4 border-t pt-4 border-gray-100 dark:border-gray-700">
                       <Checkbox
                         checked={editRates.is_default}
                         onChange={handleDefaultChange}
                         label={
                           <span>
-                            <span className="font-medium">Default</span>
-                            <span className="text-xs text-gray-500 ml-2">
+                            <span className="font-medium text-default-700 dark:text-gray-200">Default</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                               (Auto-select this pay code when creating new
                               entries)
                             </span>
@@ -313,7 +313,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                             </button>
                             <button
                               type="button"
-                              className="px-2 py-1 text-xs font-medium text-default-600 bg-default-100 hover:bg-default-200 rounded-full"
+                              className="px-2 py-1 text-xs font-medium text-default-600 dark:text-gray-300 bg-default-100 dark:bg-gray-700 hover:bg-default-200 dark:hover:bg-gray-600 rounded-full"
                               onClick={() => setShowUnlinkConfirm(false)}
                               disabled={isSaving}
                             >
@@ -326,7 +326,7 @@ const EditPayCodeRatesModal: React.FC<EditPayCodeRatesModalProps> = ({
                   )}
 
                   {error && (
-                    <p className="text-sm text-red-600 text-center">{error}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
                   )}
                 </div>
 

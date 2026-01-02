@@ -202,7 +202,7 @@ export default function NavbarBookmarks({
     >
       <div
         ref={dropdownRef}
-        className="fixed z-[100] w-72 bg-white border border-default-200 rounded-lg shadow-lg -translate-x-1/2"
+        className="fixed z-[100] w-72 bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-600 rounded-lg shadow-lg -translate-x-1/2"
         style={{
           top: dropdownPosition.top,
           left: dropdownPosition.left,
@@ -213,7 +213,7 @@ export default function NavbarBookmarks({
         {/* Bookmarks List */}
         <div className="max-h-[480px] overflow-y-auto p-2">
           {bookmarks.length === 0 ? (
-            <div className="px-4 py-6 text-center text-default-500">
+            <div className="px-4 py-6 text-center text-default-500 dark:text-gray-400">
               <IconBookmark size={32} className="mx-auto mb-2 opacity-50" />
               <p className="text-sm">No bookmarks yet</p>
               <p className="text-xs mt-1">
@@ -253,10 +253,10 @@ export default function NavbarBookmarks({
                         group flex items-center justify-between px-3 py-2 rounded-md text-sm
                         transition-colors duration-150
                         ${isActive
-                          ? "bg-sky-50 text-sky-700"
+                          ? "bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
                           : isHovered
-                            ? "bg-default-100 text-default-800"
-                            : "text-default-700 hover:bg-default-100"
+                            ? "bg-default-100 dark:bg-gray-700 text-default-800 dark:text-gray-100"
+                            : "text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
                         }
                       `}
                     >
@@ -265,7 +265,7 @@ export default function NavbarBookmarks({
                           hasPopover ? (
                             <IconChevronLeft
                               size={14}
-                              className={`transition-colors ${isHovered ? "text-sky-500" : "text-default-400"}`}
+                              className={`transition-colors ${isHovered ? "text-sky-500 dark:text-sky-400" : "text-default-400 dark:text-gray-500"}`}
                             />
                           ) : (
                             <span className="w-3.5" />
@@ -275,7 +275,7 @@ export default function NavbarBookmarks({
                       </div>
                       <button
                         onClick={(e) => handleRemoveBookmark(e, bookmark.name)}
-                        className={`p-1 rounded hover:bg-default-200 transition-opacity ${
+                        className={`p-1 rounded hover:bg-default-200 dark:hover:bg-gray-600 transition-opacity ${
                           isHovered ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
                         title="Remove bookmark"
@@ -319,7 +319,7 @@ export default function NavbarBookmarks({
     >
       <div
         ref={popoverRef}
-        className="fixed z-[101] bg-white border border-default-200 rounded-lg shadow-lg py-1 min-w-[180px] -translate-x-full"
+        className="fixed z-[101] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-600 rounded-lg shadow-lg py-1 min-w-[180px] -translate-x-full"
         style={{
           top: popoverPosition.top,
           left: popoverPosition.left,
@@ -341,7 +341,7 @@ export default function NavbarBookmarks({
               handleItemClick();
               setHoveredItem(null);
             }}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 hover:bg-sky-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
           >
             <IconPlus size={16} />
             <span>{option.name}</span>
@@ -363,8 +363,8 @@ export default function NavbarBookmarks({
             flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
             transition-colors duration-150
             ${isOpen
-              ? "bg-sky-100 text-sky-700"
-              : "text-default-700 hover:bg-default-100"
+              ? "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+              : "text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
             }
           `}
         >

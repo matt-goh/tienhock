@@ -458,15 +458,15 @@ const ECarumanPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="mb-4">
-        <h1 className="text-2xl font-semibold text-gray-900">e-Caruman</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">e-Caruman</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Generate contribution files for government submission
         </p>
       </div>
 
       {/* Month/Year Selection */}
-      <div className="mb-4 bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Select Period</h2>
+      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 p-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Select Period</h2>
         <div className="flex flex-wrap items-end gap-4">
           <YearNavigator
             selectedYear={selectedYear}
@@ -487,20 +487,20 @@ const ECarumanPage: React.FC = () => {
       </div>
 
       {/* Download Contribution Files Section */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-1">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 p-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">
           Download Contribution Files
         </h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           Select the contribution type to generate and download the file for{" "}
-          <span className="font-medium text-gray-700">
+          <span className="font-medium text-gray-700 dark:text-gray-200">
             {selectedDate.toLocaleDateString("en-MY", { month: "long", year: "numeric" })}
           </span>
         </p>
         {previewLoading ? (
           <div className="flex items-center justify-center py-8">
             <IconLoader2 size={24} className="animate-spin text-gray-400" />
-            <span className="ml-2 text-gray-500">Loading preview data...</span>
+            <span className="ml-2 text-gray-500 dark:text-gray-400">Loading preview data...</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -515,7 +515,7 @@ const ECarumanPage: React.FC = () => {
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <IconBuildingBank size={20} className="text-blue-600" />
                 </div>
-                <h3 className="font-medium text-gray-900">EPF / KWSP</h3>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">EPF / KWSP</h3>
                 {preview.missing_epf_no && preview.missing_epf_no.count > 0 && (
                   <button
                     onClick={(e) => {
@@ -540,29 +540,29 @@ const ECarumanPage: React.FC = () => {
               {preview.epf ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employees:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
                     <span className="font-medium">{preview.epf.count}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Total Salary:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Total Salary:</span>
                     <span className="font-medium">
                       RM {preview.epf.totals.salary.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employer Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
                     <span className="font-medium">
                       RM {preview.epf.totals.em_share.toLocaleString("en-MY")}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employee Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
                     <span className="font-medium">
                       RM {preview.epf.totals.emp_share.toLocaleString("en-MY")}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-100">
-                    <span className="text-gray-700 font-medium">Total:</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
                     <span className="font-semibold text-blue-600">
                       RM {preview.epf.totals.total_contribution.toLocaleString("en-MY")}
                     </span>
@@ -575,17 +575,17 @@ const ECarumanPage: React.FC = () => {
               {/* EPF Detailed Tooltip */}
               {hoveredCard === "epf" && preview.epf && preview.epf.data.length > 0 && (
                 <div
-                  className="absolute left-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[600px]"
+                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[600px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">EPF File Preview (EPFORMA2.csv)</h4>
-                    <span className="text-xs text-gray-500">{preview.epf.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">EPF File Preview (EPFORMA2.csv)</h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.epf.count} records</span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Member No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
@@ -597,17 +597,17 @@ const ECarumanPage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {preview.epf.data.map((row, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5 text-gray-700 font-mono">{row.member_no}</td>
-                            <td className="px-2 py-1.5 text-gray-700 font-mono">{formatIC(row.ic_no)}</td>
-                            <td className="px-2 py-1.5 text-gray-900">{row.name}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{row.member_no}</td>
+                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
+                            <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.salary.toFixed(2)}
                             </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {Math.round(row.em_share)}
                             </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {Math.round(row.emp_share)}
                             </td>
                           </tr>
@@ -615,8 +615,8 @@ const ECarumanPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-blue-50 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 border-t">Total</td>
-                          <td className="px-2 py-1.5 text-right text-gray-700 font-mono border-t">
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
+                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t">
                             {preview.epf.totals.salary.toFixed(2)}
                           </td>
                           <td className="px-2 py-1.5 text-right text-blue-600 font-mono border-t">
@@ -644,7 +644,7 @@ const ECarumanPage: React.FC = () => {
                 <div className="p-2 bg-green-100 rounded-lg">
                   <IconShieldCheck size={20} className="text-green-600" />
                 </div>
-                <h3 className="font-medium text-gray-900">SOCSO / PERKESO</h3>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">SOCSO / PERKESO</h3>
                 <div className="ml-auto">
                   {loadingType === "socso" ? (
                     <IconLoader2 size={20} className="animate-spin text-green-600" />
@@ -656,23 +656,23 @@ const ECarumanPage: React.FC = () => {
               {preview.socso ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employees:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
                     <span className="font-medium">{preview.socso.count}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employer Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
                     <span className="font-medium">
                       RM {preview.socso.totals.socso_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employee Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
                     <span className="font-medium">
                       RM {preview.socso.totals.socso_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-100">
-                    <span className="text-gray-700 font-medium">Total:</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
                     <span className="font-semibold text-green-600">
                       RM {preview.socso.totals.socso_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
@@ -685,17 +685,17 @@ const ECarumanPage: React.FC = () => {
               {/* SOCSO Detailed Tooltip */}
               {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
                 <div
-                  className="absolute left-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[550px]"
+                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[550px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">SOCSO File Preview (BRG8A.TXT)</h4>
-                    <span className="text-xs text-gray-500">{preview.socso.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO File Preview (BRG8A.TXT)</h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.socso.count} records</span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
@@ -706,16 +706,16 @@ const ECarumanPage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {preview.socso.data.map((row, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5 text-gray-700 font-mono">{formatIC(row.ic_no)}</td>
-                            <td className="px-2 py-1.5 text-gray-900">{row.name}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
+                            <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.salary.toFixed(2)}
                             </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.socso_employer.toFixed(2)}
                             </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.socso_employee.toFixed(2)}
                             </td>
                           </tr>
@@ -723,8 +723,8 @@ const ECarumanPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-green-50 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 border-t">Total</td>
-                          <td className="px-2 py-1.5 text-right text-gray-700 font-mono border-t">
+                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
+                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t">
                             {preview.socso.totals.salary.toFixed(2)}
                           </td>
                           <td className="px-2 py-1.5 text-right text-green-600 font-mono border-t">
@@ -752,7 +752,7 @@ const ECarumanPage: React.FC = () => {
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <IconUmbrella size={20} className="text-purple-600" />
                 </div>
-                <h3 className="font-medium text-gray-900">SIP / EIS</h3>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">SIP / EIS</h3>
                 <div className="ml-auto">
                   {loadingType === "sip" ? (
                     <IconLoader2 size={20} className="animate-spin text-purple-600" />
@@ -764,23 +764,23 @@ const ECarumanPage: React.FC = () => {
               {preview.sip ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employees:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
                     <span className="font-medium">{preview.sip.count}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employer Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
                     <span className="font-medium">
                       RM {preview.sip.totals.eis_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employee Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
                     <span className="font-medium">
                       RM {preview.sip.totals.eis_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-100">
-                    <span className="text-gray-700 font-medium">Total:</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
                     <span className="font-semibold text-purple-600">
                       RM {preview.sip.totals.sip_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
@@ -793,17 +793,17 @@ const ECarumanPage: React.FC = () => {
               {/* SIP Detailed Tooltip */}
               {hoveredCard === "sip" && preview.sip && preview.sip.data.length > 0 && (
                 <div
-                  className="absolute right-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">SIP File Preview</h4>
-                    <span className="text-xs text-gray-500">{preview.sip.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SIP File Preview</h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.sip.count} records</span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
@@ -814,16 +814,16 @@ const ECarumanPage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {preview.sip.data.map((row, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5 text-gray-700 font-mono">{formatIC(row.ic_no)}</td>
-                            <td className="px-2 py-1.5 text-gray-900">{row.name}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
+                            <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.eis_employer.toFixed(2)}
                             </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.eis_employee.toFixed(2)}
                             </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.sip_total.toFixed(2)}
                             </td>
                           </tr>
@@ -831,7 +831,7 @@ const ECarumanPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-purple-50 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 border-t">Total</td>
+                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
                           <td className="px-2 py-1.5 text-right text-purple-600 font-mono border-t">
                             {preview.sip.totals.eis_employer.toFixed(2)}
                           </td>
@@ -860,7 +860,7 @@ const ECarumanPage: React.FC = () => {
                 <div className="p-2 bg-amber-100 rounded-lg">
                   <IconReceipt size={20} className="text-amber-600" />
                 </div>
-                <h3 className="font-medium text-gray-900">Income Tax / PCB</h3>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Income Tax / PCB</h3>
                 <div className="ml-auto">
                   {loadingType === "income_tax" ? (
                     <IconLoader2 size={20} className="animate-spin text-amber-600" />
@@ -872,11 +872,11 @@ const ECarumanPage: React.FC = () => {
               {preview.income_tax ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Employees:</span>
+                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
                     <span className="font-medium">{preview.income_tax.count}</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-100">
-                    <span className="text-gray-700 font-medium">Total PCB:</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total PCB:</span>
                     <span className="font-semibold text-amber-600">
                       RM {preview.income_tax.totals.pcb_amount.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
@@ -889,17 +889,17 @@ const ECarumanPage: React.FC = () => {
               {/* Income Tax Detailed Tooltip */}
               {hoveredCard === "income_tax" && preview.income_tax && preview.income_tax.data.length > 0 && (
                 <div
-                  className="absolute right-0 bottom-full mb-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">Income Tax File Preview (LHDN*.TXT)</h4>
-                    <span className="text-xs text-gray-500">{preview.income_tax.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">Income Tax File Preview (LHDN*.TXT)</h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.income_tax.count} records</span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Tax No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
@@ -909,11 +909,11 @@ const ECarumanPage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {preview.income_tax.data.map((row, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5 text-gray-700 font-mono">{row.income_tax_no}</td>
-                            <td className="px-2 py-1.5 text-gray-900">{row.name}</td>
-                            <td className="px-2 py-1.5 text-gray-700 font-mono">{formatIC(row.ic_no)}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 font-mono">
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{row.income_tax_no}</td>
+                            <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
+                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.pcb_amount.toFixed(2)}
                             </td>
                           </tr>
@@ -921,7 +921,7 @@ const ECarumanPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-amber-50 sticky bottom-0">
                         <tr className="font-medium">
-                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 border-t">Total</td>
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t">Total</td>
                           <td className="px-2 py-1.5 text-right text-amber-600 font-mono border-t">
                             {preview.income_tax.totals.pcb_amount.toFixed(2)}
                           </td>

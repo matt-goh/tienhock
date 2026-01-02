@@ -64,35 +64,35 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   return (
     <div className="border border-gray-200 rounded-lg">
       <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+        <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
               Code
             </th>
-            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-[28%]">
+            <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[28%]">
               Description
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
               FOC
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
               RTN
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[8%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
               Qty
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
               Price
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
               Tax (RM)
             </th>
-            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 uppercase tracking-wider w-[14%]">
+            <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[14%]">
               Total (RM)
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
           {(items || []).map((item, index) => {
             const isSubtotal = item.issubtotal;
             return (
@@ -102,56 +102,56 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
               >
                 <td
                   className={`px-4 py-2 whitespace-nowrap text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {item.code}
                 </td>
                 <td
                   className={`px-4 py-2 text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {item.description}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : item.freeProduct || 0}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : item.returnProduct || 0}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : item.quantity}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : formatCurrency(item.price)}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {isSubtotal ? "" : formatCurrency(item.tax)}
                 </td>
                 <td
                   className={`px-4 py-2 text-right text-sm ${
-                    isSubtotal ? "text-gray-700 font-bold" : "text-gray-900"
+                    isSubtotal ? "text-gray-700 dark:text-gray-200 font-bold" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   {formatCurrency(item.total)}
@@ -1362,7 +1362,7 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
           <div className="h-6 w-px bg-default-300"></div>
-          <h1 className="text-xl font-semibold text-default-800">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Invoice Details
           </h1>
         </div>
@@ -1379,11 +1379,11 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
           <div className="h-6 w-px bg-default-300"></div>
-          <h1 className="text-xl font-semibold text-default-800">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Invoice Details
           </h1>
         </div>
-        <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-lg">
+        <div className="p-4 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
           Invoice data could not be loaded or invoice not found.
         </div>
       </div>
@@ -1420,7 +1420,7 @@ const InvoiceDetailsPage: React.FC = () => {
     <div className="space-y-4 relative">
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-white/70 flex justify-center items-center z-30">
+        <div className="absolute inset-0 bg-white dark:bg-gray-800/70 flex justify-center items-center z-30">
           <LoadingSpinner />
         </div>
       )}
@@ -1438,9 +1438,9 @@ const InvoiceDetailsPage: React.FC = () => {
             disabled={isLoading}
           />
           <div className="h-6 w-px bg-default-300"></div>
-          <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 flex-shrink-0 flex-wrap">
+          <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 dark:text-gray-100 flex-shrink-0 flex-wrap">
             <span className="flex items-center">
-              <IconFileInvoice size={26} className="mr-2 text-gray-500" />
+              <IconFileInvoice size={26} className="mr-2 text-gray-500 dark:text-gray-400" />
               Invoice #{invoiceData.paymenttype === "CASH" ? "C" : "I"}
               {invoiceData.id}
             </span>
@@ -1676,18 +1676,18 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Main Content Sections */}
         <div className="space-y-5">
           {/* Invoice Header Display */}
-          <section className="p-4 border rounded-lg bg-white shadow-sm">
+          <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
               Invoice Details
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
               <div className="flex flex-col group">
-                <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                   Customer
                 </span>
                 <div className="flex items-center">
                   <span
-                    className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 hover:underline cursor-pointer"
                     title={`${invoiceData.customerName} (${invoiceData.customerid})`}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1705,17 +1705,17 @@ const InvoiceDetailsPage: React.FC = () => {
                     title="Edit customer"
                     disabled={isLoading}
                   >
-                    <IconPencil size={14} className="text-sky-600" />
+                    <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                   </button>
                 </div>
               </div>
               <div className="flex flex-col group">
-                <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                   Salesman
                 </span>
                 <div className="flex items-center">
                   <span
-                    className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 hover:underline cursor-pointer"
                     title={invoiceData.salespersonid}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1734,16 +1734,16 @@ const InvoiceDetailsPage: React.FC = () => {
                     title="Edit salesman"
                     disabled={isLoading}
                   >
-                    <IconPencil size={14} className="text-sky-600" />
+                    <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                   </button>
                 </div>
               </div>
               <div className="flex flex-col group">
-                <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                   Date / Time
                 </span>
                 <div className="flex items-center">
-                  <span className="flex text-gray-900 font-medium gap-2">
+                  <span className="flex text-gray-900 dark:text-gray-100 font-medium gap-2">
                     <span>{formatDisplayDate(createdDate)}</span>
                     <span className="text-gray-600">
                       {parseDatabaseTimestamp(
@@ -1764,18 +1764,18 @@ const InvoiceDetailsPage: React.FC = () => {
                     title="Edit date/time"
                     disabled={isLoading}
                   >
-                    <IconPencil size={14} className="text-sky-600" />
+                    <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                   </button>
                 </div>
               </div>
 
               {/* Payment Type with edit functionality */}
               <div className="flex flex-col group">
-                <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                   Payment Type
                 </span>
                 <div className="flex items-center">
-                  <span className="text-gray-900 font-medium capitalize">
+                  <span className="text-gray-900 dark:text-gray-100 font-medium capitalize">
                     {invoiceData.paymenttype.toLowerCase()}
                   </span>
                   <button
@@ -1787,12 +1787,12 @@ const InvoiceDetailsPage: React.FC = () => {
                     title="Edit payment type"
                     disabled={isLoading}
                   >
-                    <IconPencil size={14} className="text-sky-600" />
+                    <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                   </button>
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+                <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                   Balance Due
                 </span>
                 <div className="flex items-center">
@@ -1838,7 +1838,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       title="Set UUID manually"
                       disabled={isLoading}
                     >
-                      <IconPencil size={14} className="text-sky-600" />
+                      <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
@@ -1851,7 +1851,7 @@ const InvoiceDetailsPage: React.FC = () => {
           </section>
 
           {/* Line Items Display */}
-          <section className="p-4 group border rounded-lg bg-white shadow-sm">
+          <section className="p-4 group border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center">
                 Line Items
@@ -1865,14 +1865,14 @@ const InvoiceDetailsPage: React.FC = () => {
                 title="Edit line items"
                 disabled={isLoading}
               >
-                <IconPencil size={16} className="text-sky-600" />
+                <IconPencil size={16} className="text-sky-600 dark:text-sky-400" />
               </button>
             </div>
             <LineItemsDisplayTable items={invoiceData.products} />
           </section>
 
           {/* Totals Display */}
-          <section className="p-4 border rounded-lg bg-white shadow-sm">
+          <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <InvoiceTotals
               subtotal={invoiceData.total_excluding_tax}
               taxTotal={invoiceData.tax_amount}
@@ -1887,7 +1887,7 @@ const InvoiceDetailsPage: React.FC = () => {
           {(invoiceData.uuid ||
             invoiceData.einvoice_status ||
             invoiceData.consolidated_part_of) && (
-            <section className="p-4 border rounded-lg bg-white shadow-sm">
+            <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
               <h2 className="text-lg font-semibold mb-3 text-gray-800">
                 {(invoiceData.einvoice_status === "valid" ||
                   invoiceData.einvoice_status === "cancelled") &&
@@ -1896,7 +1896,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     href={`https://myinvois.hasil.gov.my/${invoiceData.uuid}/share/${invoiceData.long_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-sky-600 hover:underline"
+                    className="hover:text-sky-600 dark:text-sky-400 hover:underline"
                     title="View in MyInvois Portal"
                   >
                     E-Invoice Details
@@ -1906,7 +1906,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-sky-600 hover:underline"
+                    className="hover:text-sky-600 dark:text-sky-400 hover:underline"
                     title="View Consolidated Invoice in MyInvois Portal"
                   >
                     E-Invoice Details
@@ -1918,7 +1918,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {invoiceData.uuid && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       UUID:
                     </strong>
                     <span className="font-mono text-sm break-all">
@@ -1928,7 +1928,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {invoiceData.long_id && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Long ID:
                     </strong>
                     <span className="font-mono text-sm break-all">
@@ -1938,7 +1938,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {invoiceData.submission_uid && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Submission:
                     </strong>
                     <span className="font-mono text-sm break-all">
@@ -1948,7 +1948,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {invoiceData.datetime_validated && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Validated:
                     </strong>
                     {formatDisplayDate(
@@ -1966,7 +1966,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 )}
                 {!consolidatedStatusInfo && (
                   <p>
-                    <strong className="text-gray-500 font-medium w-24 inline-block">
+                    <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                       Status:
                     </strong>
                     {eInvoiceStatusInfo ? (
@@ -1976,14 +1976,14 @@ const InvoiceDetailsPage: React.FC = () => {
                         {eInvoiceStatusInfo.text}
                       </span>
                     ) : (
-                      <span className="text-gray-500">Not Submitted</span>
+                      <span className="text-gray-500 dark:text-gray-400">Not Submitted</span>
                     )}
                   </p>
                 )}
                 {consolidatedStatusInfo && (
                   <>
                     <p>
-                      <strong className="text-gray-500 font-medium w-24 inline-block">
+                      <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                         Invoice ID:
                       </strong>
                       <span className="font-medium">
@@ -1992,7 +1992,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     </p>
                     {consolidatedStatusInfo.info.uuid && (
                       <p>
-                        <strong className="text-gray-500 font-medium w-24 inline-block">
+                        <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
                           UUID:
                         </strong>
                         <span className="font-mono text-sm break-all">
@@ -2022,7 +2022,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       title="Set UUID manually"
                       disabled={isLoading}
                     >
-                      <IconPencil size={14} className="text-sky-600" />
+                      <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
@@ -2035,43 +2035,43 @@ const InvoiceDetailsPage: React.FC = () => {
           )}
 
           {/* Payment History */}
-          <section className="p-4 border rounded-lg bg-white shadow-sm">
+          <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800">
               Payment History
             </h2>
             {payments.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                 No payments recorded yet.
               </p>
             ) : (
               <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
                         Date
                       </th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
                         Method
                       </th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
                         Reference
                       </th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
                         Status
                       </th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Notes
                       </th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
                         Amount
                       </th>
-                      <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
                         Action
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
                     {payments.map((p) => (
                       <tr
                         key={p.payment_id}
@@ -2133,7 +2133,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         <td className="px-4 py-3 whitespace-nowrap text-center">
                           <div className="flex justify-center gap-1">
                             {p.status === "cancelled" ? (
-                              <span className="italic text-gray-500 text-sm">
+                              <span className="italic text-gray-500 dark:text-gray-400 text-sm">
                                 Cancelled
                               </span>
                             ) : p.status === "pending" ? (
@@ -2255,9 +2255,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Order Details Edit Modal */}
         {isEditingOrderDetails && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
               <div className="flex justify-between items-center p-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Edit Line Items
                 </h3>
                 <button
@@ -2317,7 +2317,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   readOnly={isUpdatingOrderDetails}
                 />
               </div>
-              <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+              <div className="flex justify-end gap-3 p-6 border-t bg-gray-50 dark:bg-gray-900/50">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -2345,9 +2345,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Customer Edit Modal */}
         {isEditingCustomer && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Change Customer
                 </h3>
                 <button
@@ -2407,9 +2407,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Salesman Edit Modal */}
         {isEditingSalesman && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Change Salesman
                 </h3>
                 <button
@@ -2465,9 +2465,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Payment Type Edit Modal */}
         {isEditingPaymentType && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Change Payment Type
                 </h3>
                 <button
@@ -2558,9 +2558,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Date/Time Edit Modal */}
         {isEditingDateTime && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Change Date & Time
                 </h3>
                 <button
@@ -2612,9 +2612,9 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* UUID Edit Modal */}
         {isEditingUUID && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Set Manual UUID
                 </h3>
                 <button
@@ -2639,7 +2639,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   disabled={isUpdatingUUID}
                   placeholder="Enter UUID (e.g., 4RKA7KDV6JM3HVTSQ9S60MZJ10)"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Enter the UUID from MyInvois if the system failed to record it
                   automatically
                 </p>

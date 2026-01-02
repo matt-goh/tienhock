@@ -66,7 +66,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`text-default-400 hover:text-default-600 cursor-help inline-flex ${className}`}
+        className={`text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex ${className}`}
       >
         <IconInfoCircle size={16} />
       </span>
@@ -74,7 +74,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
       {isVisible &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-4 w-96 transform -translate-x-1/2 -translate-y-full opacity-0 transition-opacity duration-200"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-4 w-96 transform -translate-x-1/2 -translate-y-full opacity-0 transition-opacity duration-200"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
@@ -85,18 +85,18 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <div className="text-sm font-medium text-default-700 mb-2 flex justify-between items-center">
+            <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
               <span>Consolidated Invoices</span>
-              <span className="text-xs text-default-500">
+              <span className="text-xs text-default-500 dark:text-gray-400">
                 ({invoices.length} invoices)
               </span>
             </div>
 
-            <div className="border-t border-default-200 pt-2 grid grid-cols-4 gap-1">
+            <div className="border-t border-default-200 dark:border-gray-700 pt-2 grid grid-cols-4 gap-1">
               {invoices.map((invoice, index) => (
                 <div
                   key={index}
-                  className={`text-center text-xs py-1 px-2 bg-default-50 rounded border border-default-200 ${
+                  className={`text-center text-xs py-1 px-2 bg-default-50 dark:bg-gray-800 rounded border border-default-200 ${
                     !disableNavigation
                       ? "cursor-pointer hover:bg-default-100"
                       : ""

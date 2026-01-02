@@ -111,15 +111,15 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <h1 className="text-xl font-bold text-default-900">Dashboard</h1>
+      <h1 className="text-xl font-bold text-default-900 dark:text-gray-100">Dashboard</h1>
 
       {/* Main Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Revenue Card */}
-        <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 text-xs">Revenue (This Month)</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">Revenue (This Month)</p>
               <h3 className="text-xl font-bold mt-0.5">
                 {formatCurrency(metrics?.revenueThisMonth || 0)}
               </h3>
@@ -145,32 +145,32 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Rentals Card */}
-        <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 text-xs">Active Rentals</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">Active Rentals</p>
               <h3 className="text-xl font-bold mt-0.5">
                 {metrics?.activeRentals || 0}
               </h3>
-              <p className="text-default-500 text-xs mt-1">
+              <p className="text-default-500 dark:text-gray-400 text-xs mt-1">
                 Out of {metrics?.totalRentals || 0} total
               </p>
             </div>
             <div className="bg-sky-100 p-2 rounded-full">
-              <IconTruck size={20} className="text-sky-600" />
+              <IconTruck size={20} className="text-sky-600 dark:text-sky-400" />
             </div>
           </div>
         </div>
 
         {/* Invoices Card */}
-        <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 text-xs">Outstanding Invoices</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">Outstanding Invoices</p>
               <h3 className="text-xl font-bold mt-0.5">
                 {metrics?.outstandingInvoices || 0}
               </h3>
-              <p className="text-default-500 text-xs mt-1">
+              <p className="text-default-500 dark:text-gray-400 text-xs mt-1">
                 Out of {metrics?.totalInvoices || 0} total
               </p>
             </div>
@@ -181,14 +181,14 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Dumpsters Card */}
-        <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 text-xs">Available Dumpsters</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">Available Dumpsters</p>
               <h3 className="text-xl font-bold mt-0.5">
                 {metrics?.availableDumpsters || 0}
               </h3>
-              <p className="text-default-500 text-xs mt-1">
+              <p className="text-default-500 dark:text-gray-400 text-xs mt-1">
                 Out of {metrics?.totalDumpsters || 0} total
               </p>
             </div>
@@ -202,7 +202,7 @@ const DashboardPage: React.FC = () => {
       {/* Quick Links & Secondary Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Quick Links Card */}
-        <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <h3 className="text-sm font-medium mb-2">Quick Actions</h3>
           <div className="grid grid-cols-1 gap-2">
             <Button
@@ -258,25 +258,25 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Secondary Metrics */}
-        <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm lg:col-span-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm lg:col-span-2">
           <h3 className="text-sm font-medium mb-2">Business Overview</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-3 bg-default-50 rounded-lg">
-              <p className="text-default-500 text-xs">Total Customers</p>
+            <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
+              <p className="text-default-500 dark:text-gray-400 text-xs">Total Customers</p>
               <p className="text-xl font-bold">
                 {metrics?.totalCustomers || 0}
               </p>
             </div>
 
-            <div className="p-3 bg-default-50 rounded-lg">
-              <p className="text-default-500 text-xs">Total Revenue</p>
+            <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
+              <p className="text-default-500 dark:text-gray-400 text-xs">Total Revenue</p>
               <p className="text-xl font-bold">
                 {formatCurrency(metrics?.totalRevenue || 0)}
               </p>
             </div>
 
-            <div className="p-3 bg-default-50 rounded-lg">
-              <p className="text-default-500 text-xs">This Month</p>
+            <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
+              <p className="text-default-500 dark:text-gray-400 text-xs">This Month</p>
               <p className="text-xl font-bold">
                 {formatCurrency(metrics?.revenueThisMonth || 0)}
               </p>
@@ -284,11 +284,11 @@ const DashboardPage: React.FC = () => {
           </div>
 
           <div className="mt-3">
-            <h4 className="text-default-700 text-sm font-medium mb-2">
+            <h4 className="text-default-700 dark:text-gray-200 text-sm font-medium mb-2">
               Rental Activity
             </h4>
-            <div className="h-32 bg-default-50 rounded-lg flex items-center justify-center">
-              <p className="text-default-500 text-sm">
+            <div className="h-32 bg-default-50 dark:bg-gray-900/50 rounded-lg flex items-center justify-center">
+              <p className="text-default-500 dark:text-gray-400 text-sm">
                 Chart placeholder
               </p>
             </div>
@@ -297,7 +297,7 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-lg border border-default-200 p-4 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-sm font-medium">Recent Activity</h3>
           <Button
@@ -311,7 +311,7 @@ const DashboardPage: React.FC = () => {
 
         <div className="overflow-hidden">
           {recentActivities.length === 0 ? (
-            <p className="text-default-500 text-center py-4">
+            <p className="text-default-500 dark:text-gray-400 text-center py-4">
               No recent activity
             </p>
           ) : (
@@ -319,7 +319,7 @@ const DashboardPage: React.FC = () => {
               {recentActivities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-center py-2 hover:bg-default-50 transition-colors"
+                  className="flex items-center py-2 hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div
                     className={`rounded-full p-1.5 mr-3 ${
@@ -331,7 +331,7 @@ const DashboardPage: React.FC = () => {
                     }`}
                   >
                     {activity.type === "rental" && (
-                      <IconTruck size={16} className="text-sky-600" />
+                      <IconTruck size={16} className="text-sky-600 dark:text-sky-400" />
                     )}
                     {activity.type === "invoice" && (
                       <IconFileInvoice size={16} className="text-amber-600" />
@@ -342,10 +342,10 @@ const DashboardPage: React.FC = () => {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-default-900 truncate">
+                    <p className="text-sm text-default-900 dark:text-gray-100 truncate">
                       {activity.description}
                     </p>
-                    <p className="text-xs text-default-500">
+                    <p className="text-xs text-default-500 dark:text-gray-400">
                       {formatDate(activity.date)}
                     </p>
                   </div>

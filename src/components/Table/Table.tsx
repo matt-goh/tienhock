@@ -503,7 +503,7 @@ function Table<T extends Record<string, any>>({
                 e.stopPropagation();
                 handleRowSelection(row);
               }}
-              className="p-2 rounded-full hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
+              className="p-2 rounded-full hover:bg-default-200 dark:hover:bg-gray-700 active:bg-default-300 dark:active:bg-gray-600 transition-colors duration-200"
               disabled={isSorting}
             >
               {isAllSelectedGlobal ? (
@@ -523,7 +523,7 @@ function Table<T extends Record<string, any>>({
                   width={20}
                   height={20}
                   stroke={2}
-                  className="text-default-400"
+                  className="text-default-400 dark:text-gray-500"
                 />
               )}
             </button>
@@ -1114,7 +1114,7 @@ function Table<T extends Record<string, any>>({
 
   return (
     <div ref={tableRef} className="flex flex-col items-center w-auto">
-      <div className="rounded-lg border border-default-300 w-fit">
+      <div className="rounded-lg border border-default-300 dark:border-gray-600 w-fit">
         <table
           className="w-auto border-collapse border-spacing-0 rounded-lg"
           ref={tableContainerRef}
@@ -1146,12 +1146,12 @@ function Table<T extends Record<string, any>>({
                   className={`border-t ${
                     isLastRow
                       ? "border-b-0 rounded-b-lg"
-                      : "border-b border-default-300"
+                      : "border-b border-default-300 dark:border-gray-600"
                   } ${row.id === selectedRowId ? "shadow-top-bottom" : ""}
                   ${
                     selectedRows.has(row.original.id)
-                      ? "bg-blue-50 hover:bg-blue-50"
-                      : "hover:bg-default-100"
+                      ? "bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                      : "hover:bg-default-100 dark:hover:bg-gray-700"
                   } ${row.id === editableRowId ? "relative z-10" : ""}}`}
                   onClick={() =>
                     row.original.isSubtotal || row.original.isTotal
@@ -1170,7 +1170,7 @@ function Table<T extends Record<string, any>>({
                         return (
                           <td
                             key={cell.id}
-                            className="border-r border-default-300"
+                            className="border-r border-default-300 dark:border-gray-600"
                           >
                             {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
@@ -1193,7 +1193,7 @@ function Table<T extends Record<string, any>>({
                         return (
                           <td
                             key={cell.id}
-                            className="border-l border-default-300"
+                            className="border-l border-default-300 dark:border-gray-600"
                           >
                             {renderCell(row, cell, cellIndex, isLastRow)}
                           </td>
@@ -1206,23 +1206,23 @@ function Table<T extends Record<string, any>>({
                         <td
                           key={cell.id}
                           className={`relative px-6 py-4 whitespace-no-wrap ${
-                            isSorting ? "bg-default-50" : "cursor-default"
+                            isSorting ? "bg-default-50 dark:bg-gray-800" : "cursor-default"
                           } ${
                             row.id === editableRowId &&
                             cellIndex === editableCellIndex &&
                             !isSorting
-                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 before:pointer-events-none before:z-10"
+                              ? "cell-highlight before:absolute before:inset-[-1px] before:border-[2px] before:border-default-400 dark:before:border-gray-500 before:pointer-events-none before:z-10"
                               : ""
                           } ${
                             isFirstCell
                               ? "border-l-0"
-                              : "border-l border-default-300"
+                              : "border-l border-default-300 dark:border-gray-600"
                           }
                         ${isLastCell ? "border-r-0" : ""}
                         ${
                           isLastRow
                             ? "border-b-0"
-                            : "border-b border-default-300"
+                            : "border-b border-default-300 dark:border-gray-600"
                         } ${isLastCell && isLastRow ? "rounded-br-lg" : ""} ${
                             isFirstCell && isLastRow ? "rounded-bl-lg" : ""
                           }`}
@@ -1281,9 +1281,9 @@ function Table<T extends Record<string, any>>({
                     : 0,
                 transition: "opacity 0.2s ease-in-out",
               }}
-              className={`bg-default-200 rounded-full hover:bg-default-300 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
+              className={`bg-default-200 dark:bg-gray-700 rounded-full hover:bg-default-300 dark:hover:bg-gray-600 transition-colors duration-200 mt-1.5 flex items-center justify-center w-full hover:cursor-row-resize ${
                 isAddRowBarActive ? "active-bg" : ""
-              } 
+              }
         }`}
               onMouseDown={handleMouseDown}
               onClick={disableAddRowBar ? undefined : handleAddRow}

@@ -251,16 +251,16 @@ const DumpsterFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg">
-        <div className="px-6 pb-4 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg">
+        <div className="px-6 pb-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode ? "Edit Dumpster" : "Add New Dumpster"}
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
                   ? 'Edit dumpster details here. Click "Save" when you\'re done.'
                   : 'Enter new dumpster details here. Click "Save" when you\'re done.'}
@@ -274,7 +274,7 @@ const DumpsterFormPage: React.FC = () => {
               <div className="space-y-2">
                 <label
                   htmlFor="tong_no"
-                  className="text-sm font-medium text-default-700"
+                  className="text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Dumpster Number
                 </label>
@@ -303,7 +303,7 @@ const DumpsterFormPage: React.FC = () => {
                     </p>
                   )}
                   {isCheckingDuplicate && (
-                    <p className="mt-1 text-sm text-default-500">
+                    <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                       Checking availability...
                     </p>
                   )}
@@ -313,7 +313,7 @@ const DumpsterFormPage: React.FC = () => {
               <div className="w-full">
                 <label
                   htmlFor="status"
-                  className="text-sm font-medium text-default-700"
+                  className="text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Status
                 </label>
@@ -329,7 +329,7 @@ const DumpsterFormPage: React.FC = () => {
                     disabled={isEditMode && formData.status === "Rented"}
                   >
                     <div className="relative">
-                      <ListboxButton className="w-full rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
+                      <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50 dark:bg-gray-900/50">
                         <span className="block truncate">
                           {formData.status.charAt(0).toUpperCase() +
                             formData.status.slice(1)}
@@ -341,7 +341,7 @@ const DumpsterFormPage: React.FC = () => {
                           />
                         </span>
                       </ListboxButton>
-                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                      <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
                         <ListboxOption
                           className={({ active }) =>
                             `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
@@ -362,7 +362,7 @@ const DumpsterFormPage: React.FC = () => {
                                 Available
                               </span>
                               {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                                   <IconCheck
                                     className="h-5 w-5"
                                     aria-hidden="true"
@@ -393,7 +393,7 @@ const DumpsterFormPage: React.FC = () => {
                                 Rented
                               </span>
                               {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                                   <IconCheck
                                     className="h-5 w-5"
                                     aria-hidden="true"
@@ -423,7 +423,7 @@ const DumpsterFormPage: React.FC = () => {
                                 Maintenance
                               </span>
                               {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                                   <IconCheck
                                     className="h-5 w-5"
                                     aria-hidden="true"
@@ -445,29 +445,29 @@ const DumpsterFormPage: React.FC = () => {
             <div className="mt-8 pt-4 border-t">
               <h2 className="text-lg font-medium mb-4">Rental Schedule</h2>
               {rentals.length === 0 ? (
-                <p className="text-default-500">
+                <p className="text-default-500 dark:text-gray-400">
                   No rentals scheduled for this dumpster.
                 </p>
               ) : (
-                <div className="overflow-hidden border border-default-200 rounded-lg">
-                  <table className="min-w-full divide-y divide-default-200">
-                    <thead className="bg-default-50">
+                <div className="overflow-hidden border border-default-200 dark:border-gray-700 rounded-lg">
+                  <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                    <thead className="bg-default-50 dark:bg-gray-900/50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                           Customer
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                           Placement Date
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                           Pickup Date
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                           Status
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-default-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {rentals.map((rental) => {
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
@@ -489,7 +489,7 @@ const DumpsterFormPage: React.FC = () => {
                         return (
                           <tr
                             key={rental.rental_id}
-                            className="hover:bg-default-50"
+                            className="hover:bg-default-50 dark:hover:bg-gray-700"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(
@@ -497,15 +497,15 @@ const DumpsterFormPage: React.FC = () => {
                               );
                             }}
                           >
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                               {rental.customer_name}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                               {new Date(
                                 rental.date_placed
                               ).toLocaleDateString()}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                               {rental.date_picked
                                 ? new Date(
                                     rental.date_picked
@@ -519,7 +519,7 @@ const DumpsterFormPage: React.FC = () => {
                                     ? "bg-green-100 text-green-800"
                                     : isScheduled
                                     ? "bg-amber-100 text-amber-800"
-                                    : "bg-blue-100 text-blue-800"
+                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                                 }`}
                               >
                                 {isCurrent

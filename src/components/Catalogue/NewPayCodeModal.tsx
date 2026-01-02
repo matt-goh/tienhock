@@ -120,7 +120,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -134,16 +134,16 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900"
+                  className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
                   Add Pay Code to Job "{job?.name}"
                 </DialogTitle>
                 <div className="mt-4">
                   <Field>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
                       Select Pay Code
                     </label>
                     {/* Wrap Combobox in a relative container to anchor the options */}
@@ -155,7 +155,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                       >
                         <div className="relative">
                           <ComboboxInput
-                            className="w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                            className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                             displayValue={(pc: PayCode | null) =>
                               pc ? `${pc.id} - ${pc.description}` : ""
                             }
@@ -166,7 +166,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
                               size={20}
-                              className="text-gray-400"
+                              className="text-gray-400 dark:text-gray-500"
                               aria-hidden="true"
                             />
                           </ComboboxButton>
@@ -179,14 +179,14 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                           afterLeave={() => setQuery("")}
                         >
                           {/* Apply w-full to make options match input width */}
-                          <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                          <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black dark:ring-gray-700 ring-opacity-5 focus:outline-none sm:text-sm">
                             {filteredPayCodes.length === 0 && query !== "" ? (
-                              <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                                 Nothing found.
                               </div>
                             ) : filteredPayCodes.length === 0 &&
                               availablePayCodesToAdd.length === 0 ? (
-                              <div className="relative cursor-default select-none py-2 px-4 text-gray-500">
+                              <div className="relative cursor-default select-none py-2 px-4 text-gray-500 dark:text-gray-400">
                                 No available pay codes to add.
                               </div>
                             ) : (
@@ -196,8 +196,8 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                                   className={({ active }) =>
                                     `relative cursor-default select-none py-2 pl-10 pr-4 ${
                                       active
-                                        ? "bg-sky-100 text-sky-900"
-                                        : "text-gray-900"
+                                        ? "bg-sky-100 dark:bg-sky-900/30 text-sky-900 dark:text-sky-300"
+                                        : "text-gray-900 dark:text-gray-100"
                                     }`
                                   }
                                   value={pc}
@@ -215,7 +215,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                                         {pc.id} - {pc.description}
                                       </span>
                                       {selected ? (
-                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-500">
                                           <IconCheck
                                             size={20}
                                             aria-hidden="true"
@@ -229,7 +229,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                             )}
                             {/* Load More Button */}
                             {hasMoreItems && (
-                              <div className="border-t border-gray-200 p-2">
+                              <div className="border-t border-gray-200 dark:border-gray-700 p-2">
                               <button
                                 type="button"
                                 onClick={handleLoadMore}

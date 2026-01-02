@@ -57,7 +57,7 @@ export const FormInput: React.FC<InputProps> = ({
     {label && (
       <label
         htmlFor={name}
-        className="block text-sm font-medium text-default-700 truncate"
+        className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
         title={typeof label === "string" ? label : undefined}
       >
         {label} {required && <span className="text-red-500">*</span>}
@@ -77,9 +77,11 @@ export const FormInput: React.FC<InputProps> = ({
       max={max?.toString()}
       required={required}
       className={clsx(
-        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
-        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+        "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+        "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+        "placeholder-gray-400 dark:placeholder-gray-500",
+        "focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm",
+        "disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed"
       )}
     />
   </div>
@@ -108,7 +110,7 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
       {label && (
         <label
           htmlFor={name}
-          className="block text-sm font-medium text-default-700 truncate"
+          className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
           title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
@@ -128,9 +130,11 @@ export const FormInputWithStatus: React.FC<ExtendedInputProps> = ({
       placeholder={placeholder}
       required={required}
       className={clsx(
-        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
-        "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-        "disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+        "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+        "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+        "placeholder-gray-400 dark:placeholder-gray-500",
+        "focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm",
+        "disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed"
       )}
     />
   </div>
@@ -179,7 +183,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
       {label && (
         <label
           htmlFor={`${name}-button`}
-          className="block text-sm font-medium text-default-700 truncate"
+          className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
           title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
@@ -195,9 +199,10 @@ export const FormListbox: React.FC<ListboxProps> = ({
           <HeadlessListboxButton
             id={`${name}-button`}
             className={clsx(
-              "relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
-              "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-              disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+              "relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left shadow-sm",
+              "text-gray-900 dark:text-gray-100",
+              "focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 sm:text-sm",
+              disabled ? "bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
             )}
           >
             {/* Allow custom rendering for the button display value too if needed, using selectedOption */}
@@ -205,7 +210,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
                 size={20}
-                className="text-gray-400"
+                className="text-gray-400 dark:text-gray-500"
                 aria-hidden="true"
               />
             </span>
@@ -218,7 +223,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
           >
             <ListboxOptions
               className={clsx(
-                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm",
                 optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
               )}
             >
@@ -228,7 +233,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
                   className={({ active }) =>
                     clsx(
                       "relative cursor-pointer select-none py-2 pl-3 pr-10",
-                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                      active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                     )
                   }
                   value={option.id.toString()}
@@ -246,7 +251,7 @@ export const FormListbox: React.FC<ListboxProps> = ({
                           {option.name}
                         </span>
                         {selected ? (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                             <IconCheck size={20} aria-hidden="true" />
                           </span>
                         ) : null}
@@ -366,7 +371,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
       {label && (
         <label
           htmlFor={`${name}-input`}
-          className="block text-sm font-medium text-default-700 truncate"
+          className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate"
           title={typeof label === "string" ? label : undefined}
         >
           {label} {required && <span className="text-red-500">*</span>}
@@ -384,16 +389,17 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
           {/* Input area */}
           <div
             className={clsx(
-              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
-              "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500",
-              disabled ? "bg-gray-50" : ""
+              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left shadow-sm",
+              "focus-within:ring-1 focus-within:ring-sky-500 dark:focus-within:ring-sky-400 focus-within:border-sky-500 dark:focus-within:border-sky-400",
+              disabled ? "bg-gray-50 dark:bg-gray-700" : ""
             )}
           >
             <ComboboxInput
               // Render as input for typing/searching
               className={clsx(
-                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0",
-                disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 bg-transparent focus:ring-0",
+                "placeholder-gray-400 dark:placeholder-gray-500",
+                disabled ? "bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
               )}
               // displayValue tells Headless UI how to render the selected item(s) in the input
               displayValue={getDisplayValue}
@@ -408,7 +414,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
             >
               <IconChevronDown
                 size={20}
-                className="text-gray-400"
+                className="text-gray-400 dark:text-gray-500"
                 aria-hidden="true"
               />
             </HeadlessComboboxButton>
@@ -423,12 +429,12 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
           >
             <ComboboxOptions
               className={clsx(
-                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none sm:text-sm",
                 optionsPosition === "top" ? "bottom-full mb-1" : "mt-1"
               )}
             >
               {filteredOptions.length === 0 && query !== "" ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                   Nothing found.
                 </div>
               ) : (
@@ -438,7 +444,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                     className={({ active }) =>
                       clsx(
                         "relative cursor-default select-none py-2 pl-3 pr-10",
-                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                        active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                       )
                     }
                     value={option} // Pass the whole option object as value
@@ -463,7 +469,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                             <span
                               className={clsx(
                                 "text-xs ml-2 flex-shrink-0 flex items-center",
-                                active ? "text-sky-700" : "text-gray-500"
+                                active ? "text-sky-700 dark:text-sky-300" : "text-gray-500 dark:text-gray-400"
                               )}
                             >
                               <IconPhone
@@ -479,7 +485,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                           <span
                             className={clsx(
                               "absolute inset-y-0 right-0 flex items-center pr-3",
-                              active ? "text-sky-600" : "text-sky-600"
+                              "text-sky-600 dark:text-sky-400"
                             )}
                           >
                             <IconCheck size={20} aria-hidden="true" />

@@ -233,8 +233,8 @@ const GreenTargetPaymentPage: React.FC = () => {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <IconCash size={28} className="text-gray-700" />
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <IconCash size={28} className="text-gray-700 dark:text-gray-200" />
           Payment Management
         </h1>
         <Button onClick={handleNewPayment} icon={IconPlus} size="md">
@@ -243,20 +243,20 @@ const GreenTargetPaymentPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-4">
         <div className="p-4">
           <div className="flex flex-wrap items-center gap-4">
             {/* Search */}
             <div className="relative flex-1 min-w-[200px]">
               <IconSearch
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
                 size={18}
               />
               <input
                 type="text"
                 placeholder="Search"
                 title="Search payments by invoice, reference, or amount"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 value={filters.searchTerm}
                 onChange={(e) =>
                   setFilters((prev) => ({
@@ -282,13 +282,13 @@ const GreenTargetPaymentPage: React.FC = () => {
             <div className="w-full sm:w-40">
               <Listbox value={selectedMonth} onChange={handleMonthChange}>
                 <div className="relative">
-                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 bg-white py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm">
+                  <ListboxButton className="w-full h-[42px] rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-[9px] pl-3 pr-10 text-left focus:outline-none focus:border-default-500 text-sm text-default-900 dark:text-gray-100">
                     <span className="block truncate pl-1">
                       {selectedMonth.name}
                     </span>
                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                       <IconChevronDown
-                        className="h-5 w-5 text-default-400"
+                        className="h-5 w-5 text-default-400 dark:text-gray-500"
                         aria-hidden="true"
                       />
                     </span>
@@ -298,7 +298,7 @@ const GreenTargetPaymentPage: React.FC = () => {
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                   >
-                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
+                    <ListboxOptions className="absolute z-50 w-full p-1 mt-1 border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg text-sm">
                       {monthOptions.map((month) => (
                         <ListboxOption
                           key={month.id}
@@ -306,8 +306,8 @@ const GreenTargetPaymentPage: React.FC = () => {
                           className={({ active }) =>
                             `relative cursor-pointer select-none py-2 pl-4 pr-4 rounded-md ${
                               active
-                                ? "bg-default-100 text-default-900"
-                                : "text-gray-900"
+                                ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                                : "text-gray-900 dark:text-gray-100"
                             }`
                           }
                         >
@@ -321,7 +321,7 @@ const GreenTargetPaymentPage: React.FC = () => {
                                 {month.name}
                               </span>
                               {selected && (
-                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                   <IconCheck
                                     className="h-5 w-5"
                                     aria-hidden="true"

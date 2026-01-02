@@ -1600,8 +1600,8 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/greentarget/invoices")} />
           <div className="h-6 w-px bg-default-300"></div>
-          <h1 className="text-2xl font-bold text-default-900 flex items-center">
-            <IconFileInvoice size={28} className="mr-2 text-default-600" />
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100 flex items-center">
+            <IconFileInvoice size={28} className="mr-2 text-default-600 dark:text-gray-300" />
             Invoice
             <span
               className="pl-1.5 truncate max-w-[150px] md:max-w-[300px] inline-block"
@@ -1644,7 +1644,7 @@ const InvoiceDetailsPage: React.FC = () => {
             )}
             {invoice.einvoice_status === "pending" && (
               <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 border border-sky-300 text-sky-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 border border-sky-300 text-sky-600 dark:text-sky-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
                 title="e-Invoice Pending"
               >
                 <IconClock size={18} stroke={1.5} />
@@ -1797,7 +1797,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
       {/* Payment form */}
       {showPaymentForm && (
-        <div className="bg-default-50 p-6 rounded-lg mb-6 border border-default-200">
+        <div className="bg-default-50 dark:bg-gray-900/50 p-6 rounded-lg mb-6 border border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-medium mb-4">Record Payment</h2>
           <form onSubmit={handleSubmitPayment}>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -1805,7 +1805,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="space-y-2">
                 <label
                   htmlFor="payment_date"
-                  className="block text-sm font-medium text-default-700"
+                  className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Payment Date
                 </label>
@@ -1828,12 +1828,12 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="space-y-2">
                 <label
                   htmlFor="amount_paid"
-                  className="block text-sm font-medium text-default-700"
+                  className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Amount Paid
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400">
                     RM
                   </span>
                   <input
@@ -1859,7 +1859,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="space-y-2">
                 <label
                   htmlFor="payment_method-button" // Target the button ID
-                  className="block text-sm font-medium text-default-700"
+                  className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Payment Method
                 </label>
@@ -1907,7 +1907,7 @@ const InvoiceDetailsPage: React.FC = () => {
                                 "relative cursor-default select-none py-2 pl-3 pr-10",
                                 active
                                   ? "bg-sky-100 text-sky-900"
-                                  : "text-gray-900"
+                                  : "text-gray-900 dark:text-gray-100"
                               )
                             }
                             value={option.id.toString()} // Ensure value is string
@@ -1923,7 +1923,7 @@ const InvoiceDetailsPage: React.FC = () => {
                                   {option.name}
                                 </span>
                                 {selected ? (
-                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                     <IconCheck size={20} aria-hidden="true" />
                                   </span>
                                 ) : null}
@@ -1944,7 +1944,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <div className="space-y-2">
                   <label
                     htmlFor="payment_reference"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     {paymentFormData.payment_method === "cheque"
                       ? "Cheque Number"
@@ -1983,15 +1983,15 @@ const InvoiceDetailsPage: React.FC = () => {
       )}
 
       {/* Invoice details */}
-      <div className="bg-white rounded-lg shadow border border-default-200 overflow-hidden mt-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-default-200 dark:border-gray-700 overflow-hidden mt-8">
         {/* Invoice info */}
-        <section className="px-6 py-4 border-b border-default-200">
+        <section className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-medium mb-4 border-b pb-2">
             Invoice Details
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
             <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                 Invoice Number
               </span>
               {isEditingInvoiceNumber ? (
@@ -2044,7 +2044,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center">
-                  <span className="text-gray-900 font-medium">
+                  <span className="text-gray-900 dark:text-gray-100 font-medium">
                     {invoice.invoice_number}
                   </span>
                   {invoice.status !== "cancelled" && (
@@ -2053,14 +2053,14 @@ const InvoiceDetailsPage: React.FC = () => {
                       className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
                       title="Edit Invoice Number"
                     >
-                      <IconPencil size={14} className="text-sky-600" />
+                      <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   )}
                 </div>
               )}
             </div>
             <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                 Date Issued
               </span>
               {isEditingDateIssued ? (
@@ -2069,7 +2069,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     type="date"
                     value={editedDateIssued}
                     onChange={(e) => setEditedDateIssued(e.target.value)}
-                    className="flex-1 px-2 py-1.5 border border-default-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                    className="flex-1 px-2 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
                     disabled={isUpdatingDateIssued}
                   />
                   <button
@@ -2091,7 +2091,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center">
-                  <span className="text-gray-900 font-medium">
+                  <span className="text-gray-900 dark:text-gray-100 font-medium">
                     {formatDate(invoice.date_issued)}
                   </span>
                   {invoice.status !== "cancelled" && (
@@ -2100,14 +2100,14 @@ const InvoiceDetailsPage: React.FC = () => {
                       className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
                       title="Edit Date Issued"
                     >
-                      <IconPencil size={14} className="text-sky-600" />
+                      <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   )}
                 </div>
               )}
             </div>
             <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                 Customer
               </span>
               <div className="flex items-center">
@@ -2116,33 +2116,33 @@ const InvoiceDetailsPage: React.FC = () => {
                     onClick={() =>
                       navigate(`/greentarget/customers/${invoice.customer_id}`)
                     }
-                    className="text-gray-900 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 hover:underline cursor-pointer"
                     title={`${invoice.customer_name} (${invoice.customer_id})`}
                   >
                     {invoice.customer_name || invoice.customer_id}
                   </button>
                 ) : (
-                  <span className="text-gray-900 font-medium">
+                  <span className="text-gray-900 dark:text-gray-100 font-medium">
                     {invoice.customer_name}
                   </span>
                 )}
               </div>
             </div>
             <div className="flex flex-col group">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                 Total Amount
               </span>
               {isEditingAmount ? (
                 <div className="flex items-center space-x-2">
                   <div className="relative flex-1">
-                    <span className="absolute inset-y-0 left-3 flex items-center text-default-500 text-sm">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
                       RM
                     </span>
                     <input
                       type="number"
                       value={editedAmount}
                       onChange={(e) => setEditedAmount(e.target.value)}
-                      className="w-full pl-10 pr-3 py-1.5 border border-default-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                      className="w-full pl-10 pr-3 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -2172,7 +2172,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center">
-                  <span className="text-gray-900 font-semibold">
+                  <span className="text-gray-900 dark:text-gray-100 font-semibold">
                     {formatCurrency(
                       parseFloat(invoice.total_amount.toString())
                     )}
@@ -2183,14 +2183,14 @@ const InvoiceDetailsPage: React.FC = () => {
                       className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
                       title="Edit Amount"
                     >
-                      <IconPencil size={14} className="text-sky-600" />
+                      <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   )}
                 </div>
               )}
             </div>
             <div className="flex flex-col">
-              <span className="text-gray-500 text-sm font-medium uppercase tracking-wide mb-1">
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
                 Balance Due
               </span>
               <div className="flex items-center">
@@ -2224,7 +2224,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
         {/* Rental details for regular invoices */}
         {invoice.type === "regular" && (
-          <div className="px-6 py-4 border-t border-default-200">
+          <div className="px-6 py-4 border-t border-default-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-medium">
                 Rental Details ({invoice.rental_details?.length || 0} rental
@@ -2275,12 +2275,12 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isLoadingRentals ? (
                   <div className="text-center py-4">
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></div>
-                    <p className="mt-2 text-sm text-sky-600">
+                    <p className="mt-2 text-sm text-sky-600 dark:text-sky-400">
                       Loading available rentals...
                     </p>
                   </div>
                 ) : availableRentals.length === 0 ? (
-                  <p className="text-sm text-default-500">
+                  <p className="text-sm text-default-500 dark:text-gray-400">
                     No available rentals found for this customer.
                   </p>
                 ) : (
@@ -2307,7 +2307,7 @@ const InvoiceDetailsPage: React.FC = () => {
                               <div className="flex items-center">
                                 {isSelected ? (
                                   <IconSquareCheckFilled
-                                    className="text-sky-600"
+                                    className="text-sky-600 dark:text-sky-400"
                                     size={20}
                                   />
                                 ) : (
@@ -2318,11 +2318,11 @@ const InvoiceDetailsPage: React.FC = () => {
                                 )}
                               </div>
                               <div>
-                                <div className="font-medium text-gray-900">
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
                                   Rental #{rental.rental_id} - Dumpster{" "}
                                   {rental.tong_no}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                   Placed: {formatDate(rental.date_placed)}
                                   {rental.location_address &&
                                     ` • ${rental.location_address}`}
@@ -2346,7 +2346,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   </div>
                 )}
                 {selectedRentals.length > 0 && (
-                  <div className="mt-4 p-3 bg-white border border-sky-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-sky-200 rounded-lg">
                     <p className="text-sm font-medium text-sky-800">
                       Selected: {selectedRentals.length} rental
                       {selectedRentals.length > 1 ? "s" : ""}
@@ -2363,7 +2363,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 {invoice.rental_details.map((rental: any, index: number) => (
                   <div
                     key={rental.rental_id || index}
-                    className="rounded-lg border border-default-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    className="rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() =>
                       rental.rental_id &&
                       navigate(`/greentarget/rentals/${rental.rental_id}`)
@@ -2406,8 +2406,8 @@ const InvoiceDetailsPage: React.FC = () => {
                     <div className="p-4">
                       {/* Rental Dates */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                          <div className="text-xs text-default-500 mb-1">
+                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                          <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Placement Date
                           </div>
                           <div className="font-medium">
@@ -2421,7 +2421,7 @@ const InvoiceDetailsPage: React.FC = () => {
                               : "bg-green-50 border border-green-100"
                           }`}
                         >
-                          <div className="text-xs text-default-500 mb-1">
+                          <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Pickup Date
                           </div>
                           <div
@@ -2437,16 +2437,16 @@ const InvoiceDetailsPage: React.FC = () => {
                       </div>
                       {/* Dumpster, Driver & Location Info */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                          <div className="text-xs text-default-500 mb-1">
+                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                          <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Dumpster
                           </div>
                           <div className="font-medium">
                             {rental.tong_no || "N/A"}
                           </div>
                         </div>
-                        <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                          <div className="text-xs text-default-500 mb-1">
+                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                          <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Driver
                           </div>
                           <div className="font-medium">
@@ -2455,8 +2455,8 @@ const InvoiceDetailsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-                        <div className="text-xs text-default-500 mb-1">
+                      <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                        <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                           Location
                         </div>
                         <div className="font-medium">
@@ -2469,7 +2469,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
             ) : (
               !isEditingRentals && (
-                <div className="text-center py-8 text-default-500">
+                <div className="text-center py-8 text-default-500 dark:text-gray-400">
                   <p>No rentals assigned to this invoice.</p>
                   <p className="text-sm mt-1">
                     Click "Edit Rentals" to add rentals.
@@ -2486,40 +2486,40 @@ const InvoiceDetailsPage: React.FC = () => {
         <h2 className="text-xl font-medium mb-4">Payment History</h2>
 
         {payments.length === 0 ? (
-          <div className="bg-white border border-dashed border-default-200 rounded-lg p-6 text-center">
-            <p className="text-default-500">No payments recorded yet.</p>
+          <div className="bg-white dark:bg-gray-800 border border-dashed border-default-200 dark:border-gray-700 rounded-lg p-6 text-center">
+            <p className="text-default-500 dark:text-gray-400">No payments recorded yet.</p>
           </div>
         ) : (
-          <div className="bg-white border border-default-200 rounded-lg overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-50">
+              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                <thead className="bg-default-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Amount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Method
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Reference
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Internal Ref
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
                     </th>
                     {/* Add the new Actions column header */}
-                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-default-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {payments.map((payment) => (
                     <tr
                       key={payment.payment_id}
@@ -2557,14 +2557,14 @@ const InvoiceDetailsPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-default-700 capitalize">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-default-700 dark:text-gray-200 capitalize">
                           {payment.payment_method.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600 font-mono">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600 dark:text-gray-300 font-mono">
                         {payment.payment_reference || "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                         {editingPaymentId === payment.payment_id ? (
                           <div className="flex flex-col">
                             <div className="flex items-center space-x-2">
@@ -2617,7 +2617,7 @@ const InvoiceDetailsPage: React.FC = () => {
                             {payment.status !== "cancelled" && (
                               <button
                                 onClick={() => handleEditInternalRef(payment)}
-                                className="p-1 rounded-md text-default-500 hover:bg-default-100 hover:text-sky-600"
+                                className="p-1 rounded-md text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 hover:text-sky-600 dark:text-sky-400"
                                 title="Edit Internal Reference"
                               >
                                 <IconPencil size={14} />
@@ -2628,13 +2628,13 @@ const InvoiceDetailsPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         {payment.status === "pending" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                             <IconClock size={14} className="mr-1" />
                             Pending
                           </span>
                         )}
                         {payment.status === "active" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                             <IconCircleCheck size={14} className="mr-1" />
                             Settled
                           </span>
@@ -2646,7 +2646,7 @@ const InvoiceDetailsPage: React.FC = () => {
                           </span>
                         )}
                         {!payment.status && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                             <IconCircleCheck size={14} className="mr-1" />
                             No Status
                           </span>
@@ -2689,7 +2689,7 @@ const InvoiceDetailsPage: React.FC = () => {
                             </Button>
                           )}
                           {payment.status === "cancelled" && (
-                            <span className="text-xs italic text-default-500">
+                            <span className="text-xs italic text-default-500 dark:text-gray-400">
                               Cancelled
                             </span>
                           )}
@@ -2707,7 +2707,7 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* e-Invoice Details Section */}
       {invoice.einvoice_status && (
         <div className="mt-8">
-          <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
             <div
               className={`p-4 ${
                 invoice.einvoice_status === "valid"
@@ -2725,11 +2725,11 @@ const InvoiceDetailsPage: React.FC = () => {
                 {invoice.einvoice_status === "valid" ? (
                   <IconCheck size={22} className="text-green-600 mr-3" />
                 ) : invoice.einvoice_status === "pending" ? (
-                  <IconClock size={22} className="text-sky-600 mr-3" />
+                  <IconClock size={22} className="text-sky-600 dark:text-sky-400 mr-3" />
                 ) : invoice.einvoice_status === "invalid" ? (
                   <IconAlertTriangle size={22} className="text-rose-600 mr-3" />
                 ) : invoice.einvoice_status === "cancelled" ? (
-                  <IconCancel size={22} className="text-default-600 mr-3" />
+                  <IconCancel size={22} className="text-default-600 dark:text-gray-300 mr-3" />
                 ) : null}
                 <div>
                   <h3 className="text-lg font-medium">
@@ -2744,7 +2744,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       : "e-Invoice Status"}
                   </h3>
                   {invoice.einvoice_status === "pending" && (
-                    <p className="text-sm text-sky-600 mt-1">
+                    <p className="text-sm text-sky-600 dark:text-sky-400 mt-1">
                       This e-invoice has been submitted but is still pending
                       validation.
                     </p>
@@ -2760,8 +2760,8 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {invoice.uuid && (
-                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
-                    <label className="block text-xs text-default-500 mb-1">
+                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
+                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
                       UUID
                     </label>
                     <div
@@ -2773,8 +2773,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   </div>
                 )}
                 {invoice.submission_uid && (
-                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
-                    <label className="block text-xs text-default-500 mb-1">
+                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
+                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
                       Submission UID
                     </label>
                     <div
@@ -2786,8 +2786,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   </div>
                 )}
                 {invoice.long_id && (
-                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
-                    <label className="block text-xs text-default-500 mb-1">
+                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
+                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
                       Long ID
                     </label>
                     <div
@@ -2799,8 +2799,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   </div>
                 )}
                 {invoice.datetime_validated && (
-                  <div className="p-3 bg-default-50 rounded-lg border border-default-200">
-                    <label className="block text-xs text-default-500 mb-1">
+                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
+                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
                       Validation Date
                     </label>
                     <div className="text-sm">
@@ -2819,7 +2819,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-sky-600 hover:text-sky-800 hover:underline"
+                      className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 hover:underline"
                     >
                       View in MyInvois Portal
                     </a>

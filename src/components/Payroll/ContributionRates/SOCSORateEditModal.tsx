@@ -95,7 +95,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -109,10 +109,10 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
-                  className="text-lg font-medium leading-6 text-gray-900"
+                  className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
                   Edit SOCSO Rate
                 </DialogTitle>

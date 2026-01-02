@@ -564,68 +564,68 @@ const SalaryReportPage: React.FC = () => {
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full border border-default-200 rounded-lg overflow-hidden">
-          <thead className="bg-default-50 border-b border-default-200">
+        <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
             <tr>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 BIL
               </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 BAHAGIAN KERJA
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 GAJI
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 OT
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 COMM
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 GAJI KASAR
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
                 colSpan={2}
               >
                 EPF
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
                 colSpan={2}
               >
                 SOCSO
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
                 colSpan={2}
               >
                 SIP
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider border-l border-default-300">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600">
                 PCB
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 GAJI BERSIH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 1/2 BULAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 JUMLAH DIGENAPKAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                 SETELAH DIGENAPKAN
               </th>
             </tr>
-            <tr className="bg-default-50 border-t border-default-200">
+            <tr className="bg-default-50 dark:bg-gray-900/50 border-t border-default-200 dark:border-gray-700">
               <th></th>
               <th></th>
               <th></th>
@@ -659,14 +659,14 @@ const SalaryReportPage: React.FC = () => {
               <th></th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-default-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
             {LOCATION_ORDER.map((item, index) => {
               if (item.type === "header") {
                 return (
-                  <tr key={`header-${index}`} className="bg-default-100">
+                  <tr key={`header-${index}`} className="bg-default-100 dark:bg-gray-800">
                     <td
                       colSpan={19}
-                      className="px-2 py-2 text-center text-xs font-medium text-default-600 border-t border-default-300"
+                      className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-300 border-t border-default-300 dark:border-gray-600"
                     >
                       {item.text}
                     </td>
@@ -681,64 +681,64 @@ const SalaryReportPage: React.FC = () => {
               const locationName = LOCATION_MAP[item.id!];
 
               return (
-                <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
-                  <td className="px-2 py-2 text-xs text-default-900 text-center">
+                <tr key={item.id} className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}>
+                  <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
                     {locationNumber}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-left">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left">
                     {locationName}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.gaji || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.ot || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.bonus || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.comm || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.gaji_kasar || 0)}
                   </td>
-                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
+                  <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
                     {formatCurrency(locationData?.totals.epf_majikan || 0)}
                   </td>
-                  <td className="px-1 py-2 text-xs text-default-600 text-center">
+                  <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.epf_pekerja || 0)}
                   </td>
-                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
+                  <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
                     {formatCurrency(locationData?.totals.socso_majikan || 0)}
                   </td>
-                  <td className="px-1 py-2 text-xs text-default-600 text-center">
+                  <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.socso_pekerja || 0)}
                   </td>
-                  <td className="px-1 py-2 text-xs text-default-600 text-center border-l border-default-300">
+                  <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
                     {formatCurrency(locationData?.totals.sip_majikan || 0)}
                   </td>
-                  <td className="px-1 py-2 text-xs text-default-600 text-center">
+                  <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.sip_pekerja || 0)}
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 text-center border-l border-default-300">
+                  <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
                     {formatCurrency(locationData?.totals.pcb || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.gaji_bersih || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.setengah_bulan || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.jumlah || 0)}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(
                       locationData?.totals.jumlah_digenapkan || 0
                     )}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 text-center">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(
                       locationData?.totals.setelah_digenapkan || 0
                     )}
@@ -747,83 +747,83 @@ const SalaryReportPage: React.FC = () => {
               );
             })}
           </tbody>
-          <tfoot className="bg-default-100 border-t-2 border-default-300">
+          <tfoot className="bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
             <tr>
               <td
                 colSpan={2}
-                className="px-2 py-2 text-xs font-bold text-default-700 text-center"
+                className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center"
               >
                 GRAND TOTAL
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_kasar
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_pekerja
                 )}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 text-center border-l border-default-300">
+              <td className="px-2 py-2 text-sm font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_bersih
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setengah_bulan
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.jumlah_digenapkan
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setelah_digenapkan
                 )}
@@ -876,12 +876,12 @@ const SalaryReportPage: React.FC = () => {
             leaveTo="opacity-0 scale-95"
           >
             <DialogPanel
-              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <DialogTitle
                 as="h3"
-                className="text-lg font-medium leading-6 text-default-900"
+                className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
               >
                 Export Link Generator
               </DialogTitle>
@@ -923,42 +923,42 @@ const SalaryReportPage: React.FC = () => {
   // Bank Table Component
   const BankTable = () => (
     <div className="overflow-x-auto">
-      <table className="w-full border border-default-200 rounded-lg overflow-hidden">
-        <thead className="bg-default-50 border-b border-default-200">
+      <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
           <tr>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               NO.
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               STAFF NAME
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               IC NO.
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               BANK ACCOUNT NUMBER
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               TOTAL
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-default-200">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
           {bankTableData.map((item, index) => (
-            <tr key={item.no} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
-              <td className="px-2 py-2 text-sm text-default-900">
+            <tr key={item.no} className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}>
+              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100">
                 {item.no}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 font-medium">
+              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 font-medium">
                 {item.staff_name}
               </td>
-              <td className="px-2 py-2 text-sm text-default-600">
+              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300">
                 {item.icNo}
               </td>
-              <td className="px-2 py-2 text-sm text-default-600">
+              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300">
                 {item.bankAccountNumber}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 font-medium text-right">
+              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 font-medium text-right">
                 {formatCurrency(item.total)}
               </td>
             </tr>
@@ -971,55 +971,55 @@ const SalaryReportPage: React.FC = () => {
   // Pinjam Table Component
   const PinjamTable = () => (
     <div className="overflow-x-auto">
-      <table className="w-full border border-default-200 rounded-lg overflow-hidden">
-        <thead className="bg-default-50 border-b border-default-200">
+      <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
           <tr>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               NO.
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               STAFF/ID
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               GAJI/GENAP
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               TOTAL PINJAM
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               TOTAL
             </th>
-            <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 uppercase tracking-wider">
+            <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               PAYMENT
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-default-200">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
           {reportData?.data.map((item, index) => (
-            <tr key={item.staff_id} className={index % 2 === 0 ? "bg-white" : "bg-default-25"}>
-              <td className="px-2 py-2 text-sm text-default-900">
+            <tr key={item.staff_id} className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}>
+              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100">
                 {item.no}
               </td>
               <td className="px-2 py-2">
-                <div className="text-sm text-default-900 font-medium">
+                <div className="text-sm text-default-900 dark:text-gray-100 font-medium">
                   {item.staff_id} - {item.staff_name}
                 </div>
               </td>
-              <td className="px-2 py-2 text-sm text-default-600 text-right">
+              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.gaji_genap)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-600 text-right">
+              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.total_pinjam)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 font-medium text-right">
+              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 font-medium text-right">
                 {formatCurrency(item.final_total)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 text-center">
+              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 text-center">
                 <span
                   className={`inline-flex px-2 py-1 text-sm font-semibold rounded-full ${
                     item.payment_preference === "Bank"
-                      ? "bg-sky-100 text-sky-800"
-                      : "bg-emerald-100 text-emerald-800"
+                      ? "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
+                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
                   }`}
                 >
                   {item.payment_preference}
@@ -1035,13 +1035,13 @@ const SalaryReportPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800">
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
           Salary Report
         </h1>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
         <div className="flex flex-wrap items-end gap-4">
           <YearNavigator
             selectedYear={currentYear}
@@ -1060,7 +1060,7 @@ const SalaryReportPage: React.FC = () => {
           />
           {reportData && (
             <div className="flex items-end pb-2">
-              <div className="text-sm text-default-600">
+              <div className="text-sm text-default-600 dark:text-gray-300">
                 <div className="font-medium">
                   Total: {reportData.total_records} employees
                 </div>
@@ -1074,10 +1074,10 @@ const SalaryReportPage: React.FC = () => {
       </div>
 
       {/* Salary Report Table */}
-      <div className="bg-white rounded-lg border border-default-200 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-default-800">
+            <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
               {getMonthName(currentMonth)} {currentYear} Salary Report
             </h2>
             <div className="flex space-x-3">
@@ -1156,7 +1156,7 @@ const SalaryReportPage: React.FC = () => {
             <LoadingSpinner />
           </div>
         ) : !reportData || reportData.data.length === 0 ? (
-          <div className="text-center py-12 text-default-500">
+          <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No salary data found</p>
             <p>
@@ -1185,28 +1185,28 @@ const SalaryReportPage: React.FC = () => {
             </div>
 
             {/* Summary Footer */}
-            <div className="bg-default-50 px-6 py-4 border-t border-default-200">
+            <div className="bg-default-50 dark:bg-gray-900/50 px-6 py-4 border-t border-default-200 dark:border-gray-700">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
-                <div className="text-sm text-default-600">
+                <div className="text-sm text-default-600 dark:text-gray-300">
                   <span className="font-medium">Total Records:</span>{" "}
                   {reportData.total_records}
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
-                  <div className="text-default-700">
+                  <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Gaji/Genap:</span>{" "}
-                    <span className="text-default-900">
+                    <span className="text-default-900 dark:text-gray-100">
                       {formatCurrency(reportData.summary.total_gaji_genap)}
                     </span>
                   </div>
-                  <div className="text-default-700">
+                  <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Pinjam:</span>{" "}
-                    <span className="text-default-900">
+                    <span className="text-default-900 dark:text-gray-100">
                       {formatCurrency(reportData.summary.total_pinjam)}
                     </span>
                   </div>
-                  <div className="text-sky-700">
+                  <div className="text-sky-700 dark:text-sky-400">
                     <span className="font-semibold">Grand Total:</span>{" "}
-                    <span className="font-bold text-sky-800">
+                    <span className="font-bold text-sky-800 dark:text-sky-300">
                       {formatCurrency(reportData.summary.total_final)}
                     </span>
                   </div>
