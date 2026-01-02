@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 9. When it is used, write space-y-3 instead of space-y-6.
 10. Use rm instead of del when deleting files.
 11. To access the dev database, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
+12. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
 
 ## Architecture Overview
 
@@ -52,6 +53,89 @@ This is a comprehensive ERP system supporting three companies:
 - PostgreSQL with connection pooling
 - Maintenance mode support for database operations
 - Environment variables for database configuration
+
+#### Database Schema (59 tables)
+
+**Accounting & Finance:**
+- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by
+- `account_codes_hierarchy` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, path, path_array, depth
+- `journal_entries` - id, reference_no, entry_type, entry_date, description, total_debit, total_credit, status, created_at, updated_at, created_by, updated_by, posted_at, posted_by
+- `journal_entry_lines` - id, journal_entry_id, line_number, account_code, debit_amount, credit_amount, reference, particulars, created_at
+- `journal_entry_types` - code, name, description, is_active
+- `ledger_types` - code, name, description, is_system, is_active, created_at, updated_at
+- `location_account_mappings` - id, location_id, location_name, mapping_type, account_code, voucher_type, is_active, created_at, updated_at, created_by, updated_by
+
+**Customers & Sales:**
+- `customers` - id, name, closeness, salesman, tin_number, id_type, state, email, address, city, id_number, phone_number, credit_limit, credit_used, updated_at
+- `customer_branch_groups` - id, group_name, created_at
+- `customer_branch_mappings` - id, group_id, customer_id, is_main_branch, created_at
+- `customer_products` - id, customer_id, product_id, custom_price, is_available
+- `invoices` - id, salespersonid, customerid, createddate, paymenttype, total_excluding_tax, rounding, totalamountpayable, uuid, submission_uid, long_id, datetime_validated, is_consolidated, consolidated_invoices, invoice_status, einvoice_status, tax_amount, balance_due
+- `order_details` - id, invoiceid, code, price, quantity, freeproduct, returnproduct, description, tax, total, issubtotal
+- `payments` - payment_id, invoice_id, payment_date, amount_paid, payment_method, payment_reference, internal_reference, notes, created_at, status, cancellation_date, cancellation_reason
+- `consolidation_settings` - company_id, auto_consolidation_enabled, last_updated, updated_by
+- `consolidation_tracking` - id, company_id, year, month, status, consolidated_invoice_id, last_attempt, next_attempt, attempt_count, error
+
+**Products & Inventory:**
+- `products` - id, description, price_per_unit, type, tax
+- `production_entries` - id, entry_date, product_id, worker_id, bags_packed, created_at, updated_at, created_by
+- `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
+- `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
+- `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes
+- `taxes` - name, rate
+
+**Staff & Employees:**
+- `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department
+- `active_sessions` - session_id, staff_id, last_active, created_at, status
+- `bookmarks` - id, staff_id, name
+
+**Jobs & Work:**
+- `jobs` - id, name, section
+- `job_categories` - id, category, section, gaji, ikut, jv
+- `job_details` - id, description, amount, remark, type
+- `jobs_job_details` - job_id, job_detail_id
+- `job_location_mappings` - id, job_id, location_code, is_active, created_at, updated_at
+- `job_pay_codes` - id, job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
+- `locations` - id, name
+- `sections` - id, name
+
+**Payroll:**
+- `pay_codes` - id, description, pay_type, rate_unit, rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, created_at, updated_at
+- `employee_pay_codes` - id, employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
+- `monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
+- `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping
+- `payroll_items` - id, employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, created_at, job_type, source_employee_id, source_date, work_log_id, work_log_type
+- `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
+- `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
+- `pinjam_records` - id, employee_id, year, month, amount, description, pinjam_type, created_by, created_at, updated_at
+- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at
+
+**Statutory Rates:**
+- `epf_rates` - id, employee_type, wage_threshold, employee_rate_percentage, employer_rate_percentage, employer_fixed_amount, is_active, created_at, updated_at
+- `socso_rates` - id, wage_from, wage_to, employee_rate, employer_rate, employer_rate_over_60, is_active, created_at, updated_at
+- `sip_rates` - id, wage_from, wage_to, employee_rate, employer_rate, is_active, created_at, updated_at
+- `income_tax_rates` - id, wage_from, wage_to, base_rate, unemployed_spouse_k0-k10, employed_spouse_k0-k10, is_active, created_at, updated_at
+
+**Work Logs (Daily):**
+- `daily_work_logs` - id, log_date, shift, day_type, context_data, status, created_at, updated_at, section
+- `daily_work_log_entries` - id, work_log_id, employee_id, total_hours, job_id, is_on_leave, leave_type, following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
+- `daily_work_log_activities` - id, log_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added
+
+**Work Logs (Monthly):**
+- `monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at
+- `monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
+- `monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, rate_used, calculated_amount, is_manually_added, created_at
+
+**Leave Management:**
+- `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at
+- `leave_records` - id, employee_id, leave_date, leave_type, work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
+- `holiday_calendar` - id, holiday_date, description, is_active
+
+**Reference Data:**
+- `agama` - id, name
+- `banks` - id, name
+- `nationalities` - id, name
+- `races` - id, name
 
 ### Styling
 - Tailwind CSS with custom color palette
