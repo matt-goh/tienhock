@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import LoadingSpinner from "../LoadingSpinner";
 import { IconSearch, IconPackage, IconX, IconCheck, IconPlus, IconMinus } from "@tabler/icons-react";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
+import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 interface Product {
   id: string;
@@ -42,7 +43,6 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   onClose,
   onMappingComplete,
 }) => {
-  const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedPayCodeIds, setSelectedPayCodeIds] = useState<Set<string>>(
     new Set()
@@ -51,9 +51,20 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
     new Set()
   );
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [payCodeSearch, setPayCodeSearch] = useState("");
+
+  // Get products from cache (only MEE and BH types for packing)
+  const { products: cachedProducts, isLoading } = useProductsCache(["MEE", "BH"]);
+
+  // Map cached products to the Product interface (type assertion for MEE/BH)
+  const products: Product[] = useMemo(() => {
+    return cachedProducts.map((p) => ({
+      id: p.id,
+      description: p.description,
+      type: p.type as "MEE" | "BH",
+    }));
+  }, [cachedProducts]);
 
   // Get job pay code mappings for filtering
   const { detailedMappings, productMappings, refreshData } =
@@ -112,13 +123,6 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
     return filteredPayCodes.filter(pc => originalPayCodeIds.has(pc.id)).length;
   }, [filteredPayCodes, originalPayCodeIds]);
 
-  // Fetch products when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchProducts();
-    }
-  }, [isOpen]);
-
   // Load current mappings when product is selected
   useEffect(() => {
     if (selectedProduct && productMappings) {
@@ -128,19 +132,6 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
       setOriginalPayCodeIds(new Set(payCodeIds));
     }
   }, [selectedProduct, productMappings]);
-
-  const fetchProducts = async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get("/api/product-pay-codes/all-mappings");
-      setProducts(response.products || []);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      toast.error("Failed to load products");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Filter products based on search
   const filteredProducts = useMemo(() => {
