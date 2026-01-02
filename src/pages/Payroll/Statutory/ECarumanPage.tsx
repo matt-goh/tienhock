@@ -465,7 +465,7 @@ const ECarumanPage: React.FC = () => {
       </div>
 
       {/* Month/Year Selection */}
-      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 p-6">
+      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Select Period</h2>
         <div className="flex flex-wrap items-end gap-4">
           <YearNavigator
@@ -487,7 +487,7 @@ const ECarumanPage: React.FC = () => {
       </div>
 
       {/* Download Contribution Files Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">
           Download Contribution Files
         </h2>
@@ -506,7 +506,7 @@ const ECarumanPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* EPF Preview Card */}
             <div
-              className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 ${loadingType === "epf" ? "opacity-70" : ""}`}
+              className={`relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 dark:hover:border-blue-400 dark:bg-gray-800 ${loadingType === "epf" ? "opacity-70" : ""}`}
               onMouseEnter={() => handleCardMouseEnter("epf")}
               onMouseLeave={handleCardMouseLeave}
               onClick={() => handleDownload("epf")}
@@ -541,29 +541,29 @@ const ECarumanPage: React.FC = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employees:</span>
-                    <span className="font-medium">{preview.epf.count}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{preview.epf.count}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Total Salary:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.epf.totals.salary.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.epf.totals.em_share.toLocaleString("en-MY")}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.epf.totals.emp_share.toLocaleString("en-MY")}
                     </span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                  <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                     <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
-                    <span className="font-semibold text-blue-600">
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
                       RM {preview.epf.totals.total_contribution.toLocaleString("en-MY")}
                     </span>
                   </div>
@@ -575,7 +575,7 @@ const ECarumanPage: React.FC = () => {
               {/* EPF Detailed Tooltip */}
               {hoveredCard === "epf" && preview.epf && preview.epf.data.length > 0 && (
                 <div
-                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[600px]"
+                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[600px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -583,19 +583,19 @@ const ECarumanPage: React.FC = () => {
                     <h4 className="font-medium text-gray-900 dark:text-gray-100">EPF File Preview (EPFORMA2.csv)</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{preview.epf.count} records</span>
                   </div>
-                  <div className="max-h-64 overflow-auto border border-gray-100 rounded">
+                  <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Member No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Salary</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">EM Share</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">EMP Share</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Member No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">EM Share</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">EMP Share</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {preview.epf.data.map((row, index) => (
                           <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{row.member_no}</td>
@@ -635,7 +635,7 @@ const ECarumanPage: React.FC = () => {
 
             {/* SOCSO Preview Card */}
             <div
-              className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-green-300 ${loadingType === "socso" ? "opacity-70" : ""}`}
+              className={`relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-green-300 dark:hover:border-green-400 dark:bg-gray-800 ${loadingType === "socso" ? "opacity-70" : ""}`}
               onMouseEnter={() => handleCardMouseEnter("socso")}
               onMouseLeave={handleCardMouseLeave}
               onClick={() => handleDownload("socso")}
@@ -657,23 +657,23 @@ const ECarumanPage: React.FC = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employees:</span>
-                    <span className="font-medium">{preview.socso.count}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{preview.socso.count}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.socso.totals.socso_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.socso.totals.socso_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                  <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                     <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
-                    <span className="font-semibold text-green-600">
+                    <span className="font-semibold text-green-600 dark:text-green-400">
                       RM {preview.socso.totals.socso_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -685,7 +685,7 @@ const ECarumanPage: React.FC = () => {
               {/* SOCSO Detailed Tooltip */}
               {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
                 <div
-                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[550px]"
+                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[550px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -693,18 +693,18 @@ const ECarumanPage: React.FC = () => {
                     <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO File Preview (BRG8A.TXT)</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{preview.socso.count} records</span>
                   </div>
-                  <div className="max-h-64 overflow-auto border border-gray-100 rounded">
+                  <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Salary</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Employer</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Employee</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {preview.socso.data.map((row, index) => (
                           <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
@@ -743,7 +743,7 @@ const ECarumanPage: React.FC = () => {
 
             {/* SIP/EIS Preview Card */}
             <div
-              className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 ${loadingType === "sip" ? "opacity-70" : ""}`}
+              className={`relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 dark:hover:border-purple-400 dark:bg-gray-800 ${loadingType === "sip" ? "opacity-70" : ""}`}
               onMouseEnter={() => handleCardMouseEnter("sip")}
               onMouseLeave={handleCardMouseLeave}
               onClick={() => handleDownload("sip")}
@@ -765,23 +765,23 @@ const ECarumanPage: React.FC = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employees:</span>
-                    <span className="font-medium">{preview.sip.count}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{preview.sip.count}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.sip.totals.eis_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.sip.totals.eis_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                  <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                     <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
-                    <span className="font-semibold text-purple-600">
+                    <span className="font-semibold text-purple-600 dark:text-purple-400">
                       RM {preview.sip.totals.sip_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -793,7 +793,7 @@ const ECarumanPage: React.FC = () => {
               {/* SIP Detailed Tooltip */}
               {hoveredCard === "sip" && preview.sip && preview.sip.data.length > 0 && (
                 <div
-                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -801,18 +801,18 @@ const ECarumanPage: React.FC = () => {
                     <h4 className="font-medium text-gray-900 dark:text-gray-100">SIP File Preview</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{preview.sip.count} records</span>
                   </div>
-                  <div className="max-h-64 overflow-auto border border-gray-100 rounded">
+                  <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Employer</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Employee</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">Total</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Total</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {preview.sip.data.map((row, index) => (
                           <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
@@ -851,7 +851,7 @@ const ECarumanPage: React.FC = () => {
 
             {/* Income Tax Preview Card */}
             <div
-              className={`relative border border-gray-200 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-amber-300 ${loadingType === "income_tax" ? "opacity-70" : ""}`}
+              className={`relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-amber-300 dark:hover:border-amber-400 dark:bg-gray-800 ${loadingType === "income_tax" ? "opacity-70" : ""}`}
               onMouseEnter={() => handleCardMouseEnter("income_tax")}
               onMouseLeave={handleCardMouseLeave}
               onClick={() => handleDownload("income_tax")}
@@ -873,11 +873,11 @@ const ECarumanPage: React.FC = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Employees:</span>
-                    <span className="font-medium">{preview.income_tax.count}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{preview.income_tax.count}</span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-100">
+                  <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                     <span className="text-gray-700 dark:text-gray-200 font-medium">Total PCB:</span>
-                    <span className="font-semibold text-amber-600">
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
                       RM {preview.income_tax.totals.pcb_amount.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -889,7 +889,7 @@ const ECarumanPage: React.FC = () => {
               {/* Income Tax Detailed Tooltip */}
               {hoveredCard === "income_tax" && preview.income_tax && preview.income_tax.data.length > 0 && (
                 <div
-                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -897,17 +897,17 @@ const ECarumanPage: React.FC = () => {
                     <h4 className="font-medium text-gray-900 dark:text-gray-100">Income Tax File Preview (LHDN*.TXT)</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{preview.income_tax.count} records</span>
                   </div>
-                  <div className="max-h-64 overflow-auto border border-gray-100 rounded">
+                  <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Tax No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">Name</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 border-b">IC No</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 border-b">PCB Amount</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Tax No</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">PCB Amount</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {preview.income_tax.data.map((row, index) => (
                           <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{row.income_tax_no}</td>

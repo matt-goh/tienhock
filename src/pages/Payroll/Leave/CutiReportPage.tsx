@@ -320,7 +320,7 @@ const CutiReportPage: React.FC = () => {
     <div className="bg-white dark:bg-gray-800 px-6 py-4 rounded-xl border border-default-200 dark:border-gray-700">
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-4">
-          <IconUserCircle size={48} className="text-default-400" />
+          <IconUserCircle size={48} className="text-default-400 dark:text-gray-500" />
           <div>
             <h2 className="text-xl font-bold text-default-800 dark:text-gray-100">{staff.name}</h2>
             <p className="text-default-500 dark:text-gray-400">{staff.id}</p>
@@ -345,7 +345,7 @@ const CutiReportPage: React.FC = () => {
           <IconBriefcase size={20} className="text-default-500 dark:text-gray-400" />
           <div>
             <p className="text-xs text-default-500 dark:text-gray-400">Job</p>
-            <p className="text-sm font-medium">
+            <p className="text-sm font-medium text-default-800 dark:text-gray-100">
               {staff.job.join(", ") || "N/A"}
             </p>
           </div>
@@ -354,7 +354,7 @@ const CutiReportPage: React.FC = () => {
           <IconCalendar size={20} className="text-default-500 dark:text-gray-400" />
           <div>
             <p className="text-xs text-default-500 dark:text-gray-400">Date Joined</p>
-            <p className="text-sm font-medium">
+            <p className="text-sm font-medium text-default-800 dark:text-gray-100">
               {new Date(staff.dateJoined).toLocaleDateString()}
             </p>
           </div>
@@ -363,21 +363,21 @@ const CutiReportPage: React.FC = () => {
           <IconClockHour4 size={20} className="text-default-500 dark:text-gray-400" />
           <div>
             <p className="text-xs text-default-500 dark:text-gray-400">Years of Service</p>
-            <p className="text-sm font-medium">{yearsOfService} years</p>
+            <p className="text-sm font-medium text-default-800 dark:text-gray-100">{yearsOfService} years</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <IconId size={20} className="text-default-500 dark:text-gray-400" />
           <div>
             <p className="text-xs text-default-500 dark:text-gray-400">IC No.</p>
-            <p className="text-sm font-medium">{staff.icNo || "N/A"}</p>
+            <p className="text-sm font-medium text-default-800 dark:text-gray-100">{staff.icNo || "N/A"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <IconWorld size={20} className="text-default-500 dark:text-gray-400" />
           <div>
             <p className="text-xs text-default-500 dark:text-gray-400">Nationality</p>
-            <p className="text-sm font-medium">{staff.nationality || "N/A"}</p>
+            <p className="text-sm font-medium text-default-800 dark:text-gray-100">{staff.nationality || "N/A"}</p>
           </div>
         </div>
       </div>
@@ -568,8 +568,8 @@ const CutiReportPage: React.FC = () => {
                 return (
                   <tr
                     key={month}
-                    className={`border-b border-default-200 hover:bg-default-25 transition-colors ${
-                      index % 2 === 0 ? "bg-white" : "bg-default-25"
+                    className={`border-b border-default-200 dark:border-gray-700 hover:bg-default-50 dark:hover:bg-gray-700/30 transition-colors ${
+                      index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-800/50"
                     }`}
                   >
                     {/* Month column */}
@@ -815,11 +815,11 @@ const CutiReportPage: React.FC = () => {
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <IconSearch size={20} className="text-default-400" />
+                  <IconSearch size={20} className="text-default-400 dark:text-gray-500" />
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-full leading-5 bg-white dark:bg-gray-800 placeholder-default-500 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-gray-700 dark:text-gray-100"
+                  className="block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-full leading-5 bg-white placeholder-default-500 dark:placeholder:text-gray-400 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-gray-700 dark:text-gray-100"
                   placeholder="Search employees by name, ID, or job..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

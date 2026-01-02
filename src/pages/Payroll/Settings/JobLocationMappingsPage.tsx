@@ -41,8 +41,8 @@ const SettingsTabs: React.FC = () => {
               onClick={() => navigate(tab.path)}
               className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                 isActive
-                  ? "border-sky-500 text-sky-600"
-                  : "border-transparent text-default-500 hover:text-default-700 hover:border-default-300"
+                  ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                  : "border-transparent text-default-500 hover:text-default-700 hover:border-default-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600"
               }`}
             >
               {tab.name}
@@ -166,13 +166,13 @@ const JobLocationMappingsPage: React.FC = () => {
 
       {/* Unmapped Warning */}
       {unmappedCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
-          <IconAlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 flex items-center gap-3">
+          <IconAlertTriangle size={20} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-amber-800">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
               {unmappedCount} job{unmappedCount > 1 ? "s" : ""} without location mapping
             </p>
-            <p className="text-xs text-amber-600 mt-0.5">
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
               Unmapped jobs will default to location "02" (OFFICE) in the salary report.
             </p>
           </div>
@@ -192,7 +192,7 @@ const JobLocationMappingsPage: React.FC = () => {
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <IconSearch
-            className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400"
+            className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-default-400 dark:text-gray-500"
             stroke={1.5}
           />
           <input
@@ -244,7 +244,7 @@ const JobLocationMappingsPage: React.FC = () => {
                   value="Unmapped"
                   className={({ active }) =>
                     `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                      active ? "bg-amber-100 text-amber-900" : "text-amber-700"
+                      active ? "bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200" : "text-amber-700 dark:text-amber-400"
                     }`
                   }
                 >
@@ -254,7 +254,7 @@ const JobLocationMappingsPage: React.FC = () => {
                         Unmapped Jobs ({unmappedCount})
                       </span>
                       {selected && (
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-amber-600">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-amber-600 dark:text-amber-400">
                           <IconCheck size={16} />
                         </span>
                       )}
@@ -328,7 +328,7 @@ const JobLocationMappingsPage: React.FC = () => {
               filteredJobs.map((job) => (
                 <tr key={job.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                   <td className="px-4 py-3 text-sm">
-                    <span className="font-mono text-sky-700 font-medium">
+                    <span className="font-mono text-sky-700 dark:text-sky-400 font-medium">
                       {job.id}
                     </span>
                   </td>
@@ -345,8 +345,8 @@ const JobLocationMappingsPage: React.FC = () => {
                         <ListboxButton
                           className={`relative w-full cursor-pointer rounded-lg border py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 ${
                             job.location_code
-                              ? "border-default-300 bg-white"
-                              : "border-amber-300 bg-amber-50"
+                              ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                              : "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20"
                           } ${isSaving === job.id ? "opacity-50 cursor-wait" : ""}`}
                         >
                           {isSaving === job.id ? (

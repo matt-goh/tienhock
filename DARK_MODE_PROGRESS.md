@@ -189,8 +189,8 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 - [x] Stock/StockAdjustmentEntryPage.tsx - Comprehensive dark mode (references, tabs, product tables, input fields)
 - [x] Stock/ProductionEntryPage.tsx - Fully updated with dark mode (date selector, product badges, favorites)
 
-### Priority 6: Payroll Pages (21 files - 13/21 DONE ⚡ IN PROGRESS)
-**Completed (13/21):**
+### Priority 6: Payroll Pages ✅ COMPLETE (21/21 files - 100%)
+**All Completed (21/21):**
 - [x] Payroll/PayrollPage.tsx - Comprehensive dark mode update
 - [x] Payroll/PayrollDetailsPage.tsx - Comprehensive dark mode update (large file with all payroll items)
 - [x] Payroll/SalaryReportPage.tsx - Comprehensive dark mode update
@@ -204,16 +204,14 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 - [x] Payroll/MonthlyLog/MonthlyLogListPage.tsx - Comprehensive dark mode (status badges, filters, action buttons, empty states)
 - [x] Payroll/MonthlyLog/MonthlyLogEntryPage.tsx - Comprehensive dark mode (leave badges, modals, bulk selections, dividers)
 - [x] Payroll/MonthlyLog/MonthlyLogDetailsPage.tsx - Comprehensive dark mode (section headers, stats, tables, badges, footers)
-
-**Remaining (8/21):**
-- [ ] Payroll/MonthlyLog/MonthlyLogEditPage.tsx - Simple wrapper (minimal updates needed)
-- [ ] Payroll/Leave/CutiManagementPage.tsx
-- [ ] Payroll/Leave/CutiReportPage.tsx
-- [ ] Payroll/Leave/HolidayCalendarPage.tsx
-- [ ] Payroll/Settings/LocationAccountMappingsPage.tsx
-- [ ] Payroll/Settings/JobLocationMappingsPage.tsx
-- [ ] Payroll/Statutory/ContributionRatesPage.tsx
-- [ ] Payroll/Statutory/ECarumanPage.tsx
+- [x] Payroll/MonthlyLog/MonthlyLogEditPage.tsx - Simple wrapper (already had dark mode on error message)
+- [x] Payroll/Leave/CutiManagementPage.tsx - Simple wrapper with tabs (already had dark mode)
+- [x] Payroll/Leave/CutiReportPage.tsx - Comprehensive dark mode (employee cards, search, leave balances, monthly tables with color-coded sections, PDF generation)
+- [x] Payroll/Leave/HolidayCalendarPage.tsx - Comprehensive dark mode (year navigation, table, import functionality)
+- [x] Payroll/Settings/LocationAccountMappingsPage.tsx - Comprehensive dark mode (tabs, search, filters, listbox, table, status badges, modal)
+- [x] Payroll/Settings/JobLocationMappingsPage.tsx - Comprehensive dark mode (tabs, warning box, search, filters, listbox, table, conditional styling)
+- [x] Payroll/Statutory/ContributionRatesPage.tsx - Simple wrapper with tabs (already had complete dark mode)
+- [x] Payroll/Statutory/ECarumanPage.tsx - Comprehensive dark mode (contribution cards with hover tooltips, period selection, preview tables for EPF/SOCSO/SIP/Income Tax)
 
 ### Priority 7: GreenTarget Pages (10+ files)
 - [ ] GreenTarget/GreenTargetDashboardPage.tsx
@@ -326,15 +324,14 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 - **Status:** Core UI components complete, feature components in progress
 
 ### Pages:
-- **Completed:** 37 pages
+- **Completed:** 45 pages
   - Catalogue: 10/10 ✅
   - Invoice: 5/5 ✅
   - Payment: 3/3 ✅
   - Sales: 3/3 ✅
   - Stock: 3/3 ✅
-  - Payroll: 13/21 ⚡
-- **Remaining:** ~47 pages
-  - Payroll: 8/21 (MonthlyLog, Leave, Settings, Statutory sections)
+  - Payroll: 21/21 ✅
+- **Remaining:** ~39 pages
   - GreenTarget: 12+ pages
   - JellyPolly: 5+ pages
   - Accounting: 7 pages
@@ -347,9 +344,9 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 ✅ **Payment Section:** Complete (3/3 pages)
 ✅ **Sales Section:** Complete (3/3 pages)
 ✅ **Stock Section:** Complete (3/3 pages)
-⚡ **Payroll Section:** In Progress (13/21 pages - 62% complete)
+✅ **Payroll Section:** Complete (21/21 pages - 100% complete)
 📝 **Components:** High-priority shared components done, feature components pending
-🔜 **Next:** Complete remaining Payroll pages, then GreenTarget/JellyPolly/Accounting
+🔜 **Next:** GreenTarget pages (12+ files), JellyPolly pages (5+ files), Accounting pages (7 files)
 
 ## Next Steps
 1. ~~Complete remaining Catalogue pages~~ ✅ DONE
@@ -357,11 +354,11 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 3. ~~Update Payment pages~~ ✅ COMPLETE
 4. ~~Update Sales pages~~ ✅ COMPLETE
 5. ~~Update Stock pages~~ ✅ COMPLETE
-6. ⚡ **IN PROGRESS:** Complete remaining Payroll pages (8/21 remaining)
-   - MonthlyLog section (1 file - simple wrapper)
-   - Leave section (3 files)
-   - Settings section (2 files)
-   - Statutory section (2 files)
+6. ~~Complete remaining Payroll pages~~ ✅ COMPLETE (21/21)
+   - ~~MonthlyLog section~~ ✅ COMPLETE
+   - ~~Leave section~~ ✅ COMPLETE
+   - ~~Settings section~~ ✅ COMPLETE
+   - ~~Statutory section~~ ✅ COMPLETE (ContributionRatesPage.tsx, ECarumanPage.tsx)
 7. Update high-priority shared components (StyledListbox, YearNavigator, DateNavigator, etc.)
 8. Update GreenTarget pages (12+ files)
 9. Update JellyPolly pages (5+ files)
@@ -370,8 +367,12 @@ Systematic dark mode implementation for all pages in the Tien Hock ERP system.
 12. Final testing and adjustments
 
 ## Notes for Continuation
-- **Current Focus:** Payroll section is 62% complete (13/21 files)
-- **MonthlyLog Section:** ✅ Complete (3/4 files done - only simple wrapper MonthlyLogEditPage remaining)
-- **Recent Completions:** MonthlyLogListPage, MonthlyLogEntryPage, MonthlyLogDetailsPage - comprehensive dark mode with status badges, filters, modals, section headers, stats, tables
+- **Current Focus:** All Payroll pages are now complete! ✅ (21/21 files - 100%)
+- **MonthlyLog Section:** ✅ Complete (all 4 files)
+- **Leave Section:** ✅ Complete (CutiManagementPage, CutiReportPage with color-coded sections, HolidayCalendarPage)
+- **Settings Section:** ✅ Complete (LocationAccountMappingsPage, JobLocationMappingsPage with comprehensive dark mode)
+- **Statutory Section:** ✅ Complete (ContributionRatesPage wrapper, ECarumanPage with contribution cards and preview tooltips)
+- **Recent Completions:** ContributionRatesPage (simple tabs wrapper), ECarumanPage (contribution cards for EPF/SOCSO/SIP/Income Tax with hover tooltips, preview tables, period selection)
+- **Major Milestone:** First 6 page sections complete (45 pages total) - Catalogue, Invoice, Payment, Sales, Stock, and Payroll all done!
 - **Pattern Reference:** Use [InvoiceCard.tsx](src/components/Invoice/InvoiceCard.tsx) as the standard for selection rings (`ring-blue-500 dark:ring-blue-400`)
-- **Next Focus:** Complete remaining MonthlyLogEditPage wrapper, then move to Leave section (3 files)
+- **Next Focus:** Move to GreenTarget pages (12+ files), then JellyPolly (5+ files), then Accounting (7 files)
