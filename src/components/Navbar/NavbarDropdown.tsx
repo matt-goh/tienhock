@@ -213,10 +213,10 @@ export default function NavbarDropdown({
             group flex items-center justify-between px-3 py-2 rounded-md text-sm
             transition-colors duration-150
             ${isActive
-              ? "bg-sky-50 text-sky-700"
+              ? "bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
               : isHovered
-                ? "bg-default-100 text-default-800"
-                : "text-default-700 hover:bg-default-100"
+                ? "bg-default-100 dark:bg-gray-700 text-default-800 dark:text-gray-100"
+                : "text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
             }
           `}
         >
@@ -225,26 +225,26 @@ export default function NavbarDropdown({
             {showBookmarkIcon && (
               <button
                 onClick={(e) => handleBookmarkClick(e, item.name, isBookmarked)}
-                className={`p-0.5 rounded hover:bg-default-200 transition-opacity ${
+                className={`p-0.5 rounded hover:bg-default-200 dark:hover:bg-gray-600 transition-opacity ${
                   isBookmarked || isHovered ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
               >
                 {isBookmarked ? (
                   <IconBookmarkFilled size={16} className="text-sky-500" />
                 ) : (
-                  <IconBookmark size={16} className="text-default-400" />
+                  <IconBookmark size={16} className="text-default-400 dark:text-gray-500" />
                 )}
               </button>
             )}
             {hasPopover ? (
               <IconChevronRight
                 size={14}
-                className={`transition-colors ${isHovered ? "text-sky-500" : "text-default-400"}`}
+                className={`transition-colors ${isHovered ? "text-sky-500 dark:text-sky-400" : "text-default-400 dark:text-gray-500"}`}
               />
             ) : (
               <IconChevronRight
                 size={14}
-                className="text-default-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-default-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
               />
             )}
           </div>
@@ -270,7 +270,7 @@ export default function NavbarDropdown({
       <div
         ref={dropdownRef}
         className={`
-          fixed z-[100] bg-white border border-default-200 rounded-lg shadow-lg -translate-x-1/2
+          fixed z-[100] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-600 rounded-lg shadow-lg -translate-x-1/2
           ${isMegaMenu ? "p-3" : "p-2"}
         `}
         style={{
@@ -312,7 +312,7 @@ export default function NavbarDropdown({
     >
       <div
         ref={popoverRef}
-        className="fixed z-[101] bg-white border border-default-200 rounded-lg shadow-lg py-1 min-w-[180px]"
+        className="fixed z-[101] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-600 rounded-lg shadow-lg py-1 min-w-[180px]"
         style={{
           top: popoverPosition.top,
           left: popoverPosition.left,
@@ -334,7 +334,7 @@ export default function NavbarDropdown({
               onItemClick();
               setHoveredItem(null);
             }}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 hover:bg-sky-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors"
           >
             <IconPlus size={16} />
             <span>{option.name}</span>

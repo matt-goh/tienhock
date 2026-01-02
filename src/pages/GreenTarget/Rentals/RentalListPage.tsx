@@ -131,7 +131,7 @@ const RentalCard = ({
       >
         <div className="flex justify-between items-center">
           <span>Rental #{rental.rental_id}</span>
-          <span className="text-xs py-0.5 px-2 bg-white/20 rounded-full">
+          <span className="text-xs py-0.5 px-2 bg-white dark:bg-gray-800/20 rounded-full">
             {activeStatus ? "Ongoing" : "Completed"}
           </span>
         </div>
@@ -144,7 +144,7 @@ const RentalCard = ({
             <div className="w-full">
               <div className="w-full">
                 <h3
-                  className="font-semibold text-default-900 truncate cursor-pointer hover:underline w-fit"
+                  className="font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:underline w-fit"
                   title={rental.customer_name}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -156,7 +156,7 @@ const RentalCard = ({
                 {(rental.customer_phone_number ||
                   rental.location_phone_number) && (
                   <p
-                    className="text-sm text-default-600 mt-[3px] truncate w-full"
+                    className="text-sm text-default-600 dark:text-gray-300 mt-[3px] truncate w-full"
                     title={
                       rental.customer_phone_number !==
                         rental.location_phone_number &&
@@ -184,7 +184,7 @@ const RentalCard = ({
               </div>
               {rental.location_address && (
                 <p
-                  className="text-sm text-default-600 mt-0.5 truncate"
+                  className="text-sm text-default-600 dark:text-gray-300 mt-0.5 truncate"
                   title={rental.location_address}
                 >
                   <IconMapPin
@@ -200,18 +200,18 @@ const RentalCard = ({
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
-            <p className="text-xs text-default-500 mb-1">Dumpster</p>
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Dumpster</p>
             <p className="font-medium">{rental.tong_no}</p>
           </div>
-          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
-            <p className="text-xs text-default-500 mb-1">Driver</p>
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Driver</p>
             <p className="font-medium truncate" title={rental.driver}>
               {rental.driver}
             </p>
           </div>
-          <div className="bg-default-50 p-2 border border-default-100 rounded-md">
-            <p className="text-xs text-default-500 mb-1">Duration</p>
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Duration</p>
             <p className="font-medium">{calculateDuration()}</p>
           </div>
           <div
@@ -219,7 +219,7 @@ const RentalCard = ({
               activeStatus ? "bg-green-50" : "bg-default-50"
             }`}
           >
-            <p className="text-xs text-default-500 mb-1">Status</p>
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Status</p>
             <p
               className={`font-medium ${
                 activeStatus ? "text-green-700" : "text-default-700"
@@ -232,10 +232,10 @@ const RentalCard = ({
 
         {/* Remarks section - only show if there are remarks */}
         {rental.remarks && (
-          <div className="mb-4 bg-default-50/50 border border-default-100 rounded-md p-2">
-            <p className="text-xs text-default-500 mb-0.5">Remarks</p>
+          <div className="mb-4 bg-default-50 dark:bg-gray-900/50/50 border border-default-100 rounded-md p-2">
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-0.5">Remarks</p>
             <p
-              className="text-xs text-default-700 truncate"
+              className="text-xs text-default-700 dark:text-gray-200 truncate"
               title={rental.remarks}
             >
               {rental.remarks}
@@ -246,13 +246,13 @@ const RentalCard = ({
         {/* Dates section */}
         <div className="flex justify-end space-x-4 mb-4">
           <div>
-            <p className="text-xs text-default-500">Placement Date</p>
-            <p className="font-medium text-default-900">
+            <p className="text-xs text-default-500 dark:text-gray-400">Placement Date</p>
+            <p className="font-medium text-default-900 dark:text-gray-100">
               {formatDate(rental.date_placed)}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-default-500">Pickup Date</p>
+            <p className="text-xs text-default-500 dark:text-gray-400">Pickup Date</p>
             <p
               className={`font-medium ${
                 !rental.date_picked ? "text-amber-600" : "text-default-900"
@@ -641,7 +641,7 @@ const RentalListPage = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl text-default-700 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
+        <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
           Rentals ({filteredRentals.length})
         </h1>
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-end ml-auto">
@@ -649,7 +649,7 @@ const RentalListPage = () => {
             <button
               type="button"
               onClick={() => setActiveOnly(!activeOnly)}
-              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 active:bg-default-200 flex items-center"
+              className="p-2 rounded-full transition-opacity duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 flex items-center"
             >
               {activeOnly ? (
                 <IconSquareCheckFilled
@@ -695,7 +695,7 @@ const RentalListPage = () => {
 
       {filteredRentals.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-default-500">No rentals found.</p>
+          <p className="text-default-500 dark:text-gray-400">No rentals found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -713,9 +713,9 @@ const RentalListPage = () => {
       )}
 
       {filteredRentals.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
+        <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -723,7 +723,7 @@ const RentalListPage = () => {
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >

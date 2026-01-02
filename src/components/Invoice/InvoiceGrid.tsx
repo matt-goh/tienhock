@@ -34,14 +34,14 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
 
   if (invoices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-10 bg-gradient-to-b from-slate-50 to-slate-100 rounded-xl border border-dashed border-slate-200 mt-6 shadow-sm transition-all">
-        <div className="bg-slate-100 p-5 rounded-full transform transition-transform hover:scale-105">
-          <IconFileInvoice size={64} stroke={1.5} />
+      <div className="flex flex-col items-center justify-center p-10 bg-gradient-to-b from-slate-50 to-slate-100 dark:from-gray-800 dark:to-gray-900 rounded-xl border border-dashed border-slate-200 dark:border-gray-700 mt-6 shadow-sm transition-all">
+        <div className="bg-slate-100 dark:bg-gray-800 p-5 rounded-full transform transition-transform hover:scale-105">
+          <IconFileInvoice size={64} stroke={1.5} className="text-slate-600 dark:text-gray-400" />
         </div>
-        <h3 className="text-2xl font-semibold text-slate-700 mb-3">
+        <h3 className="text-2xl font-semibold text-slate-700 dark:text-gray-200 mb-3">
           No Invoices Found
         </h3>
-        <p className="text-slate-500 text-center max-w-md leading-relaxed">
+        <p className="text-slate-500 dark:text-gray-400 text-center max-w-md leading-relaxed">
           No invoices match your current filters or search criteria. Try
           adjusting the filters to see more results.
         </p>
@@ -50,7 +50,7 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 bg-white">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
       {invoices.map((invoice) => (
         <InvoiceCard
           key={invoice.id}

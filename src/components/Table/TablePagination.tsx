@@ -61,13 +61,13 @@ const TablePagination = <T extends Record<string, unknown>>({
 
   return (
     <div className="flex justify-between items-center w-full space-x-4">
-      <div className="flex items-center space-x-2 text-sm text-default-700">
+      <div className="flex items-center space-x-2 text-sm text-default-700 dark:text-gray-300">
         <span>Show:</span>
         <div className="relative">
           <select
             value={table.getState().pagination.pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="appearance-none bg-white border border-default-300 rounded-full py-1 pl-3 pr-8 focus:outline-none focus:border-default-400"
+            className="appearance-none bg-white dark:bg-gray-800 border border-default-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-full py-1 pl-3 pr-8 focus:outline-none focus:border-default-400 dark:focus:border-gray-500"
           >
             {[10, 25, 50].map((pageSize) => (
               <option key={pageSize} value={pageSize}>
@@ -75,7 +75,7 @@ const TablePagination = <T extends Record<string, unknown>>({
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-default-700">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-default-700 dark:text-gray-300">
             <IconChevronDown size={14} />
           </div>
         </div>
@@ -94,11 +94,11 @@ const TablePagination = <T extends Record<string, unknown>>({
         </span>
       </div>
 
-      <nav className="flex items-center justify-center space-x-2 text-default-700">
+      <nav className="flex items-center justify-center space-x-2 text-default-700 dark:text-gray-300">
         <button
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
-          className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-accent hover:bg-default-100 active:bg-default-200 hover:text-accent-foreground h-10 w-10 py-2"
+          className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 hover:text-accent-foreground h-10 w-10 py-2"
           type="button"
         >
           <IconChevronLeft className="h-4 w-4" />
@@ -112,9 +112,9 @@ const TablePagination = <T extends Record<string, unknown>>({
             ) : (
               <button
                 onClick={() => table.setPageIndex((page as number) - 1)}
-                className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+                className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
                   currentPage === page
-                    ? "border border-default-200 font-semibold"
+                    ? "border border-default-200 dark:border-gray-600 font-semibold"
                     : "font-medium"
                 }`}
                 type="button"
@@ -127,7 +127,7 @@ const TablePagination = <T extends Record<string, unknown>>({
         <button
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
-          className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200 hover:bg-accent hover:text-accent-foreground h-10 w-10 py-2"
+          className="inline-flex items-center justify-center rounded-full text-sm font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 hover:text-accent-foreground h-10 w-10 py-2"
           type="button"
         >
           <IconChevronRight className="h-4 w-4" />

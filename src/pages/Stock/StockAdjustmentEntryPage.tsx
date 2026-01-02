@@ -355,18 +355,18 @@ const StockAdjustmentEntryPage: React.FC = () => {
     <div className="space-y-4">
       {/* Header */}
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-default-900">
+        <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">
           Stock Adjustments
         </h1>
-        <p className="mt-1 text-sm text-default-500">
+        <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
           Record monthly ADJ+ (returned usable) and ADJ- (defective) adjustments
         </p>
       </div>
 
       {/* Month Navigation */}
-      <div className="mb-4 rounded-lg border border-default-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
         <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-default-700">Month:</label>
+          <label className="text-sm font-medium text-default-700 dark:text-gray-200">Month:</label>
           <MonthNavigator
             selectedMonth={selectedMonth}
             onChange={setSelectedMonth}
@@ -385,10 +385,10 @@ const StockAdjustmentEntryPage: React.FC = () => {
       {/* Main Content - Master-Detail Layout */}
       <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Left Panel - References List */}
-        <div className="w-72 flex-shrink-0 rounded-lg border border-default-200 bg-white shadow-sm">
-          <div className="border-b border-default-200 p-3">
+        <div className="w-72 flex-shrink-0 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+          <div className="border-b border-default-200 dark:border-gray-700 p-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-default-700">
+              <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
                 References
               </h2>
               <button
@@ -412,7 +412,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
                   className="mx-auto text-default-300"
                   size={32}
                 />
-                <p className="mt-2 text-sm text-default-500">
+                <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
                   No adjustments for this month
                 </p>
                 <p className="mt-1 text-xs text-default-400">
@@ -428,14 +428,14 @@ const StockAdjustmentEntryPage: React.FC = () => {
                     className={clsx(
                       "w-full rounded-lg border p-3 text-left transition-colors",
                       selectedReference === ref.reference && !isCreatingNew
-                        ? "border-sky-500 bg-sky-50"
-                        : "border-default-200 bg-white hover:bg-default-50"
+                        ? "border-sky-500 bg-sky-50 dark:bg-sky-900/30"
+                        : "border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700"
                     )}
                   >
-                    <div className="font-medium text-default-900">
+                    <div className="font-medium text-default-900 dark:text-gray-100">
                       {ref.reference}
                     </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-default-500">
+                    <div className="mt-1 flex items-center gap-3 text-xs text-default-500 dark:text-gray-400">
                       <span>{ref.product_count} products</span>
                       <span className="text-teal-600">
                         +{ref.total_adj_in}
@@ -444,7 +444,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
                         -{ref.total_adj_out}
                       </span>
                     </div>
-                    <div className="mt-1 text-xs text-default-400">
+                    <div className="mt-1 text-xs text-default-400 dark:text-gray-500">
                       {new Date(ref.created_at).toLocaleDateString("en-MY", {
                         day: "numeric",
                         month: "short",
@@ -459,12 +459,12 @@ const StockAdjustmentEntryPage: React.FC = () => {
         </div>
 
         {/* Right Panel - Entry Form */}
-        <div className="flex flex-1 flex-col rounded-lg border border-default-200 bg-white shadow-sm">
+        <div className="flex flex-1 flex-col rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
           {!selectedReference && !isCreatingNew ? (
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">
                 <IconPackage className="mx-auto text-default-300" size={48} />
-                <p className="mt-4 text-default-500">
+                <p className="mt-4 text-default-500 dark:text-gray-400">
                   Select a reference to edit or create a new one
                 </p>
               </div>
@@ -472,10 +472,10 @@ const StockAdjustmentEntryPage: React.FC = () => {
           ) : (
             <>
               {/* Form Header */}
-              <div className="border-b border-default-200 p-4">
+              <div className="border-b border-default-200 dark:border-gray-700 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <label className="text-sm font-medium text-default-700">
+                    <label className="text-sm font-medium text-default-700 dark:text-gray-200">
                       Reference:
                     </label>
                     {isCreatingNew ? (
@@ -484,11 +484,11 @@ const StockAdjustmentEntryPage: React.FC = () => {
                         value={newReferenceInput}
                         onChange={(e) => setNewReferenceInput(e.target.value)}
                         placeholder="Enter reference code..."
-                        className="w-48 rounded-lg border border-default-300 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className="w-48 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                         autoFocus
                       />
                     ) : (
-                      <span className="rounded-lg bg-default-100 px-3 py-1.5 text-sm font-medium text-default-900">
+                      <span className="rounded-lg bg-default-100 dark:bg-gray-700 px-3 py-1.5 text-sm font-medium text-default-900 dark:text-gray-100">
                         {selectedReference}
                       </span>
                     )}
@@ -509,7 +509,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
               </div>
 
               {/* Tabs */}
-              <div className="border-b border-default-200">
+              <div className="border-b border-default-200 dark:border-gray-700">
                 <div className="flex">
                   {(["BH", "MEE"] as ProductTab[]).map((tab) => (
                     <button
@@ -518,12 +518,12 @@ const StockAdjustmentEntryPage: React.FC = () => {
                       className={clsx(
                         "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
                         activeTab === tab
-                          ? "border-sky-500 bg-sky-50 text-sky-700"
-                          : "border-transparent text-default-600 hover:bg-default-50"
+                          ? "border-sky-500 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
+                          : "border-transparent text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       )}
                     >
                       {tab === "BH" ? "Bihun" : "Mee"} Products
-                      <span className="ml-2 rounded-full bg-default-200 px-2 py-0.5 text-xs">
+                      <span className="ml-2 rounded-full bg-default-200 dark:bg-gray-700 px-2 py-0.5 text-xs">
                         {tab === "BH" ? bhProducts.length : meeProducts.length}
                       </span>
                     </button>
@@ -539,23 +539,23 @@ const StockAdjustmentEntryPage: React.FC = () => {
                   </div>
                 ) : (
                   <table className="w-full">
-                    <thead className="sticky top-0 bg-default-50">
+                    <thead className="sticky top-0 bg-default-50 dark:bg-gray-900/50">
                       <tr>
-                        <th className="border-b border-default-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-default-600">
+                        <th className="border-b border-default-200 dark:border-gray-700 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300">
                           Product ID
                         </th>
-                        <th className="border-b border-default-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-default-600">
+                        <th className="border-b border-default-200 dark:border-gray-700 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300">
                           Description
                         </th>
-                        <th className="w-32 border-b border-default-200 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-teal-600">
+                        <th className="w-32 border-b border-default-200 dark:border-gray-700 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-teal-600">
                           ADJ+ (Return)
                         </th>
-                        <th className="w-32 border-b border-default-200 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-orange-600">
+                        <th className="w-32 border-b border-default-200 dark:border-gray-700 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-orange-600">
                           ADJ- (Defect)
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-default-100">
+                    <tbody className="divide-y divide-default-100 dark:divide-gray-700">
                       {currentProducts.map((product) => {
                         const entry = entries[product.id];
                         const hasValue =
@@ -565,14 +565,14 @@ const StockAdjustmentEntryPage: React.FC = () => {
                           <tr
                             key={product.id}
                             className={clsx(
-                              "transition-colors hover:bg-default-50",
-                              hasValue && "bg-sky-50/50"
+                              "transition-colors hover:bg-default-50 dark:hover:bg-gray-700",
+                              hasValue && "bg-sky-50/50 dark:bg-sky-900/20"
                             )}
                           >
-                            <td className="px-4 py-2 text-sm font-medium text-default-900">
+                            <td className="px-4 py-2 text-sm font-medium text-default-900 dark:text-gray-100">
                               {product.id}
                             </td>
-                            <td className="px-4 py-2 text-sm text-default-600">
+                            <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
                               {product.description}
                             </td>
                             <td className="px-4 py-2">
@@ -585,7 +585,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
                                   handleEntryChange(product.id, "adj_in", value);
                                 }}
                                 placeholder="0"
-                                className="w-full rounded-lg border border-default-300 pl-6 px-3 py-1.5 text-center text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 pl-6 px-3 py-1.5 text-center text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
                               />
                             </td>
                             <td className="px-4 py-2">
@@ -602,7 +602,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
                                   );
                                 }}
                                 placeholder="0"
-                                className="w-full rounded-lg border border-default-300 pl-6 px-3 py-1.5 text-center text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 pl-6 px-3 py-1.5 text-center text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                               />
                             </td>
                           </tr>
@@ -614,7 +614,7 @@ const StockAdjustmentEntryPage: React.FC = () => {
               </div>
 
               {/* Footer with Totals and Actions */}
-              <div className="border-t border-default-200 bg-default-50 p-4">
+              <div className="border-t border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 p-4">
                 <div className="flex items-center justify-end">
                   {/* Actions */}
                   <div className="flex gap-3">

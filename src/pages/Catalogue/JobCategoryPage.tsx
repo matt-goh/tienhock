@@ -213,10 +213,10 @@ const JobCategoryPage: React.FC = () => {
   // --- Render Section Listbox ---
   const renderSectionListbox = () => (
     <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700">Section:</span>
+      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Section:</span>
       <Listbox value={selectedSection} onChange={setSelectedSection}>
         <div className="relative">
-          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+          <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm text-default-900 dark:text-gray-100">
             <span className="block truncate">{selectedSection}</span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <IconChevronDown
@@ -226,13 +226,13 @@ const JobCategoryPage: React.FC = () => {
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+          <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
             {sections.map((section) => (
               <ListboxOption
                 key={section.id}
                 className={({ active }) =>
                   `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                    active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                    active ? "bg-sky-100 dark:bg-sky-900 text-sky-900 dark:text-sky-100" : "text-gray-900 dark:text-gray-100"
                   }`
                 }
                 value={section.name} // Value is the name string
@@ -247,7 +247,7 @@ const JobCategoryPage: React.FC = () => {
                       {section.name}
                     </span>
                     {selected ? (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                         <IconCheck size={20} aria-hidden="true" />
                       </span>
                     ) : null}
@@ -312,9 +312,9 @@ const JobCategoryPage: React.FC = () => {
     }
 
     return (
-      <div className="flex items-center justify-between pt-3 border-t border-default-200">
+      <div className="flex items-center justify-between pt-3 border-t border-default-200 dark:border-gray-700">
         <div>
-          <p className="text-sm text-default-600">
+          <p className="text-sm text-default-600 dark:text-gray-300 dark:text-gray-400">
             Showing{" "}
             <span className="font-medium">
               {(currentPage - 1) * itemsPerPage + 1}
@@ -341,11 +341,11 @@ const JobCategoryPage: React.FC = () => {
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 bg-white text-sm font-medium 
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium
               ${
                 currentPage === 1
-                  ? "text-default-300 cursor-not-allowed"
-                  : "text-default-500 hover:bg-default-50"
+                  ? "text-default-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-default-500 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
               <span className="sr-only">Previous</span>
@@ -357,12 +357,12 @@ const JobCategoryPage: React.FC = () => {
               <>
                 <button
                   onClick={() => handlePageChange(1)}
-                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 >
                   1
                 </button>
                 {startPage > 2 && (
-                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-500 dark:text-gray-400">
                     ...
                   </span>
                 )}
@@ -377,8 +377,8 @@ const JobCategoryPage: React.FC = () => {
                 className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
                 ${
                   currentPage === number
-                    ? "z-10 bg-sky-50 border-sky-500 text-sky-600"
-                    : "bg-white border-default-300 text-default-700 hover:bg-default-50"
+                    ? "z-10 bg-sky-50 dark:bg-sky-900 border-sky-500 text-sky-600 dark:text-sky-300"
+                    : "bg-white dark:bg-gray-800 border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 }`}
               >
                 {number}
@@ -389,13 +389,13 @@ const JobCategoryPage: React.FC = () => {
             {endPage < totalPages && (
               <>
                 {endPage < totalPages - 1 && (
-                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 bg-white text-sm font-medium text-default-500">
+                  <span className="relative inline-flex items-center px-2 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-500 dark:text-gray-400">
                     ...
                   </span>
                 )}
                 <button
                   onClick={() => handlePageChange(totalPages)}
-                  className="relative inline-flex items-center px-4 py-2 border border-default-300 bg-white text-sm font-medium text-default-700 hover:bg-default-50"
+                  className="relative inline-flex items-center px-4 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
                 >
                   {totalPages}
                 </button>
@@ -406,11 +406,11 @@ const JobCategoryPage: React.FC = () => {
             <button
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 bg-white text-sm font-medium
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium
               ${
                 currentPage === totalPages
-                  ? "text-default-300 cursor-not-allowed"
-                  : "text-default-500 hover:bg-default-50"
+                  ? "text-default-300 dark:text-gray-600 cursor-not-allowed"
+                  : "text-default-500 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
             >
               <span className="sr-only">Next</span>
@@ -427,7 +427,7 @@ const JobCategoryPage: React.FC = () => {
     <div className="space-y-4">
       {/* Header Area */}
       <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-        <h1 className="text-xl font-semibold text-default-800">
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
           Job Category Catalogue
         </h1>
         <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
@@ -440,7 +440,7 @@ const JobCategoryPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search ID or Category..."
-              className="w-full rounded-full border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-default-400 dark:placeholder:text-gray-400"
               value={searchTerm}
               onChange={handleSearchChange}
             />
@@ -460,62 +460,62 @@ const JobCategoryPage: React.FC = () => {
       </div>
 
       {/* Content Area - Table/List */}
-      <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-default-200">
-          <thead className="bg-default-100">
+      <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+        <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 dark:divide-gray-700 dark:divide-gray-700">
+          <thead className="bg-default-100 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 Category
               </th>
               {/* Conditionally show section if 'All Section' is selected */}
               {selectedSection === "All Section" && (
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                   Section
                 </th>
               )}
-              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 Gaji
               </th>
-              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 Ikut
               </th>
-              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="w-10 px-2 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 JV
               </th>
-              <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-default-200 bg-white">
+          <tbody className="divide-y divide-default-200 dark:divide-gray-700 dark:divide-gray-700 dark:divide-gray-700 bg-white dark:bg-gray-800">
             {paginatedJobCategories.length > 0 ? (
               paginatedJobCategories.map((category) => (
                 <tr
                   key={category.id}
-                  className="hover:bg-default-50 cursor-pointer"
+                  className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => handleEditClick(category)}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                     {category.id}
                   </td>
-                  <td className="px-4 py-3 text-sm text-default-700">
+                  <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                     {category.category}
                   </td>
                   {selectedSection === "All Section" && (
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                       {category.section}
                     </td>
                   )}
-                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700">
+                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700 dark:text-gray-200">
                     {category.gaji}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700">
+                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700 dark:text-gray-200">
                     {category.ikut}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700">
+                  <td className="whitespace-nowrap px-2 py-3 text-center text-sm text-default-700 dark:text-gray-200">
                     {category.jv}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
@@ -525,7 +525,7 @@ const JobCategoryPage: React.FC = () => {
                           e.stopPropagation(); // Prevent row click
                           handleEditClick(category);
                         }}
-                        className="text-sky-600 hover:text-sky-800"
+                        className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300"
                         title="Edit"
                       >
                         <IconPencil size={18} />
@@ -535,7 +535,7 @@ const JobCategoryPage: React.FC = () => {
                           e.stopPropagation();
                           handleDeleteClick(category);
                         }}
-                        className="text-rose-600 hover:text-rose-800"
+                        className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300"
                         title="Delete"
                       >
                         <IconTrash size={18} />
@@ -548,7 +548,7 @@ const JobCategoryPage: React.FC = () => {
               <tr>
                 <td
                   colSpan={selectedSection === "All Section" ? 7 : 6} // Adjust colspan based on section visibility
-                  className="px-6 py-10 text-center text-sm text-default-500"
+                  className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                 >
                   No job categories found matching your criteria.
                 </td>

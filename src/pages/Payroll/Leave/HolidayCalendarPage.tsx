@@ -67,22 +67,22 @@ const HolidayCalendarPage: React.FC = () => {
   return (
     <div className="space-y-2">
       <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800">
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
           Holiday Calendar ({holidays.length})
         </h1>
         <div className="flex items-center gap-4">
           {/* Year Navigation */}
-          <div className="flex items-center gap-2 border border-default-200 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-2 border border-default-200 dark:border-gray-700 rounded-lg px-3 py-2">
             <button
               onClick={() => handleYearChange("prev")}
-              className="p-1 hover:bg-default-100 rounded"
+              className="p-1 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 rounded"
             >
               <IconChevronLeft size={20} />
             </button>
             <span className="font-medium">{selectedYear}</span>
             <button
               onClick={() => handleYearChange("next")}
-              className="p-1 hover:bg-default-100 rounded"
+              className="p-1 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 rounded"
             >
               <IconChevronRight size={20} />
             </button>
@@ -112,27 +112,27 @@ const HolidayCalendarPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-default-200 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="relative overflow-hidden">
             <div className="max-h-[620px] overflow-y-auto">
-              <table className="min-w-full divide-y divide-default-200">
-                <thead className="bg-default-100 sticky top-0 z-10">
+              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                       Date
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                       Day
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                       Description
                     </th>
-                    <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                    <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-default-200 bg-white">
+                <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
                   {holidays.length > 0 ? (
                     holidays.map((holiday) => {
                       const date = new Date(holiday.holiday_date);
@@ -144,13 +144,13 @@ const HolidayCalendarPage: React.FC = () => {
                       return (
                         <tr
                           key={holiday.id}
-                          className="hover:bg-default-50 cursor-pointer"
+                          className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                           onClick={() => {
                             setHolidayToEdit(holiday);
                             setShowEditModal(true);
                           }}
                         >
-                          <td className="px-4 py-3 text-sm text-default-700">
+                          <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                             {format(date, "dd MMM yyyy")}
                           </td>
                           <td
@@ -162,13 +162,13 @@ const HolidayCalendarPage: React.FC = () => {
                           >
                             {dayOfWeek}
                           </td>
-                          <td className="px-4 py-3 text-sm text-default-700">
+                          <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                             {holiday.description || "-"}
                           </td>
                           <td className="px-4 py-3 text-center text-sm">
                             <div className="flex items-center justify-center space-x-2">
                               <button
-                                className="text-sky-600 hover:text-sky-800"
+                                className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
                                 title="Edit"
                               >
                                 <IconPencil size={18} />
@@ -193,7 +193,7 @@ const HolidayCalendarPage: React.FC = () => {
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-6 py-10 text-center text-sm text-default-500"
+                        className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                       >
                         No holidays recorded for {selectedYear}
                       </td>

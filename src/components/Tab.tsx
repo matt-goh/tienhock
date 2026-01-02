@@ -31,7 +31,7 @@ const Tab: React.FC<TabProps> = ({
   return (
     <div className="w-full">
       <div
-        className={`flex p-0.5 w-fit bg-default-100 rounded-lg whitespace-nowrap`}
+        className={`flex p-0.5 w-fit bg-default-100 dark:bg-gray-800 rounded-lg whitespace-nowrap`}
       >
         {labels.map((label, index) => (
           <button
@@ -39,8 +39,8 @@ const Tab: React.FC<TabProps> = ({
             type="button"
             className={`px-4 py-2 text-center text-sm font-medium transition-all duration-200 rounded-md m-0.5 ${tabWidth} ${
               index === activeTab
-                ? "bg-white shadow-sm"
-                : "text-default-700 hover:text-default-900 hover:bg-white/60"
+                ? "bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 shadow-sm"
+                : "text-default-700 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100 hover:bg-white/60 dark:hover:bg-gray-700/60"
             }`}
             onClick={() => handleTabChange(index)}
           >

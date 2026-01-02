@@ -43,17 +43,17 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="flex-shrink-0 z-50 h-16 bg-white/95 backdrop-blur-sm border-b border-default-200 shadow-sm">
+      <header className="flex-shrink-0 z-50 h-16 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-default-200 dark:border-gray-700 shadow-sm">
         <div className="h-full max-w-[1920px] mx-auto px-4 flex items-center justify-between">
           {/* Left Section: Mobile Menu Button + Logo + Company */}
           <div className="flex items-center gap-2">
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-default-100 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-default-100 dark:hover:bg-gray-700 transition-colors"
               aria-label="Open menu"
             >
-              <IconMenu2 size={24} />
+              <IconMenu2 size={24} className="text-default-700 dark:text-gray-200" />
             </button>
 
             {/* Company Switcher (Desktop) */}

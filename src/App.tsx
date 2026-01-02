@@ -10,6 +10,7 @@ import { Toaster } from "react-hot-toast";
 import { routes } from "./pages/pagesRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider } from "./contexts/CompanyContext";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import Login from "./pages/Auth/Login";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Navbar from "./components/Navbar/Navbar";
@@ -20,6 +21,7 @@ import GreenTargetDashboardPage from "./pages/GreenTarget/GreenTargetDashboardPa
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const { isDarkMode } = useTheme();
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isLoginRoute = location.pathname === "/login";
@@ -35,11 +37,24 @@ const Layout: React.FC = () => {
   const showNavbar = isAuthenticated && !isPDFRoute;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden dark:bg-gray-950">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            padding: "12px",
+            fontSize: "0.875rem",
+            lineHeight: "1.25rem",
+            fontWeight: 500,
+            background: isDarkMode ? "#1f2937" : "#ffffff",
+            color: isDarkMode ? "#f9fafb" : "#111827",
+          },
+        }}
+      />
       {/* Show navbar if authenticated and not on PDF route */}
       {showNavbar && <Navbar />}
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto dark:bg-gray-950">
         <div
           className={
             !isPDFRoute && !isLoginRoute
@@ -104,29 +119,20 @@ const Layout: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
-        <CompanyProvider>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                padding: "12px",
-                fontSize: "0.875rem",
-                lineHeight: "1.25rem",
-                fontWeight: 500,
-              },
-            }}
-          />
-          <Layout />
-        </CompanyProvider>
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <CompanyProvider>
+            <Layout />
+          </CompanyProvider>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

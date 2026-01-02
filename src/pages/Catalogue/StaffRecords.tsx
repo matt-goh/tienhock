@@ -217,8 +217,8 @@ const StaffRecords = () => {
           >
             Back to Staff
           </Button>
-          <h1 className="flex items-center text-2xl text-default-700 font-bold gap-2.5">
-            <IconUsers size={28} stroke={2.5} className="text-default-700" />
+          <h1 className="flex items-center text-2xl text-default-700 dark:text-gray-200 font-bold gap-2.5">
+            <IconUsers size={28} stroke={2.5} className="text-default-700 dark:text-gray-200" />
             Staff Records ({activeEmployees.length})
           </h1>
         </div>
@@ -245,103 +245,103 @@ const StaffRecords = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-default-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-default-50 border-b border-default-200">
+            <thead className="bg-default-50 dark:bg-gray-900/50 dark:bg-gray-800 border-b border-default-200 dark:border-gray-700">
               <tr>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Employee Name
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   M/F
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Age
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Married
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Tel No.
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Date Join
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Department
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   No IC / Passport
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   KWSP No
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Income Tax No
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Bank Acc. No
                 </th>
-                <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   <div className="flex flex-col">
                     <span>Date/Birth</span>
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Religion
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Race
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   Citizenship
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-default-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700 dark:divide-gray-700 dark:divide-gray-700">
               {activeEmployees.map((employee: Employee, index: number) => {
                 const birthDateParts = formatDate(employee.birthdate);
 
                 return (
                   <tr
                     key={employee.id}
-                    className={index % 2 === 0 ? "bg-white" : "bg-default-25"}
+                    className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-900/30"}
                   >
-                    <td className="px-2 py-2 text-xs text-default-900 font-medium">
+                    <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 font-medium">
                       {employee.name}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {formatGender(employee.gender)}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {calculateAge(employee.birthdate)}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {formatMaritalStatus(employee.maritalStatus)}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {employee.telephoneNo || "-"}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {formatDateJoined(employee.dateJoined)}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {employee.department || "-"}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {employee.icNo || "-"}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {employee.kwspNumber || "-"}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {employee.incomeTaxNo || "-"}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {employee.bankAccountNumber || "-"}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       <div className="flex">
                         <span className="w-16 text-center">
                           {birthDateParts.day}.{birthDateParts.month}.
@@ -351,13 +351,13 @@ const StaffRecords = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {(employee.agama || "-").toUpperCase()}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {(employee.race || "-").toUpperCase()}
                     </td>
-                    <td className="px-2 py-2 text-xs text-default-600">
+                    <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300">
                       {(employee.nationality || "-").toUpperCase()}
                     </td>
                   </tr>
@@ -369,12 +369,12 @@ const StaffRecords = () => {
       </div>
 
       {activeEmployees.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-lg border border-default-200">
+        <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
           <IconUsers size={48} className="mx-auto text-default-300 mb-4" />
-          <h3 className="text-lg font-medium text-default-800 mb-1">
+          <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-1">
             No active staff members found
           </h3>
-          <p className="text-default-500">
+          <p className="text-default-500 dark:text-gray-400">
             All staff members have been marked as resigned.
           </p>
         </div>

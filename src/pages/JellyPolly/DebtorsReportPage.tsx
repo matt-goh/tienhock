@@ -256,7 +256,7 @@ const DebtorsReportPage: React.FC = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <IconAlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Report</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Error Loading Report</h3>
             <p className="text-gray-600 mb-4">{error}</p>
             <Button onClick={fetchDebtors} variant="outline" icon={IconRefresh}>
               Retry
@@ -273,7 +273,7 @@ const DebtorsReportPage: React.FC = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <IconUser className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Debtors Found</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Debtors Found</h3>
             <p className="text-gray-600">All customers are up to date with their payments.</p>
           </div>
         </div>
@@ -286,7 +286,7 @@ const DebtorsReportPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <IconBuildingStore className="h-6 w-6 text-blue-600" />
             JellyPolly Debtors Report
           </h1>
@@ -318,21 +318,21 @@ const DebtorsReportPage: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg border-l-4 border-l-red-500 border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border-l-4 border-l-red-500 border border-gray-200 shadow-sm">
           <p className="text-sm font-medium text-gray-600">Total Outstanding</p>
           <p className="text-2xl font-bold text-red-600 mt-1">
             {formatCurrency(filteredData.grand_total_balance)}
           </p>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border-l-4 border-l-blue-500 border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border-l-4 border-l-blue-500 border border-gray-200 shadow-sm">
           <p className="text-sm font-medium text-gray-600">Total Invoiced</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">
             {formatCurrency(filteredData.grand_total_amount)}
           </p>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border-l-4 border-l-green-500 border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border-l-4 border-l-green-500 border border-gray-200 shadow-sm">
           <p className="text-sm font-medium text-gray-600">Total Paid</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
             {formatCurrency(filteredData.grand_total_paid)}
@@ -357,9 +357,9 @@ const DebtorsReportPage: React.FC = () => {
       {/* Debtors List */}
       <div className="space-y-4" ref={printRef}>
         {filteredData.salesmen.map((salesman) => (
-          <div key={salesman.salesman_id} className="bg-white rounded-lg border shadow-sm">
+          <div key={salesman.salesman_id} className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm">
             <div
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
               onClick={() => toggleSalesmanExpansion(salesman.salesman_id)}
             >
               <div className="flex items-center gap-3">
@@ -369,7 +369,7 @@ const DebtorsReportPage: React.FC = () => {
                   <IconChevronRight className="h-5 w-5 text-gray-400" />
                 )}
                 <div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     {salesman.salesman_name} ({salesman.salesman_id})
                   </h3>
                   <p className="text-sm text-gray-600">
@@ -390,7 +390,7 @@ const DebtorsReportPage: React.FC = () => {
                 {salesman.customers.map((customer) => (
                   <div key={customer.customer_id} className="border-b border-gray-100 last:border-b-0">
                     <div
-                      className="flex items-center justify-between p-4 pl-12 cursor-pointer hover:bg-gray-50"
+                      className="flex items-center justify-between p-4 pl-12 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
                       onClick={() => toggleCustomerExpansion(customer.customer_id)}
                     >
                       <div className="flex items-center gap-3">
@@ -401,7 +401,7 @@ const DebtorsReportPage: React.FC = () => {
                         )}
                         <div>
                           <h4
-                            className="font-medium text-gray-900 hover:text-blue-600 cursor-pointer"
+                            className="font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCustomerClick(customer.customer_id);
@@ -432,17 +432,17 @@ const DebtorsReportPage: React.FC = () => {
                     </div>
 
                     {expandedCustomers.has(customer.customer_id) && (
-                      <div className="bg-gray-50 p-4 pl-16">
+                      <div className="bg-gray-50 dark:bg-gray-900/50 p-4 pl-16">
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-sm">
                             <thead>
                               <tr className="border-b">
-                                <th className="text-left py-2 font-medium text-gray-700">Invoice</th>
-                                <th className="text-left py-2 font-medium text-gray-700">Date</th>
-                                <th className="text-right py-2 font-medium text-gray-700">Amount</th>
-                                <th className="text-right py-2 font-medium text-gray-700">Paid</th>
-                                <th className="text-right py-2 font-medium text-gray-700">Balance</th>
-                                <th className="text-center py-2 font-medium text-gray-700">Age</th>
+                                <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-200">Invoice</th>
+                                <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-200">Date</th>
+                                <th className="text-right py-2 font-medium text-gray-700 dark:text-gray-200">Amount</th>
+                                <th className="text-right py-2 font-medium text-gray-700 dark:text-gray-200">Paid</th>
+                                <th className="text-right py-2 font-medium text-gray-700 dark:text-gray-200">Balance</th>
+                                <th className="text-center py-2 font-medium text-gray-700 dark:text-gray-200">Age</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -476,7 +476,7 @@ const DebtorsReportPage: React.FC = () => {
                                             : days <= 60
                                             ? "bg-yellow-100 text-yellow-800"
                                             : days <= 90
-                                            ? "bg-orange-100 text-orange-800"
+                                            ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
                                             : "bg-red-100 text-red-800"
                                         }`}
                                       >

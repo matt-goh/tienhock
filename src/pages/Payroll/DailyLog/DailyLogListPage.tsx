@@ -228,28 +228,28 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   const getStatusBadge = (status: string) => {
     if (status === "Processed") {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
           <IconLock size={12} className="mr-1" />
           {status}
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
         {status}
       </span>
     );
   };
 
   const getDayTypeColor = (dayType: string, logDate?: string) => {
-    if (dayType === "Umum") return "text-red-600";
-    if (dayType === "Ahad") return "text-amber-600";
+    if (dayType === "Umum") return "text-red-600 dark:text-red-400";
+    if (dayType === "Ahad") return "text-amber-600 dark:text-amber-400";
     // Check if it's Saturday (and not a holiday)
     if (logDate && dayType === "Biasa") {
       const date = new Date(logDate);
-      if (date.getDay() === 6) return "text-sky-600";
+      if (date.getDay() === 6) return "text-sky-600 dark:text-sky-400";
     }
-    return "text-default-700";
+    return "text-default-700 dark:text-gray-200";
   };
 
   const getDisplayDayType = (dayType: string, logDate?: string): string => {
@@ -263,22 +263,22 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
   return (
     <div className="space-y-4">
       {/* Compact Header */}
-      <div className="bg-white rounded-lg border border-default-200 px-4 py-3">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 px-4 py-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           {/* Left: Title + Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <h1 className="text-xl font-semibold text-default-800">
+            <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
               {jobConfig?.name} Records
             </h1>
             {!isLoading && workLogs.length > 0 && (
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
                 <span className="text-default-300 hidden sm:inline">|</span>
                 <div className="flex items-center gap-1.5">
-                  <IconCalendarEvent size={16} className="text-sky-600" />
-                  <span className="font-medium text-default-700">
+                  <IconCalendarEvent size={16} className="text-sky-600 dark:text-sky-400" />
+                  <span className="font-medium text-default-700 dark:text-gray-200">
                     {summaryStats.totalRecords}
                   </span>
-                  <span className="text-default-400">records</span>
+                  <span className="text-default-400 dark:text-gray-400">records</span>
                 </div>
               </div>
             )}
@@ -331,18 +331,18 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
           <LoadingSpinner />
         </div>
       ) : workLogs.length > 0 ? (
-        <div className="bg-white rounded-lg border border-default-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
           <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
             <table className="min-w-full table-fixed">
-              <thead className="bg-default-100 sticky top-0 z-10">
+              <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-32">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
                     Date
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
                     Shift
                   </th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
                     Day Type
                   </th>
                   {/* Dynamic context columns */}
@@ -351,36 +351,36 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                     .map((field) => (
                       <th
                         key={field.id}
-                        className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-28"
+                        className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28"
                       >
                         {field.label}
                       </th>
                     ))}
-                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
                     Workers
                   </th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-24">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
                     Hours
                   </th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 w-28">
+                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
                     Status
                   </th>
-                  <th className="w-24 px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600">
+                  <th className="w-24 px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default-100 bg-white">
+              <tbody className="divide-y divide-default-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
                 {workLogs.map((log) => (
                   <tr
                     key={log.id}
-                    className="hover:bg-default-50 cursor-pointer transition-colors"
+                    className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                     onClick={() => handleViewLog(log)}
                   >
-                    <td className="px-4 py-2 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       {format(new Date(log.log_date), "dd MMM yyyy")}
                     </td>
-                    <td className="px-4 py-2 text-sm text-default-700">
+                    <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       {log.shift === 1 ? "Day" : "Night"}
                     </td>
                     <td
@@ -397,15 +397,15 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                       .map((field) => (
                         <td
                           key={field.id}
-                          className="px-4 py-2 text-sm text-center text-default-700"
+                          className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200"
                         >
                           {(log as any).context_data?.[field.id] ?? "-"}
                         </td>
                       ))}
-                    <td className="px-4 py-2 text-sm text-center text-default-700">
+                    <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
                       {log.total_workers}
                     </td>
-                    <td className="px-4 py-2 text-sm text-center text-default-700">
+                    <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
                       {log.total_hours.toFixed(1)}
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -446,12 +446,12 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-default-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
           <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-default-100 dark:bg-gray-800 flex items-center justify-center mb-4">
               <IconClipboardList size={32} className="text-default-400" />
             </div>
-            <p className="text-default-600 font-medium mb-1">
+            <p className="text-default-600 dark:text-gray-300 font-medium mb-1">
               No records found
             </p>
             <p className="text-default-400 text-sm text-center max-w-md">

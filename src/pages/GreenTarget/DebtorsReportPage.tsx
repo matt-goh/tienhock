@@ -129,10 +129,10 @@ const DebtorsReportPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <IconAlertCircle size={48} className="mx-auto mb-4 text-red-500" />
-        <h2 className="text-lg font-medium text-default-900 mb-1">
+        <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-1">
           Loading Error
         </h2>
-        <p className="text-default-500">{error}</p>
+        <p className="text-default-500 dark:text-gray-400">{error}</p>
         <Button onClick={fetchDebtors} className="mt-4">
           Retry
         </Button>
@@ -145,10 +145,10 @@ const DebtorsReportPage: React.FC = () => {
       {/* --- START OF MODIFIED HEADER --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-default-900">
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">
             Debtors Report
           </h1>
-          <p className="text-default-500 mt-1">
+          <p className="text-default-500 dark:text-gray-400 mt-1">
             {/* Show count based on filtered results */}
             {sortedDebtors.length} customer
             {sortedDebtors.length !== 1 ? "s" : ""} with outstanding balances
@@ -165,7 +165,7 @@ const DebtorsReportPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search..."
-              className="pl-10 pr-4 py-2 border border-default-300 rounded-full focus:outline-none focus:border-default-500"
+              className="pl-10 pr-4 py-2 border border-default-300 dark:border-gray-600 rounded-full focus:outline-none focus:border-default-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -184,19 +184,19 @@ const DebtorsReportPage: React.FC = () => {
 
       {/* Summary Cards - Adjusted layout for better responsiveness */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6">
-        <div className="bg-white border border-default-200 rounded-lg p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-default-500 mb-1">
+        <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+          <h3 className="text-sm font-medium text-default-500 dark:text-gray-400 mb-1">
             Number of Debtors
           </h3>
-          <p className="text-2xl font-bold text-default-900">
+          <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
             {sortedDebtors.length}
           </p>
         </div>
-        <div className="bg-white border border-default-200 rounded-lg p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-default-500 mb-1">
+        <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+          <h3 className="text-sm font-medium text-default-500 dark:text-gray-400 mb-1">
             Total Outstanding
           </h3>
-          <p className="text-2xl font-bold text-default-900">
+          <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
             {formatCurrency(totalOutstanding)}
           </p>
         </div>
@@ -204,29 +204,29 @@ const DebtorsReportPage: React.FC = () => {
 
       {/* Debtors Table */}
       {sortedDebtors.length === 0 ? (
-        <div className="bg-white border border-default-200 rounded-lg p-8 text-center">
+        <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg p-8 text-center">
           <IconAlertCircle
             size={48}
             className="mx-auto mb-4 text-default-300"
           />
-          <h2 className="text-lg font-medium text-default-900 mb-1">
+          <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-1">
             No debtors found
           </h2>
-          <p className="text-default-500">
+          <p className="text-default-500 dark:text-gray-400">
             {searchTerm
               ? "No debtors match your search criteria."
               : "All customer balances are settled or there are no customers yet."}
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-default-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-default-200">
-              <thead className="bg-default-50">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th
                     scope="col" // Added scope for accessibility
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
+                    className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
                     onClick={() => handleSort("name")}
                   >
                     Customer
@@ -239,13 +239,13 @@ const DebtorsReportPage: React.FC = () => {
                   </th>
                   <th
                     scope="col" // Added scope
-                    className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider whitespace-nowrap" // Added whitespace-nowrap
+                    className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap" // Added whitespace-nowrap
                   >
                     Contact
                   </th>
                   <th
                     scope="col" // Added scope
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
+                    className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
                     onClick={() => handleSort("total_invoiced")}
                   >
                     Total Invoiced
@@ -258,7 +258,7 @@ const DebtorsReportPage: React.FC = () => {
                   </th>
                   <th
                     scope="col" // Added scope
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
+                    className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
                     onClick={() => handleSort("total_paid")}
                   >
                     Total Paid
@@ -271,7 +271,7 @@ const DebtorsReportPage: React.FC = () => {
                   </th>
                   <th
                     scope="col" // Added scope
-                    className="px-6 py-3 text-right text-xs font-medium text-default-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
+                    className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" // Added whitespace-nowrap
                     onClick={() => handleSort("balance")}
                   >
                     Balance
@@ -284,7 +284,7 @@ const DebtorsReportPage: React.FC = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-default-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                 {sortedDebtors.map((debtor) => (
                   <tr
                     key={debtor.customer_id}
@@ -293,10 +293,10 @@ const DebtorsReportPage: React.FC = () => {
                     title={`View invoices for ${debtor.name}`} // More descriptive title
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-default-900">
+                      <div className="font-medium text-default-900 dark:text-gray-100">
                         {debtor.name}
                       </div>
-                      <div className="text-sm text-default-500">
+                      <div className="text-sm text-default-500 dark:text-gray-400">
                         ID: {debtor.customer_id}
                       </div>
                     </td>
@@ -307,7 +307,7 @@ const DebtorsReportPage: React.FC = () => {
                           {debtor.phone_numbers.map((phone, index) => (
                             <div
                               key={index}
-                              className="flex items-center text-sm text-default-700"
+                              className="flex items-center text-sm text-default-700 dark:text-gray-200"
                             >
                               <IconPhone
                                 size={16}
@@ -323,7 +323,7 @@ const DebtorsReportPage: React.FC = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-900 dark:text-gray-100">
                       {formatCurrency(debtor.total_invoiced)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">

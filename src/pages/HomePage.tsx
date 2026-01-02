@@ -183,9 +183,9 @@ const HomePage: React.FC = () => {
           id: "tienhock",
           name: "Tien Hock",
           logo: <TienHockLogo width={36} height={36} />,
-          color: "text-sky-600",
-          bgColor: "bg-gradient-to-r from-sky-50 via-sky-50 to-blue-50",
-          borderColor: "border-sky-100",
+          color: "text-sky-600 dark:text-sky-400",
+          bgColor: "bg-gradient-to-r from-sky-50 via-sky-50 to-blue-50 dark:from-sky-900/30 dark:via-sky-900/20 dark:to-blue-900/20",
+          borderColor: "border-sky-100 dark:border-sky-800",
         },
         items: buildTienHockItems(),
       },
@@ -194,9 +194,9 @@ const HomePage: React.FC = () => {
           id: "greentarget",
           name: "Green Target",
           logo: <GreenTargetLogo width={36} height={36} />,
-          color: "text-emerald-600",
-          bgColor: "bg-gradient-to-r from-emerald-50 via-emerald-50 to-teal-50",
-          borderColor: "border-emerald-100",
+          color: "text-emerald-600 dark:text-emerald-400",
+          bgColor: "bg-gradient-to-r from-emerald-50 via-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:via-emerald-900/20 dark:to-teal-900/20",
+          borderColor: "border-emerald-100 dark:border-emerald-800",
         },
         items: buildGreenTargetItems(),
       },
@@ -205,9 +205,9 @@ const HomePage: React.FC = () => {
           id: "jellypolly",
           name: "Jelly Polly",
           logo: <TienHockLogo width={36} height={36} />,
-          color: "text-rose-600",
-          bgColor: "bg-gradient-to-r from-rose-50 via-rose-50 to-pink-50",
-          borderColor: "border-rose-100",
+          color: "text-rose-600 dark:text-rose-400",
+          bgColor: "bg-gradient-to-r from-rose-50 via-rose-50 to-pink-50 dark:from-rose-900/30 dark:via-rose-900/20 dark:to-pink-900/20",
+          borderColor: "border-rose-100 dark:border-rose-800",
         },
         items: buildJellyPollyItems(),
       },
@@ -245,14 +245,14 @@ const HomePage: React.FC = () => {
       {companySections.map((section) => (
         <section
           key={section.company.id}
-          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden"
         >
           {/* Company Header */}
           <div
             className={`${section.company.bgColor} px-5 py-3`}
           >
             <div className="flex items-center gap-3">
-              <div className="p-1.5 bg-white/60 rounded-lg shadow-sm backdrop-blur-sm">
+              <div className="p-1.5 bg-white/60 dark:bg-gray-800/60 rounded-lg shadow-sm backdrop-blur-sm">
                 {section.company.logo}
               </div>
               <div>
@@ -275,7 +275,7 @@ const HomePage: React.FC = () => {
                   return (
                     <div
                       key={category.name}
-                      className="flex flex-col rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-sm hover:border-gray-200 transition-all duration-200"
+                      className="flex flex-col rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm hover:border-gray-200 dark:hover:border-gray-600 transition-all duration-200"
                     >
                       <div className="flex items-start gap-3 p-3 pb-2">
                         {Icon && (
@@ -289,17 +289,17 @@ const HomePage: React.FC = () => {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 text-sm">
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm">
                             {category.name}
                           </h3>
                           {category.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 leading-tight">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
                               {category.description}
                             </p>
                           )}
                         </div>
                       </div>
-                      <div className="mx-3 border-t border-gray-100" />
+                      <div className="mx-3 border-t border-gray-100 dark:border-gray-700" />
                       <div className="p-2 flex-grow">
                         <div className="space-y-0.5">
                           {category.subItems && category.subItems.length > 0 ? (
@@ -312,17 +312,17 @@ const HomePage: React.FC = () => {
                                     subItem.path
                                   )
                                 }
-                                className="group flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150"
+                                className="group flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors duration-150"
                               >
                                 <span>{subItem.name}</span>
                                 <IconChevronRight
                                   size={14}
-                                  className="text-gray-400 opacity-0 transition-opacity group-hover:opacity-100"
+                                  className="text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100"
                                 />
                               </button>
                             ))
                           ) : (
-                            <p className="px-2.5 py-1.5 text-sm text-gray-400 italic">
+                            <p className="px-2.5 py-1.5 text-sm text-gray-400 dark:text-gray-500 italic">
                               No items available.
                             </p>
                           )}
@@ -343,7 +343,7 @@ const HomePage: React.FC = () => {
                       onClick={() =>
                         handleNavigate(section.company.id, item.path)
                       }
-                      className="group p-3 rounded-lg border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-200 text-left"
+                      className="group p-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-sm transition-all duration-200 text-left"
                     >
                       <div className="flex items-start gap-2.5">
                         {Icon && (
@@ -357,15 +357,15 @@ const HomePage: React.FC = () => {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-gray-900 text-sm flex items-center">
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100 text-sm flex items-center">
                             {item.name}
                             <IconChevronRight
                               size={14}
-                              className="ml-1 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
+                              className="ml-1 text-gray-400 dark:text-gray-500 opacity-0 transition-opacity group-hover:opacity-100 flex-shrink-0"
                             />
                           </h3>
                           {item.description && (
-                            <p className="mt-0.5 text-xs text-gray-500 leading-tight">
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 leading-tight">
                               {item.description}
                             </p>
                           )}

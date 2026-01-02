@@ -88,9 +88,9 @@ const DeliveryOrderPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4">
         <BackButton onClick={handleBackClick} className="ml-5" />
-        <div className="bg-white rounded-lg p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
           <div className="text-center py-8">
-            <p className="text-default-500">
+            <p className="text-default-500 dark:text-gray-400">
               {error || "No delivery order data available"}
             </p>
           </div>
@@ -101,12 +101,12 @@ const DeliveryOrderPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg border border-default-200 px-6 py-3">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 px-6 py-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
-            <h1 className="text-xl font-semibold text-default-800">
+            <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
               Delivery Order
             </h1>
           </div>
@@ -125,7 +125,7 @@ const DeliveryOrderPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg p-8 max-w-3xl mx-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-3xl mx-auto">
         {/* Delivery Order Header */}
         <div className="mb-8 text-center border-b pb-4">
           <h1 className="text-2xl font-bold mb-2">DELIVERY ORDER</h1>
@@ -193,7 +193,7 @@ const DeliveryOrderPage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 pt-4 border-t text-center text-sm text-default-500">
+        <div className="mt-12 pt-4 border-t text-center text-sm text-default-500 dark:text-gray-400">
           <p>Green Target Waste Management Company</p>
         </div>
       </div>

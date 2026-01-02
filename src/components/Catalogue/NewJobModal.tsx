@@ -180,7 +180,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
         </TransitionChild>
 
         {/* Modal Content */}
@@ -196,10 +196,10 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
               leaveTo="opacity-0 scale-95"
             >
               {/* Updated DialogPanel structure and styling */}
-              <DialogPanel className="w-full max-w-lg transform rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-lg transform rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title
                   as="h3"
-                  className="text-lg font-semibold leading-6 text-gray-900"
+                  className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
                 >
                   Add New Job
                 </Dialog.Title>
@@ -208,14 +208,14 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                   <div className="space-y-4">
                     {/* ID Field */}
                     <Field>
-                      <Label className="block text-sm font-medium text-default-700">
+                      <Label className="block text-sm font-medium text-default-600 dark:text-gray-300">
                         Job ID <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         className={clsx(
-                          "mt-1 block w-full rounded-lg border border-default-300 bg-white py-2 px-3 text-default-900 shadow-sm",
+                          "mt-1 block w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 text-gray-900 dark:text-gray-100 shadow-sm",
                           "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                          "disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          "disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                         )}
                         name="id"
                         value={formData.id}
@@ -227,14 +227,14 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                     </Field>
                     {/* Name Field */}
                     <Field>
-                      <Label className="block text-sm font-medium text-default-700">
+                      <Label className="block text-sm font-medium text-default-600 dark:text-gray-300">
                         Job Name <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         className={clsx(
-                          "mt-1 block w-full rounded-lg border border-default-300 bg-white py-2 px-3 text-default-900 shadow-sm",
+                          "mt-1 block w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 px-3 text-gray-900 dark:text-gray-100 shadow-sm",
                           "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                          "disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          "disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                         )}
                         name="name"
                         value={formData.name}
@@ -246,7 +246,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                     </Field>
                     {/* Section Field */}
                     <Field>
-                      <Label className="block text-sm font-medium text-default-700">
+                      <Label className="block text-sm font-medium text-default-600 dark:text-gray-300">
                         Section(s) <span className="text-red-500">*</span>
                       </Label>
                       {/* Using FormCombobox structure directly */}
@@ -260,16 +260,16 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         <div className="relative mt-1">
                           <div
                             className={clsx(
-                              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 bg-white text-left shadow-sm",
+                              "relative w-full cursor-default overflow-hidden rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-left shadow-sm",
                               "focus-within:ring-1 focus-within:ring-sky-500 focus-within:border-sky-500",
-                              isSaving || loadingSections ? "bg-gray-100" : ""
+                              isSaving || loadingSections ? "bg-gray-100 dark:bg-gray-800" : ""
                             )}
                           >
                             <ComboboxInput
                               className={clsx(
-                                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0",
+                                "w-full border-none py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 dark:text-gray-100 focus:ring-0",
                                 isSaving || loadingSections
-                                  ? "bg-gray-100 cursor-not-allowed"
+                                  ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
                                   : ""
                               )}
                               displayValue={(selectedSections: string[]) =>
@@ -289,7 +289,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                             <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                               <IconChevronDown
                                 size={20}
-                                className="text-gray-400"
+                                className="text-gray-400 dark:text-gray-500"
                                 aria-hidden="true"
                               />
                             </ComboboxButton>
@@ -301,14 +301,14 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                             leaveTo="opacity-0"
                             afterLeave={() => setSectionQuery("")}
                           >
-                            <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                            <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black dark:ring-gray-700 ring-opacity-5 focus:outline-none sm:text-sm">
                               {loadingSections ? (
-                                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                                <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                                   Loading...
                                 </div>
                               ) : filteredSections.length === 0 &&
                                 sectionQuery !== "" ? (
-                                <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                                <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                                   No sections found.
                                 </div>
                               ) : (
@@ -318,8 +318,8 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                     className={({ active }) =>
                                       `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
                                         active
-                                          ? "bg-sky-100 text-sky-900"
-                                          : "text-gray-900"
+                                          ? "bg-sky-100 dark:bg-sky-900/30 text-sky-900 dark:text-sky-300"
+                                          : "text-gray-900 dark:text-gray-100"
                                       }`
                                     }
                                     value={section.name} // Value is the name string
@@ -339,8 +339,8 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                                           <span
                                             className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
                                               active
-                                                ? "text-sky-700"
-                                                : "text-sky-600"
+                                                ? "text-sky-700 dark:text-sky-400"
+                                                : "text-sky-600 dark:text-sky-500"
                                             }`}
                                           >
                                             <IconCheck
@@ -363,7 +363,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                   {/* End space-y-4 */}
                   {/* Error Display */}
                   {error && (
-                    <p className="text-red-600 text-sm mt-3 text-center">
+                    <p className="text-red-600 dark:text-red-400 text-sm mt-3 text-center">
                       {error}
                     </p>
                   )}

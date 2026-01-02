@@ -14,22 +14,22 @@ interface CompanySwitcherProps {
 // Company theme colors
 const companyThemes: Record<string, { bg: string; text: string; border: string; activeBg: string }> = {
   tienhock: {
-    bg: "bg-sky-50",
-    text: "text-sky-700",
-    border: "border-sky-200",
-    activeBg: "bg-sky-100",
+    bg: "bg-sky-50 dark:bg-sky-900/30",
+    text: "text-sky-700 dark:text-sky-300",
+    border: "border-sky-200 dark:border-sky-800",
+    activeBg: "bg-sky-100 dark:bg-sky-900/40",
   },
   greentarget: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    border: "border-emerald-200",
-    activeBg: "bg-emerald-100",
+    bg: "bg-emerald-50 dark:bg-emerald-900/30",
+    text: "text-emerald-700 dark:text-emerald-300",
+    border: "border-emerald-200 dark:border-emerald-800",
+    activeBg: "bg-emerald-100 dark:bg-emerald-900/40",
   },
   jellypolly: {
-    bg: "bg-rose-50",
-    text: "text-rose-700",
-    border: "border-rose-200",
-    activeBg: "bg-rose-100",
+    bg: "bg-rose-50 dark:bg-rose-900/30",
+    text: "text-rose-700 dark:text-rose-300",
+    border: "border-rose-200 dark:border-rose-800",
+    activeBg: "bg-rose-100 dark:bg-rose-900/40",
   },
 };
 
@@ -149,7 +149,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
         leaveFrom="opacity-100 scale-100 translate-y-0"
         leaveTo="opacity-0 scale-95 -translate-y-1"
       >
-        <div className="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-lg z-50 border border-default-200 overflow-hidden">
+        <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg z-50 border border-default-200 dark:border-gray-600 overflow-hidden">
           {/* Company Options */}
           <div className="px-1 py-0.5">
             {companies.map((company) => {
@@ -165,7 +165,7 @@ const CompanySwitcher: React.FC<CompanySwitcherProps> = ({ onNavigate }) => {
                     transition-all duration-150
                     ${isActive
                       ? `${itemTheme.activeBg} ${itemTheme.text}`
-                      : "hover:bg-default-100 text-default-700"
+                      : "hover:bg-default-100 dark:hover:bg-gray-700 text-default-700 dark:text-gray-200"
                     }
                   `}
                 >

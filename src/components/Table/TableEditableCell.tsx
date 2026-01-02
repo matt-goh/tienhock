@@ -209,7 +209,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
               onChange(newValue);
             }
           }}
-          className="p-2 rounded-full hover:bg-default-200 active:bg-default-300 transition-colors duration-200"
+          className="p-2 rounded-full hover:bg-default-200 dark:hover:bg-gray-700 active:bg-default-300 dark:active:bg-gray-600 transition-colors duration-200"
           disabled={isSorting}
           type="button"
         >
@@ -224,7 +224,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
               width={18}
               height={18}
               stroke={2}
-              className="text-default-400"
+              className="text-default-400 dark:text-gray-500"
             />
           )}
         </button>
@@ -260,9 +260,9 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                 />
               </ComboboxButton>
             </div>
-            <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+            <ComboboxOptions className="absolute z-10 w-full p-1 mt-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
               {filteredOptions.length === 0 && query !== "" ? (
-                <div className="relative cursor-default select-none py-2 px-4 text-default-700">
+                <div className="relative cursor-default select-none py-2 px-4 text-default-700 dark:text-gray-300">
                   Nothing found.
                 </div>
               ) : (
@@ -273,8 +273,8 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                         active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
+                          ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                          : "text-default-900 dark:text-gray-100"
                       }`
                     }
                   >
@@ -288,7 +288,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                           {option}
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-400">
                             <IconCheck className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
@@ -322,15 +322,15 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
               />
             </span>
           </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+          <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
             {options.map((option) => (
               <ListboxOption
                 key={option}
                 className={({ active }) =>
                   `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                     active
-                      ? "bg-default-100 text-default-900"
-                      : "text-default-900"
+                      ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                      : "text-default-900 dark:text-gray-100"
                   }`
                 }
                 value={option}
@@ -345,7 +345,7 @@ const TableEditableCell: React.FC<TableEditableCellProps> = ({
                       {option}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-400">
                         <IconCheck className="h-5 w-5" aria-hidden="true" />
                       </span>
                     )}

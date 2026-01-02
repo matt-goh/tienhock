@@ -125,13 +125,13 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-30">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 dark:bg-black/70">
       <div className="flex min-h-screen items-center justify-center p-4 text-center">
         <div
           ref={modalRef}
-          className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all"
+          className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all"
         >
-          <h3 className="text-lg font-medium leading-6 text-default-900">
+          <h3 className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100">
             {modalTitle}
           </h3>
 
@@ -139,7 +139,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
             {/* Only show customer name field when creating a new customer */}
             {isCreatingCustomer && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-default-700 mb-1">
+                <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
                   Customer Name
                 </label>
                 <input
@@ -147,7 +147,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   name="customer_name"
                   value={formData.customer_name}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                  className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="Enter customer name"
                   required
                 />
@@ -156,11 +156,11 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
 
             {/* Location Address Field */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-default-700 mb-1">
+              <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
                 Location Address
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400 dark:text-gray-400">
                   <IconMapPin size={18} />
                 </span>
                 <input
@@ -170,24 +170,24 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   onChange={handleChange}
                   className={`w-full pl-10 pr-3 py-2 border ${
                     errors.address
-                      ? "border-rose-300 focus:border-rose-500"
-                      : "border-default-300 focus:border-default-500"
-                  } rounded-lg focus:outline-none`}
+                      ? "border-rose-300 dark:border-rose-500 focus:border-rose-500"
+                      : "border-default-300 dark:border-gray-600 focus:border-default-500 dark:focus:border-sky-500"
+                  } rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
                   placeholder="Enter location address"
                 />
               </div>
               {errors.address && (
-                <p className="mt-1 text-sm text-rose-600">{errors.address}</p>
+                <p className="mt-1 text-sm text-rose-600 dark:text-rose-400">{errors.address}</p>
               )}
             </div>
 
             {/* Phone Number Field */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-default-700 mb-1">
+              <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
                 Phone Number
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400 dark:text-gray-400">
                   <IconPhone size={18} />
                 </span>
                 <input
@@ -195,7 +195,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   name="phone_number"
                   value={formData.phone_number}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:border-default-500"
+                  className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder={`Custom phone number (optional, default: ${
                     customerPhoneNumber || "none"
                   })`}

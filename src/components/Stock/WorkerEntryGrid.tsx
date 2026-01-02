@@ -146,7 +146,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       <div className="flex items-center justify-center py-12">
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
-          <span className="text-sm text-default-500">Loading workers...</span>
+          <span className="text-sm text-default-500 dark:text-gray-400">Loading workers...</span>
         </div>
       </div>
     );
@@ -154,11 +154,11 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
 
   if (workers.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-default-300 p-8 text-center">
-        <p className="text-default-500">
+      <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-8 text-center">
+        <p className="text-default-500 dark:text-gray-400">
           No workers found for the selected product type.
         </p>
-        <p className="mt-1 text-sm text-default-400">
+        <p className="mt-1 text-sm text-default-400 dark:text-gray-500">
           Please select a product first or ensure workers are assigned to the
           correct packing job.
         </p>
@@ -167,26 +167,26 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-default-200">
+    <div className="overflow-hidden rounded-lg border border-default-200 dark:border-gray-700">
       {/* Search Input */}
-      <div className="border-b border-default-200 bg-white px-4 py-3">
+      <div className="border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
         <div className="relative">
           <IconSearch
             size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
           />
           <input
             type="text"
             placeholder="Search worker name or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-default-300 py-2 pl-10 pr-10 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-10 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
             >
               <IconX size={16} />
             </button>
@@ -195,9 +195,9 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       </div>
 
       {/* Worker rows - 3 column grid */}
-      <div className="p-4">
+      <div className="p-4 bg-white dark:bg-gray-800">
         {filteredAndSortedWorkers.length === 0 ? (
-          <div className="py-8 text-center text-default-500">
+          <div className="py-8 text-center text-default-500 dark:text-gray-400">
             No workers found matching "{searchQuery}"
           </div>
         ) : (
@@ -207,29 +207,29 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                 key={worker.id}
                 className={clsx(
                   "flex items-center justify-between rounded-lg border px-3 py-2",
-                  "hover:bg-default-50 transition-colors",
+                  "hover:bg-default-50 dark:hover:bg-gray-700 transition-colors",
                   entries[worker.id] && entries[worker.id] > 0
-                    ? "border-sky-300 bg-sky-50/50"
-                    : "border-default-200 bg-white"
+                    ? "border-sky-300 dark:border-sky-600 bg-sky-50/50 dark:bg-sky-900/30"
+                    : "border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                 )}
               >
                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <span className="w-5 text-sm tabular-nums text-default-400 text-right flex-shrink-0">
+                  <span className="w-5 text-sm tabular-nums text-default-400 dark:text-gray-500 text-right flex-shrink-0">
                     {index + 1}
                   </span>
                   <Link
                     to={`/catalogue/staff/${worker.id}`}
-                    className="flex flex-col min-w-0 hover:text-sky-600 transition-colors"
+                    className="flex flex-col min-w-0 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <span
-                      className="font-medium text-default-900 text-sm truncate hover:text-sky-600 hover:underline"
+                      className="font-medium text-default-900 dark:text-gray-100 text-sm truncate hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                       title={worker.name}
                     >
                       {worker.name}
                     </span>
                     <span
-                      className="text-xs text-default-400 truncate w-fit hover:underline"
+                      className="text-xs text-default-400 dark:text-gray-500 truncate w-fit hover:underline"
                       title={worker.id}
                     >
                       {worker.id}
@@ -251,12 +251,12 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   disabled={disabled}
                   placeholder="0"
                   className={clsx(
-                    "w-24 rounded-lg border border-default-300 pl-5 px-2 py-1.5 text-center text-sm flex-shrink-0",
+                    "w-24 rounded-lg border border-default-300 dark:border-gray-600 pl-5 px-2 py-1.5 text-center text-sm flex-shrink-0 text-default-900 dark:text-gray-100",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
-                    "disabled:bg-gray-100 disabled:cursor-not-allowed",
+                    "disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed",
                     entries[worker.id] && entries[worker.id] > 0
-                      ? "bg-white border-sky-400"
-                      : "bg-white"
+                      ? "bg-white dark:bg-gray-700 border-sky-400 dark:border-sky-500"
+                      : "bg-white dark:bg-gray-700"
                   )}
                 />
               </div>
@@ -266,16 +266,16 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       </div>
 
       {/* Total row with actions */}
-      <div className="flex items-center justify-between border-t border-default-200 px-4 py-3">
+      <div className="flex items-center justify-between border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
         <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-            <IconPackage className="text-green-600" size={20} />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+            <IconPackage className="text-green-600 dark:text-green-400" size={20} />
           </div>
           <div>
-            <div className="font-semibold text-default-900">
+            <div className="font-semibold text-default-900 dark:text-gray-100">
               Total Bags Packed
             </div>
-            <div className="text-xs text-default-500">
+            <div className="text-xs text-default-500 dark:text-gray-400">
               {new Date().toLocaleDateString("en-MY", {
                 weekday: "long",
                 day: "numeric",
@@ -284,18 +284,18 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
               })}
             </div>
           </div>
-          <div className="ml-4 pl-6 border-l border-default-300">
-            <p className="text-2xl font-bold text-default-900">
+          <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
+            <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
               {totalBags.toLocaleString()}{" "}
-              <span className="text-base font-normal text-default-500">
+              <span className="text-base font-normal text-default-500 dark:text-gray-400">
                 bags
               </span>
             </p>
           </div>
-          <div className="ml-4 pl-6 border-l border-default-300">
-            <p className="text-2xl font-bold text-default-900">
+          <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
+            <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
               {workingWorkersCount}{" "}
-              <span className="text-base font-normal text-default-500">
+              <span className="text-base font-normal text-default-500 dark:text-gray-400">
                 perkerja
               </span>
             </p>

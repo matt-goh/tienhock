@@ -1468,7 +1468,7 @@ const InvoiceListPage: React.FC = () => {
         {/* --- Combined Header and Filters --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
           {/* Title */}
-          <h1 className="text-2xl md:text-3xl font-semibold text-default-900 md:mr-4">
+          <h1 className="text-2xl md:text-3xl font-semibold text-default-900 dark:text-gray-100 md:mr-4">
             Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
           </h1>
 
@@ -1520,7 +1520,7 @@ const InvoiceListPage: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full h-[40px] pl-11 pr-10 bg-white border border-default-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm"
+                  className="w-full h-[40px] pl-11 pr-10 bg-white dark:bg-gray-800 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm dark:bg-gray-700 dark:text-gray-100"
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onBlur={handleSearchBlur}
@@ -1528,7 +1528,7 @@ const InvoiceListPage: React.FC = () => {
                 />
                 {searchTerm && (
                   <button
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700 dark:text-gray-200"
                     onClick={handleClearSearch}
                     title="Clear search"
                   >
@@ -1568,24 +1568,24 @@ const InvoiceListPage: React.FC = () => {
 
               {/* Filters info dropdown panel */}
               {isFilterButtonHovered && (
-                <div className="absolute z-30 mt-2 right-0 w-72 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
-                  <h3 className="font-semibold text-default-800 mb-2 border-b pb-1.5 border-default-100">
+                <div className="absolute z-30 mt-2 right-0 w-72 bg-white dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
+                  <h3 className="font-semibold text-default-800 dark:text-gray-100 mb-2 border-b pb-1.5 border-default-100">
                     {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
                   </h3>
                   {activeFilterCount === 0 ? (
-                    <div className="text-default-500 py-2 px-1">
+                    <div className="text-default-500 dark:text-gray-400 py-2 px-1">
                       No filters applied.
                     </div>
                   ) : (
                     <ul className="space-y-2">
                       {filters.salespersonId &&
                         filters.salespersonId.length > 0 && (
-                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                             <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
-                              <IconUser size={14} className="text-sky-600" />
+                              <IconUser size={14} className="text-sky-600 dark:text-sky-400" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <span className="text-default-500 text-xs">
+                              <span className="text-default-500 dark:text-gray-400 text-xs">
                                 Salesman
                               </span>
                               <div className="font-medium break-words">
@@ -1596,12 +1596,12 @@ const InvoiceListPage: React.FC = () => {
                         )}
 
                       {filters.customerId && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                           <div className="bg-sky-100 p-1 rounded-md mr-2 flex-shrink-0">
-                            <IconUser size={14} className="text-sky-600" />
+                            <IconUser size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <span className="text-default-500 text-xs">
+                            <span className="text-default-500 dark:text-gray-400 text-xs">
                               Customer
                             </span>
                             <div className="font-medium break-words">
@@ -1613,12 +1613,12 @@ const InvoiceListPage: React.FC = () => {
                       )}
 
                       {filters.paymentType && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                           <div className="bg-sky-100 p-1 rounded-md mr-2">
-                            <IconCash size={14} className="text-sky-600" />
+                            <IconCash size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div>
-                            <span className="text-default-500 text-xs">
+                            <span className="text-default-500 dark:text-gray-400 text-xs">
                               Payment Type
                             </span>
                             <div className="font-medium">
@@ -1637,15 +1637,15 @@ const InvoiceListPage: React.FC = () => {
                           filters.invoiceStatus.includes("Overdue") &&
                           filters.invoiceStatus.includes("cancelled")
                         ) && (
-                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                             <div className="bg-sky-100 p-1 rounded-md mr-2">
                               <IconCircleCheck
                                 size={14}
-                                className="text-sky-600"
+                                className="text-sky-600 dark:text-sky-400"
                               />
                             </div>
                             <div>
-                              <span className="text-default-500 text-xs">
+                              <span className="text-default-500 dark:text-gray-400 text-xs">
                                 Invoice Status
                               </span>
                               <div className="font-medium">
@@ -1663,15 +1663,15 @@ const InvoiceListPage: React.FC = () => {
 
                       {filters.eInvoiceStatus &&
                         filters.eInvoiceStatus.length > 0 && (
-                          <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                          <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                             <div className="bg-sky-100 p-1 rounded-md mr-2">
                               <IconFileInvoice
                                 size={14}
-                                className="text-sky-600"
+                                className="text-sky-600 dark:text-sky-400"
                               />
                             </div>
                             <div>
-                              <span className="text-default-500 text-xs">
+                              <span className="text-default-500 dark:text-gray-400 text-xs">
                                 E-Invoice Status
                               </span>
                               <div className="font-medium">
@@ -1689,12 +1689,12 @@ const InvoiceListPage: React.FC = () => {
                         )}
 
                       {filters.consolidation !== "all" && (
-                        <li className="text-default-700 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
                           <div className="bg-sky-100 p-1 rounded-md mr-2">
-                            <IconFiles size={14} className="text-sky-600" />
+                            <IconFiles size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div>
-                            <span className="text-default-500 text-xs">
+                            <span className="text-default-500 dark:text-gray-400 text-xs">
                               Consolidation
                             </span>
                             <div className="font-medium">
@@ -1731,7 +1731,7 @@ const InvoiceListPage: React.FC = () => {
             {/* Selection checkbox - now toggles all selection across pages */}
             <div className="relative">
               <button
-                className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
+                className="p-1 rounded-full transition-colors duration-200 hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleToggleSelectAll(e);
@@ -1743,7 +1743,7 @@ const InvoiceListPage: React.FC = () => {
                 }
               >
                 {selectedInvoiceIds.size > 0 ? (
-                  <IconSquareMinusFilled className="text-sky-600" size={20} />
+                  <IconSquareMinusFilled className="text-sky-600 dark:text-sky-400" size={20} />
                 ) : (
                   <IconSelectAll className="text-default-400" size={20} />
                 )}
@@ -1768,7 +1768,7 @@ const InvoiceListPage: React.FC = () => {
                 </span>
               ) : (
                 <span
-                  className="text-default-500 text-sm cursor-pointer"
+                  className="text-default-500 dark:text-gray-400 text-sm cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleToggleSelectAll(e);
@@ -1920,7 +1920,7 @@ const InvoiceListPage: React.FC = () => {
         <div className="flex-1 min-h-[400px] relative">
           {/* Loading Overlay */}
           {isLoading && (
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
+            <div className="absolute inset-0 bg-white dark:bg-gray-800/60 backdrop-blur-sm flex justify-center items-center z-20 rounded-lg">
               <LoadingSpinner />
             </div>
           )}
@@ -1932,7 +1932,7 @@ const InvoiceListPage: React.FC = () => {
           )}
           {/* No Results Message */}
           {!isLoading && !error && invoices.length === 0 && (
-            <div className="p-6 text-center text-default-500 bg-default-50 rounded-lg border border-dashed border-default-200">
+            <div className="p-6 text-center text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-default-200 dark:border-gray-700">
               No invoices found matching your criteria.
             </div>
           )}

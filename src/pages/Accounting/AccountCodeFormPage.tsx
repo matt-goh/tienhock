@@ -463,7 +463,7 @@ const AccountCodeFormPage: React.FC = () => {
                           className={clsx(
                             "relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                            isSaving ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""
+                            isSaving ? "bg-gray-50 text-gray-500 dark:text-gray-400 cursor-not-allowed" : ""
                           )}
                         >
                           <span className="block truncate">
@@ -500,7 +500,7 @@ const AccountCodeFormPage: React.FC = () => {
                             {/* Options - Scrollable Container */}
                             <div className="max-h-52 overflow-auto py-1">
                               {displayedParentOptions.length === 0 ? (
-                                <div className="py-2 px-3 text-sm text-gray-500">
+                                <div className="py-2 px-3 text-sm text-gray-500 dark:text-gray-400">
                                   No accounts found
                                 </div>
                               ) : (
@@ -510,7 +510,7 @@ const AccountCodeFormPage: React.FC = () => {
                                     className={({ active }) =>
                                       clsx(
                                         "relative cursor-pointer select-none py-2 pl-3 pr-10",
-                                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                                        active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                                       )
                                     }
                                     value={option.id.toString()}
@@ -598,7 +598,7 @@ const AccountCodeFormPage: React.FC = () => {
                   {/* System Account Indicator */}
                   {isSystem && (
                     <div className="flex items-center pt-8">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
                         System Account
                       </span>
                     </div>
@@ -623,7 +623,7 @@ const AccountCodeFormPage: React.FC = () => {
                     }
                     disabled={isSaving}
                     placeholder="Optional notes about this account..."
-                    className="block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 dark:text-gray-400 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>

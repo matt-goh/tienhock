@@ -749,14 +749,14 @@ const InvoiceFormPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Unified Card - All Sections Connected */}
-      <div className="bg-white rounded-lg border border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
         {/* Header */}
-        <div className="px-6 py-3 border-b border-default-200">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             <div className="flex items-center gap-4">
               <BackButton onClick={handleBackClick} disabled={isSaving} />
-              <div className="h-6 w-px bg-default-300"></div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 New Invoice
               </h1>
             </div>
@@ -779,7 +779,7 @@ const InvoiceFormPage: React.FC = () => {
         </div>
 
         {/* Invoice Header Fields */}
-        <div className="p-4 border-b border-default-200">
+        <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <InvoiceHeader
             invoice={invoiceData}
             onInputChange={handleHeaderInputChange}
@@ -798,9 +798,9 @@ const InvoiceFormPage: React.FC = () => {
         </div>
 
         {/* Line Items Section */}
-        <div className="p-4 border-b border-default-200">
+        <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold">Line Items</h2>
+            <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">Line Items</h2>
             <div>
               <Button
                 onClick={handleAddSubtotal}
@@ -864,9 +864,9 @@ const InvoiceFormPage: React.FC = () => {
                       size={20}
                     />
                   ) : (
-                    <IconSquare className="text-default-400" size={20} />
+                    <IconSquare className="text-default-400 dark:text-gray-500" size={20} />
                   )}
-                  <span className="ml-2 font-medium text-sm">
+                  <span className="ml-2 font-medium text-sm text-default-900 dark:text-gray-100">
                     {invoiceData?.paymenttype === "CASH"
                       ? "Cash Payment"
                       : "Mark as Paid"}
@@ -930,9 +930,9 @@ const InvoiceFormPage: React.FC = () => {
                 {submitAsEinvoice ? (
                   <IconSquareCheckFilled className="text-blue-600" size={20} />
                 ) : (
-                  <IconSquare className="text-default-400" size={20} />
+                  <IconSquare className="text-default-400 dark:text-gray-500" size={20} />
                 )}
-                <span className="ml-2 font-medium text-sm truncate">
+                <span className="ml-2 font-medium text-sm truncate text-default-900 dark:text-gray-100">
                   Submit e-Invoice upon saving
                 </span>
               </button>

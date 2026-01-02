@@ -36,54 +36,54 @@ const getInvoiceStatusStyles = (status: InvoiceStatus | undefined) => {
   switch (status?.toLowerCase()) {
     case "paid":
       return {
-        bg: "bg-green-100",
-        text: "text-green-800",
-        border: "border-green-200",
+        bg: "bg-green-100 dark:bg-green-900/30",
+        text: "text-green-800 dark:text-green-300",
+        border: "border-green-200 dark:border-green-700",
         label: "Paid",
       };
     case "cancelled":
       return {
-        bg: "bg-rose-100",
-        text: "text-rose-800",
-        border: "border-rose-200",
+        bg: "bg-rose-100 dark:bg-rose-900/30",
+        text: "text-rose-800 dark:text-rose-300",
+        border: "border-rose-200 dark:border-rose-700",
         label: "Cancelled",
       };
     case "overdue":
       return {
-        bg: "bg-red-100",
-        text: "text-red-800",
-        border: "border-red-200",
+        bg: "bg-red-100 dark:bg-red-900/30",
+        text: "text-red-800 dark:text-red-300",
+        border: "border-red-200 dark:border-red-700",
         label: "Overdue",
       };
     default: // Default to Unpaid style
       return {
-        bg: "bg-amber-100",
-        text: "text-amber-800",
-        border: "border-amber-200",
+        bg: "bg-amber-100 dark:bg-amber-900/30",
+        text: "text-amber-800 dark:text-amber-300",
+        border: "border-amber-200 dark:border-amber-700",
         label: "Unpaid", // Keep original label if needed
       };
   }
 };
 
-// Helper to get e-invoice status styles and icon (no changes)
+// Helper to get e-invoice status styles and icon
 const getEInvoiceStatusInfo = (status: EInvoiceStatus) => {
   switch (status) {
     case "valid":
-      return { text: "Valid", color: "text-green-600", icon: IconCircleCheck };
+      return { text: "Valid", color: "text-green-600 dark:text-green-400", icon: IconCircleCheck };
     case "pending":
       return {
         text: "Pending",
-        color: "text-yellow-600",
+        color: "text-yellow-600 dark:text-yellow-400",
         icon: IconClockHour4,
       };
     case "invalid":
       return {
         text: "Invalid",
-        color: "text-red-600",
+        color: "text-red-600 dark:text-red-400",
         icon: IconAlertTriangle,
       };
     case "cancelled":
-      return { text: "Cancelled", color: "text-rose-600", icon: IconBan };
+      return { text: "Cancelled", color: "text-rose-600 dark:text-rose-400", icon: IconBan };
     default:
       return null; // No status or 'null'
   }
@@ -97,8 +97,8 @@ const getConsolidatedStatusInfo = (consolidatedInfo: any) => {
 
   return {
     text: "Consolidated",
-    color: "text-indigo-600",
-    border: "border-indigo-200",
+    color: "text-indigo-600 dark:text-indigo-400",
+    border: "border-indigo-200 dark:border-indigo-700",
     icon: IconFiles,
     info: consolidatedInfo,
   };
@@ -150,10 +150,10 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
 
   return (
     <div
-      className={`relative border rounded-lg overflow-hidden bg-white transition-shadow duration-200 group
+      className={`relative border rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-shadow duration-200 group
         ${
           isSelected
-            ? "shadow-md ring-2 ring-blue-500 ring-offset-1"
+            ? "shadow-md ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1"
             : "shadow-sm hover:shadow-md"
         }
         ${invoiceStatusStyle.border}
@@ -195,7 +195,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
               />
             ) : (
               <IconSquare
-                className="text-default-400 group-hover:text-blue-500 transition-colors cursor-pointer" // Show selection intent color on hover
+                className="text-default-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors cursor-pointer" // Show selection intent color on hover
                 size={22}
               />
             )}
@@ -207,7 +207,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
       <div className="space-y-2">
         <p className="flex flex-col w-auto font-medium">
           <span
-            className="w-auto truncate text-default-800 hover:underline cursor-pointer"
+            className="w-auto truncate text-default-800 dark:text-gray-200 hover:underline cursor-pointer"
             title={`${invoice.customerName} (${invoice.customerid})`}
             onClick={(e) => {
               e.stopPropagation();
@@ -217,7 +217,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             {invoice.customerName || invoice.customerid}
           </span>
           <span
-            className="w-fit text-xs text-default-500 truncate hover:underline cursor-pointer"
+            className="w-fit text-xs text-default-500 dark:text-gray-400 truncate hover:underline cursor-pointer"
             title={invoice.salespersonid}
             onClick={(e) => {
               e.stopPropagation();
@@ -227,7 +227,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             {invoice.salespersonid}
           </span>
         </p>
-        <p className="w-fit text-lg font-semibold text-default-900">
+        <p className="w-fit text-lg font-semibold text-default-900 dark:text-gray-100">
           {`RM ${invoice.totalamountpayable.toFixed(2)}`}
         </p>
       </div>

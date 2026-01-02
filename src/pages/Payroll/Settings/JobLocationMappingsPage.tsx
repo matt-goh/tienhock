@@ -31,7 +31,7 @@ const SettingsTabs: React.FC = () => {
   ];
 
   return (
-    <div className="border-b border-default-200 mb-4">
+    <div className="border-b border-default-200 dark:border-gray-700 mb-4">
       <nav className="flex space-x-6" aria-label="Tabs">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
@@ -148,10 +148,10 @@ const JobLocationMappingsPage: React.FC = () => {
       {/* Header */}
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-xl font-semibold text-default-800">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Job Location Mappings
           </h1>
-          <p className="text-sm text-default-500 mt-1">
+          <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
             Map each job to a salary report location code. This determines how payroll amounts are grouped in the salary report.
           </p>
         </div>
@@ -198,7 +198,7 @@ const JobLocationMappingsPage: React.FC = () => {
           <input
             type="text"
             placeholder="Search job or location..."
-            className="w-full rounded-lg border border-default-300 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full rounded-lg border border-default-300 dark:border-gray-600 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -206,10 +206,10 @@ const JobLocationMappingsPage: React.FC = () => {
 
         {/* Location Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-default-600">Location:</span>
+          <span className="text-sm text-default-600 dark:text-gray-300">Location:</span>
           <Listbox value={filterLocation} onChange={setFilterLocation}>
             <div className="relative w-56">
-              <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
+              <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                 <span className="block truncate">
                   {filterLocation === "All"
                     ? "All Locations"
@@ -218,12 +218,12 @@ const JobLocationMappingsPage: React.FC = () => {
                     : `${filterLocation} - ${locationMap[filterLocation]}`}
                 </span>
               </ListboxButton>
-              <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                 <ListboxOption
                   value="All"
                   className={({ active }) =>
                     `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                      active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                      active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                     }`
                   }
                 >
@@ -233,7 +233,7 @@ const JobLocationMappingsPage: React.FC = () => {
                         All Locations
                       </span>
                       {selected && (
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                           <IconCheck size={16} />
                         </span>
                       )}
@@ -267,7 +267,7 @@ const JobLocationMappingsPage: React.FC = () => {
                     value={loc.code}
                     className={({ active }) =>
                       `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                        active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                        active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                       }`
                     }
                   >
@@ -277,7 +277,7 @@ const JobLocationMappingsPage: React.FC = () => {
                           {loc.name}
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                             <IconCheck size={16} />
                           </span>
                         )}
@@ -292,12 +292,12 @@ const JobLocationMappingsPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="mb-4 flex items-center gap-4 text-sm text-default-600">
+      <div className="mb-4 flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
         <span>
-          Total: <span className="font-medium text-default-900">{jobs.length}</span> jobs
+          Total: <span className="font-medium text-default-900 dark:text-gray-100">{jobs.length}</span> jobs
         </span>
         <span>
-          Showing: <span className="font-medium text-default-900">{filteredJobs.length}</span>
+          Showing: <span className="font-medium text-default-900 dark:text-gray-100">{filteredJobs.length}</span>
         </span>
         <span>
           Mapped: <span className="font-medium text-emerald-600">{jobs.length - unmappedCount}</span>
@@ -308,31 +308,31 @@ const JobLocationMappingsPage: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="overflow-x-auto rounded-lg border border-default-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-default-200">
-          <thead className="bg-default-100">
+      <div className="overflow-x-auto rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+        <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+          <thead className="bg-default-100 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 Job ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                 Job Name
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 w-80">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-80">
                 Salary Report Location
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-default-200 bg-white">
+          <tbody className="divide-y divide-default-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
             {filteredJobs.length > 0 ? (
               filteredJobs.map((job) => (
-                <tr key={job.id} className="hover:bg-default-50">
+                <tr key={job.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                   <td className="px-4 py-3 text-sm">
                     <span className="font-mono text-sky-700 font-medium">
                       {job.id}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-default-700">
+                  <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                     {job.name}
                   </td>
                   <td className="px-4 py-3 text-sm">
@@ -350,15 +350,15 @@ const JobLocationMappingsPage: React.FC = () => {
                           } ${isSaving === job.id ? "opacity-50 cursor-wait" : ""}`}
                         >
                           {isSaving === job.id ? (
-                            <span className="text-default-500">Saving...</span>
+                            <span className="text-default-500 dark:text-gray-400">Saving...</span>
                           ) : job.location_code ? (
                             <span className="flex items-center gap-2">
                               <IconMapPin size={14} className="text-emerald-600" />
-                              <span className="font-mono text-default-700">
+                              <span className="font-mono text-default-700 dark:text-gray-200">
                                 {job.location_code}
                               </span>
-                              <span className="text-default-500">-</span>
-                              <span className="text-default-600">{job.location_name}</span>
+                              <span className="text-default-500 dark:text-gray-400">-</span>
+                              <span className="text-default-600 dark:text-gray-300">{job.location_name}</span>
                             </span>
                           ) : (
                             <span className="text-amber-600 flex items-center gap-2">
@@ -367,14 +367,14 @@ const JobLocationMappingsPage: React.FC = () => {
                             </span>
                           )}
                         </ListboxButton>
-                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                           {locationOptions.map((loc) => (
                             <ListboxOption
                               key={loc.code}
                               value={loc.code}
                               className={({ active }) =>
                                 `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                                  active ? "bg-sky-100 text-sky-900" : "text-gray-900"
+                                  active ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200" : "text-gray-900 dark:text-gray-100"
                                 }`
                               }
                             >
@@ -388,7 +388,7 @@ const JobLocationMappingsPage: React.FC = () => {
                                     {loc.name}
                                   </span>
                                   {selected && (
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                                       <IconCheck size={16} />
                                     </span>
                                   )}
@@ -404,7 +404,7 @@ const JobLocationMappingsPage: React.FC = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="px-6 py-10 text-center text-sm text-default-500">
+                <td colSpan={3} className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400">
                   No jobs found.{" "}
                   {searchTerm || filterLocation !== "All"
                     ? "Try adjusting your filters."

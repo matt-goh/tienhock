@@ -809,11 +809,11 @@ const InvoiceFormPage: React.FC = () => {
     return (
       <div className="container mx-auto px-4">
         <BackButton onClick={handleBackClick} className="ml-5" />
-        <div className="bg-white rounded-lg p-6 border border-rose-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-rose-200 shadow-sm">
           <h2 className="text-xl font-semibold text-rose-700 mb-4">
             Error Loading Invoice
           </h2>
-          <p className="text-default-600 mb-4">{error}</p>
+          <p className="text-default-600 dark:text-gray-300 mb-4">{error}</p>
           <Button onClick={handleBackClick} variant="outline" color="secondary">
             Go Back
           </Button>
@@ -839,20 +839,20 @@ const InvoiceFormPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow border border-default-200">
-        <div className="p-6 border-b border-default-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-default-200 dark:border-gray-700">
+        <div className="p-6 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
             <div>
-              <h1 className="text-xl font-semibold text-default-900">
+              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode
                   ? `Edit Invoice ${
                       formData.invoice_number ? `(#${formData.invoice_number})` : ""
                     }`
                   : "Create New Invoice"}
               </h1>
-              <p className="mt-1 text-sm text-default-500">
+              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode ? "Update invoice info." : "Fill in the details."}
               </p>
             </div>
@@ -865,11 +865,11 @@ const InvoiceFormPage: React.FC = () => {
             <div className="space-y-2">
               <label
                 htmlFor="invoice_number"
-                className="block text-sm font-medium text-default-700"
+                className="block text-sm font-medium text-default-700 dark:text-gray-200"
               >
                 Invoice Number
                 {!isEditMode && (
-                  <span className="text-sm font-normal text-default-500 ml-1">
+                  <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
                     (optional - auto-generated if empty)
                   </span>
                 )}
@@ -923,7 +923,7 @@ const InvoiceFormPage: React.FC = () => {
             <div className="space-y-2">
               <label
                 htmlFor="date_issued"
-                className="block text-sm font-medium text-default-700"
+                className="block text-sm font-medium text-default-700 dark:text-gray-200"
               >
                 Invoice Date <span className="text-red-500">*</span>
               </label>
@@ -969,23 +969,23 @@ const InvoiceFormPage: React.FC = () => {
           {formData.type === "regular" && (
             <div className="mt-6">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-default-700">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                   Select Rentals <span className="text-red-500">*</span>
-                  <span className="text-sm font-normal text-default-500 ml-1">
+                  <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
                     (Click to select multiple rentals)
                   </span>
                 </label>
 
                 {!formData.customer_id ? (
-                  <div className="p-4 border border-default-300 rounded-lg bg-gray-50 text-gray-500 text-center">
+                  <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
                     Select customer first
                   </div>
                 ) : availableRentals.length === 0 ? (
-                  <div className="p-4 border border-default-300 rounded-lg bg-gray-50 text-gray-500 text-center">
+                  <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
                     No available rentals found for this customer
                   </div>
                 ) : (
-                  <div className="border border-default-300 rounded-lg divide-y divide-default-200 max-h-80 overflow-y-auto">
+                  <div className="border border-default-300 dark:border-gray-600 rounded-lg divide-y divide-default-200 dark:divide-gray-700 max-h-80 overflow-y-auto">
                     {availableRentals.map((rental) => {
                       const isSelected = selectedRentals.some(
                         (r) => r.rental_id === rental.rental_id
@@ -1021,7 +1021,7 @@ const InvoiceFormPage: React.FC = () => {
                               <div className="flex items-center">
                                 {isSelected ? (
                                   <IconSquareCheckFilled
-                                    className="text-sky-600"
+                                    className="text-sky-600 dark:text-sky-400"
                                     size={20}
                                   />
                                 ) : (
@@ -1032,11 +1032,11 @@ const InvoiceFormPage: React.FC = () => {
                                 )}
                               </div>
                               <div>
-                                <div className="font-medium text-gray-900">
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
                                   Rental #{rental.rental_id} - Dumpster{" "}
                                   {rental.tong_no}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                   Placed:{" "}
                                   {new Date(
                                     rental.date_placed
@@ -1067,7 +1067,7 @@ const InvoiceFormPage: React.FC = () => {
 
                 {selectedRentals.length > 0 && (
                   <div className="mt-4">
-                    <div className="text-sm font-medium text-default-700 mb-2">
+                    <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
                       Selected Rentals ({selectedRentals.length})
                     </div>
                     <div className="space-y-2">
@@ -1078,7 +1078,7 @@ const InvoiceFormPage: React.FC = () => {
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <div className="font-medium text-gray-900">
+                              <div className="font-medium text-gray-900 dark:text-gray-100">
                                 Rental #{rental.rental_id} - Dumpster{" "}
                                 {rental.tong_no}
                               </div>
@@ -1104,7 +1104,7 @@ const InvoiceFormPage: React.FC = () => {
                                 )}
                               </div>
                               {rental.location_address && (
-                                <div className="text-sm text-gray-500 mt-1">
+                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                   Location: {rental.location_address}
                                 </div>
                               )}
@@ -1139,12 +1139,12 @@ const InvoiceFormPage: React.FC = () => {
               <div className="space-y-2">
                 <label
                   htmlFor="amount_before_tax"
-                  className="block text-sm font-medium text-default-700"
+                  className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Amount (Excl. Tax) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 text-sm">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
                     RM
                   </span>
                   <input
@@ -1170,12 +1170,12 @@ const InvoiceFormPage: React.FC = () => {
               <div className="space-y-2">
                 <label
                   htmlFor="tax_amount"
-                  className="block text-sm font-medium text-default-700"
+                  className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
                   Tax Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 text-sm">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
                     RM
                   </span>
                   <input
@@ -1194,17 +1194,17 @@ const InvoiceFormPage: React.FC = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-default-700">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                   Total Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 text-sm">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
                     RM
                   </span>
                   <input
                     type="text"
                     value={totalAmount.toFixed(2)}
-                    className="w-full pl-10 pr-3 py-1.5 border border-default-300 rounded-lg bg-gray-100 font-medium text-default-700 cursor-default"
+                    className="w-full pl-10 pr-3 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-100 font-medium text-default-700 dark:text-gray-200 cursor-default"
                     readOnly
                     tabIndex={-1}
                   />
@@ -1220,16 +1220,16 @@ const InvoiceFormPage: React.FC = () => {
                     >
                       {isPaid ? (
                         <IconSquareCheckFilled
-                          className="text-sky-600 group-hover:text-sky-700"
+                          className="text-sky-600 dark:text-sky-400 group-hover:text-sky-700"
                           size={20}
                         />
                       ) : (
                         <IconSquare
-                          className="text-default-400 group-hover:text-default-500"
+                          className="text-default-400 group-hover:text-default-500 dark:text-gray-400"
                           size={20}
                         />
                       )}
-                      <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900">
+                      <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-200 group-hover:text-default-900 dark:text-gray-100">
                         Mark as Paid
                       </span>
                     </button>
@@ -1249,7 +1249,7 @@ const InvoiceFormPage: React.FC = () => {
                 <div className="space-y-2">
                   <label
                     htmlFor="pm-paid"
-                    className="block text-sm font-medium text-default-700"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
                     Method <span className="text-red-500">*</span>
                   </label>
@@ -1297,7 +1297,7 @@ const InvoiceFormPage: React.FC = () => {
                                   "relative cursor-default select-none py-2 pl-3 pr-10",
                                   active
                                     ? "bg-sky-100 text-sky-900"
-                                    : "text-gray-900"
+                                    : "text-gray-900 dark:text-gray-100"
                                 )
                               }
                               value={o.id.toString()}
@@ -1313,7 +1313,7 @@ const InvoiceFormPage: React.FC = () => {
                                     {o.name}
                                   </span>
                                   {selected && (
-                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600">
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
                                       <IconCheck size={20} />
                                     </span>
                                   )}
@@ -1331,7 +1331,7 @@ const InvoiceFormPage: React.FC = () => {
                   <div className="space-y-2">
                     <label
                       htmlFor="payment_reference"
-                      className="block text-sm font-medium text-default-700"
+                      className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
                       {paymentMethod === "cheque" ? "Cheque No" : "Reference"}{" "}
                     </label>
@@ -1366,16 +1366,16 @@ const InvoiceFormPage: React.FC = () => {
                     >
                       {submitAsEinvoice ? (
                         <IconSquareCheckFilled
-                          className="text-sky-600 group-hover:text-sky-700"
+                          className="text-sky-600 dark:text-sky-400 group-hover:text-sky-700"
                           size={20}
                         />
                       ) : (
                         <IconSquare
-                          className="text-default-400 group-hover:text-default-500"
+                          className="text-default-400 group-hover:text-default-500 dark:text-gray-400"
                           size={20}
                         />
                       )}
-                      <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900">
+                      <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-200 group-hover:text-default-900 dark:text-gray-100">
                         Submit e-Invoice upon saving
                       </span>
                     </button>
@@ -1392,7 +1392,7 @@ const InvoiceFormPage: React.FC = () => {
                     onClick={() =>
                       navigate(`/greentarget/customers/${formData.customer_id}`)
                     }
-                    className="text-sm text-default-500 hover:text-sky-800 hover:underline focus:outline-none"
+                    className="text-sm text-default-500 dark:text-gray-400 hover:text-sky-800 hover:underline focus:outline-none"
                     title="Add TIN & ID or phone number for customer"
                   >
                     Cannot submit e-Invoice. Customer missing TIN & ID or phone
@@ -1404,7 +1404,7 @@ const InvoiceFormPage: React.FC = () => {
           )}
 
           {/* Action Buttons */}
-          <div className="mt-8 pt-5 border-t border-default-200 flex justify-end">
+          <div className="mt-8 pt-5 border-t border-default-200 dark:border-gray-700 flex justify-end">
             <Button
               type="button"
               variant="outline"
@@ -1463,8 +1463,8 @@ const InfoItem: React.FC<{
   value: string | number | null | undefined;
   highlight?: boolean;
 }> = ({ label, value, highlight = false }) => (
-  <div className="bg-default-50 p-3 rounded-lg border border-default-100">
-    <div className="text-xs text-default-500 mb-1">{label}</div>
+  <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+    <div className="text-xs text-default-500 dark:text-gray-400 mb-1">{label}</div>
     <div
       className={clsx(
         "font-medium truncate",

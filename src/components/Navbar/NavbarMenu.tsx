@@ -106,8 +106,8 @@ export default function NavbarMenu({
               flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium
               transition-all duration-150 active:scale-[0.98]
               ${isActive
-                ? "bg-sky-100 text-sky-700"
-                : "text-default-700 hover:bg-default-100"
+                ? "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                : "text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
               }
             `}
           >
@@ -149,8 +149,8 @@ export default function NavbarMenu({
             flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium
             transition-colors duration-150
             ${isActive
-              ? "bg-sky-100 text-sky-700"
-              : "text-default-700 hover:bg-default-100"
+              ? "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+              : "text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
             }
           `}
         >

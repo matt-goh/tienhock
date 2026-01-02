@@ -144,7 +144,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
 
   // Size-based classes
   const buttonClasses = clsx(
-    "rounded-lg border border-default-300 transition-colors flex items-center justify-center",
+    "rounded-lg border border-default-300 dark:border-gray-600 transition-colors flex items-center justify-center",
     size === "sm" ? "p-1.5" : "p-2",
     fixedHeight && (size === "sm" ? "h-[34px]" : "h-[40px]")
   );
@@ -152,7 +152,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   const iconSize = size === "sm" ? 16 : 20;
 
   const displayClasses = clsx(
-    "flex-1 rounded-lg border border-default-300 text-center font-medium text-default-900 transition-colors whitespace-nowrap flex items-center justify-center",
+    "flex-1 rounded-lg border border-default-300 dark:border-gray-600 text-center font-medium text-default-900 dark:text-gray-100 transition-colors whitespace-nowrap flex items-center justify-center",
     size === "sm" ? "px-3 text-xs" : "px-4 text-sm",
     fixedHeight ? (size === "sm" ? "h-[34px]" : "h-[40px]") : (size === "sm" ? "py-1.5" : "py-2")
   );
@@ -163,7 +163,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   return (
     <div className={clsx("space-y-2", className)}>
       {label && (
-        <label className="block text-sm font-medium text-default-700">
+        <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
           {label}
         </label>
       )}
@@ -171,7 +171,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
         {/* Previous Month Button */}
         <button
           onClick={() => navigateMonth("prev")}
-          className={clsx(buttonClasses, "text-default-600 hover:bg-default-50")}
+          className={clsx(buttonClasses, "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700")}
           title="Previous month"
           aria-label="Previous month"
         >
@@ -180,7 +180,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
 
         {/* Month Display - Clickable when full month is not selected OR not on current month */}
         {isFullMonthSelected && isCurrentMonth ? (
-          <div className={clsx(displayClasses, "bg-default-50")}>
+          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-900/50")}>
             {displayFormatter(selectedMonth)}
           </div>
         ) : (
@@ -188,7 +188,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
             onClick={handleMonthDisplayClick}
             className={clsx(
               displayClasses,
-              "bg-default-50 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700 cursor-pointer"
+              "bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-700 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
             title={
               !isFullMonthSelected
@@ -210,8 +210,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
           className={clsx(
             buttonClasses,
             isNextDisabled
-              ? "cursor-not-allowed text-default-300"
-              : "text-default-600 hover:bg-default-50"
+              ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
           )}
           title="Next month"
           aria-label="Next month"
@@ -229,8 +229,8 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
             className={clsx(
               buttonClasses,
               isCurrentMonth
-                ? "cursor-not-allowed text-default-300"
-                : "text-default-600 hover:bg-default-50"
+                ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+                : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
             )}
           >
             <IconChevronsRight size={iconSize} />

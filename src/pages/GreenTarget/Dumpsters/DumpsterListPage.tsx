@@ -291,7 +291,7 @@ const DumpsterListPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl text-default-700 font-bold">
+        <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold">
           Dumpsters ({filteredDumpsters.length})
         </h1>
         <div className="flex space-x-3">
@@ -311,7 +311,7 @@ const DumpsterListPage: React.FC = () => {
           <div className="w-48">
             <Listbox value={statusFilter} onChange={setStatusFilter}>
               <div className="relative">
-                <ListboxButton className="w-full rounded-full border border-default-300 bg-white py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
+                <ListboxButton className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
                   <span className="pl-2 block truncate">
                     {statusFilter === "All"
                       ? "All Statuses"
@@ -328,7 +328,7 @@ const DumpsterListPage: React.FC = () => {
                     />
                   </span>
                 </ListboxButton>
-                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
                   <ListboxOption
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
@@ -349,7 +349,7 @@ const DumpsterListPage: React.FC = () => {
                           All Statuses
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                             <IconCheck className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
@@ -376,7 +376,7 @@ const DumpsterListPage: React.FC = () => {
                           Available
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                             <IconCheck className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
@@ -403,7 +403,7 @@ const DumpsterListPage: React.FC = () => {
                           Rented
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                             <IconCheck className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
@@ -430,7 +430,7 @@ const DumpsterListPage: React.FC = () => {
                           Maintenance
                         </span>
                         {selected && (
-                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600">
+                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
                             <IconCheck className="h-5 w-5" aria-hidden="true" />
                           </span>
                         )}
@@ -452,30 +452,30 @@ const DumpsterListPage: React.FC = () => {
       </div>
 
       {/* Availability Calendar */}
-      <div className="bg-white rounded-lg border border-default-200 overflow-hidden shadow-sm mb-6">
-        <div className="border-b border-default-200 px-4 py-3 flex justify-between items-center bg-default-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden shadow-sm mb-6">
+        <div className="border-b border-default-200 dark:border-gray-700 px-4 py-3 flex justify-between items-center bg-default-50 dark:bg-gray-900/50">
           <div className="flex items-center">
-            <IconCalendar size={18} className="text-default-500 mr-2" />
-            <h3 className="font-medium text-default-900">
+            <IconCalendar size={18} className="text-default-500 dark:text-gray-400 mr-2" />
+            <h3 className="font-medium text-default-900 dark:text-gray-100">
               Dumpster Availability Timeline
             </h3>
           </div>
 
           {/* Navigation buttons */}
           <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-3 bg-white border border-default-200 px-3 py-1 rounded-full shadow-sm">
+            <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 px-3 py-1 rounded-full shadow-sm">
               <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-              <span className="text-sm text-default-600">Available</span>
+              <span className="text-sm text-default-600 dark:text-gray-300">Available</span>
 
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-              <span className="text-sm text-default-600">Rented</span>
+              <span className="text-sm text-default-600 dark:text-gray-300">Rented</span>
 
               <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
-              <span className="text-sm text-default-600">Maintenance</span>
+              <span className="text-sm text-default-600 dark:text-gray-300">Maintenance</span>
             </div>
 
             <div className="flex items-center">
-              <div className="text-sm font-medium text-default-700 mr-2">
+              <div className="text-sm font-medium text-default-700 dark:text-gray-200 mr-2">
                 {startDate.toLocaleDateString("en-US", {
                   month: "long",
                   year: "numeric",
@@ -484,17 +484,17 @@ const DumpsterListPage: React.FC = () => {
               <div className="flex space-x-1">
                 <button
                   onClick={() => navigatePeriod("prev")}
-                  className="p-1.5 rounded-full hover:bg-default-100"
+                  className="p-1.5 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800"
                   title="Previous two weeks"
                 >
-                  <IconChevronLeft size={16} className="text-default-700" />
+                  <IconChevronLeft size={16} className="text-default-700 dark:text-gray-200" />
                 </button>
                 <button
                   onClick={() => navigatePeriod("next")}
-                  className="p-1.5 rounded-full hover:bg-default-100"
+                  className="p-1.5 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800"
                   title="Next two weeks"
                 >
-                  <IconChevronRight size={16} className="text-default-700" />
+                  <IconChevronRight size={16} className="text-default-700 dark:text-gray-200" />
                 </button>
               </div>
             </div>
@@ -502,7 +502,7 @@ const DumpsterListPage: React.FC = () => {
         </div>
 
         {filteredDumpsters.length === 0 ? (
-          <div className="p-8 text-center text-default-500">
+          <div className="p-8 text-center text-default-500 dark:text-gray-400">
             No dumpsters match your search criteria.
           </div>
         ) : (
@@ -514,7 +514,7 @@ const DumpsterListPage: React.FC = () => {
               }}
             >
               {/* Header Row: Dates */}
-              <div className="bg-default-50 py-2 px-2 sticky left-0 z-10 text-sm font-medium text-default-600 border-b border-r border-default-200">
+              <div className="bg-default-50 dark:bg-gray-900/50 py-2 px-2 sticky left-0 z-10 text-sm font-medium text-default-600 dark:text-gray-300 border-b border-r border-default-200 dark:border-gray-700">
                 Dumpster
               </div>
               {dateRange.map((date, index) => {
@@ -612,7 +612,7 @@ const DumpsterListPage: React.FC = () => {
         {tooltipData &&
           createPortal(
             <div
-              className="fixed z-[9999] bg-white border border-default-200 shadow-lg rounded-lg p-3 transform -translate-x-1/2 -translate-y-full"
+              className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-3 transform -translate-x-1/2 -translate-y-full"
               style={{
                 top: `${tooltipData.position.top}px`,
                 left: `${tooltipData.position.left}px`,
@@ -650,7 +650,7 @@ const DumpsterListPage: React.FC = () => {
                           : "Under Maintenance"}
                       </span>
                     </div>
-                    <span className="text-xs text-default-500">
+                    <span className="text-xs text-default-500 dark:text-gray-400">
                       {formatDetailDate(
                         tooltipData.date.toISOString().split("T")[0]
                       )}
@@ -658,7 +658,7 @@ const DumpsterListPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="font-medium text-default-800">
+                <div className="font-medium text-default-800 dark:text-gray-100">
                   Dumpster: {tooltipData.dumpster.tong_no}
                 </div>
 
@@ -670,7 +670,7 @@ const DumpsterListPage: React.FC = () => {
                           size={16}
                           className="mt-0.5 text-default-400 shrink-0"
                         />
-                        <span className="text-default-700">
+                        <span className="text-default-700 dark:text-gray-200">
                           {tooltipData.status.rental.customer_name}
                         </span>
                       </div>
@@ -681,7 +681,7 @@ const DumpsterListPage: React.FC = () => {
                             size={16}
                             className="mt-0.5 text-default-400 shrink-0"
                           />
-                          <span className="text-default-600 text-sm">
+                          <span className="text-default-600 dark:text-gray-300 text-sm">
                             {tooltipData.status.rental.location_address}
                           </span>
                         </div>
@@ -693,14 +693,14 @@ const DumpsterListPage: React.FC = () => {
                           className="mt-0.5 text-default-400 shrink-0"
                         />
                         <div className="flex flex-col">
-                          <span className="text-default-600 text-sm">
+                          <span className="text-default-600 dark:text-gray-300 text-sm">
                             Placed:{" "}
                             {formatDetailDate(
                               tooltipData.status.rental.date_placed
                             )}
                           </span>
                           {tooltipData.status.rental.date_picked ? (
-                            <span className="text-default-600 text-sm">
+                            <span className="text-default-600 dark:text-gray-300 text-sm">
                               Pickup:{" "}
                               {formatDetailDate(
                                 tooltipData.status.rental.date_picked
@@ -719,14 +719,14 @@ const DumpsterListPage: React.FC = () => {
                           size={16}
                           className="mt-0.5 text-default-400 shrink-0"
                         />
-                        <span className="text-default-600 text-sm">
+                        <span className="text-default-600 dark:text-gray-300 text-sm">
                           Driver: {tooltipData.status.rental.driver}
                         </span>
                       </div>
 
                       <div className="flex justify-end pt-1.5">
                         <button
-                          className="text-sm text-sky-600 hover:text-sky-800 font-medium"
+                          className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 font-medium"
                           onClick={() => {
                             navigate(
                               `/greentarget/rentals/${tooltipData.status.rental?.rental_id}`
@@ -747,9 +747,9 @@ const DumpsterListPage: React.FC = () => {
 
       {/* Pagination Controls */}
       {filteredDumpsters.length > ITEMS_PER_PAGE && (
-        <div className="mt-6 flex justify-between items-center text-default-700">
+        <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
           <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
@@ -785,7 +785,7 @@ const DumpsterListPage: React.FC = () => {
             })}
           </div>
           <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 active:bg-default-200"
+            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
