@@ -42,32 +42,6 @@ interface LocationOrderItem {
   text?: string;
 }
 
-const LOCATION_ORDER: LocationOrderItem[] = [
-  { type: "location", id: "01" },
-  { type: "location", id: "02" },
-  { type: "location", id: "03" },
-  { type: "location", id: "04" },
-  { type: "location", id: "06" },
-  { type: "location", id: "07" },
-  { type: "location", id: "08" },
-  { type: "location", id: "09" },
-  { type: "location", id: "10" },
-  { type: "location", id: "11" },
-  { type: "location", id: "13" },
-  { type: "header", text: "KERJA LUAR MAINTENANCE" },
-  { type: "location", id: "14" },
-  { type: "header", text: "COMMISSION" },
-  { type: "location", id: "16" },
-  { type: "location", id: "17" },
-  { type: "location", id: "18" },
-  { type: "location", id: "19" },
-  { type: "location", id: "20" },
-  { type: "location", id: "21" },
-  { type: "location", id: "22" },
-  { type: "location", id: "23" },
-  { type: "location", id: "24" },
-];
-
 interface SalaryReportData {
   no: number;
   staff_id: string;
@@ -213,6 +187,63 @@ const SalaryReportPage: React.FC = () => {
       map[loc.id] = loc.name;
     });
     return map;
+  }, [locations]);
+
+  // Build LOCATION_ORDER dynamically from database locations
+  const LOCATION_ORDER: LocationOrderItem[] = useMemo(() => {
+    if (locations.length === 0) return [];
+
+    const orderStructure: LocationOrderItem[] = [];
+
+    const addLocation = (id: string) => {
+      if (locations.find((loc) => loc.id === id)) {
+        orderStructure.push({ type: "location", id });
+      }
+    };
+
+    // Build order based on existing structure
+    // Directors & Office
+    addLocation("01");
+    addLocation("02");
+    addLocation("03");
+    addLocation("04");
+    addLocation("06");
+    addLocation("07");
+    addLocation("08");
+    addLocation("09");
+    addLocation("10");
+    addLocation("11");
+    addLocation("13");
+
+    // Maintenance section
+    if (locations.find((loc) => loc.id === "14")) {
+      orderStructure.push({ type: "header", text: "KERJA LUAR MAINTENANCE" });
+      addLocation("14");
+    }
+
+    // Commission section
+    const commissionLocs = ["16", "17", "18", "19", "20", "21"];
+    if (commissionLocs.some((id) => locations.find((loc) => loc.id === id))) {
+      orderStructure.push({ type: "header", text: "COMMISSION" });
+      commissionLocs.forEach(addLocation);
+    }
+
+    // Other locations
+    addLocation("22");
+    addLocation("23");
+    addLocation("24");
+
+    // Add any new locations not in the predefined list (at the end)
+    locations.forEach((loc) => {
+      const alreadyAdded = orderStructure.some(
+        (item) => item.type === "location" && item.id === loc.id
+      );
+      if (!alreadyAdded) {
+        orderStructure.push({ type: "location", id: loc.id });
+      }
+    });
+
+    return orderStructure;
   }, [locations]);
 
   // Bank table data - now comes directly from API
@@ -665,8 +696,10 @@ const SalaryReportPage: React.FC = () => {
                   <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
                     {locationNumber}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left">
-                    {locationName}
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[100px]">
+                    <span className="block truncate" title={locationName}>
+                      {locationName}
+                    </span>
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(locationData?.totals.gaji || 0)}
@@ -1013,54 +1046,46 @@ const SalaryReportPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Salary Report
-        </h1>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <YearNavigator
-            selectedYear={currentYear}
-            onChange={handleYearChange}
-            showGoToCurrentButton={false}
-            label="Year"
-          />
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={setSelectedMonth}
-            showGoToCurrentButton={false}
-            label="Month"
-            formatDisplay={(date) =>
-              date.toLocaleDateString("en-MY", { month: "long" })
-            }
-          />
-          {reportData && (
-            <div className="flex items-end pb-2">
-              <div className="text-sm text-default-600 dark:text-gray-300">
-                <div className="font-medium">
-                  Total: {reportData.total_records} employees
-                </div>
-                <div className="font-medium">
-                  Grand Total: {formatCurrency(reportData.summary.total_final)}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
+    <div className="space-y-3">
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
-              {getMonthName(currentMonth)} {currentYear} Salary Report
-            </h2>
-            <div className="flex space-x-3">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
+                Salary Report
+              </h2>
+              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              <div className="flex items-center gap-2">
+                <YearNavigator
+                  selectedYear={currentYear}
+                  onChange={handleYearChange}
+                  showGoToCurrentButton={false}
+                />
+                <MonthNavigator
+                  selectedMonth={selectedMonth}
+                  onChange={setSelectedMonth}
+                  showGoToCurrentButton={false}
+                  formatDisplay={(date) =>
+                    date.toLocaleDateString("en-MY", { month: "long" })
+                  }
+                />
+              </div>
+              {reportData && (
+                <>
+                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
+                    <span className="font-medium">
+                      {reportData.total_records} employees
+                    </span>
+                    <span className="font-medium">
+                      Total: {formatCurrency(reportData.summary.total_final)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={fetchSalaryReport}
                 icon={IconRefresh}
@@ -1070,63 +1095,61 @@ const SalaryReportPage: React.FC = () => {
               >
                 Refresh
               </Button>
-              <div className="flex space-x-2">
-                <Button
-                  onClick={() => generatePDF("print")}
-                  icon={IconPrinter}
-                  color="green"
-                  variant="outline"
-                  disabled={
-                    !reportData ||
-                    reportData.data.length === 0 ||
-                    isGeneratingPDF
-                  }
-                  size="sm"
-                >
-                  Print
-                </Button>
-                <Button
-                  onClick={() => generatePDF("download")}
-                  icon={IconDownload}
-                  color="blue"
-                  variant="outline"
-                  disabled={
-                    !reportData ||
-                    reportData.data.length === 0 ||
-                    isGeneratingPDF
-                  }
-                  size="sm"
-                >
-                  Download
-                </Button>
-                {activeTab === 1 && (
-                  <>
-                    <Button
-                      onClick={generateTextExport}
-                      icon={IconFileExport}
-                      color="purple"
-                      variant="outline"
-                      disabled={
-                        !reportData ||
-                        reportData.data.length === 0 ||
-                        isGeneratingExport
-                      }
-                      size="sm"
-                    >
-                      Export
-                    </Button>
-                    <Button
-                      onClick={() => setShowExportDialog(true)}
-                      icon={IconLink}
-                      color="orange"
-                      variant="outline"
-                      size="sm"
-                    >
-                      Export Link
-                    </Button>
-                  </>
-                )}
-              </div>
+              <Button
+                onClick={() => generatePDF("print")}
+                icon={IconPrinter}
+                color="green"
+                variant="outline"
+                disabled={
+                  !reportData ||
+                  reportData.data.length === 0 ||
+                  isGeneratingPDF
+                }
+                size="sm"
+              >
+                Print
+              </Button>
+              <Button
+                onClick={() => generatePDF("download")}
+                icon={IconDownload}
+                color="blue"
+                variant="outline"
+                disabled={
+                  !reportData ||
+                  reportData.data.length === 0 ||
+                  isGeneratingPDF
+                }
+                size="sm"
+              >
+                Download
+              </Button>
+              {activeTab === 1 && (
+                <>
+                  <Button
+                    onClick={generateTextExport}
+                    icon={IconFileExport}
+                    color="purple"
+                    variant="outline"
+                    disabled={
+                      !reportData ||
+                      reportData.data.length === 0 ||
+                      isGeneratingExport
+                    }
+                    size="sm"
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    onClick={() => setShowExportDialog(true)}
+                    icon={IconLink}
+                    color="orange"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Export Link
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

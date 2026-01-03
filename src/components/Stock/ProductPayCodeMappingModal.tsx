@@ -303,14 +303,14 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                   </DialogTitle>
                   <button
                     onClick={handleClose}
-                    className="text-default-400 hover:text-default-600"
+                    className="text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
                     disabled={isProcessing}
                   >
                     <IconX size={20} />
                   </button>
                 </div>
 
-                <p className="text-sm text-default-500 mb-4">
+                <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
                   Map products to pay codes for production entry payroll
                   calculations.
                 </p>
@@ -322,21 +322,21 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     {/* Left Panel - Products */}
-                    <div className="border border-default-200 rounded-lg overflow-hidden">
-                      <div className="bg-default-50 px-3 py-2 border-b border-default-200">
-                        <div className="flex items-center gap-2 text-sm font-medium text-default-700">
+                    <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                      <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                        <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                           <IconPackage size={16} />
                           Products
                         </div>
                         <div className="relative mt-2">
                           <IconSearch
                             size={16}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
                           />
                           <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
                             value={productSearch}
                             onChange={(e) => setProductSearch(e.target.value)}
                           />
@@ -345,11 +345,11 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
                       <div className="max-h-[400px] overflow-y-auto">
                         {filteredProducts.length === 0 ? (
-                          <div className="py-4 text-center text-sm text-default-500">
+                          <div className="py-4 text-center text-sm text-default-500 dark:text-gray-400">
                             No products found
                           </div>
                         ) : (
-                          <ul className="divide-y divide-default-100">
+                          <ul className="divide-y divide-default-100 dark:divide-gray-600">
                             {filteredProducts.map((product) => {
                               const mappingCount = getMappingCount(product.id);
                               const isSelected =
@@ -359,17 +359,17 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                   key={product.id}
                                   className={`px-3 py-2 cursor-pointer transition-colors ${
                                     isSelected
-                                      ? "bg-sky-50 shadow-[inset_3px_0_0_0_#0ea5e9]"
-                                      : "hover:bg-default-50"
+                                      ? "bg-sky-50 dark:bg-sky-900/30 shadow-[inset_3px_0_0_0_#0ea5e9]"
+                                      : "hover:bg-default-50 dark:hover:bg-gray-700"
                                   }`}
                                   onClick={() => setSelectedProduct(product)}
                                 >
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <div className="font-medium text-sm text-default-800">
+                                      <div className="font-medium text-sm text-default-800 dark:text-gray-100">
                                         {product.id}
                                       </div>
-                                      <div className="text-xs text-default-500 truncate max-w-[200px]">
+                                      <div className="text-xs text-default-500 dark:text-gray-400 truncate max-w-[200px]">
                                         {product.description}
                                       </div>
                                     </div>
@@ -377,14 +377,14 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                       <span
                                         className={`px-1.5 py-0.5 text-xs rounded ${
                                           product.type === "MEE"
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-blue-100 text-blue-700"
+                                            ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                         }`}
                                       >
                                         {product.type}
                                       </span>
                                       {mappingCount > 0 && (
-                                        <span className="text-xs bg-default-100 text-default-600 px-1.5 py-0.5 rounded">
+                                        <span className="text-xs bg-default-100 text-default-600 dark:bg-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded">
                                           {mappingCount}
                                         </span>
                                       )}
@@ -399,16 +399,16 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                     </div>
 
                     {/* Right Panel - Pay Codes */}
-                    <div className="border border-default-200 rounded-lg overflow-hidden">
-                      <div className="bg-default-50 px-3 py-2 border-b border-default-200">
+                    <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                      <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                         <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium text-default-700">
+                          <div className="text-sm font-medium text-default-700 dark:text-gray-200">
                             {selectedProduct
                               ? `Pay Codes for ${selectedProduct.id}`
                               : "Select a product"}
                           </div>
                           {selectedProduct && (
-                            <span className="text-xs text-default-500">
+                            <span className="text-xs text-default-500 dark:text-gray-400">
                               {selectedPayCodeIds.size} selected
                             </span>
                           )}
@@ -417,12 +417,12 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                           <div className="relative mt-2">
                             <IconSearch
                               size={16}
-                              className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400"
+                              className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
                             />
                             <input
                               type="text"
                               placeholder="Search pay codes..."
-                              className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
                               value={payCodeSearch}
                               onChange={(e) => setPayCodeSearch(e.target.value)}
                             />
@@ -432,31 +432,31 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
                       <div className="max-h-[400px] overflow-y-auto">
                         {!selectedProduct ? (
-                          <div className="py-10 text-center text-sm text-default-500">
+                          <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
                             <IconPackage
                               size={32}
-                              className="mx-auto mb-2 text-default-300"
+                              className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                             />
                             Select a product to manage its pay codes
                           </div>
                         ) : filteredPayCodes.length === 0 ? (
-                          <div className="py-4 text-center text-sm text-default-500">
+                          <div className="py-4 text-center text-sm text-default-500 dark:text-gray-400">
                             No pay codes available for this product type
                           </div>
                         ) : (
-                          <ul className="divide-y divide-default-100">
+                          <ul className="divide-y divide-default-100 dark:divide-gray-600">
                             {/* Header for saved section */}
                             {savedPayCodesCount > 0 && (
-                              <li className="px-3 py-1.5 bg-green-50 text-xs text-green-700 font-medium">
+                              <li className="px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-xs text-green-700 dark:text-green-300 font-medium">
                                 Mapped Pay Codes ({savedPayCodesCount})
                               </li>
                             )}
                             {filteredPayCodes.map((payCode, index) => {
                               const status = getPayCodeStatus(payCode.id);
                               const statusStyles = {
-                                saved: 'bg-green-50 border-l-2 border-green-400',
-                                new: 'bg-sky-50 border-l-2 border-sky-400',
-                                removing: 'bg-red-50 border-l-2 border-red-300 opacity-60',
+                                saved: 'bg-green-50 dark:bg-green-900/20 border-l-2 border-green-400',
+                                new: 'bg-sky-50 dark:bg-sky-900/20 border-l-2 border-sky-400',
+                                removing: 'bg-red-50 dark:bg-red-900/20 border-l-2 border-red-300 opacity-60',
                                 none: '',
                               };
                               const showSeparator = savedPayCodesCount > 0 && index === savedPayCodesCount;
@@ -464,12 +464,12 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                               return (
                                 <React.Fragment key={payCode.id}>
                                   {showSeparator && (
-                                    <li className="px-3 py-1.5 bg-default-100 text-xs text-default-500 font-medium border-t border-default-200">
+                                    <li className="px-3 py-1.5 bg-default-100 dark:bg-gray-700 text-xs text-default-500 dark:text-gray-400 font-medium border-t border-default-200 dark:border-gray-600">
                                       Available Pay Codes ({filteredPayCodes.length - savedPayCodesCount})
                                     </li>
                                   )}
                                   <li
-                                    className={`px-3 py-2 hover:bg-default-100 cursor-pointer transition-colors select-none ${statusStyles[status]}`}
+                                    className={`px-3 py-2 hover:bg-default-100 dark:hover:bg-gray-700 cursor-pointer transition-colors select-none ${statusStyles[status]}`}
                                     onClick={() => handleTogglePayCode(payCode.id)}
                                   >
                                     <div className="flex items-start gap-3">
@@ -483,21 +483,21 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                         />
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <div className={`font-medium text-sm ${status === 'removing' ? 'line-through text-default-400' : 'text-default-800'}`}>
+                                        <div className={`font-medium text-sm ${status === 'removing' ? 'line-through text-default-400 dark:text-gray-500' : 'text-default-800 dark:text-gray-100'}`}>
                                           {payCode.id}
                                         </div>
-                                        <div className="text-xs text-default-500 truncate">
+                                        <div className="text-xs text-default-500 dark:text-gray-400 truncate">
                                           {payCode.description}
                                         </div>
-                                        <div className="text-xs text-default-400 mt-0.5">
+                                        <div className="text-xs text-default-400 dark:text-gray-500 mt-0.5">
                                           RM{payCode.rate_biasa.toFixed(2)}/bag
                                         </div>
                                       </div>
                                       {status !== 'none' && (
                                         <span className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-full whitespace-nowrap ${
-                                          status === 'saved' ? 'bg-green-100 text-green-700' :
-                                          status === 'new' ? 'bg-sky-100 text-sky-700' :
-                                          'bg-red-100 text-red-600'
+                                          status === 'saved' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
+                                          status === 'new' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300' :
+                                          'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300'
                                         }`}>
                                           {status === 'saved' && <><IconCheck size={12} /> Saved</>}
                                           {status === 'new' && <><IconPlus size={12} /> New</>}
@@ -521,26 +521,26 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                   <div className="text-sm">
                     {hasChanges && selectedProduct ? (
                       <div className="flex items-center gap-3">
-                        <span className="text-amber-600 font-medium">
+                        <span className="text-amber-600 dark:text-amber-400 font-medium">
                           Pending changes for {selectedProduct.id}:
                         </span>
                         {changesSummary.toAdd > 0 && (
-                          <span className="flex items-center gap-1 text-sky-600">
+                          <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400">
                             <IconPlus size={14} /> {changesSummary.toAdd} to add
                           </span>
                         )}
                         {changesSummary.toRemove > 0 && (
-                          <span className="flex items-center gap-1 text-red-500">
+                          <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
                             <IconMinus size={14} /> {changesSummary.toRemove} to remove
                           </span>
                         )}
                       </div>
                     ) : selectedProduct ? (
-                      <span className="text-green-600 flex items-center gap-1">
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                         <IconCheck size={14} /> All changes saved
                       </span>
                     ) : (
-                      <span className="text-default-400">Select a product to manage mappings</span>
+                      <span className="text-default-400 dark:text-gray-500">Select a product to manage mappings</span>
                     )}
                   </div>
                   <div className="flex space-x-3">
