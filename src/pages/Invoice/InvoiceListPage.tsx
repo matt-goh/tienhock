@@ -1436,38 +1436,30 @@ const InvoiceListPage: React.FC = () => {
 
   // --- Render ---
   return (
-    <div className="space-y-4">
-      <div className="space-y-4">
+    <div className="space-y-3">
+      <div className="space-y-3">
         {/* --- Combined Header and Filters --- */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
-          {/* Title */}
-          <h1 className="text-2xl md:text-3xl font-semibold text-default-900 dark:text-gray-100 md:mr-4">
-            Invoices {totalItems > 0 && !isLoading && `(${totalItems})`}
-          </h1>
-
-          {/* Filters and Actions Container */}
-          <div className="flex flex-col xl:flex-row xl:items-center gap-2 w-full md:flex-1 md:justify-end">
-            {/* Left Group: Date Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap sm:flex-nowrap w-full xl:w-auto">
-              {/* Date Range Picker */}
-              <div className="w-full sm:w-auto">
-                <DateRangePicker
-                  dateRange={{
-                    start: filters.dateRange.start || new Date(),
-                    end: filters.dateRange.end || new Date(),
-                  }}
-                  onDateChange={handleDateChange}
-                />
-              </div>
-
-              {/* Date Navigation */}
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-3 flex-shrink-0">
+          {/* Left: Count + Title + Date Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
+              {totalItems > 0 && !isLoading ? `${totalItems} ` : ""}Invoices
+            </h1>
+            <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+            <DateRangePicker
+              dateRange={{
+                start: filters.dateRange.start || new Date(),
+                end: filters.dateRange.end || new Date(),
+              }}
+              onDateChange={handleDateChange}
+            />
+            <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+            <div className="flex items-center gap-1">
               <DateNavigator
                 selectedDate={filters.dateRange.start || new Date()}
                 onChange={handleDateNavigatorChange}
                 showGoToTodayButton={false}
               />
-
-              {/* Month Navigator */}
               <MonthNavigator
                 selectedMonth={selectedMonth}
                 onChange={handleMonthChange}
@@ -1478,53 +1470,54 @@ const InvoiceListPage: React.FC = () => {
                 }}
               />
             </div>
+          </div>
 
-            {/* Right Group: Search and Main Filters */}
-            <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
-              {/* Search Input */}
-              <div
-                className="relative flex-1 w-full sm:w-auto"
-                title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
-              >
-                <IconSearch
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-500 pointer-events-none"
-                  size={18}
-                />
-                <input
-                  type="text"
-                  placeholder="Search"
-                  className="w-full h-[40px] pl-11 pr-10 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  onBlur={handleSearchBlur}
-                  onKeyDown={handleSearchKeyDown}
-                />
-                {searchTerm && (
-                  <button
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
-                    onClick={handleClearSearch}
-                    title="Clear search"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
+          {/* Right: Search and Filters */}
+          <div className="flex flex-wrap items-center gap-2 h-10">
+            {/* Search Input */}
+            <div
+              className="relative w-full sm:w-48 h-10"
+              title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
+            >
+              <IconSearch
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-500 pointer-events-none"
+                size={16}
+              />
+              <input
+                type="text"
+                placeholder="Search"
+                className="w-full h-10 pl-9 pr-8 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onBlur={handleSearchBlur}
+                onKeyDown={handleSearchKeyDown}
+              />
+              {searchTerm && (
+                <button
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
+                  onClick={handleClearSearch}
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
 
-              {/* Salesman Filter */}
-              <div className="w-full sm:w-40">
-                <StyledListbox
-                  value={selectedSalesmanId}
-                  onChange={handleSalesmanChange}
-                  options={salesmanOptions}
-                  placeholder="All Salesmen"
-                  rounded="lg"
-                  className="h-[40px]"
-                />
-              </div>
+            {/* Salesman Filter */}
+            <div className="w-full sm:w-36 h-10">
+              <StyledListbox
+                value={selectedSalesmanId}
+                onChange={handleSalesmanChange}
+                options={salesmanOptions}
+                placeholder="All Salesmen"
+                rounded="lg"
+                className="h-10"
+              />
+            </div>
 
-              {/* Filter Menu Button */}
-              <div className="relative w-full sm:w-auto sm:flex-shrink-0">
-                <InvoiceFilterMenu
+            {/* Filter Menu Button */}
+            <div className="relative w-full sm:w-auto sm:flex-shrink-0 h-10">
+              <InvoiceFilterMenu
                   currentFilters={filters}
                   onFilterChange={handleApplyFilters}
                   salesmanOptions={salesmen.map((s) => ({
@@ -1683,7 +1676,6 @@ const InvoiceListPage: React.FC = () => {
                     )}
                   </div>
                 )}
-              </div>
             </div>
           </div>
         </div>
