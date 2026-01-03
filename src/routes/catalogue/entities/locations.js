@@ -71,9 +71,9 @@ export default function (pool) {
         [id]
       );
 
-      // Check staffs assigned to this location
+      // Check staffs assigned to this location (location is stored as text or JSONB)
       const staffsResult = await pool.query(
-        `SELECT id, name FROM staffs WHERE location = $1`,
+        `SELECT id, name FROM staffs WHERE location::text = $1 OR location::text = '"' || $1 || '"'`,
         [id]
       );
 
@@ -141,9 +141,9 @@ export default function (pool) {
             [newId, id]
           );
 
-          // Update staffs
+          // Update staffs (location is stored as text or JSONB)
           await client.query(
-            "UPDATE staffs SET location = $1 WHERE location = $2",
+            "UPDATE staffs SET location = $1 WHERE location::text = $2 OR location::text = '\"' || $2 || '\"'",
             [newId, id]
           );
 
@@ -189,7 +189,8 @@ export default function (pool) {
 
   // Delete locations (with dependency check)
   router.delete("/", async (req, res) => {
-    const locationIds = req.body;
+    // Handle both { locations: [...] } format (from api.delete) and direct array
+    const locationIds = req.body.locations || req.body;
 
     if (!Array.isArray(locationIds) || locationIds.length === 0) {
       return res.status(400).json({ message: "No location IDs provided" });
@@ -216,9 +217,9 @@ export default function (pool) {
           [id]
         );
 
-        // Check staffs
+        // Check staffs (location is stored as text or JSONB)
         const staffsResult = await pool.query(
-          `SELECT id, name FROM staffs WHERE location = $1`,
+          `SELECT id, name FROM staffs WHERE location::text = $1 OR location::text = '"' || $1 || '"'`,
           [id]
         );
 
