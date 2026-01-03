@@ -76,6 +76,11 @@ import greenTargetInvoiceRouter from "./greentarget/invoices.js";
 import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
 import greenTargetDashboardRouter from "./greentarget/dashboard.js";
+import greenTargetPayrollEmployeesRouter from "./greentarget/payroll-employees.js";
+import greenTargetMonthlyPayrollsRouter from "./greentarget/monthly-payrolls.js";
+import greenTargetMonthlyWorkLogsRouter from "./greentarget/monthly-work-logs.js";
+import greenTargetDriverTripsRouter from "./greentarget/driver-trips.js";
+import greenTargetEmployeePayrollsRouter from "./greentarget/employee-payrolls.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -193,6 +198,23 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/einvoice",
     greenTargetEInvoiceRouter(pool, myInvoisGTConfig)
+  );
+  app.use(
+    "/greentarget/api/payroll-employees",
+    greenTargetPayrollEmployeesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/monthly-payrolls",
+    greenTargetMonthlyPayrollsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/monthly-work-logs",
+    greenTargetMonthlyWorkLogsRouter(pool)
+  );
+  app.use("/greentarget/api/driver-trips", greenTargetDriverTripsRouter(pool));
+  app.use(
+    "/greentarget/api/employee-payrolls",
+    greenTargetEmployeePayrollsRouter(pool)
   );
 
   // Jellypolly routes
