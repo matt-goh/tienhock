@@ -6,6 +6,7 @@ import {
   IconTrash,
   IconSearch,
   IconMapPin,
+  IconHelp,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -60,17 +61,19 @@ const LocationPage: React.FC = () => {
   } | null>(null);
 
   // Fetch job mappings summary
-  useEffect(() => {
-    const fetchJobMappings = async () => {
-      try {
-        const response = await api.get("/api/locations/job-mappings");
-        setJobMappingsData(response);
-      } catch (err) {
-        console.error("Error fetching job mappings:", err);
-      }
-    };
-    fetchJobMappings();
+  const fetchJobMappings = useCallback(async () => {
+    try {
+      const response = await api.get("/api/locations/job-mappings");
+      setJobMappingsData(response);
+    } catch (err) {
+      console.error("Error fetching job mappings:", err);
+    }
   }, []);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchJobMappings();
+  }, [fetchJobMappings]);
 
   // Merge locations with job data
   const locationsWithJobs = useMemo<LocationWithJobs[]>(() => {
@@ -224,6 +227,20 @@ const LocationPage: React.FC = () => {
           <span className="text-sm text-default-500 dark:text-gray-400">
             ({locations.length})
           </span>
+          {/* Help Tooltip */}
+          <div className="relative group">
+            <IconHelp
+              size={18}
+              className="text-default-400 dark:text-gray-500 hover:text-sky-500 dark:hover:text-sky-400 cursor-help transition-colors"
+            />
+            <div className="absolute left-0 top-full mt-2 w-72 p-3 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <p className="font-medium mb-1">Location Management</p>
+              <p className="text-gray-300 dark:text-gray-200">
+                Locations organize payroll data in salary reports. Edit a location to assign jobs to it. Mapped jobs appear under the correct location in salary reports and journal vouchers.
+              </p>
+              <div className="absolute -top-1.5 left-2 w-3 h-3 bg-gray-900 dark:bg-gray-700 rotate-45"></div>
+            </div>
+          </div>
         </div>
 
         <div className="flex w-full items-center gap-2 md:w-auto">
@@ -349,6 +366,7 @@ const LocationPage: React.FC = () => {
         isOpen={showModal}
         onClose={handleModalClose}
         onSave={handleSaveLocation}
+        onComplete={fetchJobMappings}
         initialData={locationToEdit}
         existingLocations={locations}
       />
