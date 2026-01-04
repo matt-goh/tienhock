@@ -573,7 +573,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                     <TabList className="flex space-x-1 rounded-lg bg-default-100 dark:bg-gray-700 p-1 mb-4">
                       <Tab
                         className={({ selected }) =>
-                          `w-full rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
+                          `flex-1 rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
                             selected
                               ? "bg-white dark:bg-gray-600 text-sky-700 dark:text-sky-400 shadow"
                               : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
@@ -585,7 +585,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                       </Tab>
                       <Tab
                         className={({ selected }) =>
-                          `w-full rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
+                          `flex-1 rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
                             selected
                               ? "bg-white dark:bg-gray-600 text-emerald-700 dark:text-emerald-400 shadow"
                               : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
@@ -598,15 +598,20 @@ const LocationModal: React.FC<LocationModalProps> = ({
                       {isEditing && (
                         <Tab
                           className={({ selected }) =>
-                            `w-full rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
+                            `px-3 rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-1 ${
                               selected
                                 ? "bg-white dark:bg-gray-600 text-amber-700 dark:text-amber-400 shadow"
                                 : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
                             }`
                           }
+                          title="Exclusions"
                         >
-                          <IconUserMinus size={16} />
-                          Exclusions ({exclusions.length})
+                          <IconUserMinus size={18} />
+                          {exclusions.length > 0 && (
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center text-xs bg-amber-500 text-white rounded-full">
+                              {exclusions.length}
+                            </span>
+                          )}
                         </Tab>
                       )}
                     </TabList>
@@ -930,9 +935,9 @@ const LocationModal: React.FC<LocationModalProps> = ({
                               one.
                             </p>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-5 gap-4">
                             {/* Left Panel - Current Exclusions */}
-                            <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                            <div className="col-span-3 border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
                               <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                                 <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                                   <IconUserMinus size={16} />
@@ -1001,7 +1006,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
                             </div>
 
                             {/* Right Panel - Add Exclusion */}
-                            <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                            <div className="col-span-2 border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
                               <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                                 <div className="flex items-center justify-between">
                                   <div className="text-sm font-medium text-default-700 dark:text-gray-200">
