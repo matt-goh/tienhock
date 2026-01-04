@@ -225,11 +225,11 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-4xl transform rounded-2xl bg-white p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200">
+              <DialogPanel className="w-full max-w-4xl transform rounded-2xl bg-white dark:bg-default-900 p-0 text-left align-middle shadow-xl transition-all">
+                <div className="px-6 py-4 border-b border-default-200 dark:border-default-700">
                   <DialogTitle
                     as="h3"
-                    className="text-xl font-semibold text-default-800"
+                    className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
                     Record Staff {incentiveType}
                   </DialogTitle>
@@ -250,21 +250,21 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                   <table className="min-w-full">
                     <thead>
                       <tr>
-                        <th className={`py-2 text-left font-medium text-default-600 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
+                        <th className={`py-2 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
                           Staff
                         </th>
                         {incentiveType === "Commission" && (
-                          <th className="py-2 px-3 text-left font-medium text-default-600 w-1/4">
+                          <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/4">
                             Location
                           </th>
                         )}
-                        <th className="py-2 px-3 text-left font-medium text-default-600 w-1/6">
+                        <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
                           Amount (RM)
                         </th>
-                        <th className={`py-2 px-3 text-left font-medium text-default-600 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
+                        <th className={`py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
                           Description
                         </th>
-                        <th className="py-2 text-left font-medium text-default-600"></th>
+                        <th className="py-2 text-left font-medium text-default-600 dark:text-default-400"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -350,7 +350,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center mt-6 border-t border-default-200 pt-6">
+                  <div className="flex justify-between items-center mt-6 border-t border-default-200 dark:border-default-700 pt-6">
                     <Button
                       variant="outline"
                       onClick={addEntryRow}

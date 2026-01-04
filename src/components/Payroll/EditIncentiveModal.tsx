@@ -151,15 +151,15 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-default-900 p-0 text-left align-middle shadow-xl transition-all">
+                <div className="px-6 py-4 border-b border-default-200 dark:border-default-700">
                   <DialogTitle
                     as="h3"
-                    className="text-xl font-semibold text-default-800"
+                    className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
                     Edit Incentive
                   </DialogTitle>
-                  <p className="text-sm text-default-600 mt-1">
+                  <p className="text-sm text-default-600 dark:text-default-400 mt-1">
                     Employee: {incentive.employee_name} ({incentive.employee_id}
                     )
                   </p>
@@ -209,7 +209,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 pt-6">
+                  <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 dark:border-default-700 pt-6">
                     <Button
                       variant="outline"
                       onClick={handleClose}
