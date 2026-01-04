@@ -40,13 +40,16 @@ const StyledListbox: React.FC<StyledListboxProps> = ({
   const selectedOption = options.find((option) => option.id === value);
   const displayValue = selectedOption?.name ?? placeholder;
   const roundedClass = rounded === "full" ? "rounded-full" : "rounded-lg";
-  const sizeClasses = size === "sm" ? "h-[34px] py-1.5 text-sm" : "py-2";
+  const sizeClasses = size === "sm" ? "h-[34px] py-1.5 text-sm" : "h-10 py-2";
+
+  // Extract height class from className if provided
+  const hasCustomHeight = className.includes("h-");
 
   return (
-    <div className={className}>
+    <div className={`${hasCustomHeight ? "" : "h-10"} ${className}`}>
       <Listbox value={value} onChange={onChange}>
-        <div className="relative">
-          <ListboxButton className={`w-full ${roundedClass} ${sizeClasses} border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500 h-[40px]`}>
+        <div className="relative h-full">
+          <ListboxButton className={`w-full h-full ${roundedClass} ${hasCustomHeight ? "" : sizeClasses} border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500`}>
             <span className="block truncate">{displayValue}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
               <IconChevronDown

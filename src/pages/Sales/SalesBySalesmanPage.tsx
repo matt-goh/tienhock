@@ -336,7 +336,7 @@ const SalesBySalesmanPage: React.FC = () => {
   if (error) {
     return (
       <div className="w-full p-6">
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-lg p-4 text-rose-700 dark:text-rose-300">
           {error}
         </div>
       </div>
@@ -346,7 +346,7 @@ const SalesBySalesmanPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Summary section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Summary</h2>
@@ -429,7 +429,7 @@ const SalesBySalesmanPage: React.FC = () => {
       ) : (
         <>
           {/* Detailed salesman sales table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
             <h2 className="text-lg font-semibold mb-4">
               Salesman Performance Details
             </h2>
@@ -562,7 +562,7 @@ const SalesBySalesmanPage: React.FC = () => {
           {/* Dashboard content */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Top Salesmen Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Top Performing Salesmen
               </h2>
@@ -602,7 +602,7 @@ const SalesBySalesmanPage: React.FC = () => {
             </div>
 
             {/* Average Sale per Bill */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Average Sale per Bill
               </h2>
@@ -648,7 +648,7 @@ const SalesBySalesmanPage: React.FC = () => {
           </div>
 
           {/* Sales Trend Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">
                 Salesmen's Sales Trends Over Time

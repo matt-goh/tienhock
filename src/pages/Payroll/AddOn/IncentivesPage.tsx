@@ -28,9 +28,36 @@ interface Incentive {
   description: string;
   created_by: string;
   created_at: string;
+  location_code: string | null;
+  location_name: string | null;
 }
 
 const IncentivesPage: React.FC = () => {
+  // Get initial values from URL params or defaults
+  const getInitialYear = (): number => {
+    const params = new URLSearchParams(window.location.search);
+    const yearParam = params.get("year");
+    if (yearParam) {
+      const year = parseInt(yearParam, 10);
+      if (!isNaN(year) && year >= 2000 && year <= 2100) {
+        return year;
+      }
+    }
+    return new Date().getFullYear();
+  };
+
+  const getInitialMonth = (): number => {
+    const params = new URLSearchParams(window.location.search);
+    const monthParam = params.get("month");
+    if (monthParam) {
+      const month = parseInt(monthParam, 10);
+      if (!isNaN(month) && month >= 1 && month <= 12) {
+        return month;
+      }
+    }
+    return new Date().getMonth() + 1;
+  };
+
   // State
   const [incentives, setIncentives] = useState<Incentive[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,15 +71,24 @@ const IncentivesPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Filters
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  // Filters - initialize from URL params
+  const [currentYear, setCurrentYear] = useState(getInitialYear);
+  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
 
   // Create Date object for MonthNavigator
   const selectedMonth = useMemo(
     () => new Date(currentYear, currentMonth - 1, 1),
     [currentYear, currentMonth]
   );
+
+  // Update URL when year/month changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("year", currentYear.toString());
+    params.set("month", currentMonth.toString());
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, "", newUrl);
+  }, [currentYear, currentMonth]);
 
   // Load incentives on mount and filter changes
   useEffect(() => {
@@ -204,6 +240,9 @@ const IncentivesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Name
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
+                    Location
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Amount
                   </th>
@@ -229,6 +268,15 @@ const IncentivesPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                       {incentive.employee_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
+                      {incentive.location_code ? (
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                          {incentive.location_code} - {incentive.location_name || "Unknown"}
+                        </span>
+                      ) : (
+                        <span className="text-default-400 dark:text-gray-500">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
                       {formatCurrency(incentive.amount)}

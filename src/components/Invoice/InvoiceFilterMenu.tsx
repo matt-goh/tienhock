@@ -193,7 +193,7 @@ const InvoiceFilterMenu: React.FC<InvoiceFilterMenuProps> = ({
         onClick={() => setIsOpen(true)} // Changed to just set open, not toggle
         icon={IconFilter}
         variant="outline"
-        className="relative w-full md:w-auto rounded-lg h-[40px]"
+        className="relative w-full md:w-auto rounded-lg h-10"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >

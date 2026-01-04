@@ -55,7 +55,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (59 tables)
+#### Database Schema (69 tables)
 
 **Accounting & Finance:**
 - `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by
@@ -99,6 +99,7 @@ This is a comprehensive ERP system supporting three companies:
 - `job_pay_codes` - id, job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `locations` - id, name
 - `sections` - id, name
+- `employee_job_location_exclusions` - id, employee_id, job_id, location_code, reason, created_at, created_by (excludes employee-job combinations from appearing in specific location salary reports)
 
 **Payroll:**
 - `pay_codes` - id, description, pay_type, rate_unit, rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, created_at, updated_at
@@ -109,7 +110,7 @@ This is a comprehensive ERP system supporting three companies:
 - `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
 - `pinjam_records` - id, employee_id, year, month, amount, description, pinjam_type, created_by, created_at, updated_at
-- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at
+- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus)
 
 **Statutory Rates:**
 - `epf_rates` - id, employee_type, wage_threshold, employee_rate_percentage, employer_rate_percentage, employer_fixed_amount, is_active, created_at, updated_at
@@ -137,6 +138,17 @@ This is a comprehensive ERP system supporting three companies:
 - `banks` - id, name
 - `nationalities` - id, name
 - `races` - id, name
+
+**Green Target Payroll (greentarget schema):**
+- `greentarget.payroll_employees` - id, employee_id, job_type, date_added, is_active, notes
+- `greentarget.monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
+- `greentarget.employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping
+- `greentarget.payroll_items` - id, employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, created_at, job_type, source_employee_id, source_date, work_log_id, work_log_type
+- `greentarget.payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
+- `greentarget.monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at
+- `greentarget.monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
+- `greentarget.monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, rate_used, calculated_amount, is_manually_added, created_at
+- `greentarget.driver_trips` - id, driver_id, year, month, trip_count, completed_rental_ids, auto_calculated, notes, created_at, updated_at
 
 ### Styling
 - Tailwind CSS with custom color palette

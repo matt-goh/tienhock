@@ -724,8 +724,8 @@ const CustomerFormPage: React.FC = () => {
         {/* Wrap form in a div to handle potential saving overlay */}
         <div className="relative">
           {isSaving && (
-            <div className="absolute inset-0 bg-white dark:bg-gray-800/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
-              <div className="flex items-center space-x-3 bg-white dark:bg-gray-700 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 dark:border-gray-600">
+            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-b-lg">
+              <div className="flex items-center space-x-3 bg-white dark:bg-gray-700 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-600">
                 <LoadingSpinner hideText />
                 <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                   Saving customer...
@@ -738,7 +738,7 @@ const CustomerFormPage: React.FC = () => {
             onSubmit={handleSubmit} // No need for preventDefault here if button type is submit
             noValidate // Prevent browser default validation
           >
-            <div className="p-6">
+            <div className="px-6 py-3">
               <Tab labels={["Info", "Credit & Pricing"]}>
                 {/* === First tab - Customer Info === */}
                 <div className="space-y-6 mt-5">
@@ -907,7 +907,7 @@ const CustomerFormPage: React.FC = () => {
                             }
                           }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 dark:disabled:bg-gray-800"
+                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-800"
                           disabled={isSaving}
                         />
                       </div>
@@ -949,7 +949,7 @@ const CustomerFormPage: React.FC = () => {
                             }
                           }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 dark:disabled:bg-gray-800"
+                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-800"
                           disabled={isSaving}
                         />
                       </div>
@@ -958,7 +958,7 @@ const CustomerFormPage: React.FC = () => {
                         <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                           Available Credit
                         </label>
-                        <div className="px-3 py-2 border border-default-200 dark:border-gray-700 dark:border-gray-600 rounded-md bg-default-100 dark:bg-gray-700 h-[42px] flex items-center">
+                        <div className="px-3 py-2 border border-default-200 dark:border-gray-600 rounded-md bg-default-100 dark:bg-gray-700 h-[42px] flex items-center">
                           {/* Match height */}
                           <span className="font-medium text-default-700 dark:text-gray-200">
                             {formData.credit_limit === 0
@@ -975,7 +975,7 @@ const CustomerFormPage: React.FC = () => {
                     {/* Credit Usage Bar (only if limit > 0) */}
                     {(formData.credit_limit ?? 0) > 0 && (
                       <div className="mt-4">
-                        <div className="flex justify-between text-xs text-default-600 dark:text-gray-300 dark:text-gray-400 mb-1">
+                        <div className="flex justify-between text-xs text-default-600 dark:text-gray-400 mb-1">
                           <span>Usage</span>
                           <span>
                             {Number(formData.credit_used ?? 0).toFixed(2)} /{" "}

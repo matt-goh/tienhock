@@ -234,6 +234,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   ];
   const isCombinedPayroll = uniqueJobTypes.length > 1;
 
+  // Derive employee-to-job-types mapping from actual payroll items
+  // This handles cases where one employee ID works on multiple job types
+  const derivedEmployeeJobMapping = payroll.items.reduce((acc, item) => {
+    const empId = item.source_employee_id || payroll.employee_id;
+    if (empId && item.job_type) {
+      if (!acc[empId]) {
+        acc[empId] = new Set<string>();
+      }
+      acc[empId].add(item.job_type);
+    }
+    return acc;
+  }, {} as Record<string, Set<string>>);
+
   // Group items by job type first, then by pay type for combined payrolls
   const itemsByJob = isCombinedPayroll
     ? uniqueJobTypes.reduce((acc, jobType) => {
@@ -530,15 +543,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
                   Employee
                 </p>
-                {payroll.employee_job_mapping &&
-                Object.keys(payroll.employee_job_mapping).length > 1 ? (
+                {isCombinedPayroll && Object.keys(derivedEmployeeJobMapping).length > 0 ? (
                   <>
                     <p className="font-semibold text-default-800 dark:text-gray-100">
                       {payroll.employee_name || "Unknown"}
                     </p>
                     <div className="mt-2 space-y-1">
-                      {Object.entries(payroll.employee_job_mapping).map(
-                        ([empId, jobType]) => (
+                      {Object.entries(derivedEmployeeJobMapping).map(
+                        ([empId, jobTypesSet]) => (
                           <div
                             key={empId}
                             className="flex items-center text-sm"
@@ -551,7 +563,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </Link>
                             <span className="mx-2 text-default-300 dark:text-gray-600">→</span>
                             <span className="text-default-600 dark:text-gray-300">
-                              {jobType as string}
+                              {Array.from(jobTypesSet).join(", ")}
                             </span>
                           </div>
                         )
@@ -596,10 +608,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
                     payroll.payroll_status === "CONFIRMED"
-                      ? "bg-green-100 text-green-800"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
                       : payroll.payroll_status === "PENDING"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-default-100 text-default-800"
+                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                      : "bg-default-100 text-default-800 dark:bg-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {payroll.payroll_status}
