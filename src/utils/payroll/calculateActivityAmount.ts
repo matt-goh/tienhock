@@ -43,11 +43,17 @@ export function calculateActivityAmount(
           calculatedAmount = multiplyMoney(activity.rate, overtimeHours);
         }
       } else {
-        // Non-OT pay codes: use only regular hours (exclude OT hours)
-        // Saturday threshold: 5 hours, Other days: 8 hours
-        const overtimeThreshold = getOvertimeThreshold(logDate);
-        const regularHours = Math.min(hours, overtimeThreshold);
-        calculatedAmount = multiplyMoney(activity.rate, regularHours);
+        // Non-OT pay codes
+        if (activity.hoursApplied !== undefined && activity.hoursApplied !== null) {
+          // Monthly entry: use the explicitly provided hours directly
+          calculatedAmount = multiplyMoney(activity.rate, activity.hoursApplied);
+        } else {
+          // Daily entry: use only regular hours (exclude OT hours)
+          // Saturday threshold: 5 hours, Other days: 8 hours
+          const overtimeThreshold = getOvertimeThreshold(logDate);
+          const regularHours = Math.min(hours, overtimeThreshold);
+          calculatedAmount = multiplyMoney(activity.rate, regularHours);
+        }
       }
       break;
 
