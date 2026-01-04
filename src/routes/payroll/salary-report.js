@@ -346,13 +346,16 @@ export default function (pool) {
           cr.employee_id,
           cr.location_code,
           s.name as staff_name,
+          s.ic_no,
+          s.bank_account_number,
+          s.payment_preference,
           COALESCE(SUM(cr.amount), 0) as commission_amount
         FROM commission_records cr
         JOIN staffs s ON cr.employee_id = s.id
         WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
           AND EXTRACT(MONTH FROM cr.commission_date) = $2
           AND UPPER(cr.description) LIKE '%COMMISSION%'
-        GROUP BY cr.employee_id, cr.location_code, s.name
+        GROUP BY cr.employee_id, cr.location_code, s.name, s.ic_no, s.bank_account_number, s.payment_preference
       `;
       const commissionResult = await pool.query(commissionQuery, [yearInt, monthInt]);
 
@@ -368,11 +371,17 @@ export default function (pool) {
         midMonthMap.set(row.employee_id, parseFloat(row.mid_month_amount || 0));
       });
 
+      // Track commission-only employees (those not in regular payroll)
+      const commissionOnlyEmployees = [];
+
       // Group commissions by location (16-24), defaulting to "18" if no location_code
       commissionResult.rows.forEach(row => {
         const locCode = row.location_code || "18"; // Default to COMM-KILANG if no location
         const commAmount = parseFloat(row.commission_amount || 0);
         const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
+
+        // Check if this employee exists in processedData (has regular payroll)
+        const hasRegularPayroll = processedData.some(e => e.staff_id === row.employee_id);
 
         // Only process for commission locations (16-24)
         if (locationData[locCode]) {
@@ -387,10 +396,14 @@ export default function (pool) {
 
             const jumlah = commAmount - midMonthAmount;
 
-            locationData[locCode].employees.push({
+            const commissionEmployeeData = {
               employee_payroll_id: baseEmp?.employee_payroll_id || null,
               staff_id: row.employee_id,
               staff_name: row.staff_name,
+              ic_no: row.ic_no,
+              bank_account_number: row.bank_account_number,
+              payment_preference: row.payment_preference,
+              location_code: locCode,
               gaji: 0, ot: 0, bonus: 0, comm: commAmount,
               gaji_kasar: commAmount,
               epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
@@ -399,14 +412,54 @@ export default function (pool) {
               setengah_bulan: midMonthAmount,
               jumlah: jumlah,
               jumlah_digenapkan: 0,
-              setelah_digenapkan: jumlah
-            });
+              setelah_digenapkan: jumlah,
+              // For Bank/Pinjam tabs
+              gaji_genap: commAmount - midMonthAmount,
+              total_pinjam: 0,
+              final_total: commAmount - midMonthAmount,
+              net_pay: commAmount,
+              mid_month_amount: midMonthAmount,
+            };
+
+            locationData[locCode].employees.push(commissionEmployeeData);
             locationData[locCode].totals.comm += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.setengah_bulan += midMonthAmount;
             locationData[locCode].totals.jumlah += jumlah;
             locationData[locCode].totals.setelah_digenapkan += jumlah;
+
+            // Track commission-only employees for main data response
+            if (!hasRegularPayroll) {
+              // Check if already tracked (multiple commission entries for same employee)
+              const existingCommOnly = commissionOnlyEmployees.find(e => e.staff_id === row.employee_id);
+              if (!existingCommOnly) {
+                commissionOnlyEmployees.push(commissionEmployeeData);
+                // Add to grand totals for commission-only employees
+                grandTotals.comm += commAmount;
+                grandTotals.gaji_kasar += commAmount;
+                grandTotals.gaji_bersih += commAmount;
+                grandTotals.setengah_bulan += midMonthAmount;
+                grandTotals.jumlah += jumlah;
+                grandTotals.setelah_digenapkan += jumlah;
+              } else {
+                // Update existing commission-only employee
+                existingCommOnly.comm += commAmount;
+                existingCommOnly.gaji_kasar += commAmount;
+                existingCommOnly.gaji_bersih += commAmount;
+                existingCommOnly.jumlah = existingCommOnly.gaji_bersih - existingCommOnly.setengah_bulan;
+                existingCommOnly.setelah_digenapkan = existingCommOnly.jumlah;
+                existingCommOnly.gaji_genap = existingCommOnly.gaji_bersih - existingCommOnly.mid_month_amount;
+                existingCommOnly.final_total = existingCommOnly.gaji_genap;
+                existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
+                // Update grand totals
+                grandTotals.comm += commAmount;
+                grandTotals.gaji_kasar += commAmount;
+                grandTotals.gaji_bersih += commAmount;
+                grandTotals.jumlah += commAmount;
+                grandTotals.setelah_digenapkan += commAmount;
+              }
+            }
           } else {
             // Add to existing employee's commission
             existingEmployee.comm += commAmount;
@@ -450,13 +503,28 @@ export default function (pool) {
       const locationsArray = allLocations.map(loc => locationData[loc]);
 
       // Get unique employees for Bank/Pinjam tabs (avoid duplicates from dual-location)
+      // Include both regular payroll employees and commission-only employees
       const uniqueEmployeesForBankPinjam = (() => {
         const seen = new Set();
-        return processedData.filter(emp => {
-          if (seen.has(emp.staff_id)) return false;
-          seen.add(emp.staff_id);
-          return true;
+        const result = [];
+
+        // First add regular payroll employees
+        processedData.forEach(emp => {
+          if (!seen.has(emp.staff_id)) {
+            seen.add(emp.staff_id);
+            result.push(emp);
+          }
         });
+
+        // Then add commission-only employees
+        commissionOnlyEmployees.forEach(emp => {
+          if (!seen.has(emp.staff_id)) {
+            seen.add(emp.staff_id);
+            result.push(emp);
+          }
+        });
+
+        return result;
       })();
 
       // Response with all data for all tabs
@@ -489,22 +557,49 @@ export default function (pool) {
           grand_totals: grandTotals
         },
         // Bank table data (unique employees only - avoid duplicates from dual-location)
+        // Include both regular payroll and commission-only employees
         bank_data: (() => {
           const seenEmployees = new Set();
-          return processedData
-            .filter(emp => {
-              if (seenEmployees.has(emp.staff_id) || emp.final_total <= 0) return false;
+          const result = [];
+
+          // First add regular payroll employees
+          processedData.forEach(emp => {
+            if (!seenEmployees.has(emp.staff_id) && emp.final_total > 0) {
               seenEmployees.add(emp.staff_id);
-              return true;
-            })
-            .map((emp, index) => ({
-              no: index + 1,
-              staff_name: emp.staff_name,
-              icNo: emp.ic_no || "N/A",
-              bankAccountNumber: emp.bank_account_number || "N/A",
-              total: emp.final_total,
-              payment_preference: emp.payment_preference,
-            }));
+              result.push({
+                staff_id: emp.staff_id,
+                staff_name: emp.staff_name,
+                ic_no: emp.ic_no,
+                bank_account_number: emp.bank_account_number,
+                total: emp.final_total,
+                payment_preference: emp.payment_preference,
+              });
+            }
+          });
+
+          // Then add commission-only employees
+          commissionOnlyEmployees.forEach(emp => {
+            if (!seenEmployees.has(emp.staff_id) && emp.final_total > 0) {
+              seenEmployees.add(emp.staff_id);
+              result.push({
+                staff_id: emp.staff_id,
+                staff_name: emp.staff_name,
+                ic_no: emp.ic_no,
+                bank_account_number: emp.bank_account_number,
+                total: emp.final_total,
+                payment_preference: emp.payment_preference,
+              });
+            }
+          });
+
+          return result.map((emp, index) => ({
+            no: index + 1,
+            staff_name: emp.staff_name,
+            icNo: emp.ic_no || "N/A",
+            bankAccountNumber: emp.bank_account_number || "N/A",
+            total: emp.total,
+            payment_preference: emp.payment_preference,
+          }));
         })()
       });
     } catch (error) {

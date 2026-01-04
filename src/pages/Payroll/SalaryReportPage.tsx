@@ -18,7 +18,6 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
-import Tab from "../../components/Tab";
 import MonthNavigator from "../../components/MonthNavigator";
 import YearNavigator from "../../components/YearNavigator";
 import SalaryAmountTooltip from "../../components/Payroll/SalaryAmountTooltip";
@@ -576,100 +575,100 @@ const SalaryReportPage: React.FC = () => {
     if (!comprehensiveSalaryData) return null;
 
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg">
-          <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
+      <div className="overflow-auto max-h-[74vh] border border-default-200 dark:border-gray-700 rounded-lg">
+        <table className="w-full">
+          <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 BIL
               </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 BAHAGIAN KERJA
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 GAJI
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 OT
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 COMM
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 GAJI KASAR
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
               >
                 EPF
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
               >
                 SOCSO
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
               >
                 SIP
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900">
                 PCB
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 GAJI BERSIH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 1/2 BULAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 JUMLAH DIGENAPKAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 SETELAH DIGENAPKAN
               </th>
             </tr>
-            <tr className="bg-default-50 dark:bg-gray-900/50 border-t border-default-200 dark:border-gray-700">
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+            <tr>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 PKJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 PKJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 PKJ
               </th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -709,7 +708,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.gaji !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.gaji,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Gaji (Base + Tambahan)"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -721,7 +722,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.ot !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.ot,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Overtime"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -733,7 +736,7 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.bonus !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.bonus,
-                        link: `/payroll/addon/incentives?year=${currentYear}&month=${currentMonth}`
+                        link: `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Bonus"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -745,7 +748,7 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.comm !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.comm,
-                        link: `/payroll/addon/incentives?year=${currentYear}&month=${currentMonth}`
+                        link: `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Commission"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -757,7 +760,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.gaji_kasar !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.gaji_kasar,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Gaji Kasar (Gross)"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -769,7 +774,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.epf_majikan !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.epf_majikan,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="EPF Majikan"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -781,7 +788,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.epf_pekerja !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.epf_pekerja,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="EPF Pekerja"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -793,7 +802,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.socso_majikan !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.socso_majikan,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="SOCSO Majikan"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -805,7 +816,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.socso_pekerja !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.socso_pekerja,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="SOCSO Pekerja"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -817,7 +830,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.sip_majikan !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.sip_majikan,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="SIP Majikan"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -829,19 +844,23 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.sip_pekerja !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.sip_pekerja,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="SIP Pekerja"
                       formatCurrency={(v) => formatCurrency(v)}
                     />
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
                     <SalaryAmountTooltip
                       amount={locationData?.totals.pcb || 0}
                       breakdown={locationData?.employees?.filter(e => e.pcb !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.pcb,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="PCB (Income Tax)"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -853,7 +872,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.gaji_bersih !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.gaji_bersih,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Gaji Bersih (Net)"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -865,7 +886,7 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.setengah_bulan !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.setengah_bulan,
-                        link: `/payroll/addon/mid-month?year=${currentYear}&month=${currentMonth}`
+                        link: `/payroll/mid-month-payrolls?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="1/2 Bulan (Mid-month)"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -877,7 +898,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.jumlah !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.jumlah,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Jumlah"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -894,7 +917,9 @@ const SalaryReportPage: React.FC = () => {
                       breakdown={locationData?.employees?.filter(e => e.setelah_digenapkan !== 0).map(e => ({
                         description: e.staff_name,
                         amount: e.setelah_digenapkan,
-                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
                       })) || []}
                       label="Setelah Digenapkan"
                       formatCurrency={(v) => formatCurrency(v)}
@@ -904,83 +929,83 @@ const SalaryReportPage: React.FC = () => {
               );
             })}
           </tbody>
-          <tfoot className="bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
+          <tfoot className="sticky bottom-0 z-20">
             <tr>
               <td
                 colSpan={2}
-                className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center"
+                className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
               >
                 GRAND TOTAL
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_kasar
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_pekerja
                 )}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_bersih
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setengah_bulan
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.jumlah_digenapkan
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setelah_digenapkan
                 )}
@@ -1081,7 +1106,7 @@ const SalaryReportPage: React.FC = () => {
   const BankTable = () => (
     <div className="overflow-x-auto">
       <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
           <tr>
             <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               NO.
@@ -1129,7 +1154,7 @@ const SalaryReportPage: React.FC = () => {
   const PinjamTable = () => (
     <div className="overflow-x-auto">
       <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
           <tr>
             <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               NO.
@@ -1189,16 +1214,35 @@ const SalaryReportPage: React.FC = () => {
     </div>
   );
 
+  const tabLabels = ["Salary", "Bank", "Pinjam"];
+
   return (
     <div className="space-y-3">
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
                 Salary Report
               </h2>
+              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              {/* Tab buttons */}
+              <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                {tabLabels.map((label, index) => (
+                  <button
+                    key={label}
+                    onClick={() => setActiveTab(index)}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                      activeTab === index
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
               <div className="flex items-center gap-2">
                 <YearNavigator
@@ -1229,7 +1273,7 @@ const SalaryReportPage: React.FC = () => {
                 </>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={fetchSalaryReport}
                 icon={IconRefresh}
@@ -1314,21 +1358,9 @@ const SalaryReportPage: React.FC = () => {
         ) : (
           <>
             <div className="px-6 py-4">
-              <Tab
-                labels={["Salary", "Bank", "Pinjam"]}
-                defaultActiveTab={activeTab}
-                onTabChange={setActiveTab}
-              >
-                <div>
-                  <ComprehensiveSalaryTable />
-                </div>
-                <div>
-                  <BankTable />
-                </div>
-                <div>
-                  <PinjamTable />
-                </div>
-              </Tab>
+              {activeTab === 0 && <ComprehensiveSalaryTable />}
+              {activeTab === 1 && <BankTable />}
+              {activeTab === 2 && <PinjamTable />}
             </div>
 
             {/* Summary Footer */}
