@@ -211,7 +211,7 @@ const GTPayrollDetailsPage: React.FC = () => {
   if (!payroll) {
     return (
       <div className="p-6">
-        <BackButton fallbackPath="/greentarget/payroll" />
+        <BackButton onClick={() => navigate("/greentarget/payroll")} />
         <div className="mt-4 text-center text-default-500 dark:text-gray-400">
           Payroll not found
         </div>
@@ -242,7 +242,7 @@ const GTPayrollDetailsPage: React.FC = () => {
     <div className="px-6 pb-6 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <BackButton fallbackPath="/greentarget/payroll" />
+        <BackButton onClick={() => navigate("/greentarget/payroll")} />
         <span className="text-default-300 dark:text-gray-600">|</span>
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => toast.info("Add manual item feature coming soon")}
+              onClick={() => toast("Add manual item feature coming soon")}
               icon={IconPlus}
               iconSize={16}
             >
@@ -538,9 +538,8 @@ const GTPayrollDetailsPage: React.FC = () => {
         onConfirm={handleDeleteItem}
         title="Delete Payroll Item"
         message={`Are you sure you want to delete "${itemToDelete?.description}"? This action cannot be undone.`}
-        confirmText="Delete"
-        confirmColor="red"
-        isLoading={isDeleting}
+        confirmButtonText="Delete"
+        variant="danger"
       />
     </div>
   );

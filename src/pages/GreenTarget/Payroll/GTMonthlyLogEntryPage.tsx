@@ -182,10 +182,10 @@ const GTMonthlyLogEntryPage: React.FC = () => {
 
     // Create default activities from OFFICE pay codes
     const activities: ActivityItem[] = officePayCodes.map((pc) => {
-      const rate = parseFloat(pc.override_rate_biasa || pc.rate_biasa || "0");
+      const rate = parseFloat(String(pc.override_rate_biasa || pc.rate_biasa || "0"));
       const calculatedAmount = pc.rate_unit === "Hour"
         ? rate * DEFAULT_HOURS
-        : pc.rate_unit === "Month"
+        : pc.rate_unit === "Fixed"
         ? rate
         : 0;
 
@@ -336,7 +336,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     <div className="p-6 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <BackButton fallbackPath="/greentarget/payroll" />
+        <BackButton onClick={() => navigate("/greentarget/payroll")} />
         <div>
           <h1 className="text-2xl font-semibold text-default-800 dark:text-gray-100">
             OFFICE Work Log
@@ -350,7 +350,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       {/* Month Navigator */}
       <MonthNavigator
         selectedMonth={selectedMonthDate}
-        onMonthChange={handleMonthChange}
+        onChange={handleMonthChange}
       />
 
       {/* Status Badge */}
@@ -535,7 +535,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
             >
               {isSaving ? (
                 <>
-                  <LoadingSpinner size="xs" hideText />
+                  <LoadingSpinner size="sm" hideText />
                   <span className="ml-2">Saving...</span>
                 </>
               ) : existingWorkLog ? (
