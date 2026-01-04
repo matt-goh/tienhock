@@ -20,31 +20,83 @@ export default function (pool) {
 
     try {
       // Main comprehensive query to get all employee data with payroll details
+      // Dual-location logic: employee appears in BOTH job-based AND direct-mapped locations
       const comprehensiveQuery = `
         WITH job_location_map AS (
           SELECT job_id, location_code
           FROM job_location_mappings
           WHERE is_active = true
         ),
-        employee_base_data AS (
+        -- Employee's direct locations from staffs.location JSONB array
+        employee_direct_locations AS (
+          SELECT s.id as employee_id, loc.value as location_code
+          FROM staffs s,
+            LATERAL jsonb_array_elements_text(COALESCE(s.location, '[]'::jsonb)) AS loc(value)
+          WHERE s.location IS NOT NULL
+            AND jsonb_array_length(s.location) > 0
+        ),
+        -- Base payroll data without location (we'll join locations later)
+        employee_payroll_base AS (
           SELECT
+            ep.id as employee_payroll_id,
             ep.employee_id,
             s.id as staff_id,
             s.name as staff_name,
             s.ic_no,
             s.bank_account_number,
             s.payment_preference,
-            COALESCE(jlm.location_code, '02') as location_code,
             ep.gross_pay,
             ep.net_pay,
             ep.job_type,
-            ep.section
+            ep.section,
+            jlm.location_code as job_location_code
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
           LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+        ),
+        -- UNION all location sources (employee appears in all applicable locations)
+        employee_all_locations AS (
+          -- Direct employee mapping (from staffs.location)
+          SELECT epb.*, edl.location_code, 'direct' as location_source
+          FROM employee_payroll_base epb
+          JOIN employee_direct_locations edl ON epb.employee_id = edl.employee_id
+
+          UNION ALL
+
+          -- Job-based mapping
+          SELECT epb.*, epb.job_location_code as location_code, 'job' as location_source
+          FROM employee_payroll_base epb
+          WHERE epb.job_location_code IS NOT NULL
+
+          UNION ALL
+
+          -- Default fallback (only if NO locations from either source)
+          SELECT epb.*, '02' as location_code, 'default' as location_source
+          FROM employee_payroll_base epb
+          WHERE epb.job_location_code IS NULL
+            AND NOT EXISTS (SELECT 1 FROM employee_direct_locations edl WHERE edl.employee_id = epb.employee_id)
+        ),
+        -- Deduplicate same employee in same location (keep first occurrence)
+        employee_base_data AS (
+          SELECT DISTINCT ON (employee_id, location_code)
+            employee_payroll_id,
+            employee_id,
+            staff_id,
+            staff_name,
+            ic_no,
+            bank_account_number,
+            payment_preference,
+            location_code,
+            gross_pay,
+            net_pay,
+            job_type,
+            section,
+            location_source
+          FROM employee_all_locations
+          ORDER BY employee_id, location_code, location_source
         ),
         payroll_items_data AS (
           SELECT 
@@ -181,15 +233,17 @@ export default function (pool) {
         const gajiKasar = parseFloat(row.gross_pay || 0);
         const gajiBersih = parseFloat(row.net_pay || 0) + parseFloat(row.commission_total || 0);
         const jumlah = gajiBersih - parseFloat(row.mid_month_amount || 0);
-        
+
         return {
           no: index + 1,
+          employee_payroll_id: row.employee_payroll_id,
           staff_id: row.staff_id,
           staff_name: row.staff_name,
           ic_no: row.ic_no,
           bank_account_number: row.bank_account_number,
           payment_preference: row.payment_preference,
           location_code: row.location_code,
+          location_source: row.location_source, // 'job', 'direct', or 'default'
           job_type: row.job_type,
           section: row.section,
           // Salary tab data
@@ -221,6 +275,8 @@ export default function (pool) {
       });
 
       // Group data by location for comprehensive salary view
+      // With dual-location logic, employees can appear in multiple locations
+      // Track unique employees for grand totals to avoid double-counting
       const locationData = {};
       const grandTotals = {
         gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
@@ -228,6 +284,7 @@ export default function (pool) {
         sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
         setengah_bulan: 0, jumlah: 0, jumlah_digenapkan: 0, setelah_digenapkan: 0
       };
+      const processedUniqueEmployees = new Set(); // Track unique employees for grand totals
 
       // Fetch all locations from database
       const locationsResult = await pool.query("SELECT id FROM locations ORDER BY id");
@@ -245,25 +302,28 @@ export default function (pool) {
         };
       });
 
-      // Process each employee and group by job-based location
+      // Process each employee and group by location
+      // With dual-location, an employee may appear in multiple locations
       processedData.forEach(employee => {
-        // Use job-based location_code (defaults to "02" if not mapped)
         const loc = employee.location_code || "02";
 
         if (locationData[loc]) {
           // Add employee data to location
           locationData[loc].employees.push(employee);
 
-          // Add to location totals
+          // Add to location totals (each location gets the full amount)
           Object.keys(locationData[loc].totals).forEach(key => {
             locationData[loc].totals[key] += employee[key] || 0;
           });
         }
 
-        // Add to grand totals
-        Object.keys(grandTotals).forEach(key => {
-          grandTotals[key] += employee[key] || 0;
-        });
+        // Add to grand totals ONLY ONCE per unique employee (avoid double-counting)
+        if (!processedUniqueEmployees.has(employee.staff_id)) {
+          processedUniqueEmployees.add(employee.staff_id);
+          Object.keys(grandTotals).forEach(key => {
+            grandTotals[key] += employee[key] || 0;
+          });
+        }
       });
 
       // Handle special location data (COMM-KILANG, CUTI TAHUNAN, etc.)
@@ -310,12 +370,22 @@ export default function (pool) {
       // Convert locationData object to array for response
       const locationsArray = allLocations.map(loc => locationData[loc]);
 
+      // Get unique employees for Bank/Pinjam tabs (avoid duplicates from dual-location)
+      const uniqueEmployeesForBankPinjam = (() => {
+        const seen = new Set();
+        return processedData.filter(emp => {
+          if (seen.has(emp.staff_id)) return false;
+          seen.add(emp.staff_id);
+          return true;
+        });
+      })();
+
       // Response with all data for all tabs
       res.json({
         year: yearInt,
         month: monthInt,
-        // Original format for Bank/Pinjam tabs
-        data: processedData.map((emp, index) => ({
+        // Original format for Bank/Pinjam tabs (unique employees only)
+        data: uniqueEmployeesForBankPinjam.map((emp, index) => ({
           no: index + 1,
           staff_id: emp.staff_id,
           staff_name: emp.staff_name,
@@ -326,11 +396,11 @@ export default function (pool) {
           net_pay: emp.net_pay,
           mid_month_amount: emp.mid_month_amount,
         })),
-        total_records: processedData.length,
+        total_records: uniqueEmployeesForBankPinjam.length,
         summary: {
-          total_gaji_genap: processedData.reduce((sum, item) => sum + item.gaji_genap, 0),
-          total_pinjam: processedData.reduce((sum, item) => sum + item.total_pinjam, 0),
-          total_final: processedData.reduce((sum, item) => sum + item.final_total, 0),
+          total_gaji_genap: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.gaji_genap, 0),
+          total_pinjam: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.total_pinjam, 0),
+          total_final: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.final_total, 0),
         },
         // Comprehensive salary data for the new Salary tab
         comprehensive: {
@@ -339,17 +409,24 @@ export default function (pool) {
           locations: locationsArray,
           grand_totals: grandTotals
         },
-        // Bank table data
-        bank_data: processedData
-          .filter(emp => emp.final_total > 0)
-          .map((emp, index) => ({
-            no: index + 1,
-            staff_name: emp.staff_name,
-            icNo: emp.ic_no || "N/A",
-            bankAccountNumber: emp.bank_account_number || "N/A",
-            total: emp.final_total,
-            payment_preference: emp.payment_preference,
-          }))
+        // Bank table data (unique employees only - avoid duplicates from dual-location)
+        bank_data: (() => {
+          const seenEmployees = new Set();
+          return processedData
+            .filter(emp => {
+              if (seenEmployees.has(emp.staff_id) || emp.final_total <= 0) return false;
+              seenEmployees.add(emp.staff_id);
+              return true;
+            })
+            .map((emp, index) => ({
+              no: index + 1,
+              staff_name: emp.staff_name,
+              icNo: emp.ic_no || "N/A",
+              bankAccountNumber: emp.bank_account_number || "N/A",
+              total: emp.final_total,
+              payment_preference: emp.payment_preference,
+            }));
+        })()
       });
     } catch (error) {
       console.error("Error fetching comprehensive salary report:", error);

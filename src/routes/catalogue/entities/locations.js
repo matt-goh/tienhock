@@ -261,6 +261,52 @@ export default function (pool) {
     }
   });
 
+  // Get all employees with their location mappings
+  router.get("/employee-mappings", async (req, res) => {
+    try {
+      const query = `
+        SELECT
+          s.id as employee_id,
+          s.name as employee_name,
+          loc.value as location_code
+        FROM staffs s,
+          LATERAL jsonb_array_elements_text(COALESCE(s.location, '[]'::jsonb)) AS loc(value)
+        WHERE s.location IS NOT NULL
+          AND jsonb_array_length(s.location) > 0
+          AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+        ORDER BY s.name
+      `;
+      const result = await pool.query(query);
+
+      // Group by location for summary
+      const locationSummary = {};
+      result.rows.forEach((row) => {
+        if (row.location_code) {
+          if (!locationSummary[row.location_code]) {
+            locationSummary[row.location_code] = {
+              location_code: row.location_code,
+              employees: [],
+            };
+          }
+          locationSummary[row.location_code].employees.push({
+            employee_id: row.employee_id,
+            employee_name: row.employee_name,
+          });
+        }
+      });
+
+      res.json({
+        employeeMappings: result.rows,
+        locationSummary: Object.values(locationSummary),
+      });
+    } catch (error) {
+      console.error("Error fetching employee mappings:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching employee mappings", error: error.message });
+    }
+  });
+
   // Get all jobs with their location mappings
   router.get("/job-mappings", async (req, res) => {
     try {
