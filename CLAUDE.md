@@ -110,7 +110,7 @@ This is a comprehensive ERP system supporting three companies:
 - `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
 - `pinjam_records` - id, employee_id, year, month, amount, description, pinjam_type, created_by, created_at, updated_at
-- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at
+- `commission_records` - id, employee_id, commission_date, amount, description, created_by, created_at, updated_at, location_code (location 16-24 for commission entries, NULL for bonus)
 
 **Statutory Rates:**
 - `epf_rates` - id, employee_type, wage_threshold, employee_rate_percentage, employer_rate_percentage, employer_fixed_amount, is_active, created_at, updated_at
