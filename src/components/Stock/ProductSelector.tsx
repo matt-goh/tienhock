@@ -294,7 +294,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                               )}
                             </div>
                             {selected && (
-                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                                 <IconCheck className="h-4 w-4" aria-hidden="true" />
                               </span>
                             )}
@@ -305,7 +305,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                 e.stopPropagation();
                                 toggleFavorite(e, product.id);
                               }}
-                              className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-500 hover:text-amber-600"
+                              className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300"
                             >
                               <IconStarFilled className="h-4 w-4" />
                             </button>
@@ -343,8 +343,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                 clsx(
                                   "relative cursor-pointer select-none py-2 pl-10 pr-10",
                                   active
-                                    ? "bg-sky-100 text-sky-900"
-                                    : "text-default-900"
+                                    ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                    : "text-default-900 dark:text-gray-100"
                                 )
                               }
                             >
@@ -364,8 +364,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                         className={clsx(
                                           "block truncate text-xs",
                                           active
-                                            ? "text-sky-700"
-                                            : "text-default-500"
+                                            ? "text-sky-700 dark:text-sky-300"
+                                            : "text-default-500 dark:text-gray-400"
                                         )}
                                       >
                                         {product.description}
@@ -373,7 +373,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                     )}
                                   </div>
                                   {selected && (
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                                       <IconCheck className="h-4 w-4" aria-hidden="true" />
                                     </span>
                                   )}
@@ -415,8 +415,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                             clsx(
                               "relative cursor-pointer select-none py-2 pl-10 pr-10",
                               active
-                                ? "bg-sky-100 text-sky-900"
-                                : "text-default-900"
+                                ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                : "text-default-900 dark:text-gray-100"
                             )
                           }
                         >
@@ -436,8 +436,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                     className={clsx(
                                       "block truncate text-xs",
                                       active
-                                        ? "text-sky-700"
-                                        : "text-default-500"
+                                        ? "text-sky-700 dark:text-sky-300"
+                                        : "text-default-500 dark:text-gray-400"
                                     )}
                                   >
                                     {product.description}
@@ -445,7 +445,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                                 )}
                               </div>
                               {selected && (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                                   <IconCheck className="h-4 w-4" aria-hidden="true" />
                                 </span>
                               )}
