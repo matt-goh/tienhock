@@ -55,12 +55,12 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Edit Income Tax Rate</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold dark:text-gray-100">Edit Income Tax Rate</h2>
           <button
             onClick={onClose}
-            className="text-default-400 hover:text-default-600"
+            className="text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <IconX size={24} />
           </button>
@@ -70,7 +70,7 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
           {/* Wage Range */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-default-700 mb-1">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
                 Wage From
               </label>
               <input
@@ -78,12 +78,12 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
                 step="0.01"
                 value={formData.wage_from || ""}
                 onChange={(e) => handleChange("wage_from", e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-default-700 mb-1">
+              <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
                 Wage To
               </label>
               <input
@@ -91,7 +91,7 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
                 step="0.01"
                 value={formData.wage_to || ""}
                 onChange={(e) => handleChange("wage_to", e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                 required
               />
             </div>
@@ -99,7 +99,7 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
 
           {/* Base Rate */}
           <div>
-            <label className="block text-sm font-medium text-default-700 mb-1">
+            <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
               Base Rate (Single/Married without children)
             </label>
             <input
@@ -107,20 +107,20 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
               step="0.01"
               value={formData.base_rate || ""}
               onChange={(e) => handleChange("base_rate", e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
               required
             />
           </div>
 
           {/* Unemployed Spouse Rates */}
           <div>
-            <h3 className="text-lg font-medium mb-3">
+            <h3 className="text-lg font-medium mb-3 dark:text-gray-100">
               Spouse Unemployed Rates
             </h3>
             <div className="grid grid-cols-6 gap-3">
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                 <div key={`unemployed-${num}`}>
-                  <label className="block text-sm font-medium text-default-700 mb-1">
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
                     K{num === 0 ? "" : num}
                   </label>
                   <input
@@ -134,7 +134,7 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
                     onChange={(e) =>
                       handleChange(`unemployed_spouse_k${num}`, e.target.value)
                     }
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
               ))}
@@ -143,11 +143,11 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
 
           {/* Employed Spouse Rates */}
           <div>
-            <h3 className="text-lg font-medium mb-3">Spouse Employed Rates</h3>
+            <h3 className="text-lg font-medium mb-3 dark:text-gray-100">Spouse Employed Rates</h3>
             <div className="grid grid-cols-6 gap-3">
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                 <div key={`employed-${num}`}>
-                  <label className="block text-sm font-medium text-default-700 mb-1">
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
                     K{num === 0 ? "" : num}
                   </label>
                   <input
@@ -161,7 +161,7 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
                     onChange={(e) =>
                       handleChange(`employed_spouse_k${num}`, e.target.value)
                     }
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                    className="w-full px-3 py-2 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                   />
                 </div>
               ))}
@@ -169,7 +169,7 @@ const IncomeTaxRateEditModal: React.FC<IncomeTaxRateEditModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
             <Button
               type="button"
               onClick={onClose}
