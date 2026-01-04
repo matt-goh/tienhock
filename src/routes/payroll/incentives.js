@@ -11,12 +11,6 @@ export default function (pool) {
   router.get("/", async (req, res) => {
     const { start_date, end_date, employee_id } = req.query;
 
-    console.log("Incentives API - Query params:", {
-      start_date,
-      end_date,
-      employee_id,
-    });
-
     try {
       let query = `
         SELECT cr.*, s.name as employee_name, l.name as location_name
