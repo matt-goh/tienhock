@@ -259,7 +259,7 @@ const ProductionEntryPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           {hasUnsavedChanges && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+            <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-sm font-medium text-amber-700 dark:text-amber-300">
               Unsaved changes
             </span>
           )}
