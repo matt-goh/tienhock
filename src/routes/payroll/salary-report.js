@@ -142,14 +142,15 @@ export default function (pool) {
           WHERE mmp.year = $1 AND mmp.month = $2
         ),
         commission_data AS (
-          SELECT 
+          SELECT
             cr.employee_id,
             cr.description,
+            cr.location_code,
             COALESCE(SUM(cr.amount), 0) as commission_amount
           FROM commission_records cr
-          WHERE EXTRACT(YEAR FROM cr.commission_date) = $1 
+          WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
             AND EXTRACT(MONTH FROM cr.commission_date) = $2
-          GROUP BY cr.employee_id, cr.description
+          GROUP BY cr.employee_id, cr.description, cr.location_code
         ),
         leave_data AS (
           SELECT 
@@ -338,22 +339,88 @@ export default function (pool) {
         }
       });
 
-      // Handle special location data (COMM-KILANG, CUTI TAHUNAN, etc.)
-      // COMM-KILANG (18) - Commission records
-      const commissionEmployees = processedData.filter(emp => emp.comm > 0);
-      commissionEmployees.forEach(emp => {
-        if (!locationData["18"].employees.find(e => e.staff_id === emp.staff_id)) {
-          locationData["18"].employees.push({
-            ...emp,
-            gaji: 0, ot: 0, bonus: 0, // Only show commission data
-            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-            sip_majikan: 0, sip_pekerja: 0, pcb: 0
-          });
-          locationData["18"].totals.comm += emp.comm;
-          locationData["18"].totals.gaji_kasar += emp.comm;
-          locationData["18"].totals.gaji_bersih += emp.comm;
-          locationData["18"].totals.jumlah += emp.comm;
-          locationData["18"].totals.setelah_digenapkan += emp.comm;
+      // Handle special location data (Commissions by location_code, CUTI TAHUNAN, etc.)
+      // Fetch commission records with their location_code for proper grouping
+      const commissionQuery = `
+        SELECT
+          cr.employee_id,
+          cr.location_code,
+          s.name as staff_name,
+          COALESCE(SUM(cr.amount), 0) as commission_amount
+        FROM commission_records cr
+        JOIN staffs s ON cr.employee_id = s.id
+        WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
+          AND EXTRACT(MONTH FROM cr.commission_date) = $2
+          AND UPPER(cr.description) LIKE '%COMMISSION%'
+        GROUP BY cr.employee_id, cr.location_code, s.name
+      `;
+      const commissionResult = await pool.query(commissionQuery, [yearInt, monthInt]);
+
+      // Get mid-month data for commission location employees
+      const midMonthQuery = `
+        SELECT employee_id, COALESCE(amount, 0) as mid_month_amount
+        FROM mid_month_payrolls
+        WHERE year = $1 AND month = $2
+      `;
+      const midMonthResult = await pool.query(midMonthQuery, [yearInt, monthInt]);
+      const midMonthMap = new Map();
+      midMonthResult.rows.forEach(row => {
+        midMonthMap.set(row.employee_id, parseFloat(row.mid_month_amount || 0));
+      });
+
+      // Group commissions by location (16-24), defaulting to "18" if no location_code
+      commissionResult.rows.forEach(row => {
+        const locCode = row.location_code || "18"; // Default to COMM-KILANG if no location
+        const commAmount = parseFloat(row.commission_amount || 0);
+        const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
+
+        // Only process for commission locations (16-24)
+        if (locationData[locCode]) {
+          // Find if employee already exists in this location
+          const existingEmployee = locationData[locCode].employees.find(
+            e => e.staff_id === row.employee_id
+          );
+
+          if (!existingEmployee) {
+            // Find employee base data from processed data
+            const baseEmp = processedData.find(e => e.staff_id === row.employee_id);
+
+            const jumlah = commAmount - midMonthAmount;
+
+            locationData[locCode].employees.push({
+              employee_payroll_id: baseEmp?.employee_payroll_id || null,
+              staff_id: row.employee_id,
+              staff_name: row.staff_name,
+              gaji: 0, ot: 0, bonus: 0, comm: commAmount,
+              gaji_kasar: commAmount,
+              epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
+              sip_majikan: 0, sip_pekerja: 0, pcb: 0,
+              gaji_bersih: commAmount,
+              setengah_bulan: midMonthAmount,
+              jumlah: jumlah,
+              jumlah_digenapkan: 0,
+              setelah_digenapkan: jumlah
+            });
+            locationData[locCode].totals.comm += commAmount;
+            locationData[locCode].totals.gaji_kasar += commAmount;
+            locationData[locCode].totals.gaji_bersih += commAmount;
+            locationData[locCode].totals.setengah_bulan += midMonthAmount;
+            locationData[locCode].totals.jumlah += jumlah;
+            locationData[locCode].totals.setelah_digenapkan += jumlah;
+          } else {
+            // Add to existing employee's commission
+            existingEmployee.comm += commAmount;
+            existingEmployee.gaji_kasar += commAmount;
+            existingEmployee.gaji_bersih += commAmount;
+            existingEmployee.jumlah = existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
+            existingEmployee.setelah_digenapkan = existingEmployee.jumlah;
+
+            locationData[locCode].totals.comm += commAmount;
+            locationData[locCode].totals.gaji_kasar += commAmount;
+            locationData[locCode].totals.gaji_bersih += commAmount;
+            locationData[locCode].totals.jumlah += commAmount;
+            locationData[locCode].totals.setelah_digenapkan += commAmount;
+          }
         }
       });
 

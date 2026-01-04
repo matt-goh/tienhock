@@ -28,6 +28,8 @@ interface Incentive {
   description: string;
   created_by: string;
   created_at: string;
+  location_code: string | null;
+  location_name: string | null;
 }
 
 const IncentivesPage: React.FC = () => {
@@ -204,6 +206,9 @@ const IncentivesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Name
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
+                    Location
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Amount
                   </th>
@@ -229,6 +234,15 @@ const IncentivesPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                       {incentive.employee_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
+                      {incentive.location_code ? (
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                          {incentive.location_code} - {incentive.location_name || "Unknown"}
+                        </span>
+                      ) : (
+                        <span className="text-default-400 dark:text-gray-500">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
                       {formatCurrency(incentive.amount)}
