@@ -35,6 +35,11 @@ export default function (pool) {
           WHERE s.location IS NOT NULL
             AND jsonb_array_length(s.location) > 0
         ),
+        -- Exclusions: employee-job-location combinations to filter out
+        employee_exclusions AS (
+          SELECT employee_id, job_id, location_code
+          FROM employee_job_location_exclusions
+        ),
         -- Base payroll data without location (we'll join locations later)
         employee_payroll_base AS (
           SELECT
@@ -66,10 +71,17 @@ export default function (pool) {
 
           UNION ALL
 
-          -- Job-based mapping
+          -- Job-based mapping (filtered by exclusions)
           SELECT epb.*, epb.job_location_code as location_code, 'job' as location_source
           FROM employee_payroll_base epb
           WHERE epb.job_location_code IS NOT NULL
+            -- Filter out excluded employee-job-location combinations
+            AND NOT EXISTS (
+              SELECT 1 FROM employee_exclusions ex
+              WHERE ex.employee_id = epb.employee_id
+                AND ex.job_id = epb.job_type
+                AND ex.location_code = epb.job_location_code
+            )
 
           UNION ALL
 

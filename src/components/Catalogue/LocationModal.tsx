@@ -20,6 +20,7 @@ import {
   IconBriefcase,
   IconUsers,
   IconCheck,
+  IconUserMinus,
 } from "@tabler/icons-react";
 import { Location } from "../../utils/catalogue/useLocationsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
@@ -64,6 +65,31 @@ const LocationModal: React.FC<LocationModalProps> = ({
   );
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [availableEmployeeSearch, setAvailableEmployeeSearch] = useState("");
+
+  // Exclusions state
+  interface Exclusion {
+    id: number;
+    employee_id: string;
+    employee_name: string;
+    job_id: string;
+    job_name: string;
+    reason: string | null;
+    created_at: string;
+  }
+  interface ExclusionCandidate {
+    employee_id: string;
+    employee_name: string;
+    job_id: string;
+    job_name: string;
+    is_excluded: boolean;
+  }
+  const [exclusions, setExclusions] = useState<Exclusion[]>([]);
+  const [exclusionCandidates, setExclusionCandidates] = useState<
+    ExclusionCandidate[]
+  >([]);
+  const [exclusionSearch, setExclusionSearch] = useState("");
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [isAddingExclusion, setIsAddingExclusion] = useState(false);
 
   const { jobs } = useJobsCache();
   const { byLocation, refreshData: refreshMappings } = useJobLocationMappings();
@@ -113,6 +139,32 @@ const LocationModal: React.FC<LocationModalProps> = ({
 
     if (isOpen) {
       fetchEmployeeData();
+    }
+  }, [isOpen, initialData]);
+
+  // Fetch exclusions when editing a location
+  const fetchExclusions = async () => {
+    if (!initialData) {
+      setExclusions([]);
+      setExclusionCandidates([]);
+      return;
+    }
+
+    try {
+      const [exclusionsRes, candidatesRes] = await Promise.all([
+        api.get(`/api/locations/${initialData.id}/exclusions`),
+        api.get(`/api/locations/${initialData.id}/exclusion-candidates`),
+      ]);
+      setExclusions(exclusionsRes);
+      setExclusionCandidates(candidatesRes);
+    } catch (err) {
+      console.error("Error fetching exclusions:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && initialData) {
+      fetchExclusions();
     }
   }, [isOpen, initialData]);
 
@@ -202,6 +254,39 @@ const LocationModal: React.FC<LocationModalProps> = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [allEmployees, selectedEmployees, availableEmployeeSearch]);
 
+  // Filtered exclusions (by search)
+  const filteredExclusions = useMemo(() => {
+    if (!exclusionSearch)
+      return exclusions.sort((a, b) =>
+        a.employee_name.localeCompare(b.employee_name)
+      );
+    const search = exclusionSearch.toLowerCase();
+    return exclusions
+      .filter(
+        (ex) =>
+          ex.employee_name.toLowerCase().includes(search) ||
+          ex.job_name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+  }, [exclusions, exclusionSearch]);
+
+  // Available exclusion candidates (employees with jobs mapped to this location, not already excluded)
+  const availableCandidates = useMemo(() => {
+    const candidates = exclusionCandidates.filter((c) => !c.is_excluded);
+    if (!candidateSearch)
+      return candidates.sort((a, b) =>
+        a.employee_name.localeCompare(b.employee_name)
+      );
+    const search = candidateSearch.toLowerCase();
+    return candidates
+      .filter(
+        (c) =>
+          c.employee_name.toLowerCase().includes(search) ||
+          c.job_name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+  }, [exclusionCandidates, candidateSearch]);
+
   // Check for changes
   const hasChanges = useMemo(() => {
     if (selectedJobs.size !== originalJobs.size) return true;
@@ -257,6 +342,36 @@ const LocationModal: React.FC<LocationModalProps> = ({
       newSet.delete(empId);
       return newSet;
     });
+  };
+
+  const handleAddExclusion = async (employeeId: string, jobId: string) => {
+    if (!initialData) return;
+    setIsAddingExclusion(true);
+    try {
+      await api.post(`/api/locations/${initialData.id}/exclusions`, {
+        employee_id: employeeId,
+        job_id: jobId,
+      });
+      await fetchExclusions();
+    } catch (err: any) {
+      console.error("Error adding exclusion:", err);
+      setError(err.message || "Failed to add exclusion");
+    } finally {
+      setIsAddingExclusion(false);
+    }
+  };
+
+  const handleRemoveExclusion = async (exclusionId: number) => {
+    if (!initialData) return;
+    try {
+      await api.delete(
+        `/api/locations/${initialData.id}/exclusions/${exclusionId}`
+      );
+      await fetchExclusions();
+    } catch (err: any) {
+      console.error("Error removing exclusion:", err);
+      setError(err.message || "Failed to remove exclusion");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -353,6 +468,10 @@ const LocationModal: React.FC<LocationModalProps> = ({
     setOriginalEmployees(new Set());
     setEmployeeSearch("");
     setAvailableEmployeeSearch("");
+    setExclusions([]);
+    setExclusionCandidates([]);
+    setExclusionSearch("");
+    setCandidateSearch("");
     setError("");
     onClose();
   };
@@ -476,6 +595,20 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         <IconUsers size={16} />
                         Employees ({selectedEmployees.size})
                       </Tab>
+                      {isEditing && (
+                        <Tab
+                          className={({ selected }) =>
+                            `w-full rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
+                              selected
+                                ? "bg-white dark:bg-gray-600 text-amber-700 dark:text-amber-400 shadow"
+                                : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
+                            }`
+                          }
+                        >
+                          <IconUserMinus size={16} />
+                          Exclusions ({exclusions.length})
+                        </Tab>
+                      )}
                     </TabList>
 
                     <TabPanels>
@@ -784,6 +917,173 @@ const LocationModal: React.FC<LocationModalProps> = ({
                           </div>
                         </div>
                       </TabPanel>
+
+                      {/* Exclusions Tab */}
+                      {isEditing && (
+                        <TabPanel>
+                          <div className="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                              Exclusions prevent employees from appearing in
+                              this location's salary report for specific jobs.
+                              This is useful when an employee has a job mapped
+                              to multiple locations but should only appear in
+                              one.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Left Panel - Current Exclusions */}
+                            <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                              <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                                <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                                  <IconUserMinus size={16} />
+                                  Current Exclusions ({exclusions.length})
+                                </div>
+                                <div className="relative mt-2">
+                                  <IconSearch
+                                    size={16}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Search exclusions..."
+                                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                                    value={exclusionSearch}
+                                    onChange={(e) =>
+                                      setExclusionSearch(e.target.value)
+                                    }
+                                    disabled={isSaving}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="max-h-[280px] overflow-y-auto">
+                                {filteredExclusions.length === 0 ? (
+                                  <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                                    <IconUserMinus
+                                      size={32}
+                                      className="mx-auto mb-2 text-default-300 dark:text-gray-500"
+                                    />
+                                    {exclusionSearch
+                                      ? "No exclusions found"
+                                      : "No exclusions set"}
+                                  </div>
+                                ) : (
+                                  <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                                    {filteredExclusions.map((ex) => (
+                                      <li
+                                        key={ex.id}
+                                        className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                      >
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                            {ex.employee_name}
+                                          </div>
+                                          <div className="text-xs text-amber-600 dark:text-amber-400">
+                                            Excluded from: {ex.job_name}
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRemoveExclusion(ex.id)
+                                          }
+                                          disabled={isSaving}
+                                          className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
+                                          title="Remove exclusion"
+                                        >
+                                          <IconTrash size={16} />
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Right Panel - Add Exclusion */}
+                            <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                              <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-sm font-medium text-default-700 dark:text-gray-200">
+                                    Add Exclusion
+                                  </div>
+                                  <span className="text-xs text-default-500 dark:text-gray-400">
+                                    {availableCandidates.length} available
+                                  </span>
+                                </div>
+                                <div className="relative mt-2">
+                                  <IconSearch
+                                    size={16}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Search employees/jobs..."
+                                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                                    value={candidateSearch}
+                                    onChange={(e) =>
+                                      setCandidateSearch(e.target.value)
+                                    }
+                                    disabled={isSaving || isAddingExclusion}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="max-h-[280px] overflow-y-auto">
+                                {availableCandidates.length === 0 ? (
+                                  <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                                    <IconCheck
+                                      size={32}
+                                      className="mx-auto mb-2 text-emerald-400"
+                                    />
+                                    {candidateSearch
+                                      ? "No matches found"
+                                      : "No employees to exclude"}
+                                    <p className="text-xs mt-1 text-default-400 dark:text-gray-500">
+                                      Only employees with jobs mapped to this
+                                      location can be excluded
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                                    {availableCandidates.map((c, idx) => (
+                                      <li
+                                        key={`${c.employee_id}-${c.job_id}-${idx}`}
+                                        className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                      >
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                            {c.employee_name}
+                                          </div>
+                                          <div className="text-xs text-default-500 dark:text-gray-400">
+                                            Job: {c.job_name}
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleAddExclusion(
+                                              c.employee_id,
+                                              c.job_id
+                                            )
+                                          }
+                                          disabled={
+                                            isSaving || isAddingExclusion
+                                          }
+                                          className="p-1.5 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded disabled:opacity-50"
+                                          title="Add exclusion"
+                                        >
+                                          <IconPlus size={18} />
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </TabPanel>
+                      )}
                     </TabPanels>
                   </TabGroup>
 
