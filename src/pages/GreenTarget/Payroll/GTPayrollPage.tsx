@@ -280,7 +280,7 @@ const GTPayrollPage: React.FC = () => {
       {/* Month Navigator */}
       <MonthNavigator
         selectedMonth={selectedMonth}
-        onMonthChange={handleMonthChange}
+        onChange={handleMonthChange}
       />
 
       {/* No Payroll State */}
@@ -546,9 +546,8 @@ const GTPayrollPage: React.FC = () => {
         onConfirm={handleFinalizePayroll}
         title="Finalize Payroll"
         message={`Are you sure you want to finalize the payroll for ${getMonthName(month)} ${year}? This will lock the payroll from further edits.`}
-        confirmText="Finalize"
-        confirmColor="emerald"
-        isLoading={isUpdatingStatus}
+        confirmButtonText="Finalize"
+        variant="success"
       />
     </div>
   );
