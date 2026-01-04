@@ -6,21 +6,26 @@ import {
   DialogTitle,
   Transition,
   TransitionChild,
+  Tab,
+  TabGroup,
+  TabList,
+  TabPanels,
+  TabPanel,
 } from "@headlessui/react";
 import {
   IconX,
-  IconCheck,
   IconPlus,
-  IconMinus,
+  IconTrash,
   IconSearch,
   IconBriefcase,
+  IconUsers,
+  IconCheck,
 } from "@tabler/icons-react";
 import { Location } from "../../utils/catalogue/useLocationsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useJobLocationMappings } from "../../utils/catalogue/useJobLocationMappings";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
-import Checkbox from "../Checkbox";
 
 interface LocationModalProps {
   isOpen: boolean;
@@ -45,11 +50,71 @@ const LocationModal: React.FC<LocationModalProps> = ({
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [originalJobs, setOriginalJobs] = useState<Set<string>>(new Set());
   const [jobSearch, setJobSearch] = useState("");
+  const [availableJobSearch, setAvailableJobSearch] = useState("");
+
+  // Employee mapping state
+  const [allEmployees, setAllEmployees] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(
+    new Set()
+  );
+  const [originalEmployees, setOriginalEmployees] = useState<Set<string>>(
+    new Set()
+  );
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [availableEmployeeSearch, setAvailableEmployeeSearch] = useState("");
 
   const { jobs } = useJobsCache();
   const { byLocation, refreshData: refreshMappings } = useJobLocationMappings();
 
   const isEditing = !!initialData;
+
+  // Fetch employees and employee mappings when modal opens
+  useEffect(() => {
+    const fetchEmployeeData = async () => {
+      try {
+        // Fetch all active employees
+        const staffsResponse = await api.get("/api/staffs");
+        const activeStaffs = staffsResponse.filter(
+          (s: { dateResigned: string }) => !s.dateResigned
+        );
+        setAllEmployees(
+          activeStaffs.map((s: { id: string; name: string }) => ({
+            id: s.id,
+            name: s.name,
+          }))
+        );
+
+        // Fetch employee mappings for this location
+        if (initialData) {
+          const mappingsResponse = await api.get(
+            "/api/locations/employee-mappings"
+          );
+          const locationMappings = mappingsResponse.locationSummary.find(
+            (ls: { location_code: string }) =>
+              ls.location_code === initialData.id
+          );
+          const mappedEmployeeIds = new Set<string>(
+            (locationMappings?.employees || []).map(
+              (e: { employee_id: string }) => e.employee_id
+            )
+          );
+          setSelectedEmployees(mappedEmployeeIds);
+          setOriginalEmployees(new Set<string>(mappedEmployeeIds));
+        } else {
+          setSelectedEmployees(new Set());
+          setOriginalEmployees(new Set());
+        }
+      } catch (err) {
+        console.error("Error fetching employee data:", err);
+      }
+    };
+
+    if (isOpen) {
+      fetchEmployeeData();
+    }
+  }, [isOpen, initialData]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -70,47 +135,72 @@ const LocationModal: React.FC<LocationModalProps> = ({
       }
       setError("");
       setJobSearch("");
+      setAvailableJobSearch("");
+      setEmployeeSearch("");
+      setAvailableEmployeeSearch("");
     }
   }, [isOpen, initialData, byLocation]);
 
-  // Sort jobs: saved first, then alphabetically
-  const sortedJobs = useMemo(() => {
-    return [...jobs].sort((a, b) => {
-      const aIsSaved = originalJobs.has(a.id);
-      const bIsSaved = originalJobs.has(b.id);
-      if (aIsSaved && !bIsSaved) return -1;
-      if (!aIsSaved && bIsSaved) return 1;
-      return a.name.localeCompare(b.name);
-    });
-  }, [jobs, originalJobs]);
-
-  // Filter jobs based on search
-  const filteredJobs = useMemo(() => {
-    if (!jobSearch) return sortedJobs;
+  // Mapped jobs (sorted alphabetically)
+  const mappedJobs = useMemo(() => {
+    const mapped = jobs.filter((job) => selectedJobs.has(job.id));
+    if (!jobSearch) return mapped.sort((a, b) => a.name.localeCompare(b.name));
     const search = jobSearch.toLowerCase();
-    return sortedJobs.filter(
-      (job) =>
-        job.id.toLowerCase().includes(search) ||
-        job.name.toLowerCase().includes(search)
+    return mapped
+      .filter(
+        (job) =>
+          job.id.toLowerCase().includes(search) ||
+          job.name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [jobs, selectedJobs, jobSearch]);
+
+  // Available jobs (not mapped, sorted alphabetically)
+  const availableJobs = useMemo(() => {
+    const available = jobs.filter((job) => !selectedJobs.has(job.id));
+    if (!availableJobSearch)
+      return available.sort((a, b) => a.name.localeCompare(b.name));
+    const search = availableJobSearch.toLowerCase();
+    return available
+      .filter(
+        (job) =>
+          job.id.toLowerCase().includes(search) ||
+          job.name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [jobs, selectedJobs, availableJobSearch]);
+
+  // Mapped employees (sorted alphabetically)
+  const mappedEmployees = useMemo(() => {
+    const mapped = allEmployees.filter((emp) => selectedEmployees.has(emp.id));
+    if (!employeeSearch)
+      return mapped.sort((a, b) => a.name.localeCompare(b.name));
+    const search = employeeSearch.toLowerCase();
+    return mapped
+      .filter(
+        (emp) =>
+          emp.id.toLowerCase().includes(search) ||
+          emp.name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allEmployees, selectedEmployees, employeeSearch]);
+
+  // Available employees (not mapped, sorted alphabetically)
+  const availableEmployees = useMemo(() => {
+    const available = allEmployees.filter(
+      (emp) => !selectedEmployees.has(emp.id)
     );
-  }, [sortedJobs, jobSearch]);
-
-  // Count saved jobs for separator
-  const savedJobsCount = useMemo(() => {
-    return filteredJobs.filter((job) => originalJobs.has(job.id)).length;
-  }, [filteredJobs, originalJobs]);
-
-  // Get job status
-  const getJobStatus = (
-    jobId: string
-  ): "saved" | "new" | "removing" | "none" => {
-    const isSelected = selectedJobs.has(jobId);
-    const wasOriginal = originalJobs.has(jobId);
-    if (wasOriginal && isSelected) return "saved";
-    if (!wasOriginal && isSelected) return "new";
-    if (wasOriginal && !isSelected) return "removing";
-    return "none";
-  };
+    if (!availableEmployeeSearch)
+      return available.sort((a, b) => a.name.localeCompare(b.name));
+    const search = availableEmployeeSearch.toLowerCase();
+    return available
+      .filter(
+        (emp) =>
+          emp.id.toLowerCase().includes(search) ||
+          emp.name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allEmployees, selectedEmployees, availableEmployeeSearch]);
 
   // Check for changes
   const hasChanges = useMemo(() => {
@@ -118,29 +208,54 @@ const LocationModal: React.FC<LocationModalProps> = ({
     for (const id of selectedJobs) {
       if (!originalJobs.has(id)) return true;
     }
+    if (selectedEmployees.size !== originalEmployees.size) return true;
+    for (const id of selectedEmployees) {
+      if (!originalEmployees.has(id)) return true;
+    }
     return false;
-  }, [selectedJobs, originalJobs]);
+  }, [selectedJobs, originalJobs, selectedEmployees, originalEmployees]);
 
   // Changes summary
   const changesSummary = useMemo(() => {
-    const toAdd = Array.from(selectedJobs).filter(
+    const jobsToAdd = Array.from(selectedJobs).filter(
       (id) => !originalJobs.has(id)
     ).length;
-    const toRemove = Array.from(originalJobs).filter(
+    const jobsToRemove = Array.from(originalJobs).filter(
       (id) => !selectedJobs.has(id)
     ).length;
-    return { toAdd, toRemove };
-  }, [selectedJobs, originalJobs]);
+    const employeesToAdd = Array.from(selectedEmployees).filter(
+      (id) => !originalEmployees.has(id)
+    ).length;
+    const employeesToRemove = Array.from(originalEmployees).filter(
+      (id) => !selectedEmployees.has(id)
+    ).length;
+    return {
+      toAdd: jobsToAdd + employeesToAdd,
+      toRemove: jobsToRemove + employeesToRemove,
+    };
+  }, [selectedJobs, originalJobs, selectedEmployees, originalEmployees]);
 
-  const handleToggleJob = (jobId: string) => {
+  const handleAddJob = (jobId: string) => {
+    setSelectedJobs((prev) => new Set([...prev, jobId]));
+  };
+
+  const handleRemoveJob = (jobId: string) => {
     setSelectedJobs((prev) => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(jobId)) {
-        newSelection.delete(jobId);
-      } else {
-        newSelection.add(jobId);
-      }
-      return newSelection;
+      const newSet = new Set(prev);
+      newSet.delete(jobId);
+      return newSet;
+    });
+  };
+
+  const handleAddEmployee = (empId: string) => {
+    setSelectedEmployees((prev) => new Set([...prev, empId]));
+  };
+
+  const handleRemoveEmployee = (empId: string) => {
+    setSelectedEmployees((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(empId);
+      return newSet;
     });
   };
 
@@ -201,6 +316,22 @@ const LocationModal: React.FC<LocationModalProps> = ({
         });
       }
 
+      // Save employee mappings
+      const employeesToAdd = Array.from(selectedEmployees).filter(
+        (id) => !originalEmployees.has(id)
+      );
+      const employeesToRemove = Array.from(originalEmployees).filter(
+        (id) => !selectedEmployees.has(id)
+      );
+
+      if (employeesToAdd.length > 0 || employeesToRemove.length > 0) {
+        await api.put("/api/staffs/batch-location-update", {
+          locationCode: locationId,
+          addEmployees: employeesToAdd,
+          removeEmployees: employeesToRemove,
+        });
+      }
+
       await refreshMappings(true);
       onComplete?.();
       handleClose();
@@ -217,16 +348,13 @@ const LocationModal: React.FC<LocationModalProps> = ({
     setSelectedJobs(new Set());
     setOriginalJobs(new Set());
     setJobSearch("");
+    setAvailableJobSearch("");
+    setSelectedEmployees(new Set());
+    setOriginalEmployees(new Set());
+    setEmployeeSearch("");
+    setAvailableEmployeeSearch("");
     setError("");
     onClose();
-  };
-
-  const statusStyles = {
-    saved: "bg-green-50 dark:bg-green-900/20 border-l-2 border-green-400",
-    new: "bg-sky-50 dark:bg-sky-900/20 border-l-2 border-sky-400",
-    removing:
-      "bg-red-50 dark:bg-red-900/20 border-l-2 border-red-300 opacity-60",
-    none: "",
   };
 
   return (
@@ -262,7 +390,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <DialogTitle
@@ -309,7 +437,10 @@ const LocationModal: React.FC<LocationModalProps> = ({
                         type="text"
                         value={formData.name}
                         onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, name: e.target.value }))
+                          setFormData((prev) => ({
+                            ...prev,
+                            name: e.target.value,
+                          }))
                         }
                         placeholder="e.g., New Department"
                         className="w-full px-3 py-2 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
@@ -318,124 +449,343 @@ const LocationModal: React.FC<LocationModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Job Mappings Panel */}
-                  <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <div className="bg-default-50 dark:bg-gray-800/50 px-3 py-2 border-b border-default-200 dark:border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
-                          <IconBriefcase size={16} />
-                          Mapped Jobs
-                        </div>
-                        <span className="text-xs text-default-500 dark:text-gray-400">
-                          {selectedJobs.size} selected
-                        </span>
-                      </div>
-                      <div className="relative mt-2">
-                        <IconSearch
-                          size={16}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Search jobs..."
-                          className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500"
-                          value={jobSearch}
-                          onChange={(e) => setJobSearch(e.target.value)}
-                          disabled={isSaving}
-                        />
-                      </div>
-                    </div>
+                  {/* Tabs for Jobs and Employees */}
+                  <TabGroup>
+                    <TabList className="flex space-x-1 rounded-lg bg-default-100 dark:bg-gray-700 p-1 mb-4">
+                      <Tab
+                        className={({ selected }) =>
+                          `w-full rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
+                            selected
+                              ? "bg-white dark:bg-gray-600 text-sky-700 dark:text-sky-400 shadow"
+                              : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
+                          }`
+                        }
+                      >
+                        <IconBriefcase size={16} />
+                        Jobs ({selectedJobs.size})
+                      </Tab>
+                      <Tab
+                        className={({ selected }) =>
+                          `w-full rounded-md py-2 text-sm font-medium leading-5 transition-colors flex items-center justify-center gap-2 ${
+                            selected
+                              ? "bg-white dark:bg-gray-600 text-emerald-700 dark:text-emerald-400 shadow"
+                              : "text-default-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-600/50"
+                          }`
+                        }
+                      >
+                        <IconUsers size={16} />
+                        Employees ({selectedEmployees.size})
+                      </Tab>
+                    </TabList>
 
-                    <div className="max-h-[280px] overflow-y-auto">
-                      {filteredJobs.length === 0 ? (
-                        <div className="py-8 text-center text-sm text-default-500 dark:text-gray-400">
-                          No jobs found
-                        </div>
-                      ) : (
-                        <ul className="divide-y divide-default-100 dark:divide-gray-700/50">
-                          {/* Mapped jobs header */}
-                          {savedJobsCount > 0 && (
-                            <li className="px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-xs text-green-700 dark:text-green-400 font-medium">
-                              Currently Mapped ({savedJobsCount})
-                            </li>
-                          )}
-                          {filteredJobs.map((job, index) => {
-                            const status = getJobStatus(job.id);
-                            const showSeparator =
-                              savedJobsCount > 0 && index === savedJobsCount;
+                    <TabPanels>
+                      {/* Jobs Tab */}
+                      <TabPanel>
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Left Panel - Mapped Jobs */}
+                          <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                            <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                              <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                                <IconBriefcase size={16} />
+                                Mapped Jobs ({selectedJobs.size})
+                              </div>
+                              <div className="relative mt-2">
+                                <IconSearch
+                                  size={16}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search mapped jobs..."
+                                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                                  value={jobSearch}
+                                  onChange={(e) => setJobSearch(e.target.value)}
+                                  disabled={isSaving}
+                                />
+                              </div>
+                            </div>
 
-                            return (
-                              <Fragment key={job.id}>
-                                {showSeparator && (
-                                  <li className="px-3 py-1.5 bg-default-100 dark:bg-gray-700/50 text-xs text-default-500 dark:text-gray-400 font-medium border-t border-default-200 dark:border-gray-600">
-                                    Available Jobs (
-                                    {filteredJobs.length - savedJobsCount})
-                                  </li>
-                                )}
-                                <li
-                                  className={`px-3 py-2 hover:bg-default-100 dark:hover:bg-gray-700/30 cursor-pointer transition-colors select-none ${statusStyles[status]}`}
-                                  onClick={() => handleToggleJob(job.id)}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div onClick={(e) => e.stopPropagation()}>
-                                      <Checkbox
-                                        checked={selectedJobs.has(job.id)}
-                                        onChange={() => handleToggleJob(job.id)}
-                                        size={18}
-                                        checkedColor="text-sky-600 dark:text-sky-400"
-                                        uncheckedColor="text-default-400 dark:text-gray-500"
-                                      />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div
-                                        className={`font-medium text-sm ${
-                                          status === "removing"
-                                            ? "line-through text-default-400 dark:text-gray-500"
-                                            : "text-default-800 dark:text-gray-200"
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {mappedJobs.length === 0 ? (
+                                <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                                  <IconBriefcase
+                                    size={32}
+                                    className="mx-auto mb-2 text-default-300 dark:text-gray-500"
+                                  />
+                                  {jobSearch
+                                    ? "No jobs found"
+                                    : "No jobs mapped yet"}
+                                </div>
+                              ) : (
+                                <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                                  {mappedJobs.map((job) => {
+                                    const isNew = !originalJobs.has(job.id);
+                                    return (
+                                      <li
+                                        key={job.id}
+                                        className={`px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                                          isNew
+                                            ? "bg-sky-50/50 dark:bg-sky-900/20"
+                                            : ""
                                         }`}
                                       >
-                                        {job.name}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-2">
+                                            {job.name}
+                                            {isNew && (
+                                              <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
+                                                New
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-default-500 dark:text-gray-400">
+                                            {job.id}
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveJob(job.id)}
+                                          disabled={isSaving}
+                                          className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
+                                        >
+                                          <IconTrash size={16} />
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Panel - Available Jobs */}
+                          <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                            <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm font-medium text-default-700 dark:text-gray-200">
+                                  Add Job
+                                </div>
+                                <span className="text-xs text-default-500 dark:text-gray-400">
+                                  {availableJobs.length} available
+                                </span>
+                              </div>
+                              <div className="relative mt-2">
+                                <IconSearch
+                                  size={16}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search available jobs..."
+                                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                                  value={availableJobSearch}
+                                  onChange={(e) =>
+                                    setAvailableJobSearch(e.target.value)
+                                  }
+                                  disabled={isSaving}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {availableJobs.length === 0 ? (
+                                <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                                  <IconCheck
+                                    size={32}
+                                    className="mx-auto mb-2 text-emerald-400"
+                                  />
+                                  {availableJobSearch
+                                    ? "No jobs found"
+                                    : "All jobs already mapped"}
+                                </div>
+                              ) : (
+                                <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                                  {availableJobs.map((job) => (
+                                    <li
+                                      key={job.id}
+                                      className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                          {job.name}
+                                        </div>
+                                        <div className="text-xs text-default-500 dark:text-gray-400">
+                                          {job.id}
+                                        </div>
                                       </div>
-                                      <div className="text-xs text-default-500 dark:text-gray-400">
-                                        ID: {job.id}
-                                      </div>
-                                    </div>
-                                    {status !== "none" && (
-                                      <span
-                                        className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-full whitespace-nowrap ${
-                                          status === "saved"
-                                            ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400"
-                                            : status === "new"
-                                            ? "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400"
-                                            : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400"
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddJob(job.id)}
+                                        disabled={isSaving}
+                                        className="p-1.5 text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded disabled:opacity-50"
+                                      >
+                                        <IconPlus size={18} />
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TabPanel>
+
+                      {/* Employees Tab */}
+                      <TabPanel>
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Left Panel - Mapped Employees */}
+                          <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                            <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                              <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                                <IconUsers size={16} />
+                                Mapped Employees ({selectedEmployees.size})
+                              </div>
+                              <div className="relative mt-2">
+                                <IconSearch
+                                  size={16}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search mapped employees..."
+                                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                                  value={employeeSearch}
+                                  onChange={(e) =>
+                                    setEmployeeSearch(e.target.value)
+                                  }
+                                  disabled={isSaving}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {mappedEmployees.length === 0 ? (
+                                <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                                  <IconUsers
+                                    size={32}
+                                    className="mx-auto mb-2 text-default-300 dark:text-gray-500"
+                                  />
+                                  {employeeSearch
+                                    ? "No employees found"
+                                    : "No employees mapped yet"}
+                                </div>
+                              ) : (
+                                <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                                  {mappedEmployees.map((emp) => {
+                                    const isNew = !originalEmployees.has(emp.id);
+                                    return (
+                                      <li
+                                        key={emp.id}
+                                        className={`px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                                          isNew
+                                            ? "bg-emerald-50/50 dark:bg-emerald-900/20"
+                                            : ""
                                         }`}
                                       >
-                                        {status === "saved" && (
-                                          <>
-                                            <IconCheck size={12} /> Mapped
-                                          </>
-                                        )}
-                                        {status === "new" && (
-                                          <>
-                                            <IconPlus size={12} /> New
-                                          </>
-                                        )}
-                                        {status === "removing" && (
-                                          <>
-                                            <IconMinus size={12} /> Remove
-                                          </>
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                </li>
-                              </Fragment>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-2">
+                                            {emp.name}
+                                            {isNew && (
+                                              <span className="text-xs px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded">
+                                                New
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-default-500 dark:text-gray-400">
+                                            {emp.id}
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRemoveEmployee(emp.id)
+                                          }
+                                          disabled={isSaving}
+                                          className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
+                                        >
+                                          <IconTrash size={16} />
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Panel - Available Employees */}
+                          <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                            <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm font-medium text-default-700 dark:text-gray-200">
+                                  Add Employee
+                                </div>
+                                <span className="text-xs text-default-500 dark:text-gray-400">
+                                  {availableEmployees.length} available
+                                </span>
+                              </div>
+                              <div className="relative mt-2">
+                                <IconSearch
+                                  size={16}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search available employees..."
+                                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                                  value={availableEmployeeSearch}
+                                  onChange={(e) =>
+                                    setAvailableEmployeeSearch(e.target.value)
+                                  }
+                                  disabled={isSaving}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="max-h-[280px] overflow-y-auto">
+                              {availableEmployees.length === 0 ? (
+                                <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                                  <IconCheck
+                                    size={32}
+                                    className="mx-auto mb-2 text-emerald-400"
+                                  />
+                                  {availableEmployeeSearch
+                                    ? "No employees found"
+                                    : "All employees already mapped"}
+                                </div>
+                              ) : (
+                                <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                                  {availableEmployees.map((emp) => (
+                                    <li
+                                      key={emp.id}
+                                      className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                          {emp.name}
+                                        </div>
+                                        <div className="text-xs text-default-500 dark:text-gray-400">
+                                          {emp.id}
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddEmployee(emp.id)}
+                                        disabled={isSaving}
+                                        className="p-1.5 text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded disabled:opacity-50"
+                                      >
+                                        <IconPlus size={18} />
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TabPanel>
+                    </TabPanels>
+                  </TabGroup>
 
                   {/* Error Message */}
                   {error && (
@@ -448,33 +798,33 @@ const LocationModal: React.FC<LocationModalProps> = ({
 
                   {/* Footer */}
                   <div className="mt-6 flex justify-between items-center">
-                    <div className="text-sm">
+                    <div className="text-sm text-default-500 dark:text-gray-400">
                       {hasChanges ? (
                         <div className="flex items-center gap-3">
-                          <span className="text-amber-600 dark:text-amber-400 font-medium">
-                            Pending:
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                            Jobs: {selectedJobs.size}
                           </span>
-                          {changesSummary.toAdd > 0 && (
-                            <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400">
-                              <IconPlus size={14} /> {changesSummary.toAdd} to
-                              add
-                            </span>
-                          )}
-                          {changesSummary.toRemove > 0 && (
-                            <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
-                              <IconMinus size={14} /> {changesSummary.toRemove}{" "}
-                              to remove
-                            </span>
-                          )}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Employees: {selectedEmployees.size}
+                          </span>
+                          <span className="text-amber-600 dark:text-amber-400">
+                            ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
+                            {changesSummary.toAdd > 0 &&
+                              changesSummary.toRemove > 0 &&
+                              ", "}
+                            {changesSummary.toRemove > 0 &&
+                              `-${changesSummary.toRemove}`}{" "}
+                            changes)
+                          </span>
                         </div>
                       ) : isEditing ? (
                         <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                           <IconCheck size={14} /> No changes
                         </span>
                       ) : (
-                        <span className="text-default-400 dark:text-gray-500">
-                          Select jobs to map to this location
-                        </span>
+                        <span>Map jobs and employees to this location</span>
                       )}
                     </div>
                     <div className="flex space-x-3">

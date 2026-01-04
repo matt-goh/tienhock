@@ -21,6 +21,7 @@ import { FormListbox } from "../../components/FormComponents";
 import Tab from "../../components/Tab";
 import MonthNavigator from "../../components/MonthNavigator";
 import YearNavigator from "../../components/YearNavigator";
+import SalaryAmountTooltip from "../../components/Payroll/SalaryAmountTooltip";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
@@ -79,6 +80,7 @@ interface SalaryReportResponse {
 interface LocationSalaryData {
   location: string;
   employees: {
+    employee_payroll_id: number;
     staff_id: string;
     staff_name: string;
     gaji: number; // Base Pay + Tambahan
@@ -575,7 +577,7 @@ const SalaryReportPage: React.FC = () => {
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg">
           <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
             <tr>
               <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
@@ -702,49 +704,184 @@ const SalaryReportPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.gaji || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.gaji || 0}
+                      breakdown={locationData?.employees?.filter(e => e.gaji !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.gaji,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="Gaji (Base + Tambahan)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.ot || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.ot || 0}
+                      breakdown={locationData?.employees?.filter(e => e.ot !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.ot,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="Overtime"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.bonus || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.bonus || 0}
+                      breakdown={locationData?.employees?.filter(e => e.bonus !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.bonus,
+                        link: `/payroll/addon/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Bonus"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.comm || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.comm || 0}
+                      breakdown={locationData?.employees?.filter(e => e.comm !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.comm,
+                        link: `/payroll/addon/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Commission"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.gaji_kasar || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.gaji_kasar || 0}
+                      breakdown={locationData?.employees?.filter(e => e.gaji_kasar !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.gaji_kasar,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="Gaji Kasar (Gross)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.epf_majikan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.epf_majikan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.epf_majikan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.epf_majikan,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="EPF Majikan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.epf_pekerja || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.epf_pekerja || 0}
+                      breakdown={locationData?.employees?.filter(e => e.epf_pekerja !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.epf_pekerja,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="EPF Pekerja"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.socso_majikan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.socso_majikan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.socso_majikan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.socso_majikan,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="SOCSO Majikan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.socso_pekerja || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.socso_pekerja || 0}
+                      breakdown={locationData?.employees?.filter(e => e.socso_pekerja !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.socso_pekerja,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="SOCSO Pekerja"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.sip_majikan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.sip_majikan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.sip_majikan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.sip_majikan,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="SIP Majikan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.sip_pekerja || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.sip_pekerja || 0}
+                      breakdown={locationData?.employees?.filter(e => e.sip_pekerja !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.sip_pekerja,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="SIP Pekerja"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.pcb || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.pcb || 0}
+                      breakdown={locationData?.employees?.filter(e => e.pcb !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.pcb,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="PCB (Income Tax)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.gaji_bersih || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.gaji_bersih || 0}
+                      breakdown={locationData?.employees?.filter(e => e.gaji_bersih !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.gaji_bersih,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="Gaji Bersih (Net)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.setengah_bulan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.setengah_bulan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.setengah_bulan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.setengah_bulan,
+                        link: `/payroll/addon/mid-month?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="1/2 Bulan (Mid-month)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.jumlah || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.jumlah || 0}
+                      breakdown={locationData?.employees?.filter(e => e.jumlah !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.jumlah,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="Jumlah"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(
@@ -752,9 +889,16 @@ const SalaryReportPage: React.FC = () => {
                     )}
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(
-                      locationData?.totals.setelah_digenapkan || 0
-                    )}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.setelah_digenapkan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.setelah_digenapkan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.setelah_digenapkan,
+                        link: `/payroll/employee-payroll/${e.employee_payroll_id}`
+                      })) || []}
+                      label="Setelah Digenapkan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                 </tr>
               );

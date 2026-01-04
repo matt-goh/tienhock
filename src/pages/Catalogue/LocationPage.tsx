@@ -26,9 +26,16 @@ interface JobMapping {
   section: string;
 }
 
-interface LocationWithJobs extends Location {
+interface EmployeeMapping {
+  employee_id: string;
+  employee_name: string;
+}
+
+interface LocationWithMappings extends Location {
   jobs: JobMapping[];
   jobCount: number;
+  employees: EmployeeMapping[];
+  employeeCount: number;
 }
 
 interface DependencyInfo {
@@ -42,6 +49,9 @@ const LocationPage: React.FC = () => {
   const { locations, isLoading, error, refreshLocations } = useLocationsCache();
   const { refreshData: refreshMappings } = useJobLocationMappings();
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Track expanded employee lists per location
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -75,36 +85,70 @@ const LocationPage: React.FC = () => {
     fetchJobMappings();
   }, [fetchJobMappings]);
 
-  // Merge locations with job data
-  const locationsWithJobs = useMemo<LocationWithJobs[]>(() => {
+  // Employee mappings data
+  const [employeeMappingsData, setEmployeeMappingsData] = useState<{
+    locationSummary: Array<{
+      location_code: string;
+      employees: EmployeeMapping[];
+    }>;
+  } | null>(null);
+
+  // Fetch employee mappings summary
+  const fetchEmployeeMappings = useCallback(async () => {
+    try {
+      const response = await api.get("/api/locations/employee-mappings");
+      setEmployeeMappingsData(response);
+    } catch (err) {
+      console.error("Error fetching employee mappings:", err);
+    }
+  }, []);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchEmployeeMappings();
+  }, [fetchEmployeeMappings]);
+
+  // Merge locations with job and employee data
+  const locationsWithMappings = useMemo<LocationWithMappings[]>(() => {
     return locations.map((loc) => {
       const locationJobs =
         jobMappingsData?.locationSummary.find(
           (ls) => ls.location_code === loc.id
         )?.jobs || [];
+      const locationEmployees =
+        employeeMappingsData?.locationSummary.find(
+          (ls) => ls.location_code === loc.id
+        )?.employees || [];
       return {
         ...loc,
         jobs: locationJobs,
         jobCount: locationJobs.length,
+        employees: locationEmployees,
+        employeeCount: locationEmployees.length,
       };
     });
-  }, [locations, jobMappingsData]);
+  }, [locations, jobMappingsData, employeeMappingsData]);
 
   // Filtered locations
   const filteredLocations = useMemo(() => {
-    if (!searchTerm) return locationsWithJobs;
+    if (!searchTerm) return locationsWithMappings;
     const term = searchTerm.toLowerCase();
-    return locationsWithJobs.filter(
-      (loc) =>
+    return locationsWithMappings.filter(
+      (loc: LocationWithMappings) =>
         loc.id.toLowerCase().includes(term) ||
         loc.name.toLowerCase().includes(term) ||
         loc.jobs.some(
-          (j) =>
+          (j: JobMapping) =>
             j.job_id.toLowerCase().includes(term) ||
             j.job_name.toLowerCase().includes(term)
+        ) ||
+        loc.employees.some(
+          (e: EmployeeMapping) =>
+            e.employee_id.toLowerCase().includes(term) ||
+            e.employee_name.toLowerCase().includes(term)
         )
     );
-  }, [locationsWithJobs, searchTerm]);
+  }, [locationsWithMappings, searchTerm]);
 
   // Sorted by ID
   const sortedLocations = useMemo(() => {
@@ -124,7 +168,7 @@ const LocationPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDeleteClick = async (location: LocationWithJobs) => {
+  const handleDeleteClick = async (location: LocationWithMappings) => {
     setLocationToDelete(location);
     setIsCheckingDependencies(true);
     setDependencyInfo(null);
@@ -286,6 +330,9 @@ const LocationPage: React.FC = () => {
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
                 Mapped Jobs
               </th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
+                Mapped Employees
+              </th>
               <th className="w-20 px-3 py-2 text-center text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
                 Actions
               </th>
@@ -309,7 +356,7 @@ const LocationPage: React.FC = () => {
                   <td className="px-3 py-2">
                     {location.jobCount > 0 ? (
                       <div className="flex flex-wrap gap-1">
-                        {location.jobs.map((job) => (
+                        {location.jobs.map((job: JobMapping) => (
                           <span
                             key={job.job_id}
                             className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 border border-default-200 dark:border-gray-600"
@@ -322,6 +369,49 @@ const LocationPage: React.FC = () => {
                     ) : (
                       <span className="text-xs text-default-400 dark:text-gray-500 italic">
                         No jobs mapped
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {location.employeeCount > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {(expandedEmployees.has(location.id)
+                          ? location.employees
+                          : location.employees.slice(0, 5)
+                        ).map((emp: EmployeeMapping) => (
+                          <span
+                            key={emp.employee_id}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                            title={`${emp.employee_id}: ${emp.employee_name}`}
+                          >
+                            {emp.employee_name}
+                          </span>
+                        ))}
+                        {location.employeeCount > 5 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedEmployees((prev) => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(location.id)) {
+                                  newSet.delete(location.id);
+                                } else {
+                                  newSet.add(location.id);
+                                }
+                                return newSet;
+                              });
+                            }}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
+                          >
+                            {expandedEmployees.has(location.id)
+                              ? "Show less"
+                              : `+${location.employeeCount - 5} more`}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-default-400 dark:text-gray-500 italic">
+                        No employees mapped
                       </span>
                     )}
                   </td>
@@ -348,7 +438,7 @@ const LocationPage: React.FC = () => {
             ) : (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-3 py-8 text-center text-sm text-default-500 dark:text-gray-400"
                 >
                   {searchTerm
@@ -366,7 +456,10 @@ const LocationPage: React.FC = () => {
         isOpen={showModal}
         onClose={handleModalClose}
         onSave={handleSaveLocation}
-        onComplete={fetchJobMappings}
+        onComplete={() => {
+          fetchJobMappings();
+          fetchEmployeeMappings();
+        }}
         initialData={locationToEdit}
         existingLocations={locations}
       />
