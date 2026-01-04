@@ -643,7 +643,7 @@ const SalesByProductsPage: React.FC = () => {
   if (productsError || error) {
     return (
       <div className="w-full p-6">
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-lg p-4 text-rose-700 dark:text-rose-300">
           {productsError ? String(productsError) : error}
         </div>
       </div>
@@ -653,7 +653,7 @@ const SalesByProductsPage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Summary section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">Summary</h2>
@@ -732,13 +732,13 @@ const SalesByProductsPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : error ? (
-        <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700">
+        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 rounded-lg p-4 text-rose-700 dark:text-rose-300">
           {error}
         </div>
       ) : (
         <>
           {/* Detailed product sales table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
             <h2 className="text-lg font-semibold mb-4">
               Product Sales Details
             </h2>
@@ -931,7 +931,7 @@ const SalesByProductsPage: React.FC = () => {
           {/* Dashboard content - Three separate doughnut charts without legends */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* BH Products Doughnut Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Bihun Products Distribution
               </h2>
@@ -987,7 +987,7 @@ const SalesByProductsPage: React.FC = () => {
             </div>
 
             {/* MEE Products Doughnut Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Mee Products Distribution
               </h2>
@@ -1043,7 +1043,7 @@ const SalesByProductsPage: React.FC = () => {
             </div>
 
             {/* OTH Products Doughnut Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Other Products Distribution
               </h2>
@@ -1100,7 +1100,7 @@ const SalesByProductsPage: React.FC = () => {
           </div>
 
           {/* Product Mix Analysis Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border shadow p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
               <div className="flex items-center gap-3">

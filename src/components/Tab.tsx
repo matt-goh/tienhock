@@ -17,6 +17,8 @@ interface TabProps {
   variant?: "underline" | "pill" | "enclosed";
   size?: "sm" | "md" | "lg";
   fullWidth?: boolean;
+  headerLeftContent?: React.ReactNode;
+  headerRightContent?: React.ReactNode;
 }
 
 const Tab: React.FC<TabProps> = ({
@@ -28,6 +30,8 @@ const Tab: React.FC<TabProps> = ({
   variant = "underline",
   size = "md",
   fullWidth = false,
+  headerLeftContent,
+  headerRightContent,
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
   const [indicatorStyle, setIndicatorStyle] = useState<React.CSSProperties>({});
@@ -187,24 +191,50 @@ const Tab: React.FC<TabProps> = ({
     enclosed: "flex border-b border-default-200 dark:border-gray-700",
   };
 
+  const hasHeaderContent = headerLeftContent || headerRightContent;
+
   return (
     <div className="w-full">
-      <div
-        ref={containerRef}
-        role="tablist"
-        aria-orientation="horizontal"
-        className={`${containerClasses[variant]} ${fullWidth ? "w-full" : "w-fit"}`}
-      >
-        {labels.map((label, index) => renderTab(label, index))}
-
-        {/* Animated underline indicator */}
-        {variant === "underline" && (
-          <div
-            className="absolute bottom-0 h-[2px] bg-sky-500 dark:bg-sky-400 transition-[left,width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]"
-            style={indicatorStyle}
-          />
-        )}
-      </div>
+      {hasHeaderContent ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {headerLeftContent}
+            {headerLeftContent && (
+              <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
+            )}
+            <div
+              ref={containerRef}
+              role="tablist"
+              aria-orientation="horizontal"
+              className={`${containerClasses[variant]} ${fullWidth ? "w-full" : "w-fit"}`}
+            >
+              {labels.map((label, index) => renderTab(label, index))}
+              {variant === "underline" && (
+                <div
+                  className="absolute bottom-0 h-[2px] bg-sky-500 dark:bg-sky-400 transition-[left,width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]"
+                  style={indicatorStyle}
+                />
+              )}
+            </div>
+          </div>
+          {headerRightContent}
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          role="tablist"
+          aria-orientation="horizontal"
+          className={`${containerClasses[variant]} ${fullWidth ? "w-full" : "w-fit"}`}
+        >
+          {labels.map((label, index) => renderTab(label, index))}
+          {variant === "underline" && (
+            <div
+              className="absolute bottom-0 h-[2px] bg-sky-500 dark:bg-sky-400 transition-[left,width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]"
+              style={indicatorStyle}
+            />
+          )}
+        </div>
+      )}
 
       <div
         role="tabpanel"
