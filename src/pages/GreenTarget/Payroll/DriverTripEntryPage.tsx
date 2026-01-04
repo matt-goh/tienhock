@@ -156,7 +156,7 @@ const DriverTripEntryPage: React.FC = () => {
         toast.success(`Auto-calculated trips for ${response.drivers.length} driver(s)`);
         await fetchData();
       } else {
-        toast.info("No completed rentals found for this month");
+        toast("No completed rentals found for this month");
       }
     } catch (error) {
       console.error("Error auto-calculating:", error);
@@ -234,7 +234,7 @@ const DriverTripEntryPage: React.FC = () => {
     <div className="p-6 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <BackButton fallbackPath="/greentarget/payroll" />
+        <BackButton onClick={() => navigate("/greentarget/payroll")} />
         <div>
           <h1 className="text-2xl font-semibold text-default-800 dark:text-gray-100">
             Driver Trips
@@ -248,7 +248,7 @@ const DriverTripEntryPage: React.FC = () => {
       {/* Month Navigator */}
       <MonthNavigator
         selectedMonth={selectedMonthDate}
-        onMonthChange={handleMonthChange}
+        onChange={handleMonthChange}
       />
 
       {/* No Drivers State */}
@@ -288,7 +288,7 @@ const DriverTripEntryPage: React.FC = () => {
                 className="flex items-center gap-2"
               >
                 {isAutoCalculating ? (
-                  <LoadingSpinner size="xs" hideText />
+                  <LoadingSpinner size="sm" hideText />
                 ) : (
                   <IconRefresh size={18} />
                 )}
@@ -376,7 +376,7 @@ const DriverTripEntryPage: React.FC = () => {
                       <td className="px-4 py-3 text-center">
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           onClick={() => setSelectedDriver(driver.employee_id)}
                           className={
                             selectedDriver === driver.employee_id
@@ -493,7 +493,7 @@ const DriverTripEntryPage: React.FC = () => {
             >
               {isSaving ? (
                 <>
-                  <LoadingSpinner size="xs" hideText />
+                  <LoadingSpinner size="sm" hideText />
                   <span className="ml-2">Saving...</span>
                 </>
               ) : (
