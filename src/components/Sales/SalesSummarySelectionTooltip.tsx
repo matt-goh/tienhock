@@ -190,7 +190,7 @@ const SalesSummarySelectionTooltip: React.FC<
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={() => setIsVisible(true)}
-        className="flex items-center px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 rounded-full transition-colors"
+        className="flex items-center px-4 py-2 text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded-full transition-colors"
         type="button"
       >
         <IconFileText size={18} className="mr-2" />
@@ -221,11 +221,11 @@ const SalesSummarySelectionTooltip: React.FC<
                 <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
                   Sales Summary Selection
                 </h3>
-                <div className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded-full text-xs font-medium">
+                <div className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300 rounded-full text-xs font-medium">
                   {selectedCount}/{SUMMARY_OPTIONS.length}
                 </div>
               </div>
-              <div className="flex items-center mt-2 text-sm text-sky-600 hover:text-sky-800">
+              <div className="flex items-center mt-2 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300">
                 <Checkbox
                   checked={allSelected}
                   onChange={handleSelectAll}
@@ -315,7 +315,7 @@ const SalesSummarySelectionTooltip: React.FC<
             <div className="flex flex-col items-center gap-4">
               <LoadingSpinner size="lg" hideText />
               <div className="text-center">
-                <p className="text-lg font-medium text-default-900">
+                <p className="text-lg font-medium text-default-900 dark:text-gray-100">
                   Generating Sales Summary
                 </p>
                 <p className="text-sm text-default-600 dark:text-gray-300 mt-1">
