@@ -55,7 +55,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (68 tables)
+#### Database Schema (69 tables)
 
 **Accounting & Finance:**
 - `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by
@@ -99,6 +99,7 @@ This is a comprehensive ERP system supporting three companies:
 - `job_pay_codes` - id, job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `locations` - id, name
 - `sections` - id, name
+- `employee_job_location_exclusions` - id, employee_id, job_id, location_code, reason, created_at, created_by (excludes employee-job combinations from appearing in specific location salary reports)
 
 **Payroll:**
 - `pay_codes` - id, description, pay_type, rate_unit, rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, created_at, updated_at

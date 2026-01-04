@@ -356,5 +356,150 @@ export default function (pool) {
     }
   });
 
+  // ==================== EXCLUSIONS ENDPOINTS ====================
+
+  // Get exclusions for a specific location
+  router.get("/:id/exclusions", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const query = `
+        SELECT
+          ex.id,
+          ex.employee_id,
+          s.name as employee_name,
+          ex.job_id,
+          j.name as job_name,
+          ex.reason,
+          ex.created_at,
+          ex.created_by
+        FROM employee_job_location_exclusions ex
+        JOIN staffs s ON ex.employee_id = s.id
+        JOIN jobs j ON ex.job_id = j.id
+        WHERE ex.location_code = $1
+        ORDER BY s.name, j.name
+      `;
+      const result = await pool.query(query, [id]);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching exclusions:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching exclusions", error: error.message });
+    }
+  });
+
+  // Get employees eligible for exclusion at a location
+  // (employees who have jobs mapped to this location)
+  router.get("/:id/exclusion-candidates", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // Get employees who have jobs that are mapped to this location
+      const query = `
+        SELECT DISTINCT
+          s.id as employee_id,
+          s.name as employee_name,
+          j.id as job_id,
+          j.name as job_name,
+          CASE WHEN ex.id IS NOT NULL THEN true ELSE false END as is_excluded
+        FROM staffs s
+        CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(s.job, '[]'::jsonb)) AS emp_job(value)
+        JOIN jobs j ON j.id = emp_job.value
+        JOIN job_location_mappings jlm ON jlm.job_id = j.id AND jlm.is_active = true
+        LEFT JOIN employee_job_location_exclusions ex
+          ON ex.employee_id = s.id
+          AND ex.job_id = j.id
+          AND ex.location_code = $1
+        WHERE jlm.location_code = $1
+          AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+        ORDER BY s.name, j.name
+      `;
+      const result = await pool.query(query, [id]);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching exclusion candidates:", error);
+      res
+        .status(500)
+        .json({ message: "Error fetching exclusion candidates", error: error.message });
+    }
+  });
+
+  // Add an exclusion
+  router.post("/:id/exclusions", async (req, res) => {
+    const { id } = req.params;
+    const { employee_id, job_id, reason, created_by } = req.body;
+
+    if (!employee_id || !job_id) {
+      return res
+        .status(400)
+        .json({ message: "employee_id and job_id are required" });
+    }
+
+    try {
+      const query = `
+        INSERT INTO employee_job_location_exclusions
+          (employee_id, job_id, location_code, reason, created_by)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `;
+      const result = await pool.query(query, [
+        employee_id,
+        job_id,
+        id,
+        reason || null,
+        created_by || null,
+      ]);
+
+      res.status(201).json({
+        message: "Exclusion added successfully",
+        exclusion: result.rows[0],
+      });
+    } catch (error) {
+      if (error.code === "23505") {
+        return res
+          .status(400)
+          .json({ message: "This exclusion already exists" });
+      }
+      if (error.code === "23503") {
+        return res
+          .status(400)
+          .json({ message: "Invalid employee_id, job_id, or location_code" });
+      }
+      console.error("Error adding exclusion:", error);
+      res
+        .status(500)
+        .json({ message: "Error adding exclusion", error: error.message });
+    }
+  });
+
+  // Remove an exclusion
+  router.delete("/:id/exclusions/:exclusionId", async (req, res) => {
+    const { id, exclusionId } = req.params;
+
+    try {
+      const query = `
+        DELETE FROM employee_job_location_exclusions
+        WHERE id = $1 AND location_code = $2
+        RETURNING *
+      `;
+      const result = await pool.query(query, [exclusionId, id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Exclusion not found" });
+      }
+
+      res.json({
+        message: "Exclusion removed successfully",
+        exclusion: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error removing exclusion:", error);
+      res
+        .status(500)
+        .json({ message: "Error removing exclusion", error: error.message });
+    }
+  });
+
   return router;
 }
