@@ -796,13 +796,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const getLeaveTypeColor = (type: string) => {
     switch (type) {
       case "cuti_sakit":
-        return "bg-amber-100 text-amber-700";
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
       case "cuti_tahunan":
-        return "bg-sky-100 text-sky-700";
+        return "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300";
       case "cuti_umum":
-        return "bg-red-100 text-red-700";
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
       default:
-        return "bg-default-100 text-default-700";
+        return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
     }
   };
 
@@ -903,8 +903,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <tr
                   key={entry.employeeId}
                   className={`${
-                    entry.selected ? "bg-sky-50" : "bg-white"
-                  } hover:bg-default-50 cursor-pointer`}
+                    entry.selected ? "bg-sky-50 dark:bg-sky-900/20" : "bg-white dark:bg-gray-800"
+                  } hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer`}
                   onClick={() => handleEmployeeSelect(entry.employeeId)}
                 >
                   <td
@@ -955,7 +955,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       }
                       onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
-                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400"
+                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500"
                       min="0"
                       step="0.5"
                     />
@@ -969,7 +969,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       }
                       onClick={(e) => e.stopPropagation()}
                       disabled={!entry.selected || isSaving}
-                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:bg-gray-800 disabled:text-default-400"
+                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500"
                       min="0"
                       step="0.5"
                     />
@@ -982,7 +982,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       employeeName={entry.employeeName}
                       className={
                         !entry.selected
-                          ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                          ? "disabled:text-default-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed"
                           : ""
                       }
                       disabled={!entry.selected}
@@ -1048,7 +1048,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               </thead>
               <tbody className="divide-y divide-default-200 dark:divide-gray-700">
                 {allLeaveRecords.map((leave, index) => (
-                  <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white dark:bg-gray-800">
+                  <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       <span className="font-medium">{leave.employeeName}</span>
                       <span className="text-default-400 dark:text-gray-500 ml-2">({leave.employeeId})</span>
@@ -1071,7 +1071,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           New
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-800 text-default-600 dark:text-gray-300">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
                           Existing
                         </span>
                       )}
@@ -1085,7 +1085,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                             handleRemoveExistingLeave(leave.id);
                           }
                         }}
-                        className="text-rose-600 hover:text-rose-800"
+                        className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300"
                         title="Remove"
                         disabled={isSaving}
                       >
@@ -1186,7 +1186,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           leaveType: isPublicHoliday ? "cuti_umum" : leaveFormData.leaveType,
                         });
                       }}
-                      className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                      className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
                     />
                     {leaveFormData.leaveDate && isHoliday(new Date(leaveFormData.leaveDate)) && (
                       <div className="flex items-center gap-1 mt-1 text-xs text-sky-600 dark:text-sky-400">
