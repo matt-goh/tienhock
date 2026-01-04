@@ -6,6 +6,7 @@ import {
   IconTruck,
   IconUsers,
   IconCash,
+  IconReceipt,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -22,6 +23,10 @@ import GreenTargetInvoiceDetailsPage from "./GreenTarget/Invoices/InvoiceDetails
 import GreenTargetDebtorsReportPage from "./GreenTarget/DebtorsReportPage";
 import GreenTargetDashboardPage from "./GreenTarget/GreenTargetDashboardPage";
 import GreenTargetPaymentPage from "./GreenTarget/Payments/GreenTargetPaymentPage";
+import GTPayrollPage from "./GreenTarget/Payroll/GTPayrollPage";
+import GTMonthlyLogEntryPage from "./GreenTarget/Payroll/GTMonthlyLogEntryPage";
+import DriverTripEntryPage from "./GreenTarget/Payroll/DriverTripEntryPage";
+import GTPayrollDetailsPage from "./GreenTarget/Payroll/GTPayrollDetailsPage";
 
 export const GreenTargetNavData: SidebarItem[] = [
   {
@@ -83,6 +88,31 @@ export const GreenTargetNavData: SidebarItem[] = [
     icon: IconCash,
     path: "/payments",
     component: GreenTargetPaymentPage,
+  },
+  {
+    name: "Payroll",
+    icon: IconReceipt,
+    path: "/payroll",
+    component: GTPayrollPage,
+    subItems: [
+      {
+        name: "OFFICE Work Log",
+        path: "/payroll/office-log",
+        component: GTMonthlyLogEntryPage,
+        showInPopover: true,
+      },
+      {
+        name: "Driver Trips",
+        path: "/payroll/driver-trips",
+        component: DriverTripEntryPage,
+        showInPopover: true,
+      },
+      {
+        name: "Payroll Details",
+        path: "/payroll/details/:id",
+        component: GTPayrollDetailsPage,
+      },
+    ],
   },
   {
     name: "Debtors",

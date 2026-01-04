@@ -35,6 +35,16 @@ import { useNavigate } from "react-router-dom";
 
 type JobSelection = Job | null;
 
+interface JobDependencyInfo {
+  hasDependencies: boolean;
+  payCodes: Array<{ id: number; pay_code_id: string; description: string }>;
+  locationMappings: Array<{ id: number; location_code: string; location_name: string }>;
+  staffs: Array<{ id: string; name: string }>;
+  jobDetails: Array<{ job_detail_id: string; description: string }>;
+  dailyWorkLogCount: number;
+  monthlyWorkLogCount: number;
+}
+
 // --- Job Card Component ---
 interface JobCardProps {
   job: Job;
@@ -92,6 +102,8 @@ const JobPage: React.FC = () => {
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [showDeleteJobDialog, setShowDeleteJobDialog] = useState(false);
   const [showRemovePayCodeDialog, setShowRemovePayCodeDialog] = useState(false);
+  const [jobDependencyInfo, setJobDependencyInfo] = useState<JobDependencyInfo | null>(null);
+  const [isCheckingDependencies, setIsCheckingDependencies] = useState(false);
   const [payCodeToRemove, setPayCodeToRemove] =
     useState<JobPayCodeDetails | null>(null); // Store the detail object
   const [showAddPayCodeModal, setShowAddPayCodeModal] = useState(false); // For NewPayCodeModal
@@ -250,18 +262,29 @@ const JobPage: React.FC = () => {
 
   const handleDeleteSelectedJobClick = useCallback(async () => {
     if (!selectedJob) return;
-    // Re-fetch latest details just before check, in case they changed
-    await refreshPayCodeMappings();
-    const currentJobPayCodes = detailedMappings[selectedJob.id] || [];
 
-    if (currentJobPayCodes.length > 0) {
-      toast.error(
-        `Cannot delete job "${selectedJob.name}". It has ${currentJobPayCodes.length} associated pay code(s). Remove pay codes first.`
-      );
-    } else {
+    setIsCheckingDependencies(true);
+    setJobDependencyInfo(null);
+
+    try {
+      const response = await api.get(`/api/jobs/${selectedJob.id}/dependencies`);
+      setJobDependencyInfo(response);
+    } catch (err) {
+      console.error("Error checking dependencies:", err);
+      setJobDependencyInfo({
+        hasDependencies: false,
+        payCodes: [],
+        locationMappings: [],
+        staffs: [],
+        jobDetails: [],
+        dailyWorkLogCount: 0,
+        monthlyWorkLogCount: 0,
+      });
+    } finally {
+      setIsCheckingDependencies(false);
       setShowDeleteJobDialog(true);
     }
-  }, [selectedJob, detailedMappings, refreshPayCodeMappings]); // Added dependencies
+  }, [selectedJob]);
 
   const handleConfirmRemovePayCode = useCallback(async () => {
     if (!payCodeToRemove || !selectedJob) return;
@@ -272,11 +295,20 @@ const JobPage: React.FC = () => {
 
   const confirmDeleteJob = useCallback(async () => {
     if (!selectedJob) return;
+
+    if (jobDependencyInfo?.hasDependencies) {
+      toast.error("Cannot delete job with dependencies");
+      setShowDeleteJobDialog(false);
+      setJobDependencyInfo(null);
+      return;
+    }
+
     try {
       await api.delete(`/api/jobs/${selectedJob.id}`);
       toast.success(`Job "${selectedJob.name}" deleted successfully`);
       setShowDeleteJobDialog(false);
       setSelectedJob(null); // Go back to card view
+      setJobDependencyInfo(null);
 
       // Clear the job ID from URL
       navigate(`/catalogue/job`, { replace: true });
@@ -288,7 +320,7 @@ const JobPage: React.FC = () => {
       toast.error("Failed to delete job");
       setShowDeleteJobDialog(false);
     }
-  }, [selectedJob, refreshJobs, refreshPayCodeMappings, navigate]);
+  }, [selectedJob, jobDependencyInfo, refreshJobs, refreshPayCodeMappings, navigate]);
 
   // --- Derived State ---
   const filteredJobs = useMemo(
@@ -913,13 +945,97 @@ const JobPage: React.FC = () => {
       {/* --- Dialogs --- */}
       <ConfirmationDialog
         isOpen={showDeleteJobDialog}
-        onClose={() => setShowDeleteJobDialog(false)}
-        onConfirm={confirmDeleteJob}
-        title="Delete Job"
-        message={`Are you sure you want to delete the job "${
-          selectedJob?.name ?? ""
-        }"? This action cannot be undone.`}
-        variant="danger"
+        onClose={() => {
+          setShowDeleteJobDialog(false);
+          setJobDependencyInfo(null);
+        }}
+        onConfirm={
+          jobDependencyInfo?.hasDependencies
+            ? () => {
+                setShowDeleteJobDialog(false);
+                setJobDependencyInfo(null);
+              }
+            : confirmDeleteJob
+        }
+        title={jobDependencyInfo?.hasDependencies ? "Cannot Delete Job" : "Delete Job"}
+        message={
+          isCheckingDependencies ? (
+            <div className="flex items-center gap-2">
+              <LoadingSpinner />
+              <span>Checking dependencies...</span>
+            </div>
+          ) : jobDependencyInfo?.hasDependencies ? (
+            <div className="space-y-2">
+              <p className="text-rose-600 dark:text-rose-400 font-medium text-sm">
+                This job has dependencies:
+              </p>
+              {jobDependencyInfo.payCodes.length > 0 && (
+                <div className="text-sm">
+                  <span className="font-medium text-default-700 dark:text-gray-200">
+                    Pay Codes ({jobDependencyInfo.payCodes.length}):
+                  </span>{" "}
+                  <span className="text-default-600 dark:text-gray-400">
+                    {jobDependencyInfo.payCodes.slice(0, 3).map(pc => pc.pay_code_id).join(", ")}
+                    {jobDependencyInfo.payCodes.length > 3 && ` +${jobDependencyInfo.payCodes.length - 3} more`}
+                  </span>
+                </div>
+              )}
+              {jobDependencyInfo.locationMappings.length > 0 && (
+                <div className="text-sm">
+                  <span className="font-medium text-default-700 dark:text-gray-200">
+                    Location Mappings ({jobDependencyInfo.locationMappings.length}):
+                  </span>{" "}
+                  <span className="text-default-600 dark:text-gray-400">
+                    {jobDependencyInfo.locationMappings.slice(0, 3).map(lm => lm.location_name || lm.location_code).join(", ")}
+                    {jobDependencyInfo.locationMappings.length > 3 && ` +${jobDependencyInfo.locationMappings.length - 3} more`}
+                  </span>
+                </div>
+              )}
+              {jobDependencyInfo.staffs.length > 0 && (
+                <div className="text-sm">
+                  <span className="font-medium text-default-700 dark:text-gray-200">
+                    Staff ({jobDependencyInfo.staffs.length}):
+                  </span>{" "}
+                  <span className="text-default-600 dark:text-gray-400">
+                    {jobDependencyInfo.staffs.slice(0, 3).map(s => s.name).join(", ")}
+                    {jobDependencyInfo.staffs.length > 3 && ` +${jobDependencyInfo.staffs.length - 3} more`}
+                  </span>
+                </div>
+              )}
+              {jobDependencyInfo.jobDetails.length > 0 && (
+                <div className="text-sm">
+                  <span className="font-medium text-default-700 dark:text-gray-200">
+                    Job Details ({jobDependencyInfo.jobDetails.length}):
+                  </span>{" "}
+                  <span className="text-default-600 dark:text-gray-400">
+                    {jobDependencyInfo.jobDetails.slice(0, 3).map(jd => jd.description || jd.job_detail_id).join(", ")}
+                    {jobDependencyInfo.jobDetails.length > 3 && ` +${jobDependencyInfo.jobDetails.length - 3} more`}
+                  </span>
+                </div>
+              )}
+              {(jobDependencyInfo.dailyWorkLogCount > 0 || jobDependencyInfo.monthlyWorkLogCount > 0) && (
+                <div className="text-sm">
+                  <span className="font-medium text-default-700 dark:text-gray-200">
+                    Work Logs:
+                  </span>{" "}
+                  <span className="text-default-600 dark:text-gray-400">
+                    {jobDependencyInfo.dailyWorkLogCount > 0 && `${jobDependencyInfo.dailyWorkLogCount} daily`}
+                    {jobDependencyInfo.dailyWorkLogCount > 0 && jobDependencyInfo.monthlyWorkLogCount > 0 && ", "}
+                    {jobDependencyInfo.monthlyWorkLogCount > 0 && `${jobDependencyInfo.monthlyWorkLogCount} monthly`}
+                  </span>
+                </div>
+              )}
+              <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
+                Remove dependencies before deleting.
+              </p>
+            </div>
+          ) : (
+            `Are you sure you want to delete the job "${selectedJob?.name ?? ""}"? This action cannot be undone.`
+          )
+        }
+        confirmButtonText={jobDependencyInfo?.hasDependencies ? "OK" : "Delete"}
+        variant={jobDependencyInfo?.hasDependencies ? "default" : "danger"}
+        hideCancelButton={jobDependencyInfo?.hasDependencies}
       />
       <ConfirmationDialog
         isOpen={showRemovePayCodeDialog}

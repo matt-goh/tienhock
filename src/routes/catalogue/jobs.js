@@ -83,6 +83,89 @@ export default function (pool) {
     }
   });
 
+  // Get dependencies for a specific job
+  router.get("/:id/dependencies", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // Check job_pay_codes
+      const payCodesResult = await pool.query(
+        `SELECT jpc.id, jpc.pay_code_id, pc.description
+         FROM job_pay_codes jpc
+         LEFT JOIN pay_codes pc ON pc.id = jpc.pay_code_id
+         WHERE jpc.job_id = $1`,
+        [id]
+      );
+
+      // Check job_location_mappings
+      const locationMappingsResult = await pool.query(
+        `SELECT jlm.id, jlm.location_code, l.name as location_name
+         FROM job_location_mappings jlm
+         LEFT JOIN locations l ON l.id = jlm.location_code
+         WHERE jlm.job_id = $1 AND jlm.is_active = true`,
+        [id]
+      );
+
+      // Check staffs assigned to this job (job is JSONB array)
+      const staffsResult = await pool.query(
+        `SELECT id, name FROM staffs WHERE job ? $1`,
+        [id]
+      );
+      const staffs = staffsResult.rows;
+
+      // Check jobs_job_details
+      const jobDetailsResult = await pool.query(
+        `SELECT jjd.job_detail_id, jd.description
+         FROM jobs_job_details jjd
+         LEFT JOIN job_details jd ON jd.id = jjd.job_detail_id
+         WHERE jjd.job_id = $1`,
+        [id]
+      );
+
+      // Check daily_work_log_entries
+      const dailyWorkLogsResult = await pool.query(
+        `SELECT COUNT(*) as count FROM daily_work_log_entries WHERE job_id = $1`,
+        [id]
+      );
+
+      // Check monthly_work_log_entries
+      const monthlyWorkLogsResult = await pool.query(
+        `SELECT COUNT(*) as count FROM monthly_work_log_entries WHERE job_id = $1`,
+        [id]
+      );
+
+      const payCodes = payCodesResult.rows;
+      const locationMappings = locationMappingsResult.rows;
+      const jobDetails = jobDetailsResult.rows;
+      const dailyWorkLogCount = parseInt(dailyWorkLogsResult.rows[0].count);
+      const monthlyWorkLogCount = parseInt(monthlyWorkLogsResult.rows[0].count);
+
+      const hasDependencies =
+        payCodes.length > 0 ||
+        locationMappings.length > 0 ||
+        staffs.length > 0 ||
+        jobDetails.length > 0 ||
+        dailyWorkLogCount > 0 ||
+        monthlyWorkLogCount > 0;
+
+      res.json({
+        hasDependencies,
+        payCodes,
+        locationMappings,
+        staffs,
+        jobDetails,
+        dailyWorkLogCount,
+        monthlyWorkLogCount,
+      });
+    } catch (error) {
+      console.error("Error checking job dependencies:", error);
+      res.status(500).json({
+        message: "Error checking dependencies",
+        error: error.message,
+      });
+    }
+  });
+
   // Delete job and its details
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;

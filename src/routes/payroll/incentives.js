@@ -11,17 +11,12 @@ export default function (pool) {
   router.get("/", async (req, res) => {
     const { start_date, end_date, employee_id } = req.query;
 
-    console.log("Incentives API - Query params:", {
-      start_date,
-      end_date,
-      employee_id,
-    });
-
     try {
       let query = `
-        SELECT cr.*, s.name as employee_name
+        SELECT cr.*, s.name as employee_name, l.name as location_name
         FROM commission_records cr
         JOIN staffs s ON cr.employee_id = s.id
+        LEFT JOIN locations l ON cr.location_code = l.id
         WHERE 1=1
       `;
       const values = [];
@@ -43,7 +38,7 @@ export default function (pool) {
         paramCount++;
       }
 
-      query += " ORDER BY cr.commission_date DESC";
+      query += " ORDER BY cr.commission_date DESC, cr.location_code";
 
       const result = await pool.query(query, values);
 
@@ -62,13 +57,13 @@ export default function (pool) {
    * Create a new incentive record.
    */
   router.post("/", async (req, res) => {
-    const { employee_id, commission_date, amount, description, created_by } =
+    const { employee_id, commission_date, amount, description, created_by, location_code } =
       req.body;
     try {
       const query = `
         INSERT INTO commission_records (
-          employee_id, commission_date, amount, description, created_by
-        ) VALUES ($1, $2, $3, $4, $5)
+          employee_id, commission_date, amount, description, created_by, location_code
+        ) VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *;
       `;
       const result = await pool.query(query, [
@@ -77,6 +72,7 @@ export default function (pool) {
         amount,
         description,
         created_by,
+        location_code || null, // NULL for bonus entries, location code for commission entries
       ]);
       res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -94,18 +90,19 @@ export default function (pool) {
    */
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { amount, description, commission_date } = req.body;
+    const { amount, description, commission_date, location_code } = req.body;
     try {
       const query = `
         UPDATE commission_records
-        SET amount = $1, description = $2, commission_date = $3
-        WHERE id = $4
+        SET amount = $1, description = $2, commission_date = $3, location_code = $4
+        WHERE id = $5
         RETURNING *;
       `;
       const result = await pool.query(query, [
         amount,
         description,
         commission_date,
+        location_code || null, // NULL for bonus entries
         id,
       ]);
       if (result.rows.length === 0) {

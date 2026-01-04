@@ -1,5 +1,5 @@
 // src/components/Payroll/EditIncentiveModal.tsx
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useMemo } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -9,9 +9,13 @@ import {
 } from "@headlessui/react";
 import Button from "../Button";
 import { IconDeviceFloppy } from "@tabler/icons-react";
-import { FormInput } from "../FormComponents";
+import { FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
+import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
+
+// Commission locations are 16-24
+const COMMISSION_LOCATION_IDS = ["16", "17", "18", "19", "20", "21", "22", "23", "24"];
 
 interface Incentive {
   id: number;
@@ -22,6 +26,8 @@ interface Incentive {
   description: string;
   created_by: string;
   created_at: string;
+  location_code?: string | null;
+  location_name?: string | null;
 }
 
 interface EditIncentiveModalProps {
@@ -37,16 +43,35 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   onSuccess,
   incentive,
 }) => {
+  const { locations } = useLocationsCache();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [incentiveDate, setIncentiveDate] = useState("");
+  const [locationCode, setLocationCode] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Filter locations to only show 16-24 for commission entries
+  const commissionLocationOptions = useMemo(() => {
+    return locations
+      .filter((loc) => COMMISSION_LOCATION_IDS.includes(loc.id))
+      .map((loc) => ({
+        id: loc.id,
+        name: `${loc.id} - ${loc.name}`,
+      }));
+  }, [locations]);
+
+  // Check if this is a commission entry (has location_code or description contains "Commission")
+  const isCommissionEntry = useMemo(() => {
+    if (!incentive) return false;
+    return incentive.location_code || incentive.description?.toUpperCase().includes("COMMISSION");
+  }, [incentive]);
 
   useEffect(() => {
     if (incentive) {
       setAmount(incentive.amount.toString());
       setDescription(incentive.description);
       setIncentiveDate(incentive.commission_date.split("T")[0]);
+      setLocationCode(incentive.location_code || null);
     }
   }, [incentive]);
 
@@ -63,6 +88,12 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
       return;
     }
 
+    // For commission entries, validate location
+    if (isCommissionEntry && !locationCode) {
+      toast.error("Please select a location for commission entries.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -70,6 +101,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
         amount: parseFloat(amount),
         description: description.trim(),
         commission_date: incentiveDate,
+        location_code: isCommissionEntry ? locationCode : null,
       });
 
       toast.success("Incentive updated successfully!");
@@ -119,15 +151,15 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-default-900 p-0 text-left align-middle shadow-xl transition-all">
+                <div className="px-6 py-4 border-b border-default-200 dark:border-default-700">
                   <DialogTitle
                     as="h3"
-                    className="text-xl font-semibold text-default-800"
+                    className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
                     Edit Incentive
                   </DialogTitle>
-                  <p className="text-sm text-default-600 mt-1">
+                  <p className="text-sm text-default-600 dark:text-default-400 mt-1">
                     Employee: {incentive.employee_name} ({incentive.employee_id}
                     )
                   </p>
@@ -143,6 +175,17 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       onChange={(e) => setIncentiveDate(e.target.value)}
                       required
                     />
+
+                    {isCommissionEntry && (
+                      <FormListbox
+                        name="location"
+                        label="Location"
+                        value={locationCode || ""}
+                        onChange={(value) => setLocationCode(value)}
+                        options={commissionLocationOptions}
+                        placeholder="Select Location..."
+                      />
+                    )}
 
                     <FormInput
                       name="amount"
@@ -166,7 +209,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 pt-6">
+                  <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 dark:border-default-700 pt-6">
                     <Button
                       variant="outline"
                       onClick={handleClose}

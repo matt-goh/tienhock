@@ -18,9 +18,9 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { FormListbox } from "../../components/FormComponents";
-import Tab from "../../components/Tab";
 import MonthNavigator from "../../components/MonthNavigator";
 import YearNavigator from "../../components/YearNavigator";
+import SalaryAmountTooltip from "../../components/Payroll/SalaryAmountTooltip";
 import { api } from "../../routes/utils/api";
 import { getMonthName } from "../../utils/payroll/midMonthPayrollUtils";
 import {
@@ -41,32 +41,6 @@ interface LocationOrderItem {
   id?: string;
   text?: string;
 }
-
-const LOCATION_ORDER: LocationOrderItem[] = [
-  { type: "location", id: "01" },
-  { type: "location", id: "02" },
-  { type: "location", id: "03" },
-  { type: "location", id: "04" },
-  { type: "location", id: "06" },
-  { type: "location", id: "07" },
-  { type: "location", id: "08" },
-  { type: "location", id: "09" },
-  { type: "location", id: "10" },
-  { type: "location", id: "11" },
-  { type: "location", id: "13" },
-  { type: "header", text: "KERJA LUAR MAINTENANCE" },
-  { type: "location", id: "14" },
-  { type: "header", text: "COMMISSION" },
-  { type: "location", id: "16" },
-  { type: "location", id: "17" },
-  { type: "location", id: "18" },
-  { type: "location", id: "19" },
-  { type: "location", id: "20" },
-  { type: "location", id: "21" },
-  { type: "location", id: "22" },
-  { type: "location", id: "23" },
-  { type: "location", id: "24" },
-];
 
 interface SalaryReportData {
   no: number;
@@ -105,6 +79,7 @@ interface SalaryReportResponse {
 interface LocationSalaryData {
   location: string;
   employees: {
+    employee_payroll_id: number;
     staff_id: string;
     staff_name: string;
     gaji: number; // Base Pay + Tambahan
@@ -213,6 +188,63 @@ const SalaryReportPage: React.FC = () => {
       map[loc.id] = loc.name;
     });
     return map;
+  }, [locations]);
+
+  // Build LOCATION_ORDER dynamically from database locations
+  const LOCATION_ORDER: LocationOrderItem[] = useMemo(() => {
+    if (locations.length === 0) return [];
+
+    const orderStructure: LocationOrderItem[] = [];
+
+    const addLocation = (id: string) => {
+      if (locations.find((loc) => loc.id === id)) {
+        orderStructure.push({ type: "location", id });
+      }
+    };
+
+    // Build order based on existing structure
+    // Directors & Office
+    addLocation("01");
+    addLocation("02");
+    addLocation("03");
+    addLocation("04");
+    addLocation("06");
+    addLocation("07");
+    addLocation("08");
+    addLocation("09");
+    addLocation("10");
+    addLocation("11");
+    addLocation("13");
+
+    // Maintenance section
+    if (locations.find((loc) => loc.id === "14")) {
+      orderStructure.push({ type: "header", text: "KERJA LUAR MAINTENANCE" });
+      addLocation("14");
+    }
+
+    // Commission section
+    const commissionLocs = ["16", "17", "18", "19", "20", "21"];
+    if (commissionLocs.some((id) => locations.find((loc) => loc.id === id))) {
+      orderStructure.push({ type: "header", text: "COMMISSION" });
+      commissionLocs.forEach(addLocation);
+    }
+
+    // Other locations
+    addLocation("22");
+    addLocation("23");
+    addLocation("24");
+
+    // Add any new locations not in the predefined list (at the end)
+    locations.forEach((loc) => {
+      const alreadyAdded = orderStructure.some(
+        (item) => item.type === "location" && item.id === loc.id
+      );
+      if (!alreadyAdded) {
+        orderStructure.push({ type: "location", id: loc.id });
+      }
+    });
+
+    return orderStructure;
   }, [locations]);
 
   // Bank table data - now comes directly from API
@@ -543,100 +575,100 @@ const SalaryReportPage: React.FC = () => {
     if (!comprehensiveSalaryData) return null;
 
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
+      <div className="overflow-auto max-h-[74vh] border border-default-200 dark:border-gray-700 rounded-lg">
+        <table className="w-full">
+          <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 BIL
               </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 BAHAGIAN KERJA
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 GAJI
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 OT
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 COMM
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 GAJI KASAR
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
               >
                 EPF
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
               >
                 SOCSO
               </th>
               <th
-                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600"
+                className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
               >
                 SIP
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-default-300 dark:border-gray-600">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900">
                 PCB
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 GAJI BERSIH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 1/2 BULAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 JUMLAH DIGENAPKAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 SETELAH DIGENAPKAN
               </th>
             </tr>
-            <tr className="bg-default-50 dark:bg-gray-900/50 border-t border-default-200 dark:border-gray-700">
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+            <tr>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 PKJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 PKJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 MAJ
               </th>
-              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase">
+              <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 PKJ
               </th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -665,53 +697,214 @@ const SalaryReportPage: React.FC = () => {
                   <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
                     {locationNumber}
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left">
-                    {locationName}
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[100px]">
+                    <span className="block truncate" title={locationName}>
+                      {locationName}
+                    </span>
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.gaji || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.gaji || 0}
+                      breakdown={locationData?.employees?.filter(e => e.gaji !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.gaji,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Gaji (Base + Tambahan)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.ot || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.ot || 0}
+                      breakdown={locationData?.employees?.filter(e => e.ot !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.ot,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Overtime"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.bonus || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.bonus || 0}
+                      breakdown={locationData?.employees?.filter(e => e.bonus !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.bonus,
+                        link: `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Bonus"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.comm || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.comm || 0}
+                      breakdown={locationData?.employees?.filter(e => e.comm !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.comm,
+                        link: `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Commission"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.gaji_kasar || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.gaji_kasar || 0}
+                      breakdown={locationData?.employees?.filter(e => e.gaji_kasar !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.gaji_kasar,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Gaji Kasar (Gross)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.epf_majikan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.epf_majikan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.epf_majikan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.epf_majikan,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="EPF Majikan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.epf_pekerja || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.epf_pekerja || 0}
+                      breakdown={locationData?.employees?.filter(e => e.epf_pekerja !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.epf_pekerja,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="EPF Pekerja"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.socso_majikan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.socso_majikan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.socso_majikan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.socso_majikan,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="SOCSO Majikan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.socso_pekerja || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.socso_pekerja || 0}
+                      breakdown={locationData?.employees?.filter(e => e.socso_pekerja !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.socso_pekerja,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="SOCSO Pekerja"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.sip_majikan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.sip_majikan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.sip_majikan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.sip_majikan,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="SIP Majikan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.sip_pekerja || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.sip_pekerja || 0}
+                      breakdown={locationData?.employees?.filter(e => e.sip_pekerja !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.sip_pekerja,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="SIP Pekerja"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
-                  <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
-                    {formatCurrency(locationData?.totals.pcb || 0)}
+                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.pcb || 0}
+                      breakdown={locationData?.employees?.filter(e => e.pcb !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.pcb,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="PCB (Income Tax)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.gaji_bersih || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.gaji_bersih || 0}
+                      breakdown={locationData?.employees?.filter(e => e.gaji_bersih !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.gaji_bersih,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Gaji Bersih (Net)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.setengah_bulan || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.setengah_bulan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.setengah_bulan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.setengah_bulan,
+                        link: `/payroll/mid-month-payrolls?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="1/2 Bulan (Mid-month)"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(locationData?.totals.jumlah || 0)}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.jumlah || 0}
+                      breakdown={locationData?.employees?.filter(e => e.jumlah !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.jumlah,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Jumlah"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
                     {formatCurrency(
@@ -719,91 +912,100 @@ const SalaryReportPage: React.FC = () => {
                     )}
                   </td>
                   <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(
-                      locationData?.totals.setelah_digenapkan || 0
-                    )}
+                    <SalaryAmountTooltip
+                      amount={locationData?.totals.setelah_digenapkan || 0}
+                      breakdown={locationData?.employees?.filter(e => e.setelah_digenapkan !== 0).map(e => ({
+                        description: e.staff_name,
+                        amount: e.setelah_digenapkan,
+                        link: e.employee_payroll_id
+                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
+                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
+                      })) || []}
+                      label="Setelah Digenapkan"
+                      formatCurrency={(v) => formatCurrency(v)}
+                    />
                   </td>
                 </tr>
               );
             })}
           </tbody>
-          <tfoot className="bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
+          <tfoot className="sticky bottom-0 z-20">
             <tr>
               <td
                 colSpan={2}
-                className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center"
+                className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
               >
                 GRAND TOTAL
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_kasar
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.epf_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.socso_pekerja
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_majikan
                 )}
               </td>
-              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.sip_pekerja
                 )}
               </td>
-              <td className="px-2 py-2 text-sm font-bold text-default-900 dark:text-gray-100 text-center border-l border-default-300 dark:border-gray-600">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.gaji_bersih
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setengah_bulan
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.jumlah_digenapkan
                 )}
               </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
                   comprehensiveSalaryData.grand_totals.setelah_digenapkan
                 )}
@@ -904,7 +1106,7 @@ const SalaryReportPage: React.FC = () => {
   const BankTable = () => (
     <div className="overflow-x-auto">
       <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
           <tr>
             <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               NO.
@@ -952,7 +1154,7 @@ const SalaryReportPage: React.FC = () => {
   const PinjamTable = () => (
     <div className="overflow-x-auto">
       <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
           <tr>
             <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
               NO.
@@ -1012,55 +1214,66 @@ const SalaryReportPage: React.FC = () => {
     </div>
   );
 
+  const tabLabels = ["Salary", "Bank", "Pinjam"];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row justify-between items-center">
-        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Salary Report
-        </h1>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <YearNavigator
-            selectedYear={currentYear}
-            onChange={handleYearChange}
-            showGoToCurrentButton={false}
-            label="Year"
-          />
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={setSelectedMonth}
-            showGoToCurrentButton={false}
-            label="Month"
-            formatDisplay={(date) =>
-              date.toLocaleDateString("en-MY", { month: "long" })
-            }
-          />
-          {reportData && (
-            <div className="flex items-end pb-2">
-              <div className="text-sm text-default-600 dark:text-gray-300">
-                <div className="font-medium">
-                  Total: {reportData.total_records} employees
-                </div>
-                <div className="font-medium">
-                  Grand Total: {formatCurrency(reportData.summary.total_final)}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
+    <div className="space-y-3">
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
-              {getMonthName(currentMonth)} {currentYear} Salary Report
-            </h2>
-            <div className="flex space-x-3">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
+                Salary Report
+              </h2>
+              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              {/* Tab buttons */}
+              <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                {tabLabels.map((label, index) => (
+                  <button
+                    key={label}
+                    onClick={() => setActiveTab(index)}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                      activeTab === index
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              <div className="flex items-center gap-2">
+                <YearNavigator
+                  selectedYear={currentYear}
+                  onChange={handleYearChange}
+                  showGoToCurrentButton={false}
+                />
+                <MonthNavigator
+                  selectedMonth={selectedMonth}
+                  onChange={setSelectedMonth}
+                  showGoToCurrentButton={false}
+                  formatDisplay={(date) =>
+                    date.toLocaleDateString("en-MY", { month: "long" })
+                  }
+                />
+              </div>
+              {reportData && (
+                <>
+                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
+                    <span className="font-medium">
+                      {reportData.total_records} employees
+                    </span>
+                    <span className="font-medium">
+                      Total: {formatCurrency(reportData.summary.total_final)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={fetchSalaryReport}
                 icon={IconRefresh}
@@ -1070,63 +1283,61 @@ const SalaryReportPage: React.FC = () => {
               >
                 Refresh
               </Button>
-              <div className="flex space-x-2">
-                <Button
-                  onClick={() => generatePDF("print")}
-                  icon={IconPrinter}
-                  color="green"
-                  variant="outline"
-                  disabled={
-                    !reportData ||
-                    reportData.data.length === 0 ||
-                    isGeneratingPDF
-                  }
-                  size="sm"
-                >
-                  Print
-                </Button>
-                <Button
-                  onClick={() => generatePDF("download")}
-                  icon={IconDownload}
-                  color="blue"
-                  variant="outline"
-                  disabled={
-                    !reportData ||
-                    reportData.data.length === 0 ||
-                    isGeneratingPDF
-                  }
-                  size="sm"
-                >
-                  Download
-                </Button>
-                {activeTab === 1 && (
-                  <>
-                    <Button
-                      onClick={generateTextExport}
-                      icon={IconFileExport}
-                      color="purple"
-                      variant="outline"
-                      disabled={
-                        !reportData ||
-                        reportData.data.length === 0 ||
-                        isGeneratingExport
-                      }
-                      size="sm"
-                    >
-                      Export
-                    </Button>
-                    <Button
-                      onClick={() => setShowExportDialog(true)}
-                      icon={IconLink}
-                      color="orange"
-                      variant="outline"
-                      size="sm"
-                    >
-                      Export Link
-                    </Button>
-                  </>
-                )}
-              </div>
+              <Button
+                onClick={() => generatePDF("print")}
+                icon={IconPrinter}
+                color="green"
+                variant="outline"
+                disabled={
+                  !reportData ||
+                  reportData.data.length === 0 ||
+                  isGeneratingPDF
+                }
+                size="sm"
+              >
+                Print
+              </Button>
+              <Button
+                onClick={() => generatePDF("download")}
+                icon={IconDownload}
+                color="blue"
+                variant="outline"
+                disabled={
+                  !reportData ||
+                  reportData.data.length === 0 ||
+                  isGeneratingPDF
+                }
+                size="sm"
+              >
+                Download
+              </Button>
+              {activeTab === 1 && (
+                <>
+                  <Button
+                    onClick={generateTextExport}
+                    icon={IconFileExport}
+                    color="purple"
+                    variant="outline"
+                    disabled={
+                      !reportData ||
+                      reportData.data.length === 0 ||
+                      isGeneratingExport
+                    }
+                    size="sm"
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    onClick={() => setShowExportDialog(true)}
+                    icon={IconLink}
+                    color="orange"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Export Link
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1147,21 +1358,9 @@ const SalaryReportPage: React.FC = () => {
         ) : (
           <>
             <div className="px-6 py-4">
-              <Tab
-                labels={["Salary", "Bank", "Pinjam"]}
-                defaultActiveTab={activeTab}
-                onTabChange={setActiveTab}
-              >
-                <div>
-                  <ComprehensiveSalaryTable />
-                </div>
-                <div>
-                  <BankTable />
-                </div>
-                <div>
-                  <PinjamTable />
-                </div>
-              </Tab>
+              {activeTab === 0 && <ComprehensiveSalaryTable />}
+              {activeTab === 1 && <BankTable />}
+              {activeTab === 2 && <PinjamTable />}
             </div>
 
             {/* Summary Footer */}

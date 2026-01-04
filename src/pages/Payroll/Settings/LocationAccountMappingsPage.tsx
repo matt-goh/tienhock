@@ -1,6 +1,5 @@
 // src/pages/Payroll/Settings/LocationAccountMappingsPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -20,40 +19,6 @@ import {
   ListboxOption,
   ListboxOptions,
 } from "@headlessui/react";
-
-// Settings navigation tabs
-const SettingsTabs: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const tabs = [
-    { name: "Job Location Mappings", path: "/payroll/settings/job-location-mappings" },
-    { name: "Location Account Mappings", path: "/payroll/settings/location-account-mappings" },
-  ];
-
-  return (
-    <div className="border-b border-default-200 dark:border-gray-700 mb-4">
-      <nav className="flex space-x-6" aria-label="Tabs">
-        {tabs.map((tab) => {
-          const isActive = location.pathname === tab.path;
-          return (
-            <button
-              key={tab.path}
-              onClick={() => navigate(tab.path)}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                isActive
-                  ? "border-sky-500 text-sky-600 dark:text-sky-400"
-                  : "border-transparent text-default-500 hover:text-default-700 hover:border-default-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600"
-              }`}
-            >
-              {tab.name}
-            </button>
-          );
-        })}
-      </nav>
-    </div>
-  );
-};
 
 interface LocationAccountMapping {
   id: number;
@@ -266,10 +231,7 @@ const LocationAccountMappingsPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Settings Navigation Tabs */}
-      <SettingsTabs />
-
+    <div className="space-y-3">
       {/* Header */}
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>

@@ -8,20 +8,25 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
+import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
 import Button from "../Button";
 import { IconDeviceFloppy, IconPlus, IconX } from "@tabler/icons-react";
-import { FormCombobox, FormInput } from "../FormComponents";
+import { FormCombobox, FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
 
 type IncentiveType = "Commission" | "Bonus";
 
+// Commission locations are 16-24
+const COMMISSION_LOCATION_IDS = ["16", "17", "18", "19", "20", "21", "22", "23", "24"];
+
 interface IncentiveEntry {
   id: number; // For unique key in list
   employeeId: string | null;
   amount: string;
   description: string;
+  locationCode: string | null; // For Commission entries only
 }
 
 interface AddIncentiveModalProps {
@@ -42,6 +47,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   incentiveType,
 }) => {
   const { staffs } = useStaffsCache();
+  const { locations } = useLocationsCache();
   const { user } = useAuth();
   const [incentiveDate, setIncentiveDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -50,14 +56,25 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [staffQueries, setStaffQueries] = useState<Record<number, string>>({});
 
+  // Filter locations to only show 16-24 for commission entries
+  const commissionLocationOptions = useMemo(() => {
+    return locations
+      .filter((loc) => COMMISSION_LOCATION_IDS.includes(loc.id))
+      .map((loc) => ({
+        id: loc.id,
+        name: `${loc.id} - ${loc.name}`,
+      }));
+  }, [locations]);
+
   useEffect(() => {
     if (isOpen) {
       // Reset state when modal opens
-      const initialEntry = {
+      const initialEntry: IncentiveEntry = {
         id: Date.now(),
         employeeId: null,
         amount: "",
         description: incentiveType,
+        locationCode: incentiveType === "Commission" ? "18" : null, // Default to COMM-KILANG for Commission
       };
       setEntries([initialEntry]);
       setStaffQueries({});
@@ -108,6 +125,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         employeeId: null,
         amount: "",
         description: incentiveType,
+        locationCode: incentiveType === "Commission" ? "18" : null, // Default to COMM-KILANG for Commission
       },
     ]);
   };
@@ -124,12 +142,19 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   };
 
   const handleSave = async () => {
-    const validEntries = entries.filter(
-      (e) => e.employeeId && parseFloat(e.amount) > 0 && e.description
-    );
+    // For Commission entries, also validate location_code
+    const validEntries = entries.filter((e) => {
+      const hasBasicInfo = e.employeeId && parseFloat(e.amount) > 0 && e.description;
+      if (incentiveType === "Commission") {
+        return hasBasicInfo && e.locationCode;
+      }
+      return hasBasicInfo;
+    });
+
     if (validEntries.length === 0) {
+      const locationMsg = incentiveType === "Commission" ? ", and location" : "";
       toast.error(
-        `Please add at least one valid ${incentiveType.toLowerCase()} entry with staff, amount, and description.`
+        `Please add at least one valid ${incentiveType.toLowerCase()} entry with staff, amount${locationMsg}, and description.`
       );
       return;
     }
@@ -143,6 +168,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         amount: parseFloat(entry.amount),
         description: entry.description,
         created_by: user?.id,
+        location_code: incentiveType === "Commission" ? entry.locationCode : null,
       };
       return api.post("/api/incentives", payload);
     });
@@ -199,11 +225,11 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-4xl transform rounded-2xl bg-white p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200">
+              <DialogPanel className="w-full max-w-4xl transform rounded-2xl bg-white dark:bg-default-900 p-0 text-left align-middle shadow-xl transition-all">
+                <div className="px-6 py-4 border-b border-default-200 dark:border-default-700">
                   <DialogTitle
                     as="h3"
-                    className="text-xl font-semibold text-default-800"
+                    className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
                     Record Staff {incentiveType}
                   </DialogTitle>
@@ -224,16 +250,21 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                   <table className="min-w-full">
                     <thead>
                       <tr>
-                        <th className="py-2 text-left font-medium text-default-600 w-2/5">
+                        <th className={`py-2 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
                           Staff
                         </th>
-                        <th className="py-2 px-3 text-left font-medium text-default-600 w-1/5">
+                        {incentiveType === "Commission" && (
+                          <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/4">
+                            Location
+                          </th>
+                        )}
+                        <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
                           Amount (RM)
                         </th>
-                        <th className="py-2 px-3 text-left font-medium text-default-600 w-2/5">
+                        <th className={`py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-2/5"}`}>
                           Description
                         </th>
-                        <th className="py-2 text-left font-medium text-default-600"></th>
+                        <th className="py-2 text-left font-medium text-default-600 dark:text-default-400"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -256,6 +287,20 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                               mode="single"
                             />
                           </td>
+                          {incentiveType === "Commission" && (
+                            <td className="py-2 px-3 align-top">
+                              <FormListbox
+                                name={`location-${index}`}
+                                label=""
+                                value={entry.locationCode || ""}
+                                onChange={(value) =>
+                                  handleEntryChange(index, "locationCode", value)
+                                }
+                                options={commissionLocationOptions}
+                                placeholder="Select Location..."
+                              />
+                            </td>
+                          )}
                           <td className="py-2 px-3 align-top">
                             <FormInput
                               name={`amount-${index}`}
@@ -305,7 +350,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center mt-6 border-t border-default-200 pt-6">
+                  <div className="flex justify-between items-center mt-6 border-t border-default-200 dark:border-default-700 pt-6">
                     <Button
                       variant="outline"
                       onClick={addEntryRow}
