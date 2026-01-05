@@ -8,7 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
+import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import Button from "../Button";
 import { IconDeviceFloppy, IconPlus, IconX } from "@tabler/icons-react";
 import { FormCombobox, FormInput, FormListbox } from "../FormComponents";
@@ -47,7 +47,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   incentiveType,
 }) => {
   const { staffs } = useStaffsCache();
-  const { locations } = useLocationsCache();
+  const { locations } = useLocationMappingsCache();
   const { user } = useAuth();
   const [incentiveDate, setIncentiveDate] = useState(
     new Date().toISOString().split("T")[0]

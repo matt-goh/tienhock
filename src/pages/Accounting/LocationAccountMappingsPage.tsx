@@ -1,13 +1,12 @@
 // src/pages/Accounting/LocationAccountMappingsPage.tsx
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../routes/utils/api";
+import {
+  useLocationMappingsCache,
+  LocationAccountMapping,
+  Location,
+} from "../../utils/catalogue/useLocationMappingsCache";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
@@ -37,22 +36,6 @@ import {
   ListboxOptions,
   ListboxOption,
 } from "@headlessui/react";
-
-interface LocationAccountMapping {
-  id: number;
-  location_id: string;
-  location_name: string;
-  mapping_type: string;
-  account_code: string;
-  account_description?: string;
-  voucher_type: "JVDR" | "JVSL";
-  is_active: boolean;
-}
-
-interface Location {
-  id: string;
-  name: string;
-}
 
 interface LocationDetails {
   jobs: Array<{ job_id: number; job_name: string }>;
@@ -617,9 +600,19 @@ const CATEGORY_CONFIG = {
 };
 
 const LocationAccountMappingsPage: React.FC = () => {
-  const [mappings, setMappings] = useState<LocationAccountMapping[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Use cached location mappings
+  const {
+    locations,
+    accountMappings,
+    jobMappings,
+    employeeMappings,
+    loading,
+    invalidateAccountMappings,
+  } = useLocationMappingsCache();
+
+  // Get mappings from cache
+  const mappings = accountMappings.mappings;
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"JVDR" | "JVSL">("JVSL");
 
@@ -647,46 +640,17 @@ const LocationAccountMappingsPage: React.FC = () => {
   const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">("ms");
 
   // Tooltip state
-  const [hoveredMapping, setHoveredMapping] = useState<LocationAccountMapping | null>(null);
+  const [hoveredMapping, setHoveredMapping] =
+    useState<LocationAccountMapping | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{
     x: number;
     y: number;
     position: "below" | "above";
   } | null>(null);
-  const [locationDetails, setLocationDetails] = useState<LocationDetails | null>(null);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [locationDetails, setLocationDetails] =
+    useState<LocationDetails | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const detailsCacheRef = useRef<Record<string, LocationDetails>>({});
   const navigate = useNavigate();
-
-  // Fetch data
-  const fetchMappings = useCallback(async () => {
-    try {
-      const response = await api.get("/api/journal-vouchers/mappings");
-      setMappings(response as LocationAccountMapping[]);
-    } catch (error) {
-      console.error("Error fetching mappings:", error);
-      toast.error("Failed to load mappings");
-    }
-  }, []);
-
-  const fetchLocations = useCallback(async () => {
-    try {
-      const response = await api.get("/api/locations");
-      setLocations(response as Location[]);
-    } catch (error) {
-      console.error("Error fetching locations:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchMappings(), fetchLocations()]);
-      setLoading(false);
-    };
-    loadData();
-  }, [fetchMappings, fetchLocations]);
 
   // Get expected account codes for current tab
   const expectedAccountCodes =
@@ -824,7 +788,7 @@ const LocationAccountMappingsPage: React.FC = () => {
       });
       toast.success("Mapping created successfully");
       setShowAddModal(false);
-      fetchMappings();
+      invalidateAccountMappings();
     } catch (error: unknown) {
       console.error("Error saving mapping:", error);
       const errorMessage =
@@ -843,7 +807,7 @@ const LocationAccountMappingsPage: React.FC = () => {
       toast.success("Mapping deleted successfully");
       setShowDeleteDialog(false);
       setMappingToDelete(null);
-      fetchMappings();
+      invalidateAccountMappings();
     } catch (error: unknown) {
       console.error("Error deleting mapping:", error);
       const errorMessage =
@@ -907,28 +871,27 @@ const LocationAccountMappingsPage: React.FC = () => {
     }
 
     // Delay showing tooltip
-    tooltipTimeoutRef.current = setTimeout(async () => {
+    tooltipTimeoutRef.current = setTimeout(() => {
       setHoveredMapping(mapping);
 
-      // Check cache first
-      if (detailsCacheRef.current[mapping.location_id]) {
-        setLocationDetails(detailsCacheRef.current[mapping.location_id]);
-        return;
-      }
+      // Use cached data from the hook instead of API call
+      const locationId = mapping.location_id;
+      const cachedJobs = jobMappings.byLocation[locationId]?.jobs || [];
+      const cachedEmployees = employeeMappings.byLocation[locationId]?.employees || [];
 
-      // Fetch location details
-      setIsLoadingDetails(true);
-      try {
-        const response = await api.get(`/api/locations/${mapping.location_id}/dependencies`);
-        const details = response as LocationDetails;
-        detailsCacheRef.current[mapping.location_id] = details;
-        setLocationDetails(details);
-      } catch (error) {
-        console.error("Error fetching location details:", error);
-        setLocationDetails({ jobs: [], staffs: [], hasDependencies: false });
-      } finally {
-        setIsLoadingDetails(false);
-      }
+      const details: LocationDetails = {
+        jobs: cachedJobs.map((j) => ({
+          job_id: parseInt(j.job_id) || 0,
+          job_name: j.job_name,
+        })),
+        staffs: cachedEmployees.map((e) => ({
+          id: parseInt(e.employee_id) || 0,
+          name: e.employee_name,
+        })),
+        hasDependencies: cachedJobs.length > 0 || cachedEmployees.length > 0,
+      };
+
+      setLocationDetails(details);
     }, 200);
   };
 
@@ -1812,12 +1775,7 @@ const LocationAccountMappingsPage: React.FC = () => {
           </button>
 
           <div className="border-t border-default-200 dark:border-gray-700 pt-2 space-y-2">
-            {isLoadingDetails ? (
-              <div className="flex items-center justify-center py-2">
-                <div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-default-500 ml-2">Loading...</span>
-              </div>
-            ) : locationDetails ? (
+            {locationDetails ? (
               <>
                 {/* Jobs */}
                 <div>
