@@ -202,14 +202,14 @@ const InvoiceSoloPrintOverlay: React.FC<InvoiceSoloPrintOverlayProps> = ({
 
   return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl p-6 border border-default-200">
+      <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-2xl p-6 border border-default-200 dark:border-gray-700">
         <div className="flex items-center space-x-4">
           <LoadingSpinner hideText/>
           <div>
-            <p className="text-default-800 font-medium">
+            <p className="text-default-800 dark:text-gray-100 font-medium">
               {isGenerating ? "Generating PDF..." : "Opening print dialog..."}
             </p>
-            <p className="text-default-600 text-sm mt-1">
+            <p className="text-default-600 dark:text-gray-400 text-sm mt-1">
               {isGenerating
                 ? "Please wait while we prepare your document"
                 : "The print dialog should open shortly"}
@@ -217,8 +217,8 @@ const InvoiceSoloPrintOverlay: React.FC<InvoiceSoloPrintOverlayProps> = ({
           </div>
         </div>
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 text-sm">{error}</p>
+          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-800 dark:text-red-400 text-sm">{error}</p>
           </div>
         )}
       </div>
