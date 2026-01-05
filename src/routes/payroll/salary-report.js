@@ -41,6 +41,7 @@ export default function (pool) {
           FROM employee_job_location_exclusions
         ),
         -- Base payroll data without location (we'll join locations later)
+        -- For combined payrolls (same-name staff), use Head's job for location
         employee_payroll_base AS (
           SELECT
             ep.id as employee_payroll_id,
@@ -54,10 +55,25 @@ export default function (pool) {
             ep.net_pay,
             ep.job_type,
             ep.section,
-            jlm.location_code as job_location_code
+            -- Use Head's job location if head_staff_id is set, otherwise use direct job location
+            COALESCE(
+              head_jlm.location_code,  -- HEAD's job location (when head_staff_id is set)
+              jlm.location_code        -- Fallback to direct job location
+            ) as job_location_code
           FROM employee_payrolls ep
           JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
           JOIN staffs s ON ep.employee_id = s.id
+          -- Get HEAD staff info (if head_staff_id is set)
+          LEFT JOIN staffs head_s ON head_s.id = s.head_staff_id
+          -- Get HEAD's first job location
+          LEFT JOIN LATERAL (
+            SELECT jlm_inner.location_code
+            FROM jsonb_array_elements_text(COALESCE(head_s.job, '[]'::jsonb)) AS job_elem(job_id)
+            JOIN job_location_mappings jlm_inner ON job_elem.job_id = jlm_inner.job_id
+              AND jlm_inner.is_active = true
+            LIMIT 1
+          ) head_jlm ON head_s.id IS NOT NULL
+          -- Direct job location mapping (fallback)
           LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
