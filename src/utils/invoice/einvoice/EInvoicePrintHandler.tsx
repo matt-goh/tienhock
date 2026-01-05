@@ -252,10 +252,10 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
       {isLoadingDialogVisible && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-gray-100 border-t-sky-500 rounded-full animate-spin" />
-              <p className="text-base font-medium text-default-900">
+              <div className="w-8 h-8 border-4 border-gray-100 dark:border-gray-700 border-t-sky-500 dark:border-t-sky-400 rounded-full animate-spin" />
+              <p className="text-base font-medium text-default-900 dark:text-gray-100">
                 {isGenerating
                   ? "Preparing document for printing..."
                   : "Opening print dialog..."}
@@ -266,7 +266,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
                   setIsPrinting(false);
                   setIsGenerating(false);
                 }}
-                className="mt-1 text-sm text-center text-sky-600 hover:underline"
+                className="mt-1 text-sm text-center text-sky-600 dark:text-sky-400 hover:underline"
               >
                 Close
               </button>
