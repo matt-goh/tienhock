@@ -1928,7 +1928,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
         {/* Payment History Section */}
         <div className="p-4">
-          <h2 className="text-base font-semibold mb-3 text-gray-800">
+          <h2 className="text-base font-semibold mb-3 text-gray-800 dark:text-gray-100">
             Payment History
           </h2>
           {payments.length === 0 ? (
@@ -1936,8 +1936,8 @@ const InvoiceDetailsPage: React.FC = () => {
               No payments recorded yet.
             </p>
           ) : (
-            <div className="max-h-[calc(100vh-500px)] overflow-y-auto border border-gray-200 rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <div className="max-h-[calc(100vh-500px)] overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
@@ -1963,15 +1963,15 @@ const InvoiceDetailsPage: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {payments.map((p) => (
                     <tr
                       key={p.payment_id}
-                      className={`hover:bg-gray-50 transition-colors ${
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                         p.status === "cancelled"
-                          ? "bg-gray-50 text-gray-400 line-through"
+                          ? "bg-gray-50 dark:bg-gray-900/50 text-gray-400 dark:text-gray-500 line-through"
                           : p.status === "pending"
-                          ? "bg-yellow-50"
+                          ? "bg-yellow-50 dark:bg-yellow-900/20"
                           : ""
                       }`}
                     >
@@ -1979,11 +1979,11 @@ const InvoiceDetailsPage: React.FC = () => {
                         {formatDisplayDate(new Date(p.payment_date))}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
                           {p.payment_method.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center">
                           <span>{p.payment_reference || "-"}</span>
                           {p.payment_reference && p.status != "cancelled" && (
@@ -1998,12 +1998,12 @@ const InvoiceDetailsPage: React.FC = () => {
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                             p.status === "cancelled"
-                              ? "bg-red-100 text-red-700"
+                              ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
                               : p.status === "pending"
-                              ? "bg-yellow-100 text-yellow-700"
+                              ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
                               : p.status === "overpaid"
-                              ? "bg-indigo-100 text-indigo-700"
-                              : "bg-green-100 text-green-700"
+                              ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                              : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
                           }`}
                         >
                           {p.status === "cancelled"
@@ -2015,10 +2015,10 @@ const InvoiceDetailsPage: React.FC = () => {
                             : "Paid"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 truncate max-w-xs">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                         {p.notes || "-"}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-green-600">
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(p.amount_paid)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
@@ -2163,7 +2163,7 @@ const InvoiceDetailsPage: React.FC = () => {
       {isEditingOrderDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 -top-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center p-6 border-b">
+            <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Edit Line Items
               </h3>
@@ -2172,7 +2172,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   setIsEditingOrderDetails(false);
                   setEditedProducts([]);
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={isUpdatingOrderDetails}
               >
                 <IconX size={20} />
@@ -2181,7 +2181,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
             <div className="flex-1 px-6 py-4">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
                   Modify the line items for this invoice
                 </span>
                 <div>
@@ -2226,7 +2226,7 @@ const InvoiceDetailsPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50 dark:bg-gray-900/50">
+            <div className="flex justify-end space-x-3 p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -2262,7 +2262,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   setSelectedCustomer(null);
                   setCustomerQuery("");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={isUpdatingCustomer}
               >
                 <IconX size={20} />
@@ -2323,7 +2323,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   setIsEditingSalesman(false);
                   setSelectedSalesman("");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={isUpdatingSalesman}
               >
                 <IconX size={20} />
@@ -2380,7 +2380,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   setIsEditingPaymentType(false);
                   setSelectedPaymentType("INVOICE");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={isUpdatingPaymentType}
               >
                 <IconX size={20} />
@@ -2406,13 +2406,13 @@ const InvoiceDetailsPage: React.FC = () => {
 
             {/* Warning message about automatic payment handling */}
             {selectedPaymentType !== invoiceData?.paymenttype && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                 <div className="flex items-start">
                   <IconAlertTriangle
                     size={16}
-                    className="text-amber-600 mt-0.5 mr-2 flex-shrink-0"
+                    className="text-amber-600 dark:text-amber-400 mt-0.5 mr-2 flex-shrink-0"
                   />
-                  <div className="text-sm text-amber-800">
+                  <div className="text-sm text-amber-800 dark:text-amber-200">
                     {selectedPaymentType === "CASH" ? (
                       <span>
                         <strong>Note:</strong> Changing to CASH will
@@ -2467,7 +2467,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   setIsEditingDateTime(false);
                   setSelectedDateTime("");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={isUpdatingDateTime}
               >
                 <IconX size={20} />
@@ -2520,7 +2520,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   setIsEditingUUID(false);
                   setSelectedUUID("");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={isUpdatingUUID}
               >
                 <IconX size={20} />
@@ -2544,13 +2544,13 @@ const InvoiceDetailsPage: React.FC = () => {
             </div>
 
             {/* Warning message */}
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <div className="flex items-start">
                 <IconAlertTriangle
                   size={16}
-                  className="text-amber-600 mt-0.5 mr-2 flex-shrink-0"
+                  className="text-amber-600 dark:text-amber-400 mt-0.5 mr-2 flex-shrink-0"
                 />
-                <div className="text-sm text-amber-800">
+                <div className="text-sm text-amber-800 dark:text-amber-200">
                   <strong>Warning:</strong> Only use this if the e-invoice was
                   successfully submitted to MyInvois but the UUID wasn't
                   recorded. Setting an incorrect UUID may cause issues with
@@ -2627,14 +2627,14 @@ const InvoiceDetailsPage: React.FC = () => {
                     {formatCurrency(overpaymentDetails.regularAmount)}
                   </span>
                 </div>
-                <div className="flex justify-between border-t pt-2 mt-2">
+                <div className="flex justify-between border-t dark:border-gray-700 pt-2 mt-2">
                   <span>Overpaid Amount:</span>
-                  <span className="font-medium text-indigo-600">
+                  <span className="font-medium text-indigo-600 dark:text-indigo-400">
                     {formatCurrency(overpaymentDetails.overpaidAmount)}
                   </span>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 The overpaid amount will be recorded as a separate "Overpaid"
                 payment record.
               </p>

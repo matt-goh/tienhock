@@ -119,6 +119,7 @@ const HomePage: React.FC = () => {
       Rentals: "Manage dumpster rentals",
       Invoices: "Billing and invoicing",
       Payments: "Track payments and transactions",
+      Payroll: "Employee payroll management",
       Debtors: "Track outstanding payments",
       Customers: "Customer management",
       Dumpsters: "Dumpster management",

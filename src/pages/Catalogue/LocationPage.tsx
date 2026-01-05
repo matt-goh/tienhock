@@ -1,5 +1,5 @@
 // src/pages/Catalogue/LocationPage.tsx
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   IconPlus,
   IconPencil,
@@ -11,9 +11,9 @@ import {
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import {
-  useLocationsCache,
+  useLocationMappingsCache,
   Location,
-} from "../../utils/catalogue/useLocationsCache";
+} from "../../utils/catalogue/useLocationMappingsCache";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -45,78 +45,41 @@ interface DependencyInfo {
 }
 
 const LocationPage: React.FC = () => {
-  const { locations, isLoading, error, refreshLocations } = useLocationsCache();
+  // Use cached location mappings
+  const {
+    locations,
+    jobMappings,
+    employeeMappings,
+    loading: isLoading,
+    error,
+    refreshData,
+  } = useLocationMappingsCache();
+
   const [searchTerm, setSearchTerm] = useState("");
 
   // Track expanded employee lists per location
-  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(
+    new Set()
+  );
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [locationToEdit, setLocationToEdit] = useState<Location | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
-  const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(
+    null
+  );
+  const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(
+    null
+  );
   const [isCheckingDependencies, setIsCheckingDependencies] = useState(false);
 
-  // Job mappings data
-  const [jobMappingsData, setJobMappingsData] = useState<{
-    locationSummary: Array<{
-      location_code: string;
-      location_name: string;
-      jobs: JobMapping[];
-    }>;
-  } | null>(null);
-
-  // Fetch job mappings summary
-  const fetchJobMappings = useCallback(async () => {
-    try {
-      const response = await api.get("/api/locations/job-mappings");
-      setJobMappingsData(response);
-    } catch (err) {
-      console.error("Error fetching job mappings:", err);
-    }
-  }, []);
-
-  // Initial fetch on mount
-  useEffect(() => {
-    fetchJobMappings();
-  }, [fetchJobMappings]);
-
-  // Employee mappings data
-  const [employeeMappingsData, setEmployeeMappingsData] = useState<{
-    locationSummary: Array<{
-      location_code: string;
-      employees: EmployeeMapping[];
-    }>;
-  } | null>(null);
-
-  // Fetch employee mappings summary
-  const fetchEmployeeMappings = useCallback(async () => {
-    try {
-      const response = await api.get("/api/locations/employee-mappings");
-      setEmployeeMappingsData(response);
-    } catch (err) {
-      console.error("Error fetching employee mappings:", err);
-    }
-  }, []);
-
-  // Initial fetch on mount
-  useEffect(() => {
-    fetchEmployeeMappings();
-  }, [fetchEmployeeMappings]);
-
-  // Merge locations with job and employee data
+  // Merge locations with job and employee data from cache
   const locationsWithMappings = useMemo<LocationWithMappings[]>(() => {
-    return locations.map((loc) => {
-      const locationJobs =
-        jobMappingsData?.locationSummary.find(
-          (ls) => ls.location_code === loc.id
-        )?.jobs || [];
+    return locations.map((loc: Location) => {
+      const locationJobs = jobMappings.byLocation[loc.id]?.jobs || [];
       const locationEmployees =
-        employeeMappingsData?.locationSummary.find(
-          (ls) => ls.location_code === loc.id
-        )?.employees || [];
+        employeeMappings.byLocation[loc.id]?.employees || [];
       return {
         ...loc,
         jobs: locationJobs,
@@ -125,7 +88,7 @@ const LocationPage: React.FC = () => {
         employeeCount: locationEmployees.length,
       };
     });
-  }, [locations, jobMappingsData, employeeMappingsData]);
+  }, [locations, jobMappings.byLocation, employeeMappings.byLocation]);
 
   // Filtered locations
   const filteredLocations = useMemo(() => {
@@ -233,12 +196,14 @@ const LocationPage: React.FC = () => {
       setShowDeleteDialog(false);
       setLocationToDelete(null);
       setDependencyInfo(null);
-      refreshLocations();
-    } catch (err: any) {
+      refreshData();
+    } catch (err: unknown) {
       console.error("Error deleting location:", err);
-      toast.error(err.message || "Failed to delete location");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete location"
+      );
     }
-  }, [locationToDelete, dependencyInfo, refreshLocations]);
+  }, [locationToDelete, dependencyInfo, refreshData]);
 
   if (isLoading) {
     return (
@@ -251,7 +216,7 @@ const LocationPage: React.FC = () => {
   if (error) {
     return (
       <div className="mt-20 flex w-full items-center justify-center text-rose-600 dark:text-rose-400">
-        Error loading locations: {error.message}
+        Error loading locations: {error}
       </div>
     );
   }
@@ -454,10 +419,8 @@ const LocationPage: React.FC = () => {
         onClose={handleModalClose}
         onSave={handleSaveLocation}
         onComplete={() => {
-          // Refresh all data once after modal closes
-          refreshLocations();
-          fetchJobMappings();
-          fetchEmployeeMappings();
+          // Refresh all cached data after modal closes
+          refreshData();
         }}
         initialData={locationToEdit}
         existingLocations={locations}
