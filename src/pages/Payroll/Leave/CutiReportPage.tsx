@@ -398,35 +398,35 @@ const CutiReportPage: React.FC = () => {
           Leave Balances ({currentYear})
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-sky-50 p-4 rounded-lg border border-sky-200">
-            <p className="font-semibold text-sky-800">Cuti Tahunan</p>
+          <div className="bg-sky-50 dark:bg-sky-900/30 p-4 rounded-lg border border-sky-200 dark:border-sky-800">
+            <p className="font-semibold text-sky-800 dark:text-sky-300">Cuti Tahunan</p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                 {remainingTahunan}
               </span>
-              <span className="text-sm text-sky-500">
+              <span className="text-sm text-sky-500 dark:text-sky-400">
                 / {balances.cuti_tahunan_total} days
               </span>
             </div>
           </div>
-          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-            <p className="font-semibold text-amber-800">Cuti Sakit</p>
+          <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+            <p className="font-semibold text-amber-800 dark:text-amber-300">Cuti Sakit</p>
             <div className="flex justify-between items-baseline mt-2">
-              <span className="text-2xl font-bold text-amber-600">
+              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 {remainingSakit}
               </span>
-              <span className="text-sm text-amber-500">
+              <span className="text-sm text-amber-500 dark:text-amber-400">
                 / {balances.cuti_sakit_total} days
               </span>
             </div>
           </div>
-          <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-            <p className="font-semibold text-emerald-800">Cuti Umum</p>
+          <div className="bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
+            <p className="font-semibold text-emerald-800 dark:text-emerald-300">Cuti Umum</p>
             <div className="flex justify-between items-baseline mt-2">
-              <span className="text-2xl font-bold text-emerald-600">
+              <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {remainingUmum}
               </span>
-              <span className="text-sm text-emerald-500">
+              <span className="text-sm text-emerald-500 dark:text-emerald-400">
                 / {balances.cuti_umum_total} days
               </span>
             </div>
@@ -500,7 +500,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 <th
                   colSpan={3}
-                  className="py-3 px-4 text-center text-sm font-semibold text-sky-800 uppercase border-b border-r-2 border-default-300 dark:border-gray-600 bg-sky-100"
+                  className="py-3 px-4 text-center text-sm font-semibold text-sky-800 dark:text-sky-300 uppercase border-b border-r-2 border-default-300 dark:border-gray-600 bg-sky-100 dark:bg-sky-900/40"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-sky-500"></div>
@@ -509,7 +509,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 <th
                   colSpan={3}
-                  className="py-3 px-4 text-center text-sm font-semibold text-amber-800 uppercase border-b border-r-2 border-default-300 dark:border-gray-600 bg-amber-100"
+                  className="py-3 px-4 text-center text-sm font-semibold text-amber-800 dark:text-amber-300 uppercase border-b border-r-2 border-default-300 dark:border-gray-600 bg-amber-100 dark:bg-amber-900/40"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-amber-500"></div>
@@ -518,7 +518,7 @@ const CutiReportPage: React.FC = () => {
                 </th>
                 <th
                   colSpan={3}
-                  className="py-3 px-4 text-center text-sm font-semibold text-emerald-800 uppercase border-b bg-emerald-100"
+                  className="py-3 px-4 text-center text-sm font-semibold text-emerald-800 dark:text-emerald-300 uppercase border-b bg-emerald-100 dark:bg-emerald-900/40"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
@@ -529,33 +529,33 @@ const CutiReportPage: React.FC = () => {
               {/* Sub-header row with column details */}
               <tr className="bg-default-50 dark:bg-gray-900/50">
                 {/* Cuti Tahunan sub-headers */}
-                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase border-r border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30">
                   Days Used
                 </th>
-                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r border-sky-200 bg-sky-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase border-r border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30">
                   Amount
                 </th>
-                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-sky-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-sky-50 dark:bg-sky-900/30">
                   Balance
                 </th>
                 {/* Cuti Sakit sub-headers */}
-                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 dark:text-amber-300 uppercase border-r border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30">
                   Days Used
                 </th>
-                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r border-amber-200 bg-amber-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 dark:text-amber-300 uppercase border-r border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30">
                   Amount
                 </th>
-                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-amber-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 dark:text-amber-300 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-amber-50 dark:bg-amber-900/30">
                   Balance
                 </th>
                 {/* Cuti Umum sub-headers */}
-                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase border-r border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30">
                   Days Used
                 </th>
-                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase border-r border-emerald-200 bg-emerald-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase border-r border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30">
                   Amount
                 </th>
-                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 uppercase bg-emerald-50">
+                <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase bg-emerald-50 dark:bg-emerald-900/30">
                   Balance
                 </th>
               </tr>
@@ -578,28 +578,28 @@ const CutiReportPage: React.FC = () => {
                     </td>
 
                     {/* Cuti Tahunan columns */}
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-sky-100 bg-sky-25">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-sky-100 dark:border-sky-800/50 bg-sky-25 dark:bg-sky-900/10">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           summary.cuti_tahunan.days > 0
                             ? "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
-                            : "bg-default-100 text-default-500"
+                            : "bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400"
                         }`}
                       >
                         {summary.cuti_tahunan.days || "0"}
                       </span>
                     </td>
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-sky-100 bg-sky-25">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-sky-100 dark:border-sky-800/50 bg-sky-25 dark:bg-sky-900/10">
                       <span className="font-medium">
                         {formatCurrency(summary.cuti_tahunan.amount)}
                       </span>
                     </td>
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-700 border-r-2 border-default-300 dark:border-gray-600 bg-sky-50">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-700 dark:text-sky-300 border-r-2 border-default-300 dark:border-gray-600 bg-sky-50 dark:bg-sky-900/20">
                       <span
-                        className={`px-3 py-1 rounded-full text-sky-800 ${
+                        className={`px-3 py-1 rounded-full ${
                           balances.tahunanBalance < 0
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-sky-100"
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+                            : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
                         }`}
                       >
                         {balances.tahunanBalance}
@@ -607,28 +607,28 @@ const CutiReportPage: React.FC = () => {
                     </td>
 
                     {/* Cuti Sakit columns */}
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-amber-100 bg-amber-25">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-amber-100 dark:border-amber-800/50 bg-amber-25 dark:bg-amber-900/10">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           summary.cuti_sakit.days > 0
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-default-100 text-default-500"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                            : "bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400"
                         }`}
                       >
                         {summary.cuti_sakit.days || "0"}
                       </span>
                     </td>
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-amber-100 bg-amber-25">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-amber-100 dark:border-amber-800/50 bg-amber-25 dark:bg-amber-900/10">
                       <span className="font-medium">
                         {formatCurrency(summary.cuti_sakit.amount)}
                       </span>
                     </td>
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-700 border-r-2 border-default-300 dark:border-gray-600 bg-amber-50">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-700 dark:text-amber-300 border-r-2 border-default-300 dark:border-gray-600 bg-amber-50 dark:bg-amber-900/20">
                       <span
-                        className={`px-3 py-1 rounded-full text-amber-800 ${
+                        className={`px-3 py-1 rounded-full ${
                           balances.sakitBalance < 0
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-amber-100"
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
                         }`}
                       >
                         {balances.sakitBalance}
@@ -636,28 +636,28 @@ const CutiReportPage: React.FC = () => {
                     </td>
 
                     {/* Cuti Umum columns */}
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-emerald-100 bg-emerald-25">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-emerald-100 dark:border-emerald-800/50 bg-emerald-25 dark:bg-emerald-900/10">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           summary.cuti_umum.days > 0
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                            : "bg-default-100 text-default-500"
+                            : "bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400"
                         }`}
                       >
                         {summary.cuti_umum.days || "0"}
                       </span>
                     </td>
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-emerald-100 bg-emerald-25">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center text-default-700 dark:text-gray-200 border-r border-emerald-100 dark:border-emerald-800/50 bg-emerald-25 dark:bg-emerald-900/10">
                       <span className="font-medium">
                         {formatCurrency(summary.cuti_umum.amount)}
                       </span>
                     </td>
-                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-700 bg-emerald-50">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/20">
                       <span
-                        className={`px-3 py-1 rounded-full text-emerald-800 ${
+                        className={`px-3 py-1 rounded-full ${
                           balances.umumBalance < 0
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-emerald-100"
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+                            : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
                         }`}
                       >
                         {balances.umumBalance}
@@ -674,15 +674,15 @@ const CutiReportPage: React.FC = () => {
                 </td>
 
                 {/* Cuti Tahunan totals */}
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r border-sky-200 bg-sky-50">
-                  <span className="px-2 py-1 rounded-full bg-sky-200 text-sky-900">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 dark:text-sky-300 border-r border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30">
+                  <span className="px-2 py-1 rounded-full bg-sky-200 dark:bg-sky-900/50 text-sky-900 dark:text-sky-300">
                     {Object.values(monthlySummary).reduce(
                       (sum, month) => sum + month.cuti_tahunan.days,
                       0
                     )}
                   </span>
                 </td>
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r border-sky-200 bg-sky-50">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 dark:text-sky-300 border-r border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30">
                   <span className="font-bold">
                     {formatCurrency(
                       Object.values(monthlySummary).reduce(
@@ -692,14 +692,14 @@ const CutiReportPage: React.FC = () => {
                     )}
                   </span>
                 </td>
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 border-r-2 border-default-300 dark:border-gray-600 bg-sky-100">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-sky-800 dark:text-sky-300 border-r-2 border-default-300 dark:border-gray-600 bg-sky-100 dark:bg-sky-900/40">
                   <span
                     className={`px-3 py-1 rounded-full font-bold ${
                       leaveBalances.cuti_tahunan_total -
                         (leaveTaken.cuti_tahunan || 0) <
                       0
-                        ? "bg-rose-200 text-rose-900"
-                        : "bg-sky-200 text-sky-900"
+                        ? "bg-rose-200 text-rose-900 dark:bg-rose-900/50 dark:text-rose-300"
+                        : "bg-sky-200 text-sky-900 dark:bg-sky-900/50 dark:text-sky-300"
                     }`}
                   >
                     {leaveBalances.cuti_tahunan_total -
@@ -708,15 +708,15 @@ const CutiReportPage: React.FC = () => {
                 </td>
 
                 {/* Cuti Sakit totals */}
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r border-amber-200 bg-amber-50">
-                  <span className="px-2 py-1 rounded-full bg-amber-200 text-amber-900">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 dark:text-amber-300 border-r border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30">
+                  <span className="px-2 py-1 rounded-full bg-amber-200 dark:bg-amber-900/50 text-amber-900 dark:text-amber-300">
                     {Object.values(monthlySummary).reduce(
                       (sum, month) => sum + month.cuti_sakit.days,
                       0
                     )}
                   </span>
                 </td>
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r border-amber-200 bg-amber-50">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 dark:text-amber-300 border-r border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30">
                   <span className="font-bold">
                     {formatCurrency(
                       Object.values(monthlySummary).reduce(
@@ -726,14 +726,14 @@ const CutiReportPage: React.FC = () => {
                     )}
                   </span>
                 </td>
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 border-r-2 border-default-300 dark:border-gray-600 bg-amber-100">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-amber-800 dark:text-amber-300 border-r-2 border-default-300 dark:border-gray-600 bg-amber-100 dark:bg-amber-900/40">
                   <span
                     className={`px-3 py-1 rounded-full font-bold ${
                       leaveBalances.cuti_sakit_total -
                         (leaveTaken.cuti_sakit || 0) <
                       0
-                        ? "bg-rose-200 text-rose-900"
-                        : "bg-amber-200 text-amber-900"
+                        ? "bg-rose-200 text-rose-900 dark:bg-rose-900/50 dark:text-rose-300"
+                        : "bg-amber-200 text-amber-900 dark:bg-amber-900/50 dark:text-amber-300"
                     }`}
                   >
                     {leaveBalances.cuti_sakit_total -
@@ -742,15 +742,15 @@ const CutiReportPage: React.FC = () => {
                 </td>
 
                 {/* Cuti Umum totals */}
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 border-r border-emerald-200 bg-emerald-50">
-                  <span className="px-2 py-1 rounded-full bg-emerald-200 text-emerald-900">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 dark:text-emerald-300 border-r border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30">
+                  <span className="px-2 py-1 rounded-full bg-emerald-200 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-300">
                     {Object.values(monthlySummary).reduce(
                       (sum, month) => sum + month.cuti_umum.days,
                       0
                     )}
                   </span>
                 </td>
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 border-r border-emerald-200 bg-emerald-50">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 dark:text-emerald-300 border-r border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30">
                   <span className="font-bold">
                     {formatCurrency(
                       Object.values(monthlySummary).reduce(
@@ -760,14 +760,14 @@ const CutiReportPage: React.FC = () => {
                     )}
                   </span>
                 </td>
-                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 bg-emerald-100">
+                <td className="py-4 px-3 whitespace-nowrap text-sm text-center font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40">
                   <span
                     className={`px-3 py-1 rounded-full font-bold ${
                       leaveBalances.cuti_umum_total -
                         (leaveTaken.cuti_umum || 0) <
                       0
-                        ? "bg-rose-200 text-rose-900"
-                        : "bg-emerald-200 text-emerald-900"
+                        ? "bg-rose-200 text-rose-900 dark:bg-rose-900/50 dark:text-rose-300"
+                        : "bg-emerald-200 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-300"
                     }`}
                   >
                     {leaveBalances.cuti_umum_total -

@@ -156,8 +156,8 @@ const HolidayCalendarPage: React.FC = () => {
                           <td
                             className={`px-4 py-3 text-sm ${
                               isSunday
-                                ? "text-amber-600 font-medium"
-                                : "text-default-700"
+                                ? "text-amber-600 dark:text-amber-400 font-medium"
+                                : "text-default-700 dark:text-gray-200"
                             }`}
                           >
                             {dayOfWeek}

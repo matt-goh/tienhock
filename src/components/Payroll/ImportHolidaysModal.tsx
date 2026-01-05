@@ -234,14 +234,14 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
 
                 {!showPreview ? (
                   <div className="mt-4">
-                    <p className="text-sm text-gray-500 mb-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                       Paste the list of holidays below. The format is tailored
                       for copying directly from sites like{" "}
                       <a
                         href="https://publicholidays.com.my/sabah/2026-dates/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sky-600 hover:underline"
+                        className="text-sky-600 dark:text-sky-400 hover:underline"
                       >
                         publicholidays.com.my
                       </a>
@@ -250,8 +250,8 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                       <br />
                       Each holiday should be on a new line. For example:
                     </p>
-                    <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 mb-2">
-                      <code>
+                    <pre className="text-xs bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 mb-2">
+                      <code className="dark:text-gray-200">
                         1 Jan Wed New Year's Day
                         <br />
                         29 Jan Thu Chinese New Year
@@ -262,7 +262,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                     <textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
-                      className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                      className="w-full h-64 p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                       placeholder="1 Jan Wed New Year's Day&#10;29 Jan Thu Chinese New Year&#10;14 Feb Fri Valentine's Day&#10;..."
                     />
                     <div className="mt-4 flex justify-end space-x-3">
@@ -285,7 +285,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                       <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start">
                         <IconAlertTriangle className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5 mr-2" />
                         <div>
-                          <p className="text-sm text-amber-800">
+                          <p className="text-sm text-amber-800 dark:text-amber-300">
                             {duplicateCount} duplicate
                             {duplicateCount > 1 ? "s" : ""} found
                           </p>
@@ -297,63 +297,63 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                               size={18}
                               checkedColor="text-sky-600"
                               uncheckedColor="text-gray-400"
-                              className="text-amber-700"
+                              className="text-amber-700 dark:text-amber-300"
                             />
                           </div>
                         </div>
                       </div>
                     )}
 
-                    <div className="max-h-96 overflow-y-auto border rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <div className="max-h-96 overflow-y-auto border dark:border-gray-600 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                               Date
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                               Day
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                               Description
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                               Status
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                           {parsedHolidays.map((holiday, index) => (
                             <tr
                               key={index}
                               className={
-                                holiday.isDuplicate ? "bg-amber-50" : ""
+                                holiday.isDuplicate ? "bg-amber-50 dark:bg-amber-900/20" : ""
                               }
                             >
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                                 {format(holiday.date, "dd MMM yyyy")}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                                 {holiday.day}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                                 {holiday.description}
                               </td>
                               <td className="px-4 py-3 text-sm">
                                 {holiday.isDuplicate ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
                                     Duplicate
                                     {holiday.existingDescription &&
                                       holiday.existingDescription !==
                                         holiday.description && (
-                                        <span className="ml-1 text-amber-600">
+                                        <span className="ml-1 text-amber-600 dark:text-amber-400">
                                           (Current:{" "}
                                           {holiday.existingDescription})
                                         </span>
                                       )}
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">
                                     New
                                   </span>
                                 )}
@@ -365,7 +365,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                     </div>
 
                     <div className="mt-4 flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
                         {parsedHolidays.length} total, {duplicateCount}{" "}
                         duplicates
                         {overwriteDuplicates || duplicateCount === 0

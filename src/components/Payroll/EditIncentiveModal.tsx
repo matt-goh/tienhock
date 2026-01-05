@@ -12,7 +12,7 @@ import { IconDeviceFloppy } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
+import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 
 // Commission locations are 16-24
 const COMMISSION_LOCATION_IDS = ["16", "17", "18", "19", "20", "21", "22", "23", "24"];
@@ -43,7 +43,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   onSuccess,
   incentive,
 }) => {
-  const { locations } = useLocationsCache();
+  const { locations } = useLocationMappingsCache();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [incentiveDate, setIncentiveDate] = useState("");

@@ -32,7 +32,7 @@ import {
   BankReportPDFData,
 } from "../../utils/payroll/BankReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
-import { useLocationsCache } from "../../utils/catalogue/useLocationsCache";
+import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import toast from "react-hot-toast";
 
 // Location order with headers
@@ -181,7 +181,7 @@ const SalaryReportPage: React.FC = () => {
   const { staffs } = useStaffsCache();
 
   // Location data from cache - build LOCATION_MAP from DB data
-  const { locations } = useLocationsCache();
+  const { locations } = useLocationMappingsCache();
   const LOCATION_MAP = useMemo(() => {
     const map: { [key: string]: string } = {};
     locations.forEach((loc) => {
