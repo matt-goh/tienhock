@@ -71,10 +71,15 @@ export default function (pool) {
         [id]
       );
 
-      // Check staffs assigned to this location (location is stored as text or JSONB)
+      // Check staffs assigned to this location (location is stored as JSONB array)
       const staffsResult = await pool.query(
-        `SELECT id, name FROM staffs WHERE location::text = $1 OR location::text = '"' || $1 || '"'`,
-        [id]
+        `SELECT DISTINCT s.id, s.name
+         FROM staffs s
+         WHERE s.location IS NOT NULL
+           AND s.location @> $1::jsonb
+           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
+         ORDER BY s.name`,
+        [JSON.stringify([id])]
       );
 
       const jobs = jobMappingsResult.rows;
