@@ -1058,7 +1058,7 @@ const StaffFormPage: React.FC = () => {
           </div>
         </div>
         <form id="staff-form" onSubmit={handleSubmit}>
-          <div className="p-6 pb-8">
+          <div className="px-6 py-3">
             <Tab
               labels={["Personal", "Work", "Documents", "Additional"]}
               tabWidth="w-[104px]"
