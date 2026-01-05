@@ -112,7 +112,7 @@ export default function (pool) {
     // Validate mapping_type
     const validMappingTypes = [
       // Expense types
-      "salary", "overtime", "bonus", "commission", "rounding", "cuti_tahunan", "special_ot",
+      "salary", "overtime", "bonus", "commission", "commission_mee", "commission_bh", "rounding", "cuti_tahunan", "special_ot",
       // Contribution types
       "epf_employer", "socso_employer", "sip_employer",
       // Accrual types
@@ -320,6 +320,9 @@ export default function (pool) {
         return res.status(400).json({ message: "Invalid year or month" });
       }
 
+      // Directors to exclude from JVSL (they go to JVDR)
+      const DIRECTOR_IDS = ['GOH', 'WONG', 'WINNIE', 'WINNIE.G'];
+
       // Get salary data by location from employee_payrolls using job-based location mapping
       const salaryQuery = `
         WITH job_location_map AS (
@@ -329,6 +332,7 @@ export default function (pool) {
         ),
         employee_data AS (
           SELECT
+            ep.id as employee_payroll_id,
             ep.employee_id,
             ep.job_type,
             COALESCE(jlm.location_code, '02') as location_id,
@@ -339,6 +343,20 @@ export default function (pool) {
           JOIN staffs s ON ep.employee_id = s.id
           LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
+        ),
+        -- Directors data (for JVDR) - separate from staff
+        director_data AS (
+          SELECT
+            ed.*
+          FROM employee_data ed
+          WHERE ed.employee_id IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
+        ),
+        -- Staff data (for JVSL) - excludes directors
+        staff_data AS (
+          SELECT
+            ed.*
+          FROM employee_data ed
+          WHERE ed.employee_id NOT IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
         ),
         deductions_data AS (
           SELECT
@@ -351,32 +369,134 @@ export default function (pool) {
           JOIN payroll_deductions pd ON ep.id = pd.employee_payroll_id
           WHERE mp.year = $1 AND mp.month = $2
         ),
+        -- Commission MEE/BH split for locations 03 and 04
+        commission_split AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(CASE WHEN p.type = 'MEE' THEN pi.amount ELSE 0 END), 0) as commission_mee,
+            COALESCE(SUM(CASE WHEN p.type = 'BH' THEN pi.amount ELSE 0 END), 0) as commission_bh
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          LEFT JOIN product_pay_codes ppc ON pi.pay_code_id = ppc.pay_code_id
+          LEFT JOIN products p ON ppc.product_id = p.id
+          WHERE sd.location_id IN ('03', '04')
+            AND p.type IN ('MEE', 'BH')
+          GROUP BY sd.location_id
+        ),
+        -- Cuti Tahunan by location
+        cuti_tahunan_data AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(lr.amount_paid), 0) as cuti_tahunan_amount
+          FROM staff_data sd
+          JOIN leave_records lr ON sd.employee_id = lr.employee_id
+          WHERE lr.leave_type = 'cuti_tahunan'
+            AND lr.status = 'approved'
+            AND lr.amount_paid > 0
+            AND EXTRACT(YEAR FROM lr.leave_date) = $1
+            AND EXTRACT(MONTH FROM lr.leave_date) = $2
+          GROUP BY sd.location_id
+        ),
         employee_summary AS (
           SELECT
-            ed.employee_id,
-            ed.location_id,
-            ed.gross_pay,
-            ed.net_pay,
-            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
-            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'socso'), 0) as socso_employer,
-            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
-            COALESCE((SELECT SUM(employee_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
-          FROM employee_data ed
+            sd.employee_id,
+            sd.location_id,
+            sd.gross_pay,
+            sd.net_pay,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'socso'), 0) as socso_employer,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
+            COALESCE((SELECT SUM(employee_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
+          FROM staff_data sd
+        ),
+        -- Director summary for JVDR
+        director_summary AS (
+          SELECT
+            dd.employee_id,
+            dd.location_id,
+            dd.gross_pay,
+            dd.net_pay,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data ded WHERE ded.employee_id = dd.employee_id AND ded.deduction_type = 'epf'), 0) as epf_employer,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data ded WHERE ded.employee_id = dd.employee_id AND ded.deduction_type = 'socso'), 0) as socso_employer,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data ded WHERE ded.employee_id = dd.employee_id AND ded.deduction_type = 'sip'), 0) as sip_employer,
+            COALESCE((SELECT SUM(employee_amount) FROM deductions_data ded WHERE ded.employee_id = dd.employee_id AND ded.deduction_type = 'income_tax'), 0) as pcb
+          FROM director_data dd
         )
         SELECT
-          location_id,
-          SUM(gross_pay) as total_gaji_kasar,
-          SUM(epf_employer) as total_epf_majikan,
-          SUM(socso_employer) as total_socso_majikan,
-          SUM(sip_employer) as total_sip_majikan,
-          SUM(pcb) as total_pcb,
-          SUM(net_pay) as total_gaji_bersih
-        FROM employee_summary
-        GROUP BY location_id
-        ORDER BY location_id
+          es.location_id,
+          SUM(es.gross_pay) as total_gaji_kasar,
+          SUM(es.epf_employer) as total_epf_majikan,
+          SUM(es.socso_employer) as total_socso_majikan,
+          SUM(es.sip_employer) as total_sip_majikan,
+          SUM(es.pcb) as total_pcb,
+          SUM(es.net_pay) as total_gaji_bersih,
+          COALESCE((SELECT cs.commission_mee FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_mee,
+          COALESCE((SELECT cs.commission_bh FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_bh,
+          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan
+        FROM employee_summary es
+        GROUP BY es.location_id
+        ORDER BY es.location_id
       `;
 
       const salaryResult = await pool.query(salaryQuery, [yearInt, monthInt]);
+
+      // Get individual director data for JVDR
+      const directorQuery = `
+        WITH job_location_map AS (
+          SELECT job_id, location_code
+          FROM job_location_mappings
+          WHERE is_active = true
+        ),
+        director_payroll AS (
+          SELECT
+            s.id as employee_id,
+            s.name as employee_name,
+            ep.gross_pay,
+            ep.net_pay,
+            CASE
+              WHEN s.id = 'GOH' THEN 'GTH'
+              WHEN s.id = 'WONG' THEN 'WSF'
+              WHEN s.id IN ('WINNIE', 'WINNIE.G') THEN 'WG'
+            END as director_code,
+            CASE
+              WHEN s.id = 'GOH' THEN 'Salary Director - GOH'
+              WHEN s.id = 'WONG' THEN 'Salary Director - WONG'
+              WHEN s.id IN ('WINNIE', 'WINNIE.G') THEN 'Salary Ex.Director - WINNIE.G'
+            END as particulars
+          FROM employee_payrolls ep
+          JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          JOIN staffs s ON ep.employee_id = s.id
+          WHERE mp.year = $1 AND mp.month = $2
+            AND s.id IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
+        ),
+        director_deductions AS (
+          SELECT
+            ep.employee_id,
+            pd.deduction_type,
+            pd.employee_amount,
+            pd.employer_amount
+          FROM employee_payrolls ep
+          JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          JOIN payroll_deductions pd ON ep.id = pd.employee_payroll_id
+          WHERE mp.year = $1 AND mp.month = $2
+            AND ep.employee_id IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
+        )
+        SELECT
+          dp.employee_id,
+          dp.employee_name,
+          dp.director_code,
+          dp.particulars,
+          dp.gross_pay,
+          dp.net_pay,
+          COALESCE((SELECT SUM(employer_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
+          COALESCE((SELECT SUM(employer_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'socso'), 0) as socso_employer,
+          COALESCE((SELECT SUM(employer_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
+          COALESCE((SELECT SUM(employee_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
+        FROM director_payroll dp
+        ORDER BY dp.director_code
+      `;
+
+      const directorResult = await pool.query(directorQuery, [yearInt, monthInt]);
 
       // Get location-account mappings
       const mappingsQuery = `
@@ -413,12 +533,13 @@ export default function (pool) {
       // Get accrual accounts for staff (location 00)
       const staffAccruals = mappingsByLocation["JVSL_00"] || {};
 
-      // Process salary data for each location
+      // Process salary data for each location (JVSL - staff only, directors excluded)
       salaryResult.rows.forEach(location => {
         const locationId = location.location_id;
-        const isDirector = locationId === "01";
-        const voucherType = isDirector ? "JVDR" : "JVSL";
-        const mappingKey = `${voucherType}_${locationId}`;
+        // Skip location 01 (directors are handled separately)
+        if (locationId === "01") return;
+
+        const mappingKey = `JVSL_${locationId}`;
         const locationMappings = mappingsByLocation[mappingKey] || {};
 
         const salaryAmount = parseFloat(location.total_gaji_kasar) || 0;
@@ -427,6 +548,9 @@ export default function (pool) {
         const sipAmount = parseFloat(location.total_sip_majikan) || 0;
         const pcbAmount = parseFloat(location.total_pcb) || 0;
         const netSalary = parseFloat(location.total_gaji_bersih) || 0;
+        const commissionMee = parseFloat(location.commission_mee) || 0;
+        const commissionBh = parseFloat(location.commission_bh) || 0;
+        const cutiTahunan = parseFloat(location.cuti_tahunan) || 0;
 
         const entry = {
           location_id: locationId,
@@ -437,25 +561,75 @@ export default function (pool) {
           sip_employer: sipAmount,
           pcb: pcbAmount,
           net_salary: netSalary,
+          commission_mee: commissionMee,
+          commission_bh: commissionBh,
+          cuti_tahunan: cutiTahunan,
           accounts: {
             salary: locationMappings.salary || null,
             epf_employer: locationMappings.epf_employer || null,
             socso_employer: locationMappings.socso_employer || null,
             sip_employer: locationMappings.sip_employer || null,
+            commission_mee: locationMappings.commission_mee || null,
+            commission_bh: locationMappings.commission_bh || null,
+            cuti_tahunan: locationMappings.cuti_tahunan || null,
           },
         };
 
-        if (isDirector) {
-          entry.accounts.accrual_salary = locationMappings.accrual_salary || null;
-          entry.accounts.accrual_epf = locationMappings.accrual_epf || null;
-          entry.accounts.accrual_socso = locationMappings.accrual_socso || null;
-          entry.accounts.accrual_sip = locationMappings.accrual_sip || null;
-          entry.accounts.accrual_pcb = locationMappings.accrual_pcb || null;
-          jvdrData.push(entry);
-        } else {
-          jvslData.push(entry);
-        }
+        jvslData.push(entry);
       });
+
+      // Process individual director data for JVDR
+      const directorMappings = mappingsByLocation["JVDR_01"] || {};
+      if (directorResult.rows.length > 0) {
+        // Calculate totals for JVDR debit lines
+        const directorTotals = {
+          gross_pay: 0,
+          net_pay: 0,
+          epf_employer: 0,
+          socso_employer: 0,
+          sip_employer: 0,
+          pcb: 0,
+        };
+
+        directorResult.rows.forEach(director => {
+          directorTotals.gross_pay += parseFloat(director.gross_pay) || 0;
+          directorTotals.net_pay += parseFloat(director.net_pay) || 0;
+          directorTotals.epf_employer += parseFloat(director.epf_employer) || 0;
+          directorTotals.socso_employer += parseFloat(director.socso_employer) || 0;
+          directorTotals.sip_employer += parseFloat(director.sip_employer) || 0;
+          directorTotals.pcb += parseFloat(director.pcb) || 0;
+        });
+
+        const jvdrEntry = {
+          location_id: "01",
+          location_name: locationNamesByMapping["JVDR_01"] || "DIRECTOR'S REMUNERATION",
+          salary: directorTotals.gross_pay,
+          epf_employer: directorTotals.epf_employer,
+          socso_employer: directorTotals.socso_employer,
+          sip_employer: directorTotals.sip_employer,
+          pcb: directorTotals.pcb,
+          net_salary: directorTotals.net_pay,
+          directors: directorResult.rows.map(d => ({
+            employee_id: d.employee_id,
+            employee_name: d.employee_name,
+            director_code: d.director_code,
+            particulars: d.particulars,
+            net_pay: parseFloat(d.net_pay) || 0,
+          })),
+          accounts: {
+            salary: directorMappings.salary || null,
+            epf_employer: directorMappings.epf_employer || null,
+            socso_employer: directorMappings.socso_employer || null,
+            sip_employer: directorMappings.sip_employer || null,
+            accrual_salary: directorMappings.accrual_salary || null,
+            accrual_epf: directorMappings.accrual_epf || null,
+            accrual_socso: directorMappings.accrual_socso || null,
+            accrual_sip: directorMappings.accrual_sip || null,
+            accrual_pcb: directorMappings.accrual_pcb || null,
+          },
+        };
+        jvdrData.push(jvdrEntry);
+      }
 
       // Calculate JVSL totals
       const jvslTotals = {
@@ -528,6 +702,7 @@ export default function (pool) {
       };
 
       // Get salary data by location from employee_payrolls using job-based location mapping
+      // Directors are excluded from JVSL (they go to JVDR with individual breakdown)
       const salaryQuery = `
         WITH job_location_map AS (
           SELECT job_id, location_code
@@ -536,6 +711,7 @@ export default function (pool) {
         ),
         employee_data AS (
           SELECT
+            ep.id as employee_payroll_id,
             ep.employee_id,
             ep.job_type,
             COALESCE(jlm.location_code, '02') as location_id,
@@ -546,6 +722,13 @@ export default function (pool) {
           JOIN staffs s ON ep.employee_id = s.id
           LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
           WHERE mp.year = $1 AND mp.month = $2
+        ),
+        -- Staff data (for JVSL) - excludes directors
+        staff_data AS (
+          SELECT
+            ed.*
+          FROM employee_data ed
+          WHERE ed.employee_id NOT IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
         ),
         deductions_data AS (
           SELECT
@@ -558,31 +741,114 @@ export default function (pool) {
           JOIN payroll_deductions pd ON ep.id = pd.employee_payroll_id
           WHERE mp.year = $1 AND mp.month = $2
         ),
+        -- Commission MEE/BH split for locations 03 and 04
+        commission_split AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(CASE WHEN p.type = 'MEE' THEN pi.amount ELSE 0 END), 0) as commission_mee,
+            COALESCE(SUM(CASE WHEN p.type = 'BH' THEN pi.amount ELSE 0 END), 0) as commission_bh
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          LEFT JOIN product_pay_codes ppc ON pi.pay_code_id = ppc.pay_code_id
+          LEFT JOIN products p ON ppc.product_id = p.id
+          WHERE sd.location_id IN ('03', '04')
+            AND p.type IN ('MEE', 'BH')
+          GROUP BY sd.location_id
+        ),
+        -- Cuti Tahunan by location
+        cuti_tahunan_data AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(lr.amount_paid), 0) as cuti_tahunan_amount
+          FROM staff_data sd
+          JOIN leave_records lr ON sd.employee_id = lr.employee_id
+          WHERE lr.leave_type = 'cuti_tahunan'
+            AND lr.status = 'approved'
+            AND lr.amount_paid > 0
+            AND EXTRACT(YEAR FROM lr.leave_date) = $1
+            AND EXTRACT(MONTH FROM lr.leave_date) = $2
+          GROUP BY sd.location_id
+        ),
         employee_summary AS (
           SELECT
-            ed.employee_id,
-            ed.location_id,
-            ed.gross_pay,
-            ed.net_pay,
-            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
-            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'socso'), 0) as socso_employer,
-            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
-            COALESCE((SELECT SUM(employee_amount) FROM deductions_data dd WHERE dd.employee_id = ed.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
-          FROM employee_data ed
+            sd.employee_id,
+            sd.location_id,
+            sd.gross_pay,
+            sd.net_pay,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'socso'), 0) as socso_employer,
+            COALESCE((SELECT SUM(employer_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
+            COALESCE((SELECT SUM(employee_amount) FROM deductions_data dd WHERE dd.employee_id = sd.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
+          FROM staff_data sd
         )
         SELECT
-          location_id,
-          SUM(gross_pay) as total_gaji_kasar,
-          SUM(epf_employer) as total_epf_majikan,
-          SUM(socso_employer) as total_socso_majikan,
-          SUM(sip_employer) as total_sip_majikan,
-          SUM(pcb) as total_pcb,
-          SUM(net_pay) as total_gaji_bersih
-        FROM employee_summary
-        GROUP BY location_id
-        ORDER BY location_id
+          es.location_id,
+          SUM(es.gross_pay) as total_gaji_kasar,
+          SUM(es.epf_employer) as total_epf_majikan,
+          SUM(es.socso_employer) as total_socso_majikan,
+          SUM(es.sip_employer) as total_sip_majikan,
+          SUM(es.pcb) as total_pcb,
+          SUM(es.net_pay) as total_gaji_bersih,
+          COALESCE((SELECT cs.commission_mee FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_mee,
+          COALESCE((SELECT cs.commission_bh FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_bh,
+          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan
+        FROM employee_summary es
+        GROUP BY es.location_id
+        ORDER BY es.location_id
       `;
       const salaryResult = await client.query(salaryQuery, [yearInt, monthInt]);
+
+      // Get individual director data for JVDR
+      const directorQuery = `
+        WITH director_payroll AS (
+          SELECT
+            s.id as employee_id,
+            s.name as employee_name,
+            ep.gross_pay,
+            ep.net_pay,
+            CASE
+              WHEN s.id = 'GOH' THEN 'GTH'
+              WHEN s.id = 'WONG' THEN 'WSF'
+              WHEN s.id IN ('WINNIE', 'WINNIE.G') THEN 'WG'
+            END as director_code,
+            CASE
+              WHEN s.id = 'GOH' THEN 'Salary Director - GOH'
+              WHEN s.id = 'WONG' THEN 'Salary Director - WONG'
+              WHEN s.id IN ('WINNIE', 'WINNIE.G') THEN 'Salary Ex.Director - WINNIE.G'
+            END as particulars
+          FROM employee_payrolls ep
+          JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          JOIN staffs s ON ep.employee_id = s.id
+          WHERE mp.year = $1 AND mp.month = $2
+            AND s.id IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
+        ),
+        director_deductions AS (
+          SELECT
+            ep.employee_id,
+            pd.deduction_type,
+            pd.employee_amount,
+            pd.employer_amount
+          FROM employee_payrolls ep
+          JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          JOIN payroll_deductions pd ON ep.id = pd.employee_payroll_id
+          WHERE mp.year = $1 AND mp.month = $2
+            AND ep.employee_id IN ('GOH', 'WONG', 'WINNIE', 'WINNIE.G')
+        )
+        SELECT
+          dp.employee_id,
+          dp.employee_name,
+          dp.director_code,
+          dp.particulars,
+          dp.gross_pay,
+          dp.net_pay,
+          COALESCE((SELECT SUM(employer_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'epf'), 0) as epf_employer,
+          COALESCE((SELECT SUM(employer_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'socso'), 0) as socso_employer,
+          COALESCE((SELECT SUM(employer_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'sip'), 0) as sip_employer,
+          COALESCE((SELECT SUM(employee_amount) FROM director_deductions dd WHERE dd.employee_id = dp.employee_id AND dd.deduction_type = 'income_tax'), 0) as pcb
+        FROM director_payroll dp
+        ORDER BY dp.director_code
+      `;
+      const directorResult = await client.query(directorQuery, [yearInt, monthInt]);
 
       // Get mappings
       const mappingsResult = await client.query(
@@ -613,10 +879,27 @@ export default function (pool) {
         if (existingJvdr.rows.length > 0) {
           results.jvdr = { skipped: true, message: "JVDR already exists for this month" };
         } else {
-          // Create JVDR entry
-          const directorData = salaryResult.rows.find(r => r.location_id === "01");
-          if (directorData) {
+          // Create JVDR entry using individual director data
+          if (directorResult.rows.length > 0) {
             const directorMappings = mappingsByLocation["JVDR_01"] || {};
+
+            // Calculate totals from individual directors
+            const directorTotals = {
+              gross_pay: 0,
+              net_pay: 0,
+              epf_employer: 0,
+              socso_employer: 0,
+              sip_employer: 0,
+              pcb: 0,
+            };
+            directorResult.rows.forEach(d => {
+              directorTotals.gross_pay += parseFloat(d.gross_pay) || 0;
+              directorTotals.net_pay += parseFloat(d.net_pay) || 0;
+              directorTotals.epf_employer += parseFloat(d.epf_employer) || 0;
+              directorTotals.socso_employer += parseFloat(d.socso_employer) || 0;
+              directorTotals.sip_employer += parseFloat(d.sip_employer) || 0;
+              directorTotals.pcb += parseFloat(d.pcb) || 0;
+            });
 
             // Insert journal entry
             const entryResult = await client.query(
@@ -626,12 +909,12 @@ export default function (pool) {
             );
             const entryId = entryResult.rows[0].id;
 
-            // Insert debit lines
+            // Insert debit lines (using totals)
             const debitLines = [
-              { account: directorMappings.salary, amount: parseFloat(directorData.total_gaji_kasar), desc: "Salary" },
-              { account: directorMappings.epf_employer, amount: parseFloat(directorData.total_epf_majikan), desc: "EPF Employer" },
-              { account: directorMappings.socso_employer, amount: parseFloat(directorData.total_socso_majikan), desc: "SOCSO Employer" },
-              { account: directorMappings.sip_employer, amount: parseFloat(directorData.total_sip_majikan), desc: "SIP Employer" },
+              { account: directorMappings.salary, amount: directorTotals.gross_pay, desc: "Salary" },
+              { account: directorMappings.epf_employer, amount: directorTotals.epf_employer, desc: "EPF Employer" },
+              { account: directorMappings.socso_employer, amount: directorTotals.socso_employer, desc: "SOCSO Employer" },
+              { account: directorMappings.sip_employer, amount: directorTotals.sip_employer, desc: "SIP Employer" },
             ].filter(l => l.account && l.amount > 0);
 
             let lineNumber = 1;
@@ -643,16 +926,27 @@ export default function (pool) {
               );
             }
 
-            // Insert credit lines (accruals)
-            const creditLines = [
-              { account: directorMappings.accrual_salary, amount: parseFloat(directorData.total_gaji_bersih), desc: "Salary Payable" },
-              { account: directorMappings.accrual_epf, amount: parseFloat(directorData.total_epf_majikan), desc: "EPF Payable" },
-              { account: directorMappings.accrual_socso, amount: parseFloat(directorData.total_socso_majikan), desc: "SOCSO Payable" },
-              { account: directorMappings.accrual_sip, amount: parseFloat(directorData.total_sip_majikan), desc: "SIP Payable" },
-              { account: directorMappings.accrual_pcb, amount: parseFloat(directorData.total_pcb), desc: "PCB Payable" },
+            // Insert individual director salary credit lines (ACD_SAL for each director)
+            for (const director of directorResult.rows) {
+              const netPay = parseFloat(director.net_pay) || 0;
+              if (directorMappings.accrual_salary && netPay > 0) {
+                await client.query(
+                  `INSERT INTO journal_entry_lines (journal_entry_id, line_number, account_code, debit_amount, credit_amount, particulars)
+                   VALUES ($1, $2, $3, $4, $5, $6)`,
+                  [entryId, lineNumber++, directorMappings.accrual_salary, 0, netPay, director.particulars]
+                );
+              }
+            }
+
+            // Insert other accrual credit lines (EPF, SOCSO, SIP, PCB)
+            const otherCreditLines = [
+              { account: directorMappings.accrual_epf, amount: directorTotals.epf_employer, desc: "EPF Payable" },
+              { account: directorMappings.accrual_socso, amount: directorTotals.socso_employer, desc: "SOCSO Payable" },
+              { account: directorMappings.accrual_sip, amount: directorTotals.sip_employer, desc: "SIP Payable" },
+              { account: directorMappings.accrual_pcb, amount: directorTotals.pcb, desc: "PCB Payable" },
             ].filter(l => l.account && l.amount > 0);
 
-            for (const line of creditLines) {
+            for (const line of otherCreditLines) {
               await client.query(
                 `INSERT INTO journal_entry_lines (journal_entry_id, line_number, account_code, debit_amount, credit_amount, particulars)
                  VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -692,6 +986,7 @@ export default function (pool) {
 
             let lineNumber = 1;
             let totalSalary = 0, totalEpf = 0, totalSocso = 0, totalSip = 0, totalPcb = 0, totalNet = 0;
+            let totalCommissionMee = 0, totalCommissionBh = 0, totalCutiTahunan = 0;
 
             // Insert debit lines for each location
             for (const location of staffData) {
@@ -703,6 +998,9 @@ export default function (pool) {
               const sip = parseFloat(location.total_sip_majikan) || 0;
               const pcb = parseFloat(location.total_pcb) || 0;
               const net = parseFloat(location.total_gaji_bersih) || 0;
+              const commissionMee = parseFloat(location.commission_mee) || 0;
+              const commissionBh = parseFloat(location.commission_bh) || 0;
+              const cutiTahunan = parseFloat(location.cuti_tahunan) || 0;
 
               totalSalary += salary;
               totalEpf += epf;
@@ -710,12 +1008,20 @@ export default function (pool) {
               totalSip += sip;
               totalPcb += pcb;
               totalNet += net;
+              totalCommissionMee += commissionMee;
+              totalCommissionBh += commissionBh;
+              totalCutiTahunan += cutiTahunan;
 
               const debitLines = [
-                { account: locationMappings.salary, amount: salary, desc: `Salary - Loc ${location.location_id}` },
-                { account: locationMappings.epf_employer, amount: epf, desc: `EPF - Loc ${location.location_id}` },
-                { account: locationMappings.socso_employer, amount: socso, desc: `SOCSO - Loc ${location.location_id}` },
-                { account: locationMappings.sip_employer, amount: sip, desc: `SIP - Loc ${location.location_id}` },
+                { account: locationMappings.salary, amount: salary, desc: `Salary - Location ${location.location_id}` },
+                { account: locationMappings.epf_employer, amount: epf, desc: `EPF - Location ${location.location_id}` },
+                { account: locationMappings.socso_employer, amount: socso, desc: `SOCSO - Location ${location.location_id}` },
+                { account: locationMappings.sip_employer, amount: sip, desc: `SIP - Location ${location.location_id}` },
+                // Commission MEE/BH for locations 03 and 04
+                { account: locationMappings.commission_mee, amount: commissionMee, desc: `Commission MEE - Location ${location.location_id}` },
+                { account: locationMappings.commission_bh, amount: commissionBh, desc: `Commission BH - Location ${location.location_id}` },
+                // Cuti Tahunan
+                { account: locationMappings.cuti_tahunan, amount: cutiTahunan, desc: `Cuti Tahunan - Location ${location.location_id}` },
               ].filter(l => l.account && l.amount > 0);
 
               for (const line of debitLines) {

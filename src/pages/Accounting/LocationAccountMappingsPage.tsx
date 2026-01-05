@@ -144,13 +144,13 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
     code: "MS_SM",
     description: "Salesman-Commission Mee",
     category: "salary",
-    mappingTypes: ["commission"],
+    mappingTypes: ["commission_mee"],
   },
   {
     code: "BS_SM",
     description: "Salesman-Commission Bihun",
     category: "salary",
-    mappingTypes: ["commission"],
+    mappingTypes: ["commission_bh"],
   },
   {
     code: "THJ_CK",
@@ -168,13 +168,13 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
     code: "MS_IL",
     description: "Ikut Lori-Commission Mee",
     category: "salary",
-    mappingTypes: ["commission"],
+    mappingTypes: ["commission_mee"],
   },
   {
     code: "BS_IL",
     description: "Ikut Lori-Commission Bihun",
     category: "salary",
-    mappingTypes: ["commission"],
+    mappingTypes: ["commission_bh"],
   },
   {
     code: "THJ_SM",
@@ -549,10 +549,70 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
     mappingTypes: ["sip_employer"],
   },
 
-  // ========== CUTI TAHUNAN & BONUS (1 entry) ==========
+  // ========== CUTI TAHUNAN (11 entries) ==========
   {
     code: "MBS_M",
     description: "Cuti Tahunan & Bonus",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_O",
+    description: "Cuti Tahunan - Office",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_SM",
+    description: "Cuti Tahunan - Salesman",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_IL",
+    description: "Cuti Tahunan - Ikut Lori",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_JB",
+    description: "Cuti Tahunan - Jaga Boiler",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_MM",
+    description: "Cuti Tahunan - Mesin Mee",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_PM",
+    description: "Cuti Tahunan - Packing Mee",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_MB",
+    description: "Cuti Tahunan - Mesin Bihun",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_PB",
+    description: "Cuti Tahunan - Packing Bihun",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_TS",
+    description: "Cuti Tahunan - Tukang Sapu",
+    category: "salary",
+    mappingTypes: ["cuti_tahunan"],
+  },
+  {
+    code: "MCTB_M",
+    description: "Cuti Tahunan - Maintenance",
     category: "salary",
     mappingTypes: ["cuti_tahunan"],
   },
@@ -822,6 +882,8 @@ const LocationAccountMappingsPage: React.FC = () => {
       overtime: "OT",
       bonus: "Bonus",
       commission: "Comm",
+      commission_mee: "Comm-MEE",
+      commission_bh: "Comm-BH",
       rounding: "Rnd",
       cuti_tahunan: "CT",
       special_ot: "SOT",
