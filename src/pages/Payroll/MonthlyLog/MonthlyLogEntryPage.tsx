@@ -899,7 +899,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-default-200 dark:divide-gray-700">
-              {Object.values(employeeEntries).map((entry) => (
+              {Object.values(employeeEntries).map((entry, index) => (
                 <tr
                   key={entry.employeeId}
                   className={`${
@@ -987,6 +987,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       }
                       disabled={!entry.selected}
                       onClick={() => handleManageActivities(entry)}
+                      showBelow={index < 5}
                     />
                   </td>
                 </tr>
