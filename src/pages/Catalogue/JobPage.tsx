@@ -29,6 +29,7 @@ import Button from "../../components/Button";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
+import AssociateEmployeesWithJobModal from "../../components/Catalogue/AssociateEmployeesWithJobModal";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useNavigate } from "react-router-dom";
@@ -84,7 +85,7 @@ const JobPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { jobs, loading: loadingJobs, refreshJobs } = useJobsCache();
-  const { staffs, loading: loadingStaffs } = useStaffsCache();
+  const { staffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
   const [selectedJob, setSelectedJob] = useState<JobSelection>(null);
   const [query, setQuery] = useState(""); // For job combobox filtering
   const {
@@ -110,6 +111,8 @@ const JobPage: React.FC = () => {
   const [showEditRatesModal, setShowEditRatesModal] = useState(false); // For EditPayCodeRatesModal
   const [payCodeDetailToEdit, setPayCodeDetailToEdit] =
     useState<JobPayCodeDetails | null>(null); // Data for edit modal
+  const [showAssociateEmployeesModal, setShowAssociateEmployeesModal] =
+    useState(false); // For AssociateEmployeesWithJobModal
 
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -133,11 +136,14 @@ const JobPage: React.FC = () => {
     const jobId = params.get("id");
     const payCodeId = params.get("paycode");
 
-    if (jobId && !selectedJob && !loadingJobs && jobs.length > 0) {
+    if (jobId && !loadingJobs && jobs.length > 0) {
       const jobToSelect = jobs.find((job) => job.id === jobId);
-      if (jobToSelect) {
+      if (jobToSelect && (!selectedJob || selectedJob.id !== jobId)) {
         setSelectedJob(jobToSelect);
       }
+    } else if (!jobId && selectedJob) {
+      // If there's no jobId in URL but we have a selected job, clear it
+      setSelectedJob(null);
     }
 
     // Set pay code search if parameter exists
@@ -145,7 +151,7 @@ const JobPage: React.FC = () => {
       setPayCodeSearch(payCodeId);
     }
     // Dependency on jobs.length ensures this runs after jobs are loaded
-  }, [location.search, jobs, selectedJob, loadingJobs]);
+  }, [location.search, jobs, loadingJobs]);
 
   // --- Add/Remove Pay Codes ---
   const handleAddPayCodeToJob = async (payCodeId: string) => {
@@ -553,11 +559,22 @@ const JobPage: React.FC = () => {
           <div className="mb-4 flex flex-col md:flex-row md:items-center gap-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
             <div className="md:flex-shrink-0">
               {/* Existing Job Combobox */}
-              <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                Select Job
-              </label>
-              <Field className="w-64">
-                <Combobox value={selectedJob} onChange={handleJobSelection}>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => handleJobSelection(null)}
+                  className="flex items-center gap-1 text-default-600 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors pb-1.5"
+                  title="Back to job list"
+                >
+                  <IconChevronLeft size={20} />
+                  <span className="text-sm font-medium">Back</span>
+                </button>
+                <span className="text-default-300 dark:text-gray-600 pb-1.5">|</span>
+                <div>
+                  <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
+                    Select Job
+                  </label>
+                  <Field className="w-64">
+                  <Combobox value={selectedJob} onChange={handleJobSelection}>
                   <div className="relative">
                     <ComboboxInput
                       className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-1.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100"
@@ -586,7 +603,7 @@ const JobPage: React.FC = () => {
                       Add New Job
                     </ComboboxOption>
                     {(filteredJobs.length > 0 || loadingJobs) && (
-                      <hr className="my-1" />
+                      <hr className="my-1 border-default-200 dark:border-gray-600" />
                     )}
                     {loadingJobs && (
                       <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-200">
@@ -607,7 +624,7 @@ const JobPage: React.FC = () => {
                           className={({ active }) =>
                             `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
                               active
-                                ? "bg-sky-100 text-sky-900"
+                                ? "bg-sky-100 text-sky-900 dark:bg-sky-900/50 dark:text-sky-200"
                                 : "text-gray-900 dark:text-gray-100"
                             }`
                           }
@@ -636,6 +653,8 @@ const JobPage: React.FC = () => {
                   </ComboboxOptions>
                 </Combobox>
               </Field>
+                </div>
+              </div>
             </div>
 
             {/* Selected Job Info & Delete Button */}
@@ -692,9 +711,20 @@ const JobPage: React.FC = () => {
           {/* --- Staff Section --- */}
           {selectedJob && (
             <div className="mb-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-              <h3 className="mb-3 text-sm font-medium text-default-700 dark:text-gray-200">
-                Staff Associated with this Job:
-              </h3>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-default-700 dark:text-gray-200">
+                  Staff Associated with this Job:
+                </h3>
+                <Button
+                  onClick={() => setShowAssociateEmployeesModal(true)}
+                  color="sky"
+                  variant="outline"
+                  size="sm"
+                  icon={IconPencil}
+                >
+                  Manage Staff
+                </Button>
+              </div>
               {loadingStaffs ? (
                 <div className="flex items-center justify-center py-2">
                   <LoadingSpinner size="sm" />
@@ -940,6 +970,16 @@ const JobPage: React.FC = () => {
         jobName={selectedJob?.name}
         payCodeDetail={payCodeDetailToEdit} // Pass the detail for editing
         onRatesSaved={handleRatesSaved} // Pass callback to refresh data
+      />
+      <AssociateEmployeesWithJobModal
+        isOpen={showAssociateEmployeesModal}
+        onClose={() => setShowAssociateEmployeesModal(false)}
+        job={selectedJob}
+        availableEmployees={staffs}
+        currentEmployeeIds={associatedStaff.map((s) => s.id)}
+        onAssociationComplete={async () => {
+          await refreshStaffs(); // Refresh staffs cache to reflect the changes
+        }}
       />
 
       {/* --- Dialogs --- */}
