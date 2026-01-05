@@ -22,7 +22,7 @@ import {
   IconCheck,
   IconUserMinus,
 } from "@tabler/icons-react";
-import { Location } from "../../utils/catalogue/useLocationsCache";
+import { Location } from "../../utils/catalogue/useLocationMappingsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { api } from "../../routes/utils/api";

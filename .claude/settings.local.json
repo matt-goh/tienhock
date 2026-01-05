@@ -27,7 +27,8 @@
       "Bash(npm install:*)",
       "Bash(del \"c:\\\\tienhock\\\\src\\\\components\\\\Payroll\\\\EmployeePayrollCard.tsx\")",
       "Bash(del \"c:\\\\tienhock\\\\src\\\\utils\\\\payroll\\\\PaySlipPDF.tsx\")",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
