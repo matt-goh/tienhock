@@ -1,4 +1,4 @@
-// src/pages/Payroll/IncentivesPage.tsx
+// src/pages/Payroll/AddOn/CommissionPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import {
@@ -19,7 +19,7 @@ import EditIncentiveModal from "../../../components/Payroll/EditIncentiveModal";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 
-interface Incentive {
+interface Commission {
   id: number;
   employee_id: string;
   employee_name: string;
@@ -28,11 +28,11 @@ interface Incentive {
   description: string;
   created_by: string;
   created_at: string;
-  location_code: string | null;
+  location_code: string;
   location_name: string | null;
 }
 
-const IncentivesPage: React.FC = () => {
+const CommissionPage: React.FC = () => {
   // Get initial values from URL params or defaults
   const getInitialYear = (): number => {
     const params = new URLSearchParams(window.location.search);
@@ -59,13 +59,11 @@ const IncentivesPage: React.FC = () => {
   };
 
   // State
-  const [incentives, setIncentives] = useState<Incentive[]>([]);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [addModalType, setAddModalType] = useState<
-    "Commission" | "Bonus" | null
-  >(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingIncentive, setEditingIncentive] = useState<Incentive | null>(
+  const [editingCommission, setEditingCommission] = useState<Commission | null>(
     null
   );
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -90,12 +88,12 @@ const IncentivesPage: React.FC = () => {
     window.history.replaceState({}, "", newUrl);
   }, [currentYear, currentMonth]);
 
-  // Load incentives on mount and filter changes
+  // Load commissions on mount and filter changes
   useEffect(() => {
-    fetchIncentives();
+    fetchCommissions();
   }, [currentYear, currentMonth]);
 
-  const fetchIncentives = async () => {
+  const fetchCommissions = async () => {
     setIsLoading(true);
     try {
       const startDate = `${currentYear}-${currentMonth
@@ -105,35 +103,35 @@ const IncentivesPage: React.FC = () => {
       const endDate = `${currentYear}-${currentMonth
         .toString()
         .padStart(2, "0")}-${lastDay.toString().padStart(2, "0")}`;
-      const url = `/api/incentives?start_date=${encodeURIComponent(
+      const url = `/api/incentives?type=commission&start_date=${encodeURIComponent(
         startDate
       )}&end_date=${encodeURIComponent(endDate)}`;
       const response = await api.get(url);
-      setIncentives(response || []);
+      setCommissions(response || []);
     } catch (error) {
-      console.error("Error fetching incentives:", error);
-      toast.error("Failed to load incentives");
+      console.error("Error fetching commissions:", error);
+      toast.error("Failed to load commissions");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEdit = (incentive: Incentive) => {
-    setEditingIncentive(incentive);
+  const handleEdit = (commission: Commission) => {
+    setEditingCommission(commission);
     setShowEditModal(true);
   };
 
-  const handleDeleteIncentive = async () => {
+  const handleDeleteCommission = async () => {
     if (!deletingId) return;
     try {
       await api.delete(`/api/incentives/${deletingId}`);
-      toast.success("Incentive record deleted successfully");
+      toast.success("Commission record deleted successfully");
       setShowDeleteDialog(false);
       setDeletingId(null);
-      await fetchIncentives();
+      await fetchCommissions();
     } catch (error) {
-      console.error("Error deleting incentive:", error);
-      toast.error("Failed to delete incentive");
+      console.error("Error deleting commission:", error);
+      toast.error("Failed to delete commission");
     }
   };
 
@@ -144,8 +142,8 @@ const IncentivesPage: React.FC = () => {
     }).format(amount);
   };
 
-  const totalAmount = incentives.reduce(
-    (sum, incentive) => sum + (Number(incentive.amount) || 0),
+  const totalAmount = commissions.reduce(
+    (sum, commission) => sum + (Number(commission.amount) || 0),
     0
   );
 
@@ -153,11 +151,11 @@ const IncentivesPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Incentives (Commission & Bonus)
+          Commission Records
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
-            onClick={fetchIncentives}
+            onClick={fetchCommissions}
             icon={IconRefresh}
             variant="outline"
             disabled={isLoading}
@@ -165,20 +163,12 @@ const IncentivesPage: React.FC = () => {
             Refresh
           </Button>
           <Button
-            onClick={() => setAddModalType("Commission")}
+            onClick={() => setShowAddModal(true)}
             icon={IconPlus}
             color="sky"
             variant="filled"
           >
             Add Commission
-          </Button>
-          <Button
-            onClick={() => setAddModalType("Bonus")}
-            icon={IconPlus}
-            color="teal"
-            variant="filled"
-          >
-            Add Bonus
           </Button>
         </div>
       </div>
@@ -203,7 +193,7 @@ const IncentivesPage: React.FC = () => {
           </div>
           <div className="text-sm text-default-600 dark:text-gray-300">
             <div className="font-medium">
-              Total: {incentives.length} records
+              Total: {commissions.length} records
             </div>
             <div className="font-medium">
               Amount: {formatCurrency(totalAmount)}
@@ -212,7 +202,7 @@ const IncentivesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Incentives Table */}
+      {/* Commissions Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
@@ -223,11 +213,11 @@ const IncentivesPage: React.FC = () => {
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : incentives.length === 0 ? (
+        ) : commissions.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No incentives found</p>
-            <p>Click "Add Commission" or "Add Bonus" to create records</p>
+            <p className="text-lg font-medium">No commissions found</p>
+            <p>Click "Add Commission" to create records</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -252,51 +242,41 @@ const IncentivesPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Created
-                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {incentives.map((incentive) => (
-                  <tr key={incentive.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                {commissions.map((commission) => (
+                  <tr key={commission.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
-                      {incentive.employee_id}
+                      {commission.employee_id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                      {incentive.employee_name}
+                      {commission.employee_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
-                      {incentive.location_code ? (
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
-                          {incentive.location_code} - {incentive.location_name || "Unknown"}
-                        </span>
-                      ) : (
-                        <span className="text-default-400 dark:text-gray-500">-</span>
-                      )}
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                        {commission.location_code} - {commission.location_name || "Unknown"}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
-                      {formatCurrency(incentive.amount)}
+                      {formatCurrency(commission.amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
-                      {incentive.description}
+                      {commission.description}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {format(
-                        new Date(incentive.commission_date),
+                        new Date(commission.commission_date),
                         "dd MMM yyyy"
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
-                      {format(new Date(incentive.created_at), "dd MMM yyyy")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end space-x-3">
                         <button
-                          onClick={() => handleEdit(incentive)}
+                          onClick={() => handleEdit(commission)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
                           title="Edit"
                         >
@@ -304,7 +284,7 @@ const IncentivesPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => {
-                            setDeletingId(incentive.id);
+                            setDeletingId(commission.id);
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
@@ -323,14 +303,14 @@ const IncentivesPage: React.FC = () => {
       </div>
 
       {/* Modals */}
-      {addModalType && (
+      {showAddModal && (
         <AddIncentiveModal
-          isOpen={addModalType !== null}
-          onClose={() => setAddModalType(null)}
-          onSuccess={fetchIncentives}
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={fetchCommissions}
           currentYear={currentYear}
           currentMonth={currentMonth}
-          incentiveType={addModalType}
+          incentiveType="Commission"
         />
       )}
 
@@ -338,10 +318,10 @@ const IncentivesPage: React.FC = () => {
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
-          setEditingIncentive(null);
+          setEditingCommission(null);
         }}
-        onSuccess={fetchIncentives}
-        incentive={editingIncentive}
+        onSuccess={fetchCommissions}
+        incentive={editingCommission}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -351,9 +331,9 @@ const IncentivesPage: React.FC = () => {
           setShowDeleteDialog(false);
           setDeletingId(null);
         }}
-        onConfirm={handleDeleteIncentive}
-        title="Delete Incentive"
-        message="Are you sure you want to delete this incentive record? This action cannot be undone."
+        onConfirm={handleDeleteCommission}
+        title="Delete Commission"
+        message="Are you sure you want to delete this commission record? This action cannot be undone."
         confirmButtonText="Delete"
         variant="danger"
       />
@@ -361,4 +341,4 @@ const IncentivesPage: React.FC = () => {
   );
 };
 
-export default IncentivesPage;
+export default CommissionPage;

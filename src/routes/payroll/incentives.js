@@ -9,7 +9,7 @@ export default function (pool) {
    * List incentives (commissions, bonuses, etc.) with date filtering.
    */
   router.get("/", async (req, res) => {
-    const { start_date, end_date, employee_id } = req.query;
+    const { start_date, end_date, employee_id, type } = req.query;
 
     try {
       let query = `
@@ -21,6 +21,13 @@ export default function (pool) {
       `;
       const values = [];
       let paramCount = 1;
+
+      // Filter by type: 'commission' (has location_code) or 'bonus' (no location_code)
+      if (type === "commission") {
+        query += ` AND cr.location_code IS NOT NULL`;
+      } else if (type === "bonus") {
+        query += ` AND cr.location_code IS NULL`;
+      }
 
       if (start_date) {
         query += ` AND DATE(cr.commission_date) >= $${paramCount}`;

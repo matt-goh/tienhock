@@ -55,7 +55,8 @@ import ContributionRatesPage from "./Payroll/Statutory/ContributionRatesPage";
 import ECarumanPage from "./Payroll/Statutory/ECarumanPage";
 
 // Payroll - AddOn
-import IncentivesPage from "./Payroll/AddOn/IncentivesPage";
+import CommissionPage from "./Payroll/AddOn/CommissionPage";
+import BonusPage from "./Payroll/AddOn/BonusPage";
 import PinjamListPage from "./Payroll/AddOn/PinjamListPage";
 import MidMonthPayrollPage from "./Payroll/AddOn/MidMonthPayrollPage";
 
@@ -196,9 +197,15 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Incentives",
-    path: "/payroll/incentives",
-    component: IncentivesPage,
+    name: "Commission",
+    path: "/payroll/commission",
+    component: CommissionPage,
+  });
+
+  payrollSubItems.push({
+    name: "Bonus",
+    path: "/payroll/bonus",
+    component: BonusPage,
   });
 
   payrollSubItems.push({
