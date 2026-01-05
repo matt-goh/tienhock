@@ -635,14 +635,15 @@ const CustomerFormPage: React.FC = () => {
           maxLength={20}
           placeholder="e.g., +60123456789"
           className={`
-          block w-full rounded-md border-0 py-1.5 px-3 text-default-900 
-          shadow-sm ring-1 ring-inset placeholder:text-default-400 
+          block w-full rounded-md border-0 py-1.5 px-3 text-default-900 dark:text-gray-100
+          bg-white dark:bg-gray-700 shadow-sm ring-1 ring-inset
+          placeholder:text-default-400 dark:placeholder:text-gray-500
           focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6
-          disabled:cursor-not-allowed disabled:bg-default-50 disabled:text-default-500
+          disabled:cursor-not-allowed disabled:bg-default-50 dark:disabled:bg-gray-800 disabled:text-default-500 dark:disabled:text-gray-400
           ${
             hasWarning
-              ? "ring-amber-300 focus:ring-amber-500"
-              : "ring-default-300 focus:ring-blue-600"
+              ? "ring-amber-300 dark:ring-amber-600 focus:ring-amber-500 dark:focus:ring-amber-400"
+              : "ring-default-300 dark:ring-gray-600 focus:ring-blue-600 dark:focus:ring-blue-500"
           }
           ${isSaving ? "opacity-50" : ""}
         `.trim()}
