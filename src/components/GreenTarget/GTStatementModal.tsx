@@ -667,14 +667,14 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           leaveTo="opacity-0 scale-95"
           className={"w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8"}
         >
-          <div className="relative bg-white rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <DialogTitle as="h3" className="text-lg font-medium">
+              <DialogTitle as="h3" className="text-lg font-medium text-default-900 dark:text-gray-100">
                 Generate Statement
               </DialogTitle>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full hover:bg-default-100"
+                className="p-2 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 text-default-500 dark:text-gray-400"
               >
                 <IconX size={18} />
               </button>
@@ -683,7 +683,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             <div className="space-y-6">
               {/* Month range selection */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-default-700">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                   Select Month Range
                 </label>
                 <div className="flex items-center space-x-3">
@@ -719,7 +719,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                     />
                   </div>
                 </div>
-                <p className="text-xs text-default-500 mt-1">
+                <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
                   {endMonthYear
                     ? `Statement will include all transactions from ${
                         monthYearOptions.find((o) => o.id === startMonthYear)
@@ -742,7 +742,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
               {/* Customer selection */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-default-700">
+                <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
                   Select Customer(s)
                 </label>
                 <FormCombobox
@@ -775,21 +775,21 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
                 {/* Selected customers summary */}
                 {selectedCustomers.length > 0 && (
-                  <div className="mt-2 p-2 bg-sky-50 border border-sky-100 rounded-lg">
+                  <div className="mt-2 p-2 bg-sky-50 dark:bg-sky-900/30 border border-sky-100 dark:border-sky-800 rounded-lg">
                     <div className="flex justify-between">
-                      <p className="text-sm text-default-700 font-medium mb-1">
+                      <p className="text-sm text-default-700 dark:text-gray-200 font-medium mb-1">
                         Selected: {selectedCustomers.length} customer
                         {selectedCustomers.length > 1 ? "s" : ""}
                       </p>
                       <button
-                        className="text-xs text-sky-600 hover:text-sky-800 hover:underline"
+                        className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                         onClick={() => setSelectedCustomers([])}
                       >
                         Clear selection
                       </button>
                     </div>
                     <div className="max-h-36 overflow-y-auto">
-                      <ul className="text-xs text-default-600 space-y-1">
+                      <ul className="text-xs text-default-600 dark:text-gray-300 space-y-1">
                         {selectedCustomers.map((customerId) => {
                           const customer = customerOptions.find(
                             (c) => c.id === customerId
@@ -812,7 +812,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                   </div>
                 )}
 
-                <p className="text-xs text-default-500 mt-1">
+                <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
                   Statements will be generated for each selected customer
                 </p>
               </div>
@@ -837,10 +837,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       {isLoadingDialogVisible && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[240px]">
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 min-w-[240px]">
             <div className="flex flex-col items-center gap-3">
               <LoadingSpinner size="sm" hideText />
-              <p className="text-base font-medium text-default-900">
+              <p className="text-base font-medium text-default-900 dark:text-gray-100">
                 {isGenerating
                   ? `Preparing statement${
                       selectedCustomers.length > 1 ? "s" : ""
@@ -859,7 +859,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                   cleanup(true);
                   onClose();
                 }}
-                className="mt-1 text-sm text-center text-sky-600 hover:underline"
+                className="mt-1 text-sm text-center text-sky-600 dark:text-sky-400 hover:underline"
               >
                 Close
               </button>

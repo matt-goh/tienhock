@@ -505,8 +505,8 @@ const CustomerFormPage: React.FC = () => {
           onChange={handleInputChange}
           placeholder={placeholder}
           rows={4}
-          className="block w-full h-[10rem] px-3 py-2 border border-default-300 rounded-lg shadow-sm
-                     focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+          className="block w-full h-[10rem] px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg shadow-sm
+                     focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 dark:focus:border-sky-500 sm:text-sm"
         />
       </div>
     );
@@ -527,7 +527,7 @@ const CustomerFormPage: React.FC = () => {
   return (
     <div className="space-y-3">
       <div className="bg-white dark:bg-gray-800 rounded-lg">
-        <div className="justify-between flex px-6 pb-4 mb-4 border-b border-default-200 dark:border-gray-700">
+        <div className="justify-between flex px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
@@ -548,8 +548,8 @@ const CustomerFormPage: React.FC = () => {
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                     formData.has_active_rental
-                      ? "bg-green-100 text-green-800"
-                      : "bg-amber-100 text-amber-800"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                   }`}
                 >
                   {formData.has_active_rental ? "Active" : "Inactive"}
@@ -592,17 +592,19 @@ const CustomerFormPage: React.FC = () => {
             )}
 
             {/* Locations Section */}
-            <div className="border-t pt-4 mt-4">
-              <h2 className="text-lg font-medium mb-4">Customer Locations</h2>
+            <div className="border-t border-default-200 dark:border-gray-700 pt-4 mt-4">
+              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
+                Customer Locations
+              </h2>
 
               <div className="mb-4">
                 <div className="flex flex-row space-x-2 w-full">
                   {/* Location input - 70% width */}
                   <div
-                    className={`flex flex-grow w-[70%] border rounded-lg p-1.5 ${
+                    className={`flex flex-grow w-[70%] border rounded-lg p-1.5 bg-white dark:bg-gray-700 ${
                       isLocationInputFocused
-                        ? "border-default-500"
-                        : "border-default-300"
+                        ? "border-default-500 dark:border-gray-500"
+                        : "border-default-300 dark:border-gray-600"
                     }`}
                   >
                     <div className="flex relative w-[85%]">
@@ -617,7 +619,7 @@ const CustomerFormPage: React.FC = () => {
                         onFocus={() => setIsLocationInputFocused(true)}
                         onBlur={() => setIsLocationInputFocused(false)}
                         placeholder="Enter location address"
-                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none"
+                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none"
                       />
                     </div>
                     <Button
@@ -635,10 +637,10 @@ const CustomerFormPage: React.FC = () => {
 
                   {/* Phone input - 30% width */}
                   <div
-                    className={`flex w-[30%] border rounded-lg p-1.5 ${
+                    className={`flex w-[30%] border rounded-lg p-1.5 bg-white dark:bg-gray-700 ${
                       isPhoneInputFocused
-                        ? "border-default-500"
-                        : "border-default-300"
+                        ? "border-default-500 dark:border-gray-500"
+                        : "border-default-300 dark:border-gray-600"
                     }`}
                   >
                     <div className="flex relative w-full">
@@ -655,7 +657,7 @@ const CustomerFormPage: React.FC = () => {
                         placeholder={`Optional phone number (default: ${
                           formData.phone_number || "none"
                         })`}
-                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent focus:outline-none"
+                        className="w-full pl-10 pr-3 py-2 border-0 bg-transparent text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -679,7 +681,7 @@ const CustomerFormPage: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <span className="flex h-8 w-8 items-center justify-center bg-sky-100 text-sky-600 dark:text-sky-400 rounded-full mr-3">
+                            <span className="flex h-8 w-8 items-center justify-center bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400 rounded-full mr-3">
                               <IconMapPin size={16} />
                             </span>
                             <span className="font-medium">
@@ -700,7 +702,7 @@ const CustomerFormPage: React.FC = () => {
                               e.stopPropagation();
                               handleRemoveLocation(index);
                             }}
-                            className="p-1.5 rounded-full text-default-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            className="p-1.5 rounded-full text-default-400 dark:text-gray-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
                             title="Remove location"
                           >
                             <IconTrash size={18} />
@@ -713,7 +715,10 @@ const CustomerFormPage: React.FC = () => {
               ) : (
                 <div className="border-2 border-dashed border-default-200 dark:border-gray-700 rounded-lg p-6 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-default-100 dark:bg-gray-800">
-                    <IconMap size={24} className="text-default-600 dark:text-gray-300" />
+                    <IconMap
+                      size={24}
+                      className="text-default-600 dark:text-gray-300"
+                    />
                   </div>
                   <h3 className="mt-3 text-sm font-medium text-default-900 dark:text-gray-100">
                     No locations
@@ -726,10 +731,10 @@ const CustomerFormPage: React.FC = () => {
             </div>
 
             {/* e-Invoice fields */}
-            <div className="border-t pt-6 mt-6">
-              <h2 className="text-lg font-medium mb-4">
+            <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
+              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
                 e-Invoice Information{" "}
-                <span className="text-sm font-medium text-default-400">
+                <span className="text-sm font-medium text-default-400 dark:text-gray-500">
                   (optional)
                 </span>
               </h2>
