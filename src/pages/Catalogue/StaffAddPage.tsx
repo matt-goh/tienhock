@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Tab from "../../components/Tab";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -24,6 +24,7 @@ interface SelectOption {
 
 const StaffAddPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const maritalStatusOptions = [
     { id: "Single", name: "Single" },
     { id: "Married", name: "Married" },
@@ -134,6 +135,28 @@ const StaffAddPage: React.FC = () => {
       JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
     setIsFormChanged(hasChanged);
   }, [formData]);
+
+  // Handle pre-fill data when creating new staff from "Add Same-Name Staff" button
+  useEffect(() => {
+    if (location.state?.prefillData) {
+      const prefillData = location.state.prefillData;
+      setFormData((prev) => ({
+        ...prev,
+        ...prefillData,
+        id: "", // Ensure ID is empty
+        job: [], // Ensure job is empty
+      }));
+      // Update the initial form data ref so form change detection works correctly
+      initialFormDataRef.current = {
+        ...initialFormDataRef.current,
+        ...prefillData,
+        id: "",
+        job: [],
+      };
+      // Clear the navigation state to prevent re-applying on subsequent renders
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleBackClick = () => {
     if (isFormChanged) {

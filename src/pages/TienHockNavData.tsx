@@ -18,8 +18,8 @@ import JournalEntryListPage from "./Accounting/JournalEntryListPage";
 import JournalEntryPage from "./Accounting/JournalEntryPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 
-// Payroll Settings imports
-import LocationAccountMappingsPage from "./Payroll/Settings/LocationAccountMappingsPage";
+// Accounting - Location Mappings
+import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -207,13 +207,6 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     component: PinjamListPage,
   });
 
-  // Settings section - Job Location Mappings moved to Catalogue > Location
-  payrollSubItems.push({
-    name: "Settings",
-    path: "/payroll/settings/location-account-mappings",
-    component: LocationAccountMappingsPage,
-  });
-
   return payrollSubItems;
 };
 
@@ -273,6 +266,11 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Voucher Generator",
         path: "/accounting/voucher-generator",
         component: VoucherGeneratorPage,
+      },
+      {
+        name: "Account Mappings",
+        path: "/accounting/location-account-mappings",
+        component: LocationAccountMappingsPage,
       },
     ],
   },

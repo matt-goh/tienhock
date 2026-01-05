@@ -885,10 +885,10 @@ const InvoiceFormPage: React.FC = () => {
                     "block w-full px-3 py-2 border rounded-lg shadow-sm",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                     invoiceNumberValidation.isDuplicate
-                      ? "border-red-500 bg-red-50"
+                      ? "border-red-500 bg-red-50 dark:bg-red-900/30"
                       : invoiceNumberValidation.isValid
-                      ? "border-default-300"
-                      : "border-yellow-500 bg-yellow-50"
+                      ? "border-default-300 dark:border-gray-600"
+                      : "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30"
                   )}
                   placeholder="Enter custom invoice number or leave blank"
                 />
@@ -935,7 +935,7 @@ const InvoiceFormPage: React.FC = () => {
                 onChange={handleInputChange}
                 required
                 className={clsx(
-                  "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                  "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                   "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                 )}
               />
@@ -1026,7 +1026,7 @@ const InvoiceFormPage: React.FC = () => {
                                   />
                                 ) : (
                                   <IconSquare
-                                    className="text-gray-400"
+                                    className="text-gray-400 dark:text-gray-500"
                                     size={20}
                                   />
                                 )}
@@ -1051,8 +1051,8 @@ const InvoiceFormPage: React.FC = () => {
                                 className={clsx(
                                   "text-xs font-medium px-2 py-1 rounded-full",
                                   isActive
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                                 )}
                               >
                                 {isActive ? "Ongoing" : "Completed"}
@@ -1074,7 +1074,7 @@ const InvoiceFormPage: React.FC = () => {
                       {selectedRentals.map((rental) => (
                         <div
                           key={rental.rental_id}
-                          className="bg-sky-50 border border-sky-200 rounded-lg p-3"
+                          className="bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 rounded-lg p-3"
                         >
                           <div className="flex justify-between items-start">
                             <div>
@@ -1082,7 +1082,7 @@ const InvoiceFormPage: React.FC = () => {
                                 Rental #{rental.rental_id} - Dumpster{" "}
                                 {rental.tong_no}
                               </div>
-                              <div className="text-sm text-gray-600 mt-1">
+                              <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                                 <span>Driver: {rental.driver}</span>
                                 <span className="mx-2">•</span>
                                 <span>
@@ -1157,12 +1157,12 @@ const InvoiceFormPage: React.FC = () => {
                     step="1"
                     required
                     className={clsx(
-                      "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                      "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                       !isEditMode &&
                         formData.type === "regular" &&
                         selectedRentals.length > 0 &&
-                        "bg-sky-50"
+                        "bg-sky-50 dark:bg-sky-900/30"
                     )}
                   />
                 </div>
@@ -1187,8 +1187,8 @@ const InvoiceFormPage: React.FC = () => {
                     min="0"
                     step="1"
                     className={clsx(
-                      "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
-                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm bg-default-50"
+                      "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm bg-default-50 dark:bg-gray-900/50"
                     )}
                   />
                 </div>
@@ -1262,7 +1262,7 @@ const InvoiceFormPage: React.FC = () => {
                       <HeadlessListboxButton
                         id="pm-paid"
                         className={clsx(
-                          "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                          "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm",
                           "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                         )}
                       >
@@ -1285,7 +1285,7 @@ const InvoiceFormPage: React.FC = () => {
                       >
                         <ListboxOptions
                           className={clsx(
-                            "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                            "absolute z-20 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
                             "bottom-full mb-1"
                           )}
                         >
@@ -1296,7 +1296,7 @@ const InvoiceFormPage: React.FC = () => {
                                 clsx(
                                   "relative cursor-default select-none py-2 pl-3 pr-10",
                                   active
-                                    ? "bg-sky-100 text-sky-900"
+                                    ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
                                     : "text-gray-900 dark:text-gray-100"
                                 )
                               }
@@ -1342,7 +1342,7 @@ const InvoiceFormPage: React.FC = () => {
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
                       className={clsx(
-                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       )}
                     />
@@ -1463,12 +1463,12 @@ const InfoItem: React.FC<{
   value: string | number | null | undefined;
   highlight?: boolean;
 }> = ({ label, value, highlight = false }) => (
-  <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+  <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100 dark:border-gray-700">
     <div className="text-xs text-default-500 dark:text-gray-400 mb-1">{label}</div>
     <div
       className={clsx(
         "font-medium truncate",
-        highlight ? "text-green-600" : "text-default-800"
+        highlight ? "text-green-600 dark:text-green-400" : "text-default-800 dark:text-gray-200"
       )}
     >
       {value ?? "N/A"}

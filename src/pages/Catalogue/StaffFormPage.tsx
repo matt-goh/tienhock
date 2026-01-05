@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import Tab from "../../components/Tab";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -22,7 +22,7 @@ import {
   useJobPayCodeMappings,
 } from "../../utils/catalogue/useJobPayCodeMappings";
 import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
-import { IconLink, IconChevronDown, IconChevronRight, IconLayoutList, IconLayoutGrid, IconChevronsDown, IconChevronsUp } from "@tabler/icons-react";
+import { IconLink, IconChevronDown, IconChevronRight, IconLayoutList, IconLayoutGrid, IconChevronsDown, IconChevronsUp, IconUsers, IconUserPlus, IconCrown, IconExternalLink } from "@tabler/icons-react";
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import { JobPayCodeDetails, PayType } from "../../types/types";
@@ -32,6 +32,14 @@ type PayCodeViewMode = 'grouped' | 'flat';
 interface SelectOption {
   id: string;
   name: string;
+}
+
+interface SameNameStaff {
+  id: string;
+  name: string;
+  headStaffId: string | null;
+  job: string[];
+  isHead: boolean;
 }
 
 /**
@@ -45,6 +53,7 @@ interface SelectOption {
  */
 const StaffFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const maritalStatusOptions = [
@@ -127,6 +136,12 @@ const StaffFormPage: React.FC = () => {
     payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[];
     onConfirm: () => void;
   } | null>(null);
+
+  // Same-name staff state for Head management
+  const [sameNameStaff, setSameNameStaff] = useState<SameNameStaff[]>([]);
+  const [isUniqueName, setIsUniqueName] = useState(true);
+  const [loadingSameNameStaff, setLoadingSameNameStaff] = useState(false);
+  const [settingHeadStaff, setSettingHeadStaff] = useState(false);
 
   const genderOptions = [
     { id: "Male", name: "Male" },
@@ -794,6 +809,103 @@ const StaffFormPage: React.FC = () => {
     navigate("/catalogue/staff");
   };
 
+  // Fetch same-name staff for Head management
+  const fetchSameNameStaff = useCallback(async () => {
+    if (!id) return;
+
+    setLoadingSameNameStaff(true);
+    try {
+      const response = await api.get(`/api/staffs/same-name/${id}`);
+      setSameNameStaff(response.sameNameStaff || []);
+      setIsUniqueName(response.isUniqueName);
+    } catch (error) {
+      console.error("Error fetching same-name staff:", error);
+      setSameNameStaff([]);
+      setIsUniqueName(true);
+    } finally {
+      setLoadingSameNameStaff(false);
+    }
+  }, [id]);
+
+  // Fetch same-name staff when in edit mode
+  useEffect(() => {
+    if (isEditMode && id) {
+      fetchSameNameStaff();
+    }
+  }, [isEditMode, id, fetchSameNameStaff]);
+
+  // Handle pre-fill data when creating new staff from "Add Same-Name Staff" button
+  useEffect(() => {
+    if (!isEditMode && location.state?.prefillData) {
+      setFormData((prev) => ({
+        ...prev,
+        ...location.state.prefillData,
+        id: "", // Ensure ID is empty
+        job: [], // Ensure job is empty
+      }));
+      // Clear the state to prevent re-applying on subsequent renders
+      window.history.replaceState({}, document.title);
+    }
+  }, [isEditMode, location.state]);
+
+  // Handler for setting head staff
+  const handleHeadStaffChange = async (newHeadStaffId: string) => {
+    if (!formData.name || settingHeadStaff) return;
+
+    // Don't do anything if clicking on the already-selected head
+    const currentHead = sameNameStaff.find((s) => s.isHead);
+    if (currentHead?.id === newHeadStaffId) return;
+
+    setSettingHeadStaff(true);
+    try {
+      await api.put("/api/staffs/set-head", {
+        headStaffId: newHeadStaffId,
+        staffName: formData.name,
+      });
+
+      // Refresh same-name staff list (this updates the isHead flags)
+      await fetchSameNameStaff();
+
+      toast.success("Head staff updated successfully");
+    } catch (error) {
+      console.error("Error setting head staff:", error);
+      toast.error("Failed to update head staff");
+    } finally {
+      setSettingHeadStaff(false);
+    }
+  };
+
+  // Handler for adding a new staff with the same name
+  const handleAddSameNameStaff = () => {
+    // Create state object with current staff data, excluding ID and job
+    const prefillData = {
+      name: formData.name,
+      telephoneNo: formData.telephoneNo,
+      email: formData.email,
+      gender: formData.gender,
+      nationality: formData.nationality,
+      birthdate: formData.birthdate,
+      address: formData.address,
+      icNo: formData.icNo,
+      bankAccountNumber: formData.bankAccountNumber,
+      epfNo: formData.epfNo,
+      incomeTaxNo: formData.incomeTaxNo,
+      socsoNo: formData.socsoNo,
+      paymentType: formData.paymentType,
+      paymentPreference: formData.paymentPreference,
+      race: formData.race,
+      agama: formData.agama,
+      maritalStatus: formData.maritalStatus,
+      spouseEmploymentStatus: formData.spouseEmploymentStatus,
+      numberOfChildren: formData.numberOfChildren,
+      kwspNumber: formData.kwspNumber,
+      department: formData.department,
+    };
+
+    // Navigate to new staff page with state
+    navigate("/catalogue/staff/new", { state: { prefillData } });
+  };
+
   // Format IC Number with hyphens
   const formatICNumber = (value: string): string => {
     // Remove all non-digits
@@ -1025,44 +1137,91 @@ const StaffFormPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
-            <div>
-              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                Edit {formData.name}'s Details
-              </h1>
-              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                {isEditMode
-                  ? 'Edit maklumat kakitangan di sini. Klik "Save" apabila anda selesai.'
-                  : 'Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila anda selesai.'}
-              </p>
+            <div className="flex-1 min-w-0">
+              {/* Staff Name & ID Row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
+                  {formData.name || "New Staff"}
+                </h1>
+                {formData.id && (
+                  <span className="px-2.5 py-0.5 text-sm font-mono font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded-full">
+                    {formData.id}
+                  </span>
+                )}
+              </div>
+
+              {/* Staff Details Row */}
+              <div className="mt-1.5 flex items-center gap-4 flex-wrap text-sm text-default-600 dark:text-gray-400">
+                {/* IC Number */}
+                {formData.icNo && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-default-400 dark:text-gray-500">IC:</span>
+                    <span className="font-medium text-default-700 dark:text-gray-300">{formData.icNo}</span>
+                  </div>
+                )}
+
+                {/* Telephone */}
+                {formData.telephoneNo && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-default-400 dark:text-gray-500">Tel:</span>
+                    <span className="font-medium text-default-700 dark:text-gray-300">{formData.telephoneNo}</span>
+                  </div>
+                )}
+
+                {/* Jobs */}
+                {formData.job && formData.job.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-default-400 dark:text-gray-500">Jobs:</span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {formData.job.slice(0, 3).map((jobId) => (
+                        <span
+                          key={jobId}
+                          className="px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded"
+                        >
+                          {jobId}
+                        </span>
+                      ))}
+                      {formData.job.length > 3 && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-default-200 dark:bg-gray-700 text-default-600 dark:text-gray-300 rounded">
+                          +{formData.job.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center space-x-3">
             {isEditMode && (
               <button
                 type="button"
-                className="px-5 py-2 border border-rose-400 hover:border-rose-500 bg-white dark:bg-gray-800 hover:bg-rose-500 active:bg-rose-600 active:border-rose-600 rounded-full font-medium text-base text-rose-500 hover:text-default-100 active:text-default-200 transition-colors duration-200"
+                className="px-5 py-2 text-base font-medium rounded-full border border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 hover:border-rose-400 dark:hover:border-rose-600 active:bg-rose-200 dark:active:bg-rose-900/60 transition-colors"
                 onClick={handleDeleteClick}
               >
                 Delete
               </button>
             )}
-            <Button
+            <button
               type="submit"
               form="staff-form"
-              variant="boldOutline"
-              size="lg"
               disabled={isSaving || !isFormChanged}
+              className={`px-5 py-2 text-base font-medium rounded-full transition-colors ${
+                isSaving || !isFormChanged
+                  ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border border-default-200 dark:border-gray-600"
+                  : "bg-sky-500 dark:bg-sky-600 text-white hover:bg-sky-600 dark:hover:bg-sky-500 active:bg-sky-700 dark:active:bg-sky-700 border border-sky-500 dark:border-sky-600 hover:border-sky-600 dark:hover:border-sky-500"
+              }`}
             >
-              Save
-            </Button>
+              {isSaving ? "Saving..." : "Save"}
+            </button>
           </div>
         </div>
         <form id="staff-form" onSubmit={handleSubmit}>
-          <div className="p-6 pb-8">
+          <div className="px-6 py-3">
             <Tab
               labels={["Personal", "Work", "Documents", "Additional"]}
               tabWidth="w-[104px]"
-              defaultActiveTab={1}
+              defaultActiveTab={0}
             >
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -1085,6 +1244,117 @@ const StaffFormPage: React.FC = () => {
                 <div className="grid grid-cols-1 gap-6">
                   {renderInput("address", "Address")}
                 </div>
+
+                {/* Head Staff Management Section */}
+                {isEditMode && (
+                  <div className="mt-4 p-4 bg-default-50 dark:bg-gray-800/50 rounded-lg border border-default-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <IconUsers size={18} className="text-default-500" />
+                        <h4 className="text-sm font-medium text-default-700 dark:text-gray-200">
+                          Same Name Staff Records
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddSameNameStaff}
+                        disabled={settingHeadStaff}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded-lg hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors ${
+                          settingHeadStaff ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        <IconUserPlus size={16} />
+                        Add New
+                      </button>
+                    </div>
+
+                    {loadingSameNameStaff ? (
+                      <div className="flex items-center justify-center py-4">
+                        <LoadingSpinner />
+                      </div>
+                    ) : isUniqueName ? (
+                      <p className="text-sm text-default-400 dark:text-gray-500 italic">
+                        This staff has a unique name - no other records found.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sameNameStaff.map((staff) => (
+                          <div
+                            key={staff.id}
+                            onClick={() => handleHeadStaffChange(staff.id)}
+                            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                              settingHeadStaff
+                                ? "cursor-wait opacity-60"
+                                : "cursor-pointer"
+                            } ${
+                              staff.isHead
+                                ? "bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700"
+                                : "bg-white dark:bg-gray-800 border-default-200 dark:border-gray-700 hover:border-sky-300 dark:hover:border-sky-600"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {/* Radio-style indicator */}
+                              <div
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                  staff.isHead
+                                    ? "border-amber-500 bg-amber-500"
+                                    : "border-default-300 dark:border-gray-600"
+                                }`}
+                              >
+                                {staff.isHead && (
+                                  <IconCrown size={10} className="text-white" />
+                                )}
+                              </div>
+
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-medium text-default-800 dark:text-gray-100">
+                                    {staff.id}
+                                  </span>
+                                  {staff.isHead && (
+                                    <span className="px-1.5 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded">
+                                      HEAD
+                                    </span>
+                                  )}
+                                  {staff.id === id && (
+                                    <span className="px-1.5 py-0.5 text-xs bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
+                                      Current
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-default-500 dark:text-gray-400">
+                                  {staff.job.length > 0
+                                    ? staff.job.join(", ")
+                                    : "No job assigned"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Navigate to this staff's page */}
+                            {staff.id !== id && (
+                              <button
+                                type="button"
+                                disabled={settingHeadStaff}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!settingHeadStaff) {
+                                    navigate(`/catalogue/staff/${staff.id}`);
+                                  }
+                                }}
+                                className={`p-1.5 text-default-400 hover:text-sky-500 dark:hover:text-sky-400 ${
+                                  settingHeadStaff ? "opacity-50 cursor-not-allowed" : ""
+                                }`}
+                                title="View this staff"
+                              >
+                                <IconExternalLink size={16} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

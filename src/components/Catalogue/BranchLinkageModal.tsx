@@ -465,7 +465,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                 </DialogTitle>
 
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                     Link multiple customer branches to share pricing and
                     e-Invoice information. Any price change in one branch will
                     update pricing for all linked branches. All branches will
@@ -473,16 +473,16 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                   </p>
 
                   {/* List of All Branch Groups */}
-                  <div className="mb-4 border rounded-lg p-4">
+                  <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg p-4">
                     {fetchingCustomers ? (
                       <>
-                        <h4 className="font-medium mb-3">All Branch Groups</h4>
+                        <h4 className="font-medium mb-3 dark:text-gray-100">All Branch Groups</h4>
                         <div className="flex justify-center py-4">
                           <LoadingSpinner size="sm" />
                         </div>
                       </>
                     ) : getAllBranchGroups.length === 0 ? (
-                      <p className="text-gray-500 text-center py-3">
+                      <p className="text-gray-500 dark:text-gray-400 text-center py-3">
                         No branch groups found
                       </p>
                     ) : (
@@ -490,17 +490,17 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                         {getAllBranchGroups.map((group: any) => (
                           <div
                             key={group.id}
-                            className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-gray-50 ${
+                            className={`border rounded-lg p-3 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
                               activeGroup?.id === group.id
-                                ? "border-sky-500 bg-sky-50"
-                                : ""
+                                ? "border-sky-500 bg-sky-50 dark:bg-sky-900/20"
+                                : "border-default-200 dark:border-gray-700"
                             }`}
                             onClick={() => selectBranchGroup(group)}
                           >
-                            <h5 className="font-medium text-gray-900">
+                            <h5 className="font-medium text-gray-900 dark:text-gray-100">
                               {group.group_name}
                             </h5>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
                               {group.branches.length}{" "}
                               {group.branches.length === 1
                                 ? "branch"
@@ -550,8 +550,8 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                       <LoadingSpinner />
                     </div>
                   ) : !selectedCustomerId ? (
-                    <div className="text-center py-6 border rounded-lg bg-gray-50">
-                      <p className="text-gray-500">
+                    <div className="text-center py-6 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                      <p className="text-gray-500 dark:text-gray-400">
                         Please select a customer to manage branch pricing
                       </p>
                     </div>
@@ -559,9 +559,9 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                     <>
                       {/* Show current group or option to create new group */}
                       {activeGroup ? (
-                        <div className="border rounded-lg p-4 mb-6">
+                        <div className="border border-default-200 dark:border-gray-700 rounded-lg p-4 mb-6">
                           <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-medium text-lg">
+                            <h4 className="font-medium text-lg dark:text-gray-100">
                               {activeGroup.group_name}
                             </h4>
                             <Button
@@ -576,40 +576,40 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                           </div>
 
                           <div className="mb-6">
-                            <h5 className="font-medium mb-2">
+                            <h5 className="font-medium mb-2 dark:text-gray-200">
                               Linked Branches
                             </h5>
-                            <div className="border rounded-lg overflow-hidden">
+                            <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
                               <div className="max-h-80 overflow-y-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                  <thead className="bg-gray-50 sticky top-0 z-10">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                  <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                                     <tr>
-                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Customer ID
                                       </th>
-                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Name
                                       </th>
-                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Main Branch
                                       </th>
-                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Actions
                                       </th>
                                     </tr>
                                   </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
+                                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                     {activeGroup.branches.map((branch) => (
                                       <tr key={branch.customer_id}>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                           {branch.customer_id}
                                         </td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                           {branch.customer_name}
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap text-center">
                                           {branch.is_main_branch ? (
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                                               <IconCheck
                                                 size={12}
                                                 className="mr-1"
@@ -661,7 +661,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
                           {/* Add more branches */}
                           <div className="mt-2">
-                            <h5 className="font-medium mb-2">
+                            <h5 className="font-medium mb-2 dark:text-gray-200">
                               Add More Branches
                             </h5>
                             <div className="flex items-center gap-2">
@@ -700,10 +700,10 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="border rounded-lg p-4 mb-6">
+                        <div className="border border-default-200 dark:border-gray-700 rounded-lg p-4 mb-6">
                           {isAddingNew ? (
                             <div>
-                              <h4 className="font-medium mb-3">
+                              <h4 className="font-medium mb-3 dark:text-gray-100">
                                 Create New Branch Group
                               </h4>
                               <div className="space-y-3">
@@ -739,7 +739,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                     disabled={saving}
                                     placeholder="Select customers to add as branches"
                                   />
-                                  <p className="text-xs text-gray-500 mt-1">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     Current customer ({selectedCustomer?.name},{" "}
                                     {selectedCustomer?.id}) will be added as the
                                     main branch
@@ -767,7 +767,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                             </div>
                           ) : (
                             <div className="text-center py-6">
-                              <p className="text-gray-500 mb-4">
+                              <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 This customer is not part of any branch group
                                 yet
                               </p>

@@ -13,9 +13,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 8. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
 9. When it is used, write space-y-3 instead of space-y-6.
 10. Use rm instead of del when deleting files.
-11. To access the dev database, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
+11. If needed during planning, access the dev database to understand the system better, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
 12. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
 13. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
+14. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files you have created or modified, and find any bugs or limitations that you can improve upon/fix.
 
 ## Architecture Overview
 
@@ -41,14 +42,6 @@ This is a comprehensive ERP system supporting three companies:
 - **Database**: PostgreSQL with enhanced connection pooling (`src/routes/utils/db-pool.js`)
 - **Route Organization**: `src/routes/index.js` sets up all API routes
 - **Company-specific Routes**: Each company has separate route handlers under their respective directories
-
-### Key Features
-- **E-Invoice Integration**: Malaysia MyInvois system integration for all companies
-- **PDF Generation**: Invoice, payslip, and report generation using `@react-pdf/renderer`
-- **Payroll System**: Comprehensive payroll processing with EPF, SOCSO, income tax calculations
-- **Multi-user Support**: Session-based authentication with real-time data synchronization
-- **Scheduled Jobs**: Daily invoice status updates and auto-consolidation via node-cron
-- **Mobile Warning**: Desktop-optimized UI with mobile device detection
 
 ### Database
 - PostgreSQL with connection pooling
@@ -86,7 +79,7 @@ This is a comprehensive ERP system supporting three companies:
 - `taxes` - name, rate
 
 **Staff & Employees:**
-- `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department
+- `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
 - `bookmarks` - id, staff_id, name
 
@@ -195,9 +188,3 @@ This starts:
 **Environment Variables:**
 - Development: `.env` file in project root
 - Production: Server environment variables (not from .env)
-
-### Production Setup
-- Frontend built with `npm run build` (outputs to `build/` directory)
-- Server runs with `npm run server-prod` (node server.js directly)
-- Database connection via production environment variables
-- CORS configured for production domain

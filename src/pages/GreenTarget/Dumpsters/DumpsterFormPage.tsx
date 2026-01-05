@@ -252,7 +252,7 @@ const DumpsterFormPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg">
-        <div className="px-6 pb-4 border-b border-default-200 dark:border-gray-700">
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
             <div className="h-6 w-px bg-default-300"></div>
@@ -293,9 +293,9 @@ const DumpsterFormPage: React.FC = () => {
                     disabled={isEditMode}
                     className={`w-full px-3 py-2 border ${
                       isDuplicate
-                        ? "border-rose-300 focus:border-rose-500"
-                        : "border-default-300 focus:border-default-500"
-                    } rounded-lg focus:outline-none disabled:bg-default-50`}
+                        ? "border-rose-300 focus:border-rose-500 dark:border-rose-600 dark:focus:border-rose-500"
+                        : "border-default-300 dark:border-gray-600 focus:border-default-500 dark:focus:border-gray-500"
+                    } bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg focus:outline-none disabled:bg-default-50 dark:disabled:bg-gray-900/50`}
                   />
                   {isDuplicate && (
                     <p className="mt-1 text-sm text-rose-600">
@@ -346,8 +346,8 @@ const DumpsterFormPage: React.FC = () => {
                           className={({ active }) =>
                             `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                               active
-                                ? "bg-default-100 text-default-900"
-                                : "text-default-900"
+                                ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                                : "text-default-900 dark:text-gray-100"
                             }`
                           }
                           value="Available"
@@ -376,8 +376,8 @@ const DumpsterFormPage: React.FC = () => {
                           className={({ active }) =>
                             `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                               active
-                                ? "bg-default-100 text-default-900"
-                                : "text-default-900"
+                                ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                                : "text-default-900 dark:text-gray-100"
                             }`
                           }
                           value="Rented"
@@ -407,8 +407,8 @@ const DumpsterFormPage: React.FC = () => {
                           className={({ active }) =>
                             `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                               active
-                                ? "bg-default-100 text-default-900"
-                                : "text-default-900"
+                                ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                                : "text-default-900 dark:text-gray-100"
                             }`
                           }
                           value="Maintenance"
@@ -442,8 +442,8 @@ const DumpsterFormPage: React.FC = () => {
           </div>
 
           {isEditMode && (
-            <div className="mt-8 pt-4 border-t">
-              <h2 className="text-lg font-medium mb-4">Rental Schedule</h2>
+            <div className="mt-6 pt-4 border-t border-default-200 dark:border-gray-700">
+              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">Rental Schedule</h2>
               {rentals.length === 0 ? (
                 <p className="text-default-500 dark:text-gray-400">
                   No rentals scheduled for this dumpster.
@@ -516,9 +516,9 @@ const DumpsterFormPage: React.FC = () => {
                               <span
                                 className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                                   isCurrent
-                                    ? "bg-green-100 text-green-800"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                                     : isScheduled
-                                    ? "bg-amber-100 text-amber-800"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
                                     : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                                 }`}
                               >
@@ -539,7 +539,7 @@ const DumpsterFormPage: React.FC = () => {
             </div>
           )}
 
-          <div className="mt-6 py-3 text-right">
+          <div className="mt-2 pt-2 text-right">
             {isEditMode && (
               <Button
                 type="button"

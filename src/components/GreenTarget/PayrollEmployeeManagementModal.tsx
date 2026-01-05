@@ -33,6 +33,12 @@ interface GTPayrollEmployee {
   employee_name: string;
 }
 
+interface PendingAdd {
+  employee_id: string;
+  employee_name: string;
+  job_type: "OFFICE" | "DRIVER";
+}
+
 interface PayrollEmployeeManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -45,17 +51,24 @@ const PayrollEmployeeManagementModal: React.FC<
 > = ({ isOpen, onClose, availableEmployees, onUpdate }) => {
   const [gtEmployees, setGtEmployees] = useState<GTPayrollEmployee[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [selectedJobType, setSelectedJobType] = useState<"OFFICE" | "DRIVER">(
     "OFFICE"
   );
 
+  // Staged changes - like LocationModal pattern
+  const [pendingAdds, setPendingAdds] = useState<PendingAdd[]>([]);
+  const [pendingRemoves, setPendingRemoves] = useState<Set<number>>(new Set());
+
   // Fetch GT payroll employees when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchGTEmployees();
+      // Reset pending changes when modal opens
+      setPendingAdds([]);
+      setPendingRemoves(new Set());
     }
   }, [isOpen]);
 
@@ -72,12 +85,39 @@ const PayrollEmployeeManagementModal: React.FC<
     }
   };
 
-  // Get employee IDs already in GT payroll
-  const gtEmployeeIds = new Set(gtEmployees.map((e) => e.employee_id));
+  // Current members = original - pending removes + pending adds
+  const currentMembers = useMemo(() => {
+    const existing = gtEmployees
+      .filter((emp) => !pendingRemoves.has(emp.id))
+      .map((emp) => ({
+        id: emp.id,
+        employee_id: emp.employee_id,
+        employee_name: emp.employee_name,
+        job_type: emp.job_type,
+        isNew: false,
+        isPendingRemove: false,
+      }));
+
+    const newAdds = pendingAdds.map((add) => ({
+      id: null as number | null,
+      employee_id: add.employee_id,
+      employee_name: add.employee_name,
+      job_type: add.job_type,
+      isNew: true,
+      isPendingRemove: false,
+    }));
+
+    return [...existing, ...newAdds];
+  }, [gtEmployees, pendingAdds, pendingRemoves]);
+
+  // Get employee IDs currently in the list (original + pending adds - pending removes)
+  const currentMemberIds = useMemo(() => {
+    return new Set(currentMembers.map((m) => m.employee_id));
+  }, [currentMembers]);
 
   // Filter and group current members
   const filteredMembers = useMemo(() => {
-    let members = gtEmployees;
+    let members = currentMembers;
 
     if (memberSearch) {
       const search = memberSearch.toLowerCase();
@@ -89,67 +129,115 @@ const PayrollEmployeeManagementModal: React.FC<
     }
 
     return members;
-  }, [gtEmployees, memberSearch]);
+  }, [currentMembers, memberSearch]);
 
   const officeMembers = filteredMembers.filter((e) => e.job_type === "OFFICE");
   const driverMembers = filteredMembers.filter((e) => e.job_type === "DRIVER");
 
-  // Filter available employees who are not already in GT payroll
+  // Filter available employees who are not in current members
   const eligibleEmployees = useMemo(() => {
     let employees = availableEmployees
       .filter((emp) => !emp.dateResigned) // Only active employees
-      .filter((emp) => !gtEmployeeIds.has(emp.id)); // Not already in GT payroll
+      .filter((emp) => !currentMemberIds.has(emp.id)); // Not in current members
 
     if (employeeSearch) {
       const search = employeeSearch.toLowerCase();
       employees = employees.filter(
         (emp) =>
           emp.name.toLowerCase().includes(search) ||
-          emp.id.toLowerCase().includes(search)
+          emp.id.toLowerCase().includes(search) ||
+          emp.job?.some((j) => j.toLowerCase().includes(search))
       );
     }
 
     return employees.sort((a, b) => a.name.localeCompare(b.name));
-  }, [availableEmployees, gtEmployeeIds, employeeSearch]);
+  }, [availableEmployees, currentMemberIds, employeeSearch]);
 
-  const handleAddEmployee = async (employeeId: string) => {
-    setIsProcessing(true);
-    try {
-      await api.post("/greentarget/api/payroll-employees", {
+  // Check for changes
+  const hasChanges = pendingAdds.length > 0 || pendingRemoves.size > 0;
+
+  // Changes summary
+  const changesSummary = useMemo(() => {
+    return {
+      toAdd: pendingAdds.length,
+      toRemove: pendingRemoves.size,
+    };
+  }, [pendingAdds, pendingRemoves]);
+
+  // Stage an add (local state only)
+  const handleAddEmployee = (employeeId: string) => {
+    const employee = availableEmployees.find((e) => e.id === employeeId);
+    if (!employee) return;
+
+    setPendingAdds((prev) => [
+      ...prev,
+      {
         employee_id: employeeId,
+        employee_name: employee.name,
         job_type: selectedJobType,
-      });
-      toast.success("Employee added to GT Payroll");
-      await fetchGTEmployees();
-      onUpdate?.();
-    } catch (error) {
-      console.error("Error adding employee:", error);
-      toast.error("Failed to add employee");
-    } finally {
-      setIsProcessing(false);
+      },
+    ]);
+  };
+
+  // Stage a remove (local state only)
+  const handleRemoveEmployee = (
+    id: number | null,
+    employeeId: string,
+    isNew: boolean
+  ) => {
+    if (isNew) {
+      // Remove from pending adds
+      setPendingAdds((prev) =>
+        prev.filter((add) => add.employee_id !== employeeId)
+      );
+    } else if (id !== null) {
+      // Add to pending removes
+      setPendingRemoves((prev) => new Set([...prev, id]));
     }
   };
 
-  const handleRemoveEmployee = async (id: number, name: string) => {
-    if (!confirm(`Remove ${name} from GT Payroll?`)) return;
+  // Save all changes
+  const handleSave = async () => {
+    if (!hasChanges) return;
 
-    setIsProcessing(true);
+    setIsSaving(true);
     try {
-      await api.delete(`/greentarget/api/payroll-employees/${id}`);
-      toast.success("Employee removed from GT Payroll");
+      // Process removes
+      for (const id of pendingRemoves) {
+        await api.delete(`/greentarget/api/payroll-employees/${id}`);
+      }
+
+      // Process adds
+      for (const add of pendingAdds) {
+        await api.post("/greentarget/api/payroll-employees", {
+          employee_id: add.employee_id,
+          job_type: add.job_type,
+        });
+      }
+
+      toast.success(
+        `Saved changes: ${pendingAdds.length > 0 ? `+${pendingAdds.length}` : ""}${pendingAdds.length > 0 && pendingRemoves.size > 0 ? ", " : ""}${pendingRemoves.size > 0 ? `-${pendingRemoves.size}` : ""}`
+      );
+
+      // Refresh and reset
       await fetchGTEmployees();
+      setPendingAdds([]);
+      setPendingRemoves(new Set());
       onUpdate?.();
     } catch (error) {
-      console.error("Error removing employee:", error);
-      toast.error("Failed to remove employee");
+      console.error("Error saving changes:", error);
+      toast.error("Failed to save changes");
     } finally {
-      setIsProcessing(false);
+      setIsSaving(false);
     }
   };
 
   const handleClose = () => {
+    if (isSaving) return;
     setMemberSearch("");
     setEmployeeSearch("");
+    setPendingAdds([]);
+    setPendingRemoves(new Set());
     onClose();
   };
 
@@ -158,7 +246,7 @@ const PayrollEmployeeManagementModal: React.FC<
       <Dialog
         as="div"
         className="relative z-50"
-        onClose={() => !isProcessing && handleClose()}
+        onClose={() => !isSaving && handleClose()}
       >
         <TransitionChild
           as={Fragment}
@@ -197,7 +285,7 @@ const PayrollEmployeeManagementModal: React.FC<
                   <button
                     onClick={handleClose}
                     className="text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
-                    disabled={isProcessing}
+                    disabled={isSaving}
                   >
                     <IconX size={20} />
                   </button>
@@ -218,7 +306,7 @@ const PayrollEmployeeManagementModal: React.FC<
                       <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                         <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                           <IconUsers size={16} />
-                          Current Members ({gtEmployees.length})
+                          Current Members ({currentMembers.length})
                         </div>
                         <div className="relative mt-2">
                           <IconSearch
@@ -231,11 +319,12 @@ const PayrollEmployeeManagementModal: React.FC<
                             className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
                             value={memberSearch}
                             onChange={(e) => setMemberSearch(e.target.value)}
+                            disabled={isSaving}
                           />
                         </div>
                       </div>
 
-                      <div className="max-h-[400px] overflow-y-auto">
+                      <div className="max-h-[460px] overflow-y-auto">
                         {filteredMembers.length === 0 ? (
                           <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
                             <IconUsers
@@ -257,12 +346,21 @@ const PayrollEmployeeManagementModal: React.FC<
                                 </li>
                                 {officeMembers.map((emp) => (
                                   <li
-                                    key={emp.id}
-                                    className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                    key={emp.employee_id}
+                                    className={`px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                                      emp.isNew
+                                        ? "bg-sky-50/50 dark:bg-sky-900/20"
+                                        : ""
+                                    }`}
                                   >
-                                    <div>
-                                      <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-2">
                                         {emp.employee_name}
+                                        {emp.isNew && (
+                                          <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
+                                            New
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="text-xs text-default-500 dark:text-gray-400">
                                         {emp.employee_id}
@@ -272,10 +370,11 @@ const PayrollEmployeeManagementModal: React.FC<
                                       onClick={() =>
                                         handleRemoveEmployee(
                                           emp.id,
-                                          emp.employee_name
+                                          emp.employee_id,
+                                          emp.isNew
                                         )
                                       }
-                                      disabled={isProcessing}
+                                      disabled={isSaving}
                                       className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
                                     >
                                       <IconTrash size={16} />
@@ -294,12 +393,21 @@ const PayrollEmployeeManagementModal: React.FC<
                                 </li>
                                 {driverMembers.map((emp) => (
                                   <li
-                                    key={emp.id}
-                                    className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                    key={emp.employee_id}
+                                    className={`px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                                      emp.isNew
+                                        ? "bg-amber-50/50 dark:bg-amber-900/20"
+                                        : ""
+                                    }`}
                                   >
-                                    <div>
-                                      <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-2">
                                         {emp.employee_name}
+                                        {emp.isNew && (
+                                          <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded">
+                                            New
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="text-xs text-default-500 dark:text-gray-400">
                                         {emp.employee_id}
@@ -309,10 +417,11 @@ const PayrollEmployeeManagementModal: React.FC<
                                       onClick={() =>
                                         handleRemoveEmployee(
                                           emp.id,
-                                          emp.employee_name
+                                          emp.employee_id,
+                                          emp.isNew
                                         )
                                       }
-                                      disabled={isProcessing}
+                                      disabled={isSaving}
                                       className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
                                     >
                                       <IconTrash size={16} />
@@ -342,7 +451,8 @@ const PayrollEmployeeManagementModal: React.FC<
                         <div className="flex gap-2 mt-2">
                           <button
                             onClick={() => setSelectedJobType("OFFICE")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                            disabled={isSaving}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50 ${
                               selectedJobType === "OFFICE"
                                 ? "bg-sky-100 dark:bg-sky-900/30 border-sky-500 text-sky-700 dark:text-sky-300"
                                 : "border-default-300 dark:border-gray-500 text-default-600 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-600"
@@ -353,7 +463,8 @@ const PayrollEmployeeManagementModal: React.FC<
                           </button>
                           <button
                             onClick={() => setSelectedJobType("DRIVER")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                            disabled={isSaving}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50 ${
                               selectedJobType === "DRIVER"
                                 ? "bg-amber-100 dark:bg-amber-900/30 border-amber-500 text-amber-700 dark:text-amber-300"
                                 : "border-default-300 dark:border-gray-500 text-default-600 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-600"
@@ -376,6 +487,7 @@ const PayrollEmployeeManagementModal: React.FC<
                             className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
                             value={employeeSearch}
                             onChange={(e) => setEmployeeSearch(e.target.value)}
+                            disabled={isSaving}
                           />
                         </div>
                       </div>
@@ -398,7 +510,7 @@ const PayrollEmployeeManagementModal: React.FC<
                                 key={employee.id}
                                 className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
                               >
-                                <div>
+                                <div className="flex-1 min-w-0">
                                   <div className="font-medium text-sm text-default-800 dark:text-gray-100">
                                     {employee.name}
                                   </div>
@@ -409,7 +521,7 @@ const PayrollEmployeeManagementModal: React.FC<
                                 </div>
                                 <button
                                   onClick={() => handleAddEmployee(employee.id)}
-                                  disabled={isProcessing}
+                                  disabled={isSaving}
                                   className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
                                     selectedJobType === "OFFICE"
                                       ? "text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20"
@@ -430,23 +542,70 @@ const PayrollEmployeeManagementModal: React.FC<
                 {/* Footer */}
                 <div className="mt-6 flex justify-between items-center">
                   <div className="text-sm text-default-500 dark:text-gray-400">
-                    <span className="inline-flex items-center gap-1.5 mr-4">
-                      <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                      OFFICE: {gtEmployees.filter((e) => e.job_type === "OFFICE").length}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                      DRIVER: {gtEmployees.filter((e) => e.job_type === "DRIVER").length}
-                    </span>
+                    {hasChanges ? (
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                          OFFICE:{" "}
+                          {
+                            currentMembers.filter((e) => e.job_type === "OFFICE")
+                              .length
+                          }
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          DRIVER:{" "}
+                          {
+                            currentMembers.filter((e) => e.job_type === "DRIVER")
+                              .length
+                          }
+                        </span>
+                        <span className="text-amber-600 dark:text-amber-400">
+                          ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
+                          {changesSummary.toAdd > 0 &&
+                            changesSummary.toRemove > 0 &&
+                            ", "}
+                          {changesSummary.toRemove > 0 &&
+                            `-${changesSummary.toRemove}`}{" "}
+                          changes)
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 mr-4">
+                          <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                          OFFICE:{" "}
+                          {gtEmployees.filter((e) => e.job_type === "OFFICE").length}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          DRIVER:{" "}
+                          {gtEmployees.filter((e) => e.job_type === "DRIVER").length}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleClose}
-                    disabled={isProcessing}
-                  >
-                    Close
-                  </Button>
+                  <div className="flex space-x-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleClose}
+                      disabled={isSaving}
+                    >
+                      Cancel
+                    </Button>
+                    {hasChanges && (
+                      <Button
+                        type="button"
+                        color="sky"
+                        variant="filled"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? "Saving..." : "Save Changes"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </DialogPanel>
             </TransitionChild>

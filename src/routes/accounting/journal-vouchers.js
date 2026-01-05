@@ -111,7 +111,11 @@ export default function (pool) {
 
     // Validate mapping_type
     const validMappingTypes = [
-      "salary", "epf_employer", "socso_employer", "sip_employer",
+      // Expense types
+      "salary", "overtime", "bonus", "commission", "rounding", "cuti_tahunan", "special_ot",
+      // Contribution types
+      "epf_employer", "socso_employer", "sip_employer",
+      // Accrual types
       "accrual_salary", "accrual_epf", "accrual_socso", "accrual_sip", "accrual_pcb"
     ];
     if (!validMappingTypes.includes(mapping_type)) {
@@ -382,16 +386,26 @@ export default function (pool) {
       `;
       const mappingsResult = await pool.query(mappingsQuery);
 
+      // Get all locations for name lookup
+      const locationsQuery = `SELECT id, name FROM locations ORDER BY id`;
+      const locationsResult = await pool.query(locationsQuery);
+      const locationNames = {};
+      locationsResult.rows.forEach(l => {
+        locationNames[l.id] = l.name;
+      });
+
       // Build voucher preview
       const jvdrData = [];
       const jvslData = [];
 
       // Group mappings by location and voucher type
       const mappingsByLocation = {};
+      const locationNamesByMapping = {};
       mappingsResult.rows.forEach(m => {
         const key = `${m.voucher_type}_${m.location_id}`;
         if (!mappingsByLocation[key]) {
           mappingsByLocation[key] = {};
+          locationNamesByMapping[key] = m.location_name;
         }
         mappingsByLocation[key][m.mapping_type] = m.account_code;
       });
@@ -416,6 +430,7 @@ export default function (pool) {
 
         const entry = {
           location_id: locationId,
+          location_name: locationNamesByMapping[mappingKey] || locationNames[locationId] || locationId,
           salary: salaryAmount,
           epf_employer: epfAmount,
           socso_employer: socsoAmount,

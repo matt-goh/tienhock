@@ -116,9 +116,9 @@ const RentalCard = ({
 
   return (
     <div
-      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer ${
+      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800 ${
         isCardHovered ? "shadow-md" : "shadow-sm"
-      } ${activeStatus ? "border-green-400" : "border-default-200"}`}
+      } ${activeStatus ? "border-green-400 dark:border-green-500" : "border-default-200 dark:border-gray-700"}`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -126,7 +126,7 @@ const RentalCard = ({
       {/* Status banner */}
       <div
         className={`w-full py-1.5 px-4 text-sm font-medium text-white ${
-          activeStatus ? "bg-green-500" : "bg-default-500"
+          activeStatus ? "bg-green-500" : "bg-default-500 dark:bg-gray-600"
         }`}
       >
         <div className="flex justify-between items-center">
@@ -139,7 +139,7 @@ const RentalCard = ({
 
       <div className="p-4">
         {/* Customer section */}
-        <div className="mb-3 border-b pb-3">
+        <div className="mb-3 border-b border-default-200 dark:border-gray-700 pb-3">
           <div className="flex justify-between items-start w-full">
             <div className="w-full">
               <div className="w-full">
@@ -200,29 +200,29 @@ const RentalCard = ({
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
             <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Dumpster</p>
-            <p className="font-medium">{rental.tong_no}</p>
+            <p className="font-medium text-default-900 dark:text-gray-100">{rental.tong_no}</p>
           </div>
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
             <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Driver</p>
-            <p className="font-medium truncate" title={rental.driver}>
+            <p className="font-medium text-default-900 dark:text-gray-100 truncate" title={rental.driver}>
               {rental.driver}
             </p>
           </div>
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
             <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Duration</p>
-            <p className="font-medium">{calculateDuration()}</p>
+            <p className="font-medium text-default-900 dark:text-gray-100">{calculateDuration()}</p>
           </div>
           <div
-            className={`p-2 border border-default-100 rounded-md ${
-              activeStatus ? "bg-green-50" : "bg-default-50"
+            className={`p-2 border border-default-100 dark:border-gray-700 rounded-md ${
+              activeStatus ? "bg-green-50 dark:bg-green-900/30" : "bg-default-50 dark:bg-gray-900/50"
             }`}
           >
             <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Status</p>
             <p
               className={`font-medium ${
-                activeStatus ? "text-green-700" : "text-default-700"
+                activeStatus ? "text-green-700 dark:text-green-400" : "text-default-700 dark:text-gray-300"
               }`}
             >
               {activeStatus ? "Active" : "Completed"}
@@ -232,7 +232,7 @@ const RentalCard = ({
 
         {/* Remarks section - only show if there are remarks */}
         {rental.remarks && (
-          <div className="mb-4 bg-default-50 dark:bg-gray-900/50/50 border border-default-100 rounded-md p-2">
+          <div className="mb-4 bg-default-50 dark:bg-gray-900/50 border border-default-100 dark:border-gray-700 rounded-md p-2">
             <p className="text-xs text-default-500 dark:text-gray-400 mb-0.5">Remarks</p>
             <p
               className="text-xs text-default-700 dark:text-gray-200 truncate"
@@ -255,7 +255,7 @@ const RentalCard = ({
             <p className="text-xs text-default-500 dark:text-gray-400">Pickup Date</p>
             <p
               className={`font-medium ${
-                !rental.date_picked ? "text-amber-600" : "text-default-900"
+                !rental.date_picked ? "text-amber-600 dark:text-amber-400" : "text-default-900 dark:text-gray-100"
               }`}
             >
               {formatDate(rental.date_picked)}
@@ -276,7 +276,7 @@ const RentalCard = ({
                 e.stopPropagation();
                 onPickupRental(rental);
               }}
-              className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors"
+              className="p-1.5 bg-amber-100 dark:bg-amber-900/50 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300 rounded-full transition-colors"
               title="Mark as Picked Up"
             >
               <IconTruck size={18} stroke={1.5} />
@@ -297,7 +297,7 @@ const RentalCard = ({
                   );
                 }
               }}
-              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 rounded-full transition-colors"
               title="View Invoice"
             >
               <IconFileInvoice size={18} stroke={1.5} />
@@ -308,7 +308,7 @@ const RentalCard = ({
                 e.stopPropagation();
                 onCreateInvoice(rental);
               }}
-              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 rounded-full transition-colors"
               title="Create Invoice"
             >
               <IconFileInvoice size={18} stroke={1.5} />
@@ -320,7 +320,7 @@ const RentalCard = ({
               e.stopPropagation();
               onGenerateDeliveryOrder(rental);
             }}
-            className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
+            className="p-1.5 bg-sky-100 dark:bg-sky-900/50 hover:bg-sky-200 dark:hover:bg-sky-800/50 text-sky-700 dark:text-sky-300 rounded-full transition-colors"
             title="Generate Delivery Order"
           >
             <IconReceipt size={18} stroke={1.5} />
@@ -331,7 +331,7 @@ const RentalCard = ({
               e.stopPropagation();
               onDeleteRental(rental);
             }}
-            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+            className="p-1.5 bg-rose-100 dark:bg-rose-900/50 hover:bg-rose-200 dark:hover:bg-rose-800/50 text-rose-700 dark:text-rose-300 rounded-full transition-colors"
             title="Delete Rental"
           >
             <IconTrash size={18} stroke={1.5} />
@@ -540,9 +540,9 @@ const RentalListPage = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               i === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -557,9 +557,9 @@ const RentalListPage = () => {
         <button
           key={1}
           onClick={() => handlePageChange(1)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
             1 === currentPage
-              ? "border border-default-200 font-semibold"
+              ? "border border-default-200 dark:border-gray-600 font-semibold"
               : "font-medium"
           }`}
         >
@@ -585,9 +585,9 @@ const RentalListPage = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               i === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -611,9 +611,9 @@ const RentalListPage = () => {
           <button
             key={totalPages}
             onClick={() => handlePageChange(totalPages)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               totalPages === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -675,7 +675,7 @@ const RentalListPage = () => {
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

@@ -440,6 +440,7 @@ export interface Employee {
   department: string;
   kwspNumber: string;
   updatedAt?: string;
+  headStaffId?: string | null;
 }
 
 export type FilterOptions = {

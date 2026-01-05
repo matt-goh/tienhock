@@ -15,6 +15,7 @@ import {
 
 interface VoucherLocation {
   location_id: string;
+  location_name: string;
   salary: number;
   epf_employer: number;
   socso_employer: number;
@@ -262,7 +263,9 @@ const VoucherGeneratorPage: React.FC = () => {
                     {previewData.jvdr.locations.map((loc) => (
                       <tr key={loc.location_id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                         <td className="px-4 py-2 text-sm font-medium text-default-800 dark:text-gray-200">
-                          {loc.location_id} - Director
+                          <span className="font-mono text-purple-600 dark:text-purple-400">{loc.location_id}</span>
+                          <span className="mx-1">-</span>
+                          {loc.location_name || "Director"}
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                           <div>{formatCurrency(loc.salary)}</div>
@@ -390,7 +393,9 @@ const VoucherGeneratorPage: React.FC = () => {
                       return (
                         <tr key={loc.location_id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                           <td className="px-4 py-2 text-sm font-medium text-default-800 dark:text-gray-200">
-                            {loc.location_id}
+                            <span className="font-mono text-sky-600 dark:text-sky-400">{loc.location_id}</span>
+                            <span className="mx-1">-</span>
+                            <span className="truncate" title={loc.location_name}>{loc.location_name || loc.location_id}</span>
                           </td>
                           <td className="px-4 py-2 text-sm text-right font-mono text-default-700 dark:text-gray-200">
                             <div>{formatCurrency(loc.salary)}</div>

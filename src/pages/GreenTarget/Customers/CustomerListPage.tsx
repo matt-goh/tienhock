@@ -3,8 +3,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
-  IconChevronLeft,
-  IconChevronRight,
   IconPlus,
   IconTrash,
   IconSquare,
@@ -29,15 +27,12 @@ const CustomerListPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null
   );
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showInactive, setShowInactive] = useState(true);
   const navigate = useNavigate();
-
-  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     fetchCustomers();
@@ -122,114 +117,6 @@ const CustomerListPage = () => {
     });
   }, [customers, searchTerm, showInactive]);
 
-  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
-
-  const paginatedCustomers = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredCustomers, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, showInactive]);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const renderPaginationButtons = () => {
-    const buttons = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        buttons.push(
-          <button
-            key={i}
-            onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
-              i === currentPage
-                ? "border border-default-200 font-semibold"
-                : "font-medium"
-            }`}
-          >
-            {i}
-          </button>
-        );
-      }
-    } else {
-      // Show first page
-      buttons.push(
-        <button
-          key={1}
-          onClick={() => handlePageChange(1)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
-            1 === currentPage
-              ? "border border-default-200 font-semibold"
-              : "font-medium"
-          }`}
-        >
-          1
-        </button>
-      );
-
-      // Show ellipsis if needed
-      if (currentPage > 3) {
-        buttons.push(
-          <div key="ellipsis1" className="flex items-center">
-            <span className="px-2">...</span>
-          </div>
-        );
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) {
-        buttons.push(
-          <button
-            key={i}
-            onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
-              i === currentPage
-                ? "border border-default-200 font-semibold"
-                : "font-medium"
-            }`}
-          >
-            {i}
-          </button>
-        );
-      }
-
-      // Show ellipsis if needed
-      if (currentPage < totalPages - 2) {
-        buttons.push(
-          <div key="ellipsis2" className="flex items-center">
-            <span className="px-2">...</span>
-          </div>
-        );
-      }
-
-      // Show last page
-      buttons.push(
-        <button
-          key={totalPages}
-          onClick={() => handlePageChange(totalPages)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
-            totalPages === currentPage
-              ? "border border-default-200 font-semibold"
-              : "font-medium"
-          }`}
-        >
-          {totalPages}
-        </button>
-      );
-    }
-
-    return buttons;
-  };
-
   if (loading) {
     return (
       <div className="mt-40 w-full flex items-center justify-center">
@@ -243,7 +130,7 @@ const CustomerListPage = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold">
           Customers ({filteredCustomers.length})
@@ -279,7 +166,7 @@ const CustomerListPage = () => {
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -302,7 +189,7 @@ const CustomerListPage = () => {
         <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-              <thead className="bg-default-50 dark:bg-gray-900/50">
+              <thead className="bg-default-50 dark:bg-gray-900/50 sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Customer Name
@@ -324,80 +211,64 @@ const CustomerListPage = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {paginatedCustomers.map((customer) => (
-                  <tr
-                    key={customer.customer_id}
-                    onClick={() =>
-                      navigate(`/greentarget/customers/${customer.customer_id}`)
-                    }
-                    className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-default-900 dark:text-gray-100">
-                        {customer.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-default-600 dark:text-gray-300">
-                      {customer.customer_id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-default-600 dark:text-gray-300">
-                      {customer.phone_number || "N/A"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-default-600 dark:text-gray-300">
-                      {formatDate(customer.last_activity_date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full font-medium ${
-                          customer.has_active_rental
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {customer.has_active_rental ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowDeleteDialog(true);
-                          setCustomerToDelete(customer);
-                        }}
-                        variant="outline"
-                        color="rose"
-                        size="sm"
-                        icon={IconTrash}
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
             </table>
+            <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                  {filteredCustomers.map((customer) => (
+                    <tr
+                      key={customer.customer_id}
+                      onClick={() =>
+                        navigate(`/greentarget/customers/${customer.customer_id}`)
+                      }
+                      className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
+                    >
+                      <td className="px-6 py-2 whitespace-nowrap">
+                        <div className="font-medium text-default-900 dark:text-gray-100">
+                          {customer.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
+                        {customer.customer_id}
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
+                        {customer.phone_number || "N/A"}
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
+                        {formatDate(customer.last_activity_date)}
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full font-medium ${
+                            customer.has_active_rental
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          {customer.has_active_rental ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-2 whitespace-nowrap text-right font-medium">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDeleteDialog(true);
+                            setCustomerToDelete(customer);
+                          }}
+                          variant="outline"
+                          color="rose"
+                          size="sm"
+                          icon={IconTrash}
+                        >
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-
-      {filteredCustomers.length > 0 && (
-        <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">
-          <button
-            className="pl-2.5 pr-4 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
-          </button>
-          <div className="flex space-x-2">{renderPaginationButtons()}</div>
-          <button
-            className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-background hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800 active:bg-default-200"
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Next <IconChevronRight className="w-5 h-5 ml-2" />
-          </button>
         </div>
       )}
 
