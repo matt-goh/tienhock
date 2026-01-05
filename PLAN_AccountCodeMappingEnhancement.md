@@ -39,14 +39,21 @@ Understanding where each component comes from:
 | **Overtime** | Payroll items | `payroll_items` | pay_type = 'Overtime' |
 | **MEE Commission** | Payroll items | `payroll_items` | pay_code_id LIKE '1-%' (for Salesman/Ikut Lori) |
 | **BH Commission** | Payroll items | `payroll_items` | pay_code_id LIKE '2-%' (for Salesman/Ikut Lori) |
-| **BONUS** | **Incentives page** | `commission_records` | description LIKE '%BONUS%', location_code IS NULL |
-| **Location Commission** | Incentives page | `commission_records` | description LIKE '%COMMISSION%', has location_code (16-24) |
+| **BONUS** | **Bonus page** | `commission_records` | `location_code IS NULL` (no location) |
+| **Location Commission** | Commission page | `commission_records` | `location_code IS NOT NULL` (16-24) |
 | **EPF/SOCSO/SIP/PCB** | Payroll deductions | `payroll_deductions` | by deduction_type |
-| **Cuti Tahunan** | Leave records | `leave_records` | leave_type = 'cuti_tahunan', status = 'approved' |
+| **Cuti Tahunan** | Leave records | `leave_records` | leave_type = 'cuti_tahunan', status = 'approved', amount_paid > 0 |
+| **Cuti Umum** | Leave records | `leave_records` | leave_type = 'cuti_umum', status = 'approved', amount_paid > 0 |
+| **Cuti Sakit** | Leave records | `leave_records` | leave_type = 'cuti_sakit', status = 'approved', amount_paid > 0 |
 
-**Note:** The salary report (`src/routes/payroll/salary-report.js`) already groups:
-- `bonus_total`: `SUM WHERE UPPER(description) LIKE '%BONUS%'` from commission_records
-- `commission_total`: `SUM WHERE UPPER(description) LIKE '%COMMISSION%'` from commission_records
+**Note - Incentive System Update (Jan 2026):**
+The incentives page has been separated into two distinct pages:
+- **Bonus page** (`/payroll/bonus`): Entries with `location_code IS NULL` - for bonus payments
+- **Commission page** (`/payroll/commission`): Entries with `location_code IS NOT NULL` (16-24) - for location-specific commissions
+
+The salary report (`src/routes/payroll/salary-report.js`) queries:
+- `bonus_total`: `SUM WHERE location_code IS NULL` from commission_records
+- `commission_total`: `SUM WHERE location_code IS NOT NULL` from commission_records
 
 ---
 
@@ -78,15 +85,16 @@ GROUP BY ep.employee_id
 
 **Data Source:** BONUS comes from `commission_records` table, NOT from pay_codes.
 
-**Query for BONUS data:**
+**Updated Query for BONUS data (using new system):**
 ```sql
+-- BONUS entries are identified by location_code IS NULL (not by description pattern)
 SELECT
   employee_id,
   COALESCE(SUM(amount), 0) as bonus_amount
 FROM commission_records
 WHERE EXTRACT(YEAR FROM commission_date) = $1
   AND EXTRACT(MONTH FROM commission_date) = $2
-  AND UPPER(description) LIKE '%BONUS%'
+  AND location_code IS NULL  -- Key: BONUS entries have NO location
 GROUP BY employee_id
 ```
 
@@ -95,7 +103,7 @@ GROUP BY employee_id
 - MS_SM: Salesman bonus (MEE portion - if split needed)
 - BS_SM: Salesman bonus (BH portion - if split needed)
 
-**Note:** The incentives page already stores BONUS in commission_records. The frontend (PayrollDetailsPage) fetches this via `/api/incentives` and shows it in the payroll details.
+**Note:** The Bonus page (`/payroll/bonus`) stores entries in commission_records with `location_code = NULL`. The API `/api/incentives?type=bonus` returns only bonus entries.
 
 ---
 
@@ -111,12 +119,51 @@ Currently they have `job_type = 'OFFICE'` which maps to Location 02. For JVDR:
 2. Generate JVDR entries with individual salary credit lines
 3. JVSL (Location 02 OFFICE) should exclude these 3 directors
 
+### Part 4: Cuti (Leave) Integration for JVSL
+
+**Data Source:** Paid leave comes from `leave_records` table with `amount_paid > 0`.
+
+**Leave Types:**
+- `cuti_tahunan` - Annual leave (paid)
+- `cuti_umum` - Public holiday (paid)
+- `cuti_sakit` - Sick leave (paid)
+
+**Query for Cuti Tahunan amounts by employee/location:**
+```sql
+-- Get paid leave amounts for journal voucher entries
+cuti_data AS (
+  SELECT
+    lr.employee_id,
+    jlm.location_code,
+    COALESCE(SUM(lr.amount_paid), 0) as cuti_amount
+  FROM leave_records lr
+  JOIN employee_payrolls ep ON lr.employee_id = ep.employee_id
+  JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+  JOIN job_location_mappings jlm ON ep.job_type = jlm.job_id
+  WHERE mp.year = $1 AND mp.month = $2
+    AND EXTRACT(YEAR FROM lr.leave_date) = $1
+    AND EXTRACT(MONTH FROM lr.leave_date) = $2
+    AND lr.leave_type = 'cuti_tahunan'
+    AND lr.status = 'approved'
+    AND lr.amount_paid > 0
+  GROUP BY lr.employee_id, jlm.location_code
+)
+```
+
+**Account Code Assignment:** Use location_account_mappings with `mapping_type = 'cuti_tahunan'`:
+- Each location should have a cuti_tahunan mapping if paid annual leave is a separate line item
+
+**Note:** The payroll system already includes cuti amounts in the payroll. The salary-report.js queries `cuti_tahunan_amount` from leave_records. For journal vouchers, decide if cuti is:
+1. Included in base salary (no separate line item needed)
+2. A separate account code entry (requires new mapping type)
+
 ### New Mapping Types
 
 | New Type | Description | Account Code |
 |----------|-------------|--------------|
 | `commission_mee` | Commission from MEE products | MS_SM (Loc 03), MS_IL (Loc 04) |
 | `commission_bh` | Commission from BH products | BS_SM (Loc 03), BS_IL (Loc 04) |
+| `cuti_tahunan` | Paid annual leave (if separate) | TBD per location |
 
 ---
 
@@ -208,7 +255,7 @@ salesman_product_split AS (
 
 **2.3 Add BONUS query from commission_records (NOT from pay_codes):**
 ```sql
--- BONUS data comes from incentives page, stored in commission_records
+-- BONUS data comes from Bonus page, stored in commission_records with location_code IS NULL
 bonus_data AS (
   SELECT
     cr.employee_id,
@@ -221,7 +268,7 @@ bonus_data AS (
   WHERE mp.year = $1 AND mp.month = $2
     AND EXTRACT(YEAR FROM cr.commission_date) = $1
     AND EXTRACT(MONTH FROM cr.commission_date) = $2
-    AND UPPER(cr.description) LIKE '%BONUS%'
+    AND cr.location_code IS NULL  -- BONUS entries have no location_code
   GROUP BY cr.employee_id, jlm.location_code
 )
 ```
@@ -251,6 +298,28 @@ director_data AS (
 ```sql
 -- In the JVSL query, exclude director IDs
 WHERE ep.employee_id NOT IN ('GOH', 'WONG', 'WINNIE')
+```
+
+**2.6 Add Cuti Tahunan query from leave_records (if separate account entry):**
+```sql
+-- Cuti data comes from leave_records with amount_paid > 0
+cuti_tahunan_data AS (
+  SELECT
+    lr.employee_id,
+    jlm.location_code,
+    COALESCE(SUM(lr.amount_paid), 0) as cuti_amount
+  FROM leave_records lr
+  JOIN employee_payrolls ep ON lr.employee_id = ep.employee_id
+  JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+  JOIN job_location_mappings jlm ON ep.job_type = jlm.job_id
+  WHERE mp.year = $1 AND mp.month = $2
+    AND EXTRACT(YEAR FROM lr.leave_date) = $1
+    AND EXTRACT(MONTH FROM lr.leave_date) = $2
+    AND lr.leave_type = 'cuti_tahunan'
+    AND lr.status = 'approved'
+    AND lr.amount_paid > 0
+  GROUP BY lr.employee_id, jlm.location_code
+)
 ```
 
 ### Step 3: Update Database Mappings
@@ -319,12 +388,26 @@ Keep THJ_CK and THJ_SM in the expected account codes list. Add mappings when dat
 ## Validation Checklist
 
 After implementation, verify:
+
+**Commission MEE/BH Split:**
 - [ ] MS_SM only receives MEE product commission amounts (pay_code LIKE '1-%')
 - [ ] BS_SM only receives BH product commission amounts (pay_code LIKE '2-%')
 - [ ] MS_IL only receives MEE product commission amounts
 - [ ] BS_IL only receives BH product commission amounts
+
+**Director Breakdown (JVDR):**
 - [ ] JVDR shows 3 individual director salary credit lines (GTH, WSF, WG)
 - [ ] JVSL Location 02 (Office) excludes directors GOH, WONG, WINNIE
-- [ ] BONUS amounts match data in incentives page (commission_records table)
+
+**Bonus (New System):**
+- [ ] BONUS amounts match data in **Bonus page** (`/payroll/bonus`)
+- [ ] BONUS query uses `location_code IS NULL` (NOT description pattern)
 - [ ] BONUS is NOT sourced from pay_codes
+
+**Cuti (Leave):**
+- [ ] If cuti_tahunan is separate line: amounts match `leave_records` with `amount_paid > 0`
+- [ ] Cuti is properly attributed to employee's job location
+
+**General:**
 - [ ] Journal voucher total debits = total credits
+- [ ] Commission page (`/payroll/commission`) data not mixed with bonus
