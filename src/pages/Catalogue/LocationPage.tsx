@@ -14,7 +14,6 @@ import {
   useLocationsCache,
   Location,
 } from "../../utils/catalogue/useLocationsCache";
-import { useJobLocationMappings } from "../../utils/catalogue/useJobLocationMappings";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -47,7 +46,6 @@ interface DependencyInfo {
 
 const LocationPage: React.FC = () => {
   const { locations, isLoading, error, refreshLocations } = useLocationsCache();
-  const { refreshData: refreshMappings } = useJobLocationMappings();
   const [searchTerm, setSearchTerm] = useState("");
 
   // Track expanded employee lists per location
@@ -163,7 +161,7 @@ const LocationPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleEditClick = (location: Location) => {
+  const handleEditClick = (location: LocationWithMappings) => {
     setLocationToEdit(location);
     setShowModal(true);
   };
@@ -211,14 +209,13 @@ const LocationPage: React.FC = () => {
           await api.post("/api/locations", locationData);
           toast.success("Location created successfully");
         }
-        refreshLocations();
-        refreshMappings(true);
+        // Don't refresh here - let onComplete handle it after modal closes
       } catch (err: any) {
         console.error("Error saving location:", err);
         throw new Error(err.message || "Failed to save location");
       }
     },
-    [refreshLocations, refreshMappings]
+    []
   );
 
   const handleConfirmDelete = useCallback(async () => {
@@ -457,11 +454,15 @@ const LocationPage: React.FC = () => {
         onClose={handleModalClose}
         onSave={handleSaveLocation}
         onComplete={() => {
+          // Refresh all data once after modal closes
+          refreshLocations();
           fetchJobMappings();
           fetchEmployeeMappings();
         }}
         initialData={locationToEdit}
         existingLocations={locations}
+        initialJobMappings={locationToEdit ? (locationToEdit as LocationWithMappings).jobs : []}
+        initialEmployeeMappings={locationToEdit ? (locationToEdit as LocationWithMappings).employees : []}
       />
 
       {/* Delete Confirmation */}

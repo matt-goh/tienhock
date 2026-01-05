@@ -1379,10 +1379,12 @@ export default function (pool, config) {
       // Parse comma-separated salesmanIds
       const salesmanIdArray = salesmanIds.split(",");
 
-      // Convert date to timestamp range (start of day to end of day)
-      const startDate = new Date(date);
+      // Convert date parameter to timestamp range (start of day to end of day)
+      // Handle both timestamp strings and date strings
+      const dateValue = isNaN(date) ? new Date(date) : new Date(parseInt(date));
+      const startDate = new Date(dateValue);
       startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(date);
+      const endDate = new Date(dateValue);
       endDate.setHours(23, 59, 59, 999);
 
       const startTimestamp = startDate.getTime().toString();

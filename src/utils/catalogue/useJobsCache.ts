@@ -14,7 +14,7 @@ export const useJobsCache = () => {
   const [error, setError] = useState<Error | null>(null);
 
   const CACHE_KEY = "jobsData";
-  const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
   const fetchJobs = useCallback(async (force = false) => {
     // Try to load from cache first

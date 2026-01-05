@@ -148,23 +148,23 @@ const PrintPDFOverlay = ({
   return isLoadingDialogVisible ? (
     <div className="fixed inset-0 flex items-center justify-center z-50">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative bg-white rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 min-w-[300px] transform scale-110">
         <div className="flex flex-col items-center gap-3">
           <LoadingSpinner size="sm" hideText />
-          <p className="text-base font-medium text-default-900">
+          <p className="text-base font-medium text-default-900 dark:text-gray-100">
             {isGenerating
               ? "Preparing document for printing..."
               : "Opening print dialog..."}
           </p>
-          <p className="text-sm text-default-500">Please wait a moment</p>
+          <p className="text-sm text-default-500 dark:text-gray-400">Please wait a moment</p>
           {error && (
-            <p className="text-sm text-rose-600 mt-2 text-center">{error}</p>
+            <p className="text-sm text-rose-600 dark:text-rose-400 mt-2 text-center">{error}</p>
           )}
           <button
             onClick={() => {
               cleanup(true);
             }}
-            className="mt-2 text-sm text-center text-sky-600 hover:underline"
+            className="mt-2 text-sm text-center text-sky-600 dark:text-sky-400 hover:underline"
           >
             Close
           </button>

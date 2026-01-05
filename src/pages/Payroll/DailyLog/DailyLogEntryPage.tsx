@@ -1377,11 +1377,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
       if (salesmenIds.length === 0) return;
 
+      // Convert date to timestamp format (matching SalesByProductsPage.tsx pattern)
+      const selectedDate = new Date(formData.logDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      const dateTimestamp = selectedDate.getTime().toString();
+
       // Fetch products for all salesmen in one request
       const response = await api.get(
         `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(
           ","
-        )}&date=${formData.logDate}`
+        )}&date=${dateTimestamp}`
       );
 
       // Response might be directly available or in a data property
@@ -3015,7 +3020,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       {(jobConfig?.id === "SALESMAN"
                         ? salesmanEmployees
                         : expandedEmployees
-                      ).map((row) => {
+                      ).map((row, index) => {
                         const isSelected =
                           employeeSelectionState.selectedJobs[row.id]?.includes(
                             row.jobType
@@ -3330,6 +3335,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 disabled={!isSelected}
                                 onClick={() => handleManageActivities(row)}
                                 logDate={formData.logDate}
+                                showBelow={index < 5}
                               />
                             </td>
                           </tr>
@@ -3720,6 +3726,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                       handleManageActivities(row)
                                     }
                                     logDate={formData.logDate}
+                                    showBelow={index < 5}
                                   />
                                 </td>
                               </tr>
