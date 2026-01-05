@@ -57,7 +57,8 @@ export default function (pool) {
            s.spouse_employment_status as "spouseEmploymentStatus",
            s.number_of_children as "numberOfChildren",
            s.department,
-           s.kwsp_number as "kwspNumber"`;
+           s.kwsp_number as "kwspNumber",
+           s.head_staff_id as "headStaffId"`;
 
       let query = `
       SELECT ${columns}
@@ -149,14 +150,29 @@ export default function (pool) {
       const hasOfficeJob = shouldSetPassword(job);
       const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
 
+      // Check if there are existing staff with the same name and get their head_staff_id
+      let headStaffId = null;
+      if (name) {
+        const existingHeadResult = await pool.query(
+          `SELECT head_staff_id FROM staffs
+           WHERE UPPER(TRIM(name)) = UPPER(TRIM($1))
+           AND head_staff_id IS NOT NULL
+           LIMIT 1`,
+          [name]
+        );
+        if (existingHeadResult.rows.length > 0) {
+          headStaffId = existingHeadResult.rows[0].head_staff_id;
+        }
+      }
+
       const query = `
         INSERT INTO staffs (
           id, name, telephone_no, email, gender, nationality, birthdate, address,
           job, location, date_joined, ic_no, bank_account_number, epf_no,
           income_tax_no, socso_no, document, payment_type, payment_preference,
-          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password
+          race, agama, date_resigned, marital_status, spouse_employment_status, number_of_children, department, kwsp_number, password, head_staff_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
         RETURNING *
       `;
 
@@ -189,6 +205,7 @@ export default function (pool) {
         department || null,
         kwspNumber || null,
         password,
+        headStaffId,
       ];
 
       const result = await pool.query(query, values);
@@ -240,6 +257,116 @@ export default function (pool) {
     }
   });
 
+  // Get all staff members with the same name as the given staff ID
+  router.get("/same-name/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // First get the name of the requested staff
+      const staffResult = await pool.query(
+        "SELECT name FROM staffs WHERE id = $1",
+        [id]
+      );
+
+      if (staffResult.rows.length === 0) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+
+      const staffName = staffResult.rows[0].name;
+
+      // Then find all active (non-resigned) staff with the same name
+      const sameNameQuery = `
+        SELECT
+          s.id,
+          s.name,
+          s.head_staff_id as "headStaffId",
+          s.job
+        FROM staffs s
+        WHERE UPPER(TRIM(s.name)) = UPPER(TRIM($1))
+          AND s.date_resigned IS NULL
+        ORDER BY s.id
+      `;
+
+      const result = await pool.query(sameNameQuery, [staffName]);
+
+      res.json({
+        staffName: staffName,
+        count: result.rows.length,
+        isUniqueName: result.rows.length === 1,
+        sameNameStaff: result.rows.map((staff) => ({
+          id: staff.id,
+          name: staff.name,
+          headStaffId: staff.headStaffId,
+          job: Array.isArray(staff.job) ? staff.job : [],
+          isHead: staff.headStaffId === staff.id,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching same-name staff:", error);
+      res.status(500).json({
+        message: "Error fetching same-name staff",
+        error: error.message,
+      });
+    }
+  });
+
+  // Set head staff for all same-name staff members
+  router.put("/set-head", async (req, res) => {
+    const { headStaffId, staffName } = req.body;
+
+    if (!headStaffId || !staffName) {
+      return res.status(400).json({
+        message: "headStaffId and staffName are required",
+      });
+    }
+
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        // Verify the head staff exists and has the correct name
+        const verifyResult = await client.query(
+          "SELECT id, name FROM staffs WHERE id = $1 AND UPPER(TRIM(name)) = UPPER(TRIM($2))",
+          [headStaffId, staffName]
+        );
+
+        if (verifyResult.rows.length === 0) {
+          throw new Error("Head staff ID does not match the given name");
+        }
+
+        // Update all staff with the same name to point to the new head
+        const updateResult = await client.query(
+          `UPDATE staffs
+           SET head_staff_id = $1, updated_at = NOW()
+           WHERE UPPER(TRIM(name)) = UPPER(TRIM($2))
+           RETURNING id`,
+          [headStaffId, staffName]
+        );
+
+        await client.query("COMMIT");
+
+        res.json({
+          message: "Head staff updated successfully",
+          headStaffId: headStaffId,
+          updatedCount: updateResult.rows.length,
+          updatedIds: updateResult.rows.map((r) => r.id),
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error("Error setting head staff:", error);
+      res.status(500).json({
+        message: "Error setting head staff",
+        error: error.message,
+      });
+    }
+  });
+
   // Get single staff member
   router.get("/:id", async (req, res) => {
     const { id } = req.params;
@@ -272,8 +399,9 @@ export default function (pool) {
           s.spouse_employment_status as "spouseEmploymentStatus",
           s.number_of_children as "numberOfChildren",
           s.department,
-          s.kwsp_number as "kwspNumber"
-        FROM 
+          s.kwsp_number as "kwspNumber",
+          s.head_staff_id as "headStaffId"
+        FROM
           staffs s
         WHERE
           s.id = $1
