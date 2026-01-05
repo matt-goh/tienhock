@@ -3020,7 +3020,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       {(jobConfig?.id === "SALESMAN"
                         ? salesmanEmployees
                         : expandedEmployees
-                      ).map((row) => {
+                      ).map((row, index) => {
                         const isSelected =
                           employeeSelectionState.selectedJobs[row.id]?.includes(
                             row.jobType
@@ -3335,6 +3335,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 disabled={!isSelected}
                                 onClick={() => handleManageActivities(row)}
                                 logDate={formData.logDate}
+                                showBelow={index < 5}
                               />
                             </td>
                           </tr>
@@ -3725,6 +3726,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                       handleManageActivities(row)
                                     }
                                     logDate={formData.logDate}
+                                    showBelow={index < 5}
                                   />
                                 </td>
                               </tr>

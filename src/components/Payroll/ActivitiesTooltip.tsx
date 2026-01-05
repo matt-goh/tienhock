@@ -14,6 +14,7 @@ interface ActivitiesTooltipProps {
   hasUnsavedChanges?: boolean;
   onNavigateAttempt?: (to: string) => void;
   logDate?: string; // Log date for displaying correct OT threshold (5 for Saturday, 8 for others)
+  showBelow?: boolean; // Show tooltip below button instead of above (for top rows)
 }
 
 const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
@@ -25,6 +26,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   hasUnsavedChanges = false,
   onNavigateAttempt = () => {},
   logDate,
+  showBelow = false,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -34,13 +36,21 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   useEffect(() => {
     if (isVisible && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      // Position directly above the button, aligned to button's right edge
-      setPosition({
-        top: rect.top - 10,
-        left: rect.right, // Set to button's right edge
-      });
+      if (showBelow) {
+        // Position directly below the button, aligned to button's right edge
+        setPosition({
+          top: rect.bottom + 10,
+          left: rect.right,
+        });
+      } else {
+        // Position directly above the button, aligned to button's right edge
+        setPosition({
+          top: rect.top - 10,
+          left: rect.right,
+        });
+      }
     }
-  }, [isVisible]);
+  }, [isVisible, showBelow]);
 
   // Clean up timeouts when component unmounts
   useEffect(() => {
@@ -109,7 +119,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
               left: `${position.left}px`,
               maxHeight: "400px",
               opacity: isVisible ? 1 : 0,
-              transform: `translate(-100%, -100%)`,
+              transform: showBelow ? `translate(-100%, 0)` : `translate(-100%, -100%)`,
             }}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
