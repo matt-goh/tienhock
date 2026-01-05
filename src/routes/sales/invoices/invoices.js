@@ -1379,16 +1379,29 @@ export default function (pool, config) {
       // Parse comma-separated salesmanIds
       const salesmanIdArray = salesmanIds.split(",");
 
-      // Convert date parameter to timestamp range (start of day to end of day)
-      // Handle both timestamp strings and date strings
-      const dateValue = isNaN(date) ? new Date(date) : new Date(parseInt(date));
-      const startDate = new Date(dateValue);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(dateValue);
-      endDate.setHours(23, 59, 59, 999);
+      // Convert date parameter to timestamp range (start of day to end of day in Malaysia timezone)
+      // Malaysia is UTC+8, so we need to adjust for timezone when the server is in UTC
+      let startTimestamp, endTimestamp;
 
-      const startTimestamp = startDate.getTime().toString();
-      const endTimestamp = endDate.getTime().toString();
+      if (isNaN(date)) {
+        // Date string format (YYYY-MM-DD) - interpret as Malaysia time (UTC+8)
+        // Parse the date parts directly to avoid timezone interpretation issues
+        const [year, month, day] = date.split("-").map(Number);
+        // Create date at midnight Malaysia time (UTC+8), which is 16:00 UTC previous day
+        const startDate = new Date(Date.UTC(year, month - 1, day, -8, 0, 0, 0)); // Midnight MYT = UTC-8 hours
+        const endDate = new Date(Date.UTC(year, month - 1, day, -8 + 23, 59, 59, 999)); // 23:59:59 MYT
+        startTimestamp = startDate.getTime().toString();
+        endTimestamp = endDate.getTime().toString();
+      } else {
+        // Timestamp format - use directly (legacy support)
+        const dateValue = new Date(parseInt(date));
+        const startDate = new Date(dateValue);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(dateValue);
+        endDate.setHours(23, 59, 59, 999);
+        startTimestamp = startDate.getTime().toString();
+        endTimestamp = endDate.getTime().toString();
+      }
 
       // Query for main invoices products - now includes salespersonid in results and uses ANY for multiple salesmen
       const mainInvoicesQuery = `
