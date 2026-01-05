@@ -186,20 +186,20 @@ const InvoiceCard = ({
 
   return (
     <div
-      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer 
+      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800
     ${
       isSelected
-        ? "shadow-md ring-2 ring-sky-400 ring-offset-1" // Clear visual indication when selected
+        ? "shadow-md ring-2 ring-sky-400 ring-offset-1 dark:ring-offset-gray-900" // Clear visual indication when selected
         : "shadow-sm hover:shadow-md"
-    } 
+    }
     ${
       isCancelled
-        ? "border-default-400"
+        ? "border-default-400 dark:border-gray-600"
         : isPaid
-        ? "border-green-400"
+        ? "border-green-400 dark:border-green-500"
         : invoice.status === "overdue"
-        ? "border-red-400"
-        : "border-amber-400"
+        ? "border-red-400 dark:border-red-500"
+        : "border-amber-400 dark:border-amber-500"
     }`}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
@@ -209,7 +209,7 @@ const InvoiceCard = ({
       <div
         className={`w-full py-2 px-4 text-sm font-medium text-white ${
           isCancelled
-            ? "bg-default-500"
+            ? "bg-default-500 dark:bg-gray-600"
             : isPaid
             ? "bg-green-500"
             : invoice.status === "overdue"
@@ -253,7 +253,7 @@ const InvoiceCard = ({
 
       <div className="px-4 py-3" onClick={handleClick}>
         {/* Customer section */}
-        <div className="mb-3 border-b pb-3">
+        <div className="mb-3 border-b border-default-200 dark:border-gray-700 pb-3">
           <div className="flex justify-between items-start">
             <div className="max-w-[65%]">
               <h3
@@ -527,31 +527,31 @@ const InvoiceCard = ({
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 rounded-md">
+          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
             <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Date Issued</p>
-            <p className="font-medium">{formatDate(invoice.date_issued)}</p>
+            <p className="font-medium text-default-900 dark:text-gray-100">{formatDate(invoice.date_issued)}</p>
           </div>
           <div
             className={`p-2 border rounded-md ${
               isCancelled
-                ? "bg-default-50 border-default-100"
+                ? "bg-default-50 dark:bg-gray-800 border-default-100 dark:border-gray-700"
                 : isPaid
-                ? "bg-green-50 border-green-100"
+                ? "bg-green-50 dark:bg-green-900/30 border-green-100 dark:border-green-800"
                 : invoice.status === "overdue"
-                ? "bg-red-50 border-red-100"
-                : "bg-amber-50 border-amber-100"
+                ? "bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800"
+                : "bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800"
             }`}
           >
             <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Balance</p>
             <p
               className={`font-medium ${
                 isCancelled
-                  ? "text-default-700"
+                  ? "text-default-700 dark:text-gray-300"
                   : isPaid
-                  ? "text-green-700"
+                  ? "text-green-700 dark:text-green-400"
                   : invoice.status === "overdue"
-                  ? "text-red-700"
-                  : "text-amber-700"
+                  ? "text-red-700 dark:text-red-400"
+                  : "text-amber-700 dark:text-amber-400"
               }`}
             >
               {invoice.status === "cancelled"
@@ -586,7 +586,7 @@ const InvoiceCard = ({
                   e.stopPropagation();
                   onSubmitEInvoiceClick(invoice);
                 }}
-                className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition-colors"
+                className="p-1.5 bg-amber-100 dark:bg-amber-900/50 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300 rounded-full transition-colors"
                 title="Submit as e-Invoice"
               >
                 <IconFileInvoice size={18} stroke={1.5} />
@@ -600,7 +600,7 @@ const InvoiceCard = ({
                 e.stopPropagation();
                 onCheckEInvoiceStatus(invoice);
               }}
-              className="p-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-full transition-colors"
+              className="p-1.5 bg-sky-100 dark:bg-sky-900/50 hover:bg-sky-200 dark:hover:bg-sky-800/50 text-sky-700 dark:text-sky-300 rounded-full transition-colors"
               title="Check e-Invoice Status"
             >
               <IconClock size={18} stroke={1.5} />
@@ -616,7 +616,7 @@ const InvoiceCard = ({
                   e.stopPropagation();
                   onSyncCancellationStatus(invoice);
                 }}
-                className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+                className="p-1.5 bg-rose-100 dark:bg-rose-900/50 hover:bg-rose-200 dark:hover:bg-rose-800/50 text-rose-700 dark:text-rose-300 rounded-full transition-colors"
                 title="Sync e-Invoice Cancellation"
               >
                 <IconRefresh size={18} stroke={1.5} />
@@ -628,7 +628,7 @@ const InvoiceCard = ({
               e.stopPropagation();
               onPrintClick(invoice);
             }}
-            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+            className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 rounded-full transition-colors"
             title="Print Invoice"
           >
             <IconPrinter size={18} stroke={1.5} />
@@ -639,7 +639,7 @@ const InvoiceCard = ({
               e.stopPropagation();
               onDownloadClick(invoice);
             }}
-            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-full transition-colors"
+            className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 rounded-full transition-colors"
             title="Download Invoice"
           >
             <IconFileDownload size={18} stroke={1.5} />
@@ -654,7 +654,7 @@ const InvoiceCard = ({
                   state: { showPaymentForm: true },
                 });
               }}
-              className={`p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-full transition-colors ${
+              className={`p-1.5 bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300 rounded-full transition-colors ${
                 invoice.status === "cancelled"
                   ? "cursor-not-allowed opacity-50"
                   : ""
@@ -670,7 +670,7 @@ const InvoiceCard = ({
           {!isCancelled && (
             <button
               onClick={handleCancelClick}
-              className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-full transition-colors"
+              className="p-1.5 bg-rose-100 dark:bg-rose-900/50 hover:bg-rose-200 dark:hover:bg-rose-800/50 text-rose-700 dark:text-rose-300 rounded-full transition-colors"
               title="Cancel Invoice"
             >
               <IconCancel size={18} stroke={1.5} />
@@ -681,7 +681,7 @@ const InvoiceCard = ({
           {isCancelled && (
             <button
               onClick={handleDeleteClick}
-              className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-full transition-colors"
+              className="p-1.5 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-700 dark:text-red-300 rounded-full transition-colors"
               title="Delete Invoice"
             >
               <IconTrash size={18} stroke={1.5} />
@@ -1650,9 +1650,9 @@ const InvoiceListPage: React.FC = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               i === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -1666,9 +1666,9 @@ const InvoiceListPage: React.FC = () => {
         <button
           key={1}
           onClick={() => handlePageChange(1)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
             1 === currentPage
-              ? "border border-default-200 font-semibold"
+              ? "border border-default-200 dark:border-gray-600 font-semibold"
               : "font-medium"
           }`}
         >
@@ -1694,9 +1694,9 @@ const InvoiceListPage: React.FC = () => {
           <button
             key={i}
             onClick={() => handlePageChange(i)}
-            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+            className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
               i === currentPage
-                ? "border border-default-200 font-semibold"
+                ? "border border-default-200 dark:border-gray-600 font-semibold"
                 : "font-medium"
             }`}
           >
@@ -1719,9 +1719,9 @@ const InvoiceListPage: React.FC = () => {
         <button
           key={totalPages}
           onClick={() => handlePageChange(totalPages)}
-          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+          className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
             totalPages === currentPage
-              ? "border border-default-200 font-semibold"
+              ? "border border-default-200 dark:border-gray-600 font-semibold"
               : "font-medium"
           }`}
         >
@@ -1820,8 +1820,8 @@ const InvoiceListPage: React.FC = () => {
                   ) : (
                     <ul className="space-y-2">
                       {filters.customer_id && (
-                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-md transition-colors">
+                          <div className="bg-sky-100 dark:bg-sky-900/50 p-1 rounded-md mr-2">
                             <IconUser size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div>
@@ -1837,8 +1837,8 @@ const InvoiceListPage: React.FC = () => {
                         </li>
                       )}
                       {filters.status && filters.status.length > 0 && (
-                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-md transition-colors">
+                          <div className="bg-sky-100 dark:bg-sky-900/50 p-1 rounded-md mr-2">
                             <IconCircleCheck
                               size={14}
                               className="text-sky-600 dark:text-sky-400"
@@ -1861,8 +1861,8 @@ const InvoiceListPage: React.FC = () => {
                         </li>
                       )}
                       {filters.consolidation !== "all" && (
-                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 rounded-md transition-colors">
-                          <div className="bg-sky-100 p-1 rounded-md mr-2">
+                        <li className="text-default-700 dark:text-gray-200 flex items-center p-1 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-md transition-colors">
+                          <div className="bg-sky-100 dark:bg-sky-900/50 p-1 rounded-md mr-2">
                             <IconFiles size={14} className="text-sky-600 dark:text-sky-400" />
                           </div>
                           <div>
@@ -1892,7 +1892,7 @@ const InvoiceListPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search"
-                className="w-full pl-10 py-2 border focus:border-default-500 rounded-lg h-[40px]"
+                className="w-full pl-10 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-lg h-[40px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -1904,8 +1904,8 @@ const InvoiceListPage: React.FC = () => {
         <div
           className={`p-3 ${
             selectedInvoiceIds.size > 0
-              ? "bg-sky-50/95 border border-sky-200"
-              : "bg-white/95 border border-default-200"
+              ? "bg-sky-50/95 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800"
+              : "bg-white/95 dark:bg-gray-800/95 border border-default-200 dark:border-gray-700"
           } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
           onClick={handleSelectAllOnPage}
           title={
@@ -1925,9 +1925,9 @@ const InvoiceListPage: React.FC = () => {
             {/* Selection Count and Total */}
             <div className="flex-grow">
               {selectedInvoiceIds.size > 0 ? (
-                <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
+                <span className="font-medium text-sky-800 dark:text-sky-300 text-sm flex items-center flex-wrap gap-x-2">
                   <span>{selectedInvoiceIds.size} selected</span>
-                  <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
+                  <span className="hidden sm:inline mx-1 border-r border-sky-300 dark:border-sky-600 h-4"></span>
                   <span className="whitespace-nowrap">
                     Total:{" "}
                     {new Intl.NumberFormat("en-MY", {
@@ -2032,10 +2032,10 @@ const InvoiceListPage: React.FC = () => {
         </div>
 
         {filteredInvoices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-default-200 dark:border-gray-700">
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-default-200 dark:border-gray-700">
             <IconFileInvoice
               size={64}
-              className="text-default-300 mb-5"
+              className="text-default-300 dark:text-gray-600 mb-5"
               stroke={1.2}
             />
             <h3 className="text-xl font-semibold text-default-700 dark:text-gray-200 mb-2">
@@ -2228,8 +2228,8 @@ const InvoiceListPage: React.FC = () => {
                         <div
                           className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
                             filters.consolidation === "all"
-                              ? "border-sky-500 bg-white"
-                              : "border-default-300 bg-white"
+                              ? "border-sky-500 bg-white dark:bg-gray-700"
+                              : "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                           }`}
                         >
                           {filters.consolidation === "all" && (
@@ -2256,8 +2256,8 @@ const InvoiceListPage: React.FC = () => {
                         <div
                           className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
                             filters.consolidation === "individual"
-                              ? "border-sky-500 bg-white"
-                              : "border-default-300 bg-white"
+                              ? "border-sky-500 bg-white dark:bg-gray-700"
+                              : "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                           }`}
                         >
                           {filters.consolidation === "individual" && (
@@ -2284,8 +2284,8 @@ const InvoiceListPage: React.FC = () => {
                         <div
                           className={`w-5 h-5 rounded-full border flex items-center justify-center mr-2.5 ${
                             filters.consolidation === "consolidated"
-                              ? "border-sky-500 bg-white"
-                              : "border-default-300 bg-white"
+                              ? "border-sky-500 bg-white dark:bg-gray-700"
+                              : "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                           }`}
                         >
                           {filters.consolidation === "consolidated" && (

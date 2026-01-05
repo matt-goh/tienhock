@@ -575,7 +575,7 @@ const SalaryReportPage: React.FC = () => {
     if (!comprehensiveSalaryData) return null;
 
     return (
-      <div className="overflow-auto max-h-[74vh] border border-default-200 dark:border-gray-700 rounded-lg">
+      <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="w-full">
           <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
@@ -1364,7 +1364,7 @@ const SalaryReportPage: React.FC = () => {
             </div>
 
             {/* Summary Footer */}
-            <div className="bg-default-50 dark:bg-gray-900/50 px-6 py-4 border-t border-default-200 dark:border-gray-700">
+            <div className="bg-default-50 dark:bg-gray-900/50 px-6 py-2 border-t border-default-200 dark:border-gray-700">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
                 <div className="text-sm text-default-600 dark:text-gray-300">
                   <span className="font-medium">Total Records:</span>{" "}

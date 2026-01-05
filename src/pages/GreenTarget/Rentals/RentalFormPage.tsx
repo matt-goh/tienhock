@@ -802,10 +802,10 @@ const RentalFormPage: React.FC = () => {
                         <HeadlessListboxButton
                           id="location_id-button"
                           className={clsx(
-                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                             !formData.customer_id
-                              ? "bg-gray-50 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                              ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                               : ""
                           )}
                         >
@@ -850,7 +850,7 @@ const RentalFormPage: React.FC = () => {
                         >
                           <ListboxOptions
                             className={clsx(
-                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
                               "mt-1"
                             )}
                           >
@@ -862,7 +862,7 @@ const RentalFormPage: React.FC = () => {
                                 clsx(
                                   "relative cursor-default select-none py-2 pl-3 pr-10",
                                   active
-                                    ? "bg-sky-100 text-sky-900"
+                                    ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
                                     : "text-gray-900 dark:text-gray-100"
                                 )
                               }
@@ -894,7 +894,7 @@ const RentalFormPage: React.FC = () => {
                                   clsx(
                                     "relative cursor-default select-none py-2 pl-3 pr-10",
                                     active
-                                      ? "bg-sky-100 text-sky-900"
+                                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
                                       : "text-gray-900 dark:text-gray-100"
                                   )
                                 }
@@ -948,10 +948,10 @@ const RentalFormPage: React.FC = () => {
                                 }}
                                 className={({ active }) =>
                                   clsx(
-                                    "relative cursor-pointer select-none py-2 pl-3 pr-10 mt-1 pt-2 border-t",
+                                    "relative cursor-pointer select-none py-2 pl-3 pr-10 mt-1 pt-2 border-t border-default-200 dark:border-gray-600",
                                     active
-                                      ? "bg-sky-100 text-sky-600"
-                                      : "text-sky-600"
+                                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400"
+                                      : "text-sky-600 dark:text-sky-400"
                                   )
                                 }
                               >
@@ -992,7 +992,7 @@ const RentalFormPage: React.FC = () => {
                       onChange={handleDateChange}
                       required
                       className={clsx(
-                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       )}
                     />
@@ -1015,7 +1015,7 @@ const RentalFormPage: React.FC = () => {
                       onChange={handleDateChange}
                       min={formData.date_placed}
                       className={clsx(
-                        "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                        "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       )}
                     />
@@ -1040,10 +1040,10 @@ const RentalFormPage: React.FC = () => {
                         <HeadlessListboxButton
                           id="tong_no-button"
                           className={clsx(
-                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                             !formData.date_placed
-                              ? "bg-gray-50 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                              ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                               : ""
                           )}
                         >
@@ -1068,7 +1068,7 @@ const RentalFormPage: React.FC = () => {
                         >
                           <ListboxOptions
                             className={clsx(
-                              "absolute z-10 max-h-72 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "absolute z-10 max-h-72 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
                               "mt-1"
                             )}
                           >
@@ -1095,7 +1095,7 @@ const RentalFormPage: React.FC = () => {
                                       className="mr-2 text-amber-500 flex-shrink-0"
                                     />
                                   );
-                                  c += " text-amber-600";
+                                  c += " text-amber-600 dark:text-amber-400";
                                   t = `Available after ${formatDumpsterDate(
                                     d.available_after
                                   )}`;
@@ -1107,11 +1107,11 @@ const RentalFormPage: React.FC = () => {
                                       className="mr-2 text-rose-500 flex-shrink-0"
                                     />
                                   );
-                                  c += " text-rose-600";
+                                  c += " text-rose-600 dark:text-rose-400";
                                   t = d.reason || "Unavailable";
                                   if (d.customer) t += ` (with ${d.customer})`;
                                 } else if (d.next_rental?.date) {
-                                  c += " text-amber-600";
+                                  c += " text-amber-600 dark:text-amber-400";
                                   t = `Available until ${formatDumpsterDate(
                                     d.available_until
                                   )}`;
@@ -1122,7 +1122,7 @@ const RentalFormPage: React.FC = () => {
                                       d.next_rental.date
                                     )})`;
                                 } else if (d.is_transition_day) {
-                                  c += " text-blue-600";
+                                  c += " text-blue-600 dark:text-blue-400";
                                   t = `Transition Day (from ${
                                     d.transition_from?.customer_name ?? "prev"
                                   })`;
@@ -1134,7 +1134,7 @@ const RentalFormPage: React.FC = () => {
                                       clsx(
                                         "relative cursor-default select-none py-2 pl-3 pr-10",
                                         active
-                                          ? "bg-sky-100 text-sky-900"
+                                          ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
                                           : "text-gray-900 dark:text-gray-100"
                                       )
                                     }
@@ -1205,7 +1205,7 @@ const RentalFormPage: React.FC = () => {
                         <HeadlessListboxButton
                           id="driver-button"
                           className={clsx(
-                            "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                            "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm",
                             "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                           )}
                         >
@@ -1227,7 +1227,7 @@ const RentalFormPage: React.FC = () => {
                         >
                           <ListboxOptions
                             className={clsx(
-                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
                               "mt-1"
                             )}
                           >
@@ -1246,7 +1246,7 @@ const RentalFormPage: React.FC = () => {
                                   clsx(
                                     "relative cursor-default select-none py-2 pl-3 pr-10",
                                     active
-                                      ? "bg-sky-100 text-sky-900"
+                                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
                                       : "text-gray-900 dark:text-gray-100"
                                   )
                                 }
@@ -1294,7 +1294,7 @@ const RentalFormPage: React.FC = () => {
                   name="remarks"
                   rows={3}
                   className={clsx(
-                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                    "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                     "placeholder-default-400"
                   )}

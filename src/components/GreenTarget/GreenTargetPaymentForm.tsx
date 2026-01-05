@@ -507,12 +507,12 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                       ({ invoice, amountToPay }) =>
                         amountToPay > invoice.current_balance
                     ) && (
-                      <div className="mt-2 pt-2 border-t border-purple-200 bg-purple-50 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
+                      <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/30 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
                         <div className="flex justify-between text-sm">
-                          <span className="text-purple-700">
+                          <span className="text-purple-700 dark:text-purple-300">
                             Regular Payments:
                           </span>
-                          <span className="font-medium text-purple-700">
+                          <span className="font-medium text-purple-700 dark:text-purple-300">
                             {formatCurrency(
                               selectedInvoices.reduce(
                                 (sum, { invoice, amountToPay }) =>
@@ -524,10 +524,10 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-purple-700">
+                          <span className="text-purple-700 dark:text-purple-300">
                             Overpaid Amounts:
                           </span>
-                          <span className="font-medium text-purple-700">
+                          <span className="font-medium text-purple-700 dark:text-purple-300">
                             {formatCurrency(
                               selectedInvoices.reduce(
                                 (sum, { invoice, amountToPay }) =>

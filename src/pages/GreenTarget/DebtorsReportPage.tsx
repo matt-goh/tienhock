@@ -292,7 +292,7 @@ const DebtorsReportPage: React.FC = () => {
                     onClick={() => handleViewInvoices(debtor.customer_id)}
                     title={`View invoices for ${debtor.name}`} // More descriptive title
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-2 whitespace-nowrap">
                       <div className="font-medium text-default-900 dark:text-gray-100">
                         {debtor.name}
                       </div>
@@ -300,7 +300,7 @@ const DebtorsReportPage: React.FC = () => {
                         ID: {debtor.customer_id}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-2 whitespace-nowrap">
                       {debtor.phone_numbers &&
                       debtor.phone_numbers.length > 0 ? (
                         <div className="flex flex-col space-y-1">
@@ -323,14 +323,14 @@ const DebtorsReportPage: React.FC = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-default-900 dark:text-gray-100">
+                    <td className="px-6 py-2 whitespace-nowrap text-right text-sm text-default-900 dark:text-gray-100">
                       {formatCurrency(debtor.total_invoiced)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600 dark:text-green-400">
+                    <td className="px-6 py-2 whitespace-nowrap text-right text-sm text-green-600 dark:text-green-400">
                       {formatCurrency(debtor.total_paid)}
                     </td>
                     <td
-                      className={`px-6 py-4 whitespace-nowrap text-right text-sm font-medium ${
+                      className={`px-6 py-2 whitespace-nowrap text-right text-sm font-medium ${
                         debtor.has_overdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
                       }`}
                     >

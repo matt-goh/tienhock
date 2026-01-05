@@ -21,7 +21,6 @@ import {
   IconDeviceFloppy,
   IconSquare,
   IconSquareCheckFilled,
-  IconPlus,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -1325,9 +1324,9 @@ const InvoiceDetailsPage: React.FC = () => {
 
     return {
       text: "Consolidated",
-      color: "text-indigo-700",
-      bg: "bg-indigo-50",
-      border: "border-indigo-200",
+      color: "text-indigo-700 dark:text-indigo-400",
+      bg: "bg-indigo-50 dark:bg-indigo-900/30",
+      border: "border-indigo-200 dark:border-indigo-800",
       icon: IconFiles,
       info: consolidatedInfo,
     };
@@ -1496,16 +1495,16 @@ const InvoiceDetailsPage: React.FC = () => {
   const getGTStatusBadgeStyle = (status?: string) => {
     switch (status?.toLowerCase()) {
       case "paid": // Assuming you derive 'paid' from balance
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300";
       case "cancelled":
-        return "bg-default-200 text-default-800";
+        return "bg-default-200 dark:bg-gray-700 text-default-800 dark:text-gray-300";
       case "overdue":
-        return "bg-red-100 text-red-800"; // Example: Red style
+        return "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"; // Example: Red style
       case "active":
       default: // Treat active/default as Unpaid visually if balance > 0
         return invoice && invoice.current_balance > 0
-          ? "bg-amber-100 text-amber-800" // Unpaid style
-          : "bg-gray-100 text-gray-800"; // Default/Unknown style
+          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300" // Unpaid style
+          : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"; // Default/Unknown style
     }
   };
 
@@ -1571,7 +1570,7 @@ const InvoiceDetailsPage: React.FC = () => {
   if (error || !invoice) {
     return (
       <div className="container mx-auto px-8 py-8">
-        <div className="bg-rose-50 text-rose-700 p-4 rounded-lg">
+        <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 p-4 rounded-lg">
           <p>{error || "Invoice not found"}</p>
           <Button
             onClick={() => navigate("/greentarget/invoices")}
@@ -1599,7 +1598,7 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/greentarget/invoices")} />
-          <div className="h-6 w-px bg-default-300"></div>
+          <div className="h-6 w-px bg-default-300 dark:bg-default-700"></div>
           <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100 flex items-center">
             <IconFileInvoice size={28} className="mr-2 text-default-600 dark:text-gray-300" />
             Invoice
@@ -1635,7 +1634,7 @@ const InvoiceDetailsPage: React.FC = () => {
             {/* e-Invoice status badges */}
             {invoice.einvoice_status === "valid" && (
               <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 border border-green-300 text-green-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
                 title="e-Invoice Valid"
               >
                 <IconCheck size={18} stroke={1.5} />
@@ -1644,7 +1643,7 @@ const InvoiceDetailsPage: React.FC = () => {
             )}
             {invoice.einvoice_status === "pending" && (
               <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 border border-sky-300 text-sky-600 dark:text-sky-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 dark:bg-sky-900/50 border border-sky-300 dark:border-sky-700 text-sky-600 dark:text-sky-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
                 title="e-Invoice Pending"
               >
                 <IconClock size={18} stroke={1.5} />
@@ -1653,7 +1652,7 @@ const InvoiceDetailsPage: React.FC = () => {
             )}
             {invoice.einvoice_status === "invalid" && (
               <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-rose-100 border border-rose-300 text-rose-600 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+                className="ml-3 px-3 py-1.5 text-xs font-medium bg-rose-100 dark:bg-rose-900/50 border border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
                 title="e-Invoice Invalid"
               >
                 <IconAlertTriangle size={18} stroke={1.5} />
@@ -1667,7 +1666,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   href={`https://myinvois.hasil.gov.my/${consolidatedInfo.uuid}/share/${consolidatedInfo.long_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-3 px-3 py-1.5 text-xs font-medium bg-indigo-100 border border-indigo-300 text-indigo-600 rounded-full flex items-center gap-1 max-w-[180px]"
+                  className="ml-3 px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center gap-1 max-w-[180px]"
                   title={`Part of consolidated invoice ${consolidatedInfo.invoice_number}`}
                 >
                   <IconFiles size={18} stroke={1.5} />
@@ -1818,7 +1817,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   required // Added required
                   className={clsx(
                     // Use clsx for consistency
-                    "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                    "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                   )}
                 />
@@ -1848,7 +1847,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     required // Added required
                     className={clsx(
                       // Use clsx for consistency
-                      "block w-full pl-10 pr-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                      "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                     )}
                   />
@@ -1872,7 +1871,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     <HeadlessListboxButton
                       id="payment_method-button"
                       className={clsx(
-                        "relative w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm",
+                        "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       )}
                     >
@@ -1895,7 +1894,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     >
                       <ListboxOptions
                         className={clsx(
-                          "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                          "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
                           "mt-1" // Default position bottom
                         )}
                       >
@@ -1906,7 +1905,7 @@ const InvoiceDetailsPage: React.FC = () => {
                               clsx(
                                 "relative cursor-default select-none py-2 pl-3 pr-10",
                                 active
-                                  ? "bg-sky-100 text-sky-900"
+                                  ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
                                   : "text-gray-900 dark:text-gray-100"
                               )
                             }
@@ -1960,7 +1959,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     onChange={handlePaymentFormChange}
                     className={clsx(
                       // Use clsx for consistency
-                      "block w-full px-3 py-2 border border-default-300 rounded-lg shadow-sm",
+                      "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                     )}
                   />
@@ -1986,7 +1985,7 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-default-200 dark:border-gray-700 overflow-hidden mt-8">
         {/* Invoice info */}
         <section className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
-          <h2 className="text-lg font-medium mb-4 border-b pb-2">
+          <h2 className="text-lg font-medium mb-4 border-b dark:border-gray-600 pb-2">
             Invoice Details
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
@@ -2208,12 +2207,12 @@ const InvoiceDetailsPage: React.FC = () => {
                 </span>
                 {invoice.current_balance <= 0 &&
                   invoice.status !== "cancelled" && (
-                    <span className="ml-2 text-green-600 text-xs font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                    <span className="ml-2 text-green-600 dark:text-green-400 text-xs font-medium px-2 py-0.5 bg-green-50 dark:bg-green-900/50 rounded-full">
                       Paid in Full
                     </span>
                   )}
                 {invoice.status === "cancelled" && (
-                  <span className="ml-2 text-rose-600 text-xs font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                  <span className="ml-2 text-rose-600 dark:text-rose-400 text-xs font-medium px-2 py-0.5 bg-rose-50 dark:bg-rose-900/50 rounded-full">
                     Cancelled
                   </span>
                 )}
@@ -2268,8 +2267,8 @@ const InvoiceDetailsPage: React.FC = () => {
             </div>
 
             {isEditingRentals && (
-              <div className="mb-6 p-4 bg-sky-50 border border-sky-200 rounded-lg">
-                <h3 className="text-sm font-medium text-sky-800 mb-3">
+              <div className="mb-6 p-4 bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800 rounded-lg">
+                <h3 className="text-sm font-medium text-sky-800 dark:text-sky-300 mb-3">
                   Select Rentals for Invoice
                 </h3>
                 {isLoadingRentals ? (
@@ -2298,8 +2297,8 @@ const InvoiceDetailsPage: React.FC = () => {
                           className={clsx(
                             "p-3 border rounded-lg cursor-pointer transition-colors",
                             isSelected
-                              ? "bg-sky-100 border-sky-300"
-                              : "bg-white border-default-200 hover:bg-gray-50"
+                              ? "bg-sky-100 dark:bg-sky-900/50 border-sky-300 dark:border-sky-700"
+                              : "bg-white dark:bg-gray-800 border-default-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
                           )}
                         >
                           <div className="flex items-center justify-between">
@@ -2333,8 +2332,8 @@ const InvoiceDetailsPage: React.FC = () => {
                               className={clsx(
                                 "text-xs font-medium px-2 py-1 rounded-full",
                                 isActive
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-gray-100 text-gray-600"
+                                  ? "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300"
+                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                               )}
                             >
                               {isActive ? "Ongoing" : "Completed"}
@@ -2346,8 +2345,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   </div>
                 )}
                 {selectedRentals.length > 0 && (
-                  <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-sky-200 rounded-lg">
-                    <p className="text-sm font-medium text-sky-800">
+                  <div className="mt-4 p-3 bg-white dark:bg-gray-800 border border-sky-200 dark:border-sky-800 rounded-lg">
+                    <p className="text-sm font-medium text-sky-800 dark:text-sky-300">
                       Selected: {selectedRentals.length} rental
                       {selectedRentals.length > 1 ? "s" : ""}
                     </p>
@@ -2375,7 +2374,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       className={`px-4 py-2 ${
                         isRentalActive(rental.date_picked)
                           ? "bg-green-500 text-white"
-                          : "bg-default-100 text-default-700"
+                          : "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200"
                       }`}
                     >
                       <div className="flex justify-between items-center">
@@ -2392,7 +2391,7 @@ const InvoiceDetailsPage: React.FC = () => {
                           className={`text-sm font-medium px-2 py-0.5 rounded-full ${
                             isRentalActive(rental.date_picked)
                               ? "bg-green-400/30 text-white"
-                              : "bg-default-200 text-default-600"
+                              : "bg-default-200 dark:bg-gray-600 text-default-600 dark:text-gray-300"
                           }`}
                         >
                           {isRentalActive(rental.date_picked)
@@ -2406,19 +2405,19 @@ const InvoiceDetailsPage: React.FC = () => {
                     <div className="p-4">
                       {/* Rental Dates */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100 dark:border-gray-700">
                           <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Placement Date
                           </div>
-                          <div className="font-medium">
+                          <div className="font-medium text-default-900 dark:text-gray-100">
                             {formatDate(rental.date_placed || "")}
                           </div>
                         </div>
                         <div
                           className={`p-3 rounded-lg ${
                             rental.date_picked
-                              ? "bg-default-50 border border-default-100"
-                              : "bg-green-50 border border-green-100"
+                              ? "bg-default-50 dark:bg-gray-900/50 border border-default-100 dark:border-gray-700"
+                              : "bg-green-50 dark:bg-green-900/30 border border-green-100 dark:border-green-800"
                           }`}
                         >
                           <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
@@ -2426,7 +2425,7 @@ const InvoiceDetailsPage: React.FC = () => {
                           </div>
                           <div
                             className={`font-medium ${
-                              !rental.date_picked ? "text-green-600" : ""
+                              !rental.date_picked ? "text-green-600 dark:text-green-400" : "text-default-900 dark:text-gray-100"
                             }`}
                           >
                             {rental.date_picked
@@ -2437,29 +2436,29 @@ const InvoiceDetailsPage: React.FC = () => {
                       </div>
                       {/* Dumpster, Driver & Location Info */}
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100 dark:border-gray-700">
                           <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Dumpster
                           </div>
-                          <div className="font-medium">
+                          <div className="font-medium text-default-900 dark:text-gray-100">
                             {rental.tong_no || "N/A"}
                           </div>
                         </div>
-                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                        <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100 dark:border-gray-700">
                           <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                             Driver
                           </div>
-                          <div className="font-medium">
+                          <div className="font-medium text-default-900 dark:text-gray-100">
                             {rental.driver || "N/A"}
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100">
+                      <div className="bg-default-50 dark:bg-gray-900/50 p-3 rounded-lg border border-default-100 dark:border-gray-700">
                         <div className="text-xs text-default-500 dark:text-gray-400 mb-1">
                           Location
                         </div>
-                        <div className="font-medium">
+                        <div className="font-medium text-default-900 dark:text-gray-100">
                           {rental.location_address || "No specific location"}
                         </div>
                       </div>
@@ -2523,11 +2522,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   {payments.map((payment) => (
                     <tr
                       key={payment.payment_id}
-                      className={`hover:bg-default-50 transition-colors ${
+                      className={`hover:bg-default-50 dark:hover:bg-gray-800 transition-colors ${
                         payment.status === "cancelled"
-                          ? "bg-default-50 text-default-400"
+                          ? "bg-default-50 dark:bg-gray-800 text-default-400 dark:text-gray-500"
                           : payment.status === "pending"
-                          ? "bg-amber-50"
+                          ? "bg-amber-50 dark:bg-amber-900/30"
                           : ""
                       }`}
                       title={
@@ -2557,7 +2556,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-default-700 dark:text-gray-200 capitalize">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 dark:bg-indigo-900/50 text-default-700 dark:text-gray-200 capitalize">
                           {payment.payment_method.replace("_", " ")}
                         </span>
                       </td>
@@ -2640,7 +2639,7 @@ const InvoiceDetailsPage: React.FC = () => {
                           </span>
                         )}
                         {payment.status === "cancelled" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300">
                             <IconCancel size={14} className="mr-1" />
                             Cancelled
                           </span>
@@ -2711,14 +2710,14 @@ const InvoiceDetailsPage: React.FC = () => {
             <div
               className={`p-4 ${
                 invoice.einvoice_status === "valid"
-                  ? "bg-green-50 border-b border-green-200"
+                  ? "bg-green-50 dark:bg-green-900/30 border-b border-green-200 dark:border-green-800"
                   : invoice.einvoice_status === "pending"
-                  ? "bg-sky-50 border-b border-sky-200"
+                  ? "bg-sky-50 dark:bg-sky-900/30 border-b border-sky-200 dark:border-sky-800"
                   : invoice.einvoice_status === "invalid"
-                  ? "bg-rose-50 border-b border-rose-200"
+                  ? "bg-rose-50 dark:bg-rose-900/30 border-b border-rose-200 dark:border-rose-800"
                   : invoice.einvoice_status === "cancelled"
-                  ? "bg-default-50 border-b border-default-200"
-                  : "bg-default-50 border-b border-default-200"
+                  ? "bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700"
+                  : "bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700"
               }`}
             >
               <div className="flex items-center">
