@@ -166,7 +166,7 @@ export const JOB_CONFIGS: JobTypeConfigs = {
     name: "Office",
     section: ["OFFICE"],
     entryMode: "monthly",
-    defaultHours: 176, // Default monthly hours
+    defaultHours: 1, // Default hours for office staff
     contextFields: [],
     jobIds: ["OFFICE"],
   },
