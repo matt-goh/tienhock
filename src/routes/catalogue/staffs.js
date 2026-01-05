@@ -319,6 +319,76 @@ export default function (pool) {
     }
   });
 
+  // Batch update staff jobs (MUST be before /:id route)
+  router.put("/batch-job-update", async (req, res) => {
+    const { jobId, addEmployees, removeEmployees } = req.body;
+
+    if (!jobId) {
+      return res.status(400).json({ message: "Job ID is required" });
+    }
+
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        let addedCount = 0;
+        let removedCount = 0;
+
+        // Add job to employees
+        if (addEmployees && addEmployees.length > 0) {
+          // For each employee, add the job to their job array if not already present
+          for (const employeeId of addEmployees) {
+            const result = await client.query(
+              `UPDATE staffs
+               SET job = COALESCE(job, '[]'::jsonb) || $1::jsonb
+               WHERE id = $2
+                 AND NOT (COALESCE(job, '[]'::jsonb) ? $3)
+               RETURNING id`,
+              [JSON.stringify([jobId]), employeeId, jobId]
+            );
+            if (result.rows.length > 0) addedCount++;
+          }
+        }
+
+        // Remove job from employees
+        if (removeEmployees && removeEmployees.length > 0) {
+          for (const employeeId of removeEmployees) {
+            const result = await client.query(
+              `UPDATE staffs
+               SET job = (
+                 SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                 FROM jsonb_array_elements_text(COALESCE(job, '[]'::jsonb)) AS elem
+                 WHERE elem != $1
+               )
+               WHERE id = $2
+               RETURNING id`,
+              [jobId, employeeId]
+            );
+            if (result.rows.length > 0) removedCount++;
+          }
+        }
+
+        await client.query("COMMIT");
+        res.json({
+          message: "Staff jobs updated successfully",
+          addedCount,
+          removedCount,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error("Error updating staff jobs:", error);
+      res
+        .status(500)
+        .json({ message: "Error updating staff jobs", error: error.message });
+    }
+  });
+
   // Batch update staff locations (MUST be before /:id route)
   router.put("/batch-location-update", async (req, res) => {
     const { locationCode, addEmployees, removeEmployees } = req.body;
