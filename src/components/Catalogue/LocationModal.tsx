@@ -24,9 +24,19 @@ import {
 } from "@tabler/icons-react";
 import { Location } from "../../utils/catalogue/useLocationsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
-import { useJobLocationMappings } from "../../utils/catalogue/useJobLocationMappings";
+import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
+
+interface JobMapping {
+  job_id: string;
+  job_name: string;
+}
+
+interface EmployeeMapping {
+  employee_id: string;
+  employee_name: string;
+}
 
 interface LocationModalProps {
   isOpen: boolean;
@@ -35,6 +45,8 @@ interface LocationModalProps {
   onComplete?: () => void;
   initialData: Location | null;
   existingLocations: Location[];
+  initialJobMappings?: JobMapping[];
+  initialEmployeeMappings?: EmployeeMapping[];
 }
 
 const LocationModal: React.FC<LocationModalProps> = ({
@@ -44,6 +56,8 @@ const LocationModal: React.FC<LocationModalProps> = ({
   onComplete,
   initialData,
   existingLocations,
+  initialJobMappings = [],
+  initialEmployeeMappings = [],
 }) => {
   const [formData, setFormData] = useState<Location>({ id: "", name: "" });
   const [error, setError] = useState<string>("");
@@ -92,55 +106,21 @@ const LocationModal: React.FC<LocationModalProps> = ({
   const [isAddingExclusion, setIsAddingExclusion] = useState(false);
 
   const { jobs } = useJobsCache();
-  const { byLocation, refreshData: refreshMappings } = useJobLocationMappings();
+  const { staffs } = useStaffsCache();
 
   const isEditing = !!initialData;
 
-  // Fetch employees and employee mappings when modal opens
+  // Convert staffs to the format needed for the modal
   useEffect(() => {
-    const fetchEmployeeData = async () => {
-      try {
-        // Fetch all active employees
-        const staffsResponse = await api.get("/api/staffs");
-        const activeStaffs = staffsResponse.filter(
-          (s: { dateResigned: string }) => !s.dateResigned
-        );
-        setAllEmployees(
-          activeStaffs.map((s: { id: string; name: string }) => ({
-            id: s.id,
-            name: s.name,
-          }))
-        );
-
-        // Fetch employee mappings for this location
-        if (initialData) {
-          const mappingsResponse = await api.get(
-            "/api/locations/employee-mappings"
-          );
-          const locationMappings = mappingsResponse.locationSummary.find(
-            (ls: { location_code: string }) =>
-              ls.location_code === initialData.id
-          );
-          const mappedEmployeeIds = new Set<string>(
-            (locationMappings?.employees || []).map(
-              (e: { employee_id: string }) => e.employee_id
-            )
-          );
-          setSelectedEmployees(mappedEmployeeIds);
-          setOriginalEmployees(new Set<string>(mappedEmployeeIds));
-        } else {
-          setSelectedEmployees(new Set());
-          setOriginalEmployees(new Set());
-        }
-      } catch (err) {
-        console.error("Error fetching employee data:", err);
-      }
-    };
-
-    if (isOpen) {
-      fetchEmployeeData();
+    if (isOpen && staffs.length > 0) {
+      setAllEmployees(
+        staffs.map((s) => ({
+          id: s.id,
+          name: s.name,
+        }))
+      );
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, staffs]);
 
   // Fetch exclusions when editing a location
   const fetchExclusions = async () => {
@@ -177,13 +157,22 @@ const LocationModal: React.FC<LocationModalProps> = ({
           name: initialData.name,
           originalId: initialData.id,
         });
-        const mappedJobs = new Set(byLocation[initialData.id] || []);
+        // Use the job mappings passed from parent
+        const jobIds = initialJobMappings.map(j => j.job_id);
+        const mappedJobs = new Set<string>(jobIds);
         setSelectedJobs(mappedJobs);
-        setOriginalJobs(new Set(mappedJobs));
+        setOriginalJobs(new Set<string>(mappedJobs));
+        // Use the employee mappings passed from parent
+        const employeeIds = initialEmployeeMappings.map(e => e.employee_id);
+        const mappedEmployees = new Set<string>(employeeIds);
+        setSelectedEmployees(mappedEmployees);
+        setOriginalEmployees(new Set<string>(mappedEmployees));
       } else {
         setFormData({ id: "", name: "" });
         setSelectedJobs(new Set());
         setOriginalJobs(new Set());
+        setSelectedEmployees(new Set());
+        setOriginalEmployees(new Set());
       }
       setError("");
       setJobSearch("");
@@ -191,7 +180,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
       setEmployeeSearch("");
       setAvailableEmployeeSearch("");
     }
-  }, [isOpen, initialData, byLocation]);
+  }, [isOpen, initialData, initialJobMappings, initialEmployeeMappings]);
 
   // Mapped jobs (sorted alphabetically)
   const mappedJobs = useMemo(() => {
@@ -447,7 +436,7 @@ const LocationModal: React.FC<LocationModalProps> = ({
         });
       }
 
-      await refreshMappings(true);
+      // Don't refresh here - let onComplete handle all refreshes after modal closes
       onComplete?.();
       handleClose();
     } catch (err: any) {
