@@ -55,7 +55,10 @@ const DumpsterListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [dumpsterToDelete, setDumpsterToDelete] = useState<Dumpster | null>(
@@ -121,7 +124,12 @@ const DumpsterListPage: React.FC = () => {
     return dates;
   };
 
-  const dateRange = getDateRange(startDate, 14); // Show 14 days
+  // Get days in the current month
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const dateRange = getDateRange(startDate, getDaysInMonth(startDate));
 
   // Check if a date falls within a rental period
   const isDateInRental = (date: Date, rental: Rental) => {
@@ -195,13 +203,13 @@ const DumpsterListPage: React.FC = () => {
       .replace(/\//g, "/");
   };
 
-  // Navigate to previous/next period
+  // Navigate to previous/next month
   const navigatePeriod = (direction: "prev" | "next") => {
     const newDate = new Date(startDate);
     if (direction === "prev") {
-      newDate.setDate(newDate.getDate() - 14);
+      newDate.setMonth(newDate.getMonth() - 1);
     } else {
-      newDate.setDate(newDate.getDate() + 14);
+      newDate.setMonth(newDate.getMonth() + 1);
     }
     setStartDate(newDate);
   };
@@ -239,6 +247,7 @@ const DumpsterListPage: React.FC = () => {
     date: Date;
     status: DumpsterStatus;
     position: { top: number; left: number };
+    rowIndex: number;
   } | null>(null);
 
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -247,14 +256,16 @@ const DumpsterListPage: React.FC = () => {
     e: React.MouseEvent,
     dumpster: Dumpster,
     date: Date,
-    status: DumpsterStatus
+    status: DumpsterStatus,
+    rowIndex: number
   ) => {
     e.stopPropagation(); // Prevent cell click navigation
 
     // Get position for the tooltip
     const rect = (e.target as HTMLElement).getBoundingClientRect();
+    // For first 2 rows, position below; otherwise position above
     const position = {
-      top: rect.top - 10,
+      top: rowIndex < 2 ? rect.bottom + 10 : rect.top - 10,
       left: rect.left + rect.width / 2,
     };
 
@@ -265,7 +276,7 @@ const DumpsterListPage: React.FC = () => {
 
     // Set tooltip data with a small delay
     tooltipTimeoutRef.current = setTimeout(() => {
-      setTooltipData({ dumpster, date, status, position });
+      setTooltipData({ dumpster, date, status, position, rowIndex });
     }, 100);
   };
 
@@ -303,7 +314,7 @@ const DumpsterListPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search"
-              className="w-full pl-11 py-2 border focus:border-default-500 rounded-full"
+              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -328,13 +339,13 @@ const DumpsterListPage: React.FC = () => {
                     />
                   </span>
                 </ListboxButton>
-                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
+                <ListboxOptions className="absolute z-10 w-full p-1 mt-1 border bg-white dark:bg-gray-800 dark:border-gray-600 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
                   <ListboxOption
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                         active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
+                          ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                          : "text-default-900 dark:text-gray-100"
                       }`
                     }
                     value="All"
@@ -360,8 +371,8 @@ const DumpsterListPage: React.FC = () => {
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                         active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
+                          ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                          : "text-default-900 dark:text-gray-100"
                       }`
                     }
                     value="Available"
@@ -387,8 +398,8 @@ const DumpsterListPage: React.FC = () => {
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                         active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
+                          ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                          : "text-default-900 dark:text-gray-100"
                       }`
                     }
                     value="Rented"
@@ -414,8 +425,8 @@ const DumpsterListPage: React.FC = () => {
                     className={({ active }) =>
                       `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
                         active
-                          ? "bg-default-100 text-default-900"
-                          : "text-default-900"
+                          ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                          : "text-default-900 dark:text-gray-100"
                       }`
                     }
                     value="Maintenance"
@@ -474,27 +485,36 @@ const DumpsterListPage: React.FC = () => {
               <span className="text-sm text-default-600 dark:text-gray-300">Maintenance</span>
             </div>
 
-            <div className="flex items-center">
-              <div className="text-sm font-medium text-default-700 dark:text-gray-200 mr-2">
+            <div className="flex items-center border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 shadow-sm overflow-hidden">
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  setStartDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                }}
+                className="text-sm font-medium text-default-700 dark:text-gray-200 px-3 py-1 hover:bg-default-100 dark:hover:bg-gray-600 transition-colors"
+                title="Go to current month"
+              >
                 {startDate.toLocaleDateString("en-US", {
                   month: "long",
                   year: "numeric",
                 })}
-              </div>
-              <div className="flex space-x-1">
+              </button>
+              <div className="w-px h-5 bg-default-300 dark:bg-gray-600"></div>
+              <div className="flex items-center">
                 <button
                   onClick={() => navigatePeriod("prev")}
-                  className="p-1.5 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800"
-                  title="Previous two weeks"
+                  className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-600 transition-colors"
+                  title="Previous month"
                 >
-                  <IconChevronLeft size={16} className="text-default-700 dark:text-gray-200" />
+                  <IconChevronLeft size={18} className="text-default-700 dark:text-gray-200" />
                 </button>
+                <div className="w-px h-5 bg-default-300 dark:bg-gray-600"></div>
                 <button
                   onClick={() => navigatePeriod("next")}
-                  className="p-1.5 rounded-full hover:bg-default-100 dark:hover:bg-gray-700 dark:bg-gray-800"
-                  title="Next two weeks"
+                  className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-600 transition-colors"
+                  title="Next month"
                 >
-                  <IconChevronRight size={16} className="text-default-700 dark:text-gray-200" />
+                  <IconChevronRight size={18} className="text-default-700 dark:text-gray-200" />
                 </button>
               </div>
             </div>
@@ -510,7 +530,7 @@ const DumpsterListPage: React.FC = () => {
             <div
               className="min-w-max grid"
               style={{
-                gridTemplateColumns: `minmax(120px, auto) repeat(${dateRange.length}, minmax(38px, 1fr))`,
+                gridTemplateColumns: `minmax(90px, auto) repeat(${dateRange.length}, minmax(22px, 1fr))`,
               }}
             >
               {/* Header Row: Dates */}
@@ -524,15 +544,15 @@ const DumpsterListPage: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className={`bg-default-50 py-2 px-1 text-center text-sm font-medium border-b border-default-200 ${
+                    className={`bg-default-50 dark:bg-gray-900/50 py-2 px-0 text-center text-xs font-medium border-b border-default-200 dark:border-gray-700 ${
                       index < dateRange.length - 1 ? "border-r" : ""
                     } ${
-                      isToday ? "text-sky-700 bg-sky-50" : "text-default-600"
+                      isToday ? "text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/30" : "text-default-600 dark:text-gray-300"
                     }`}
                   >
                     {formatDate(date)}
                     {isToday && (
-                      <div className="h-0.5 w-10 bg-sky-500 mx-auto mt-1 rounded-full"></div>
+                      <div className="h-0.5 w-4 bg-sky-500 mx-auto mt-1 rounded-full"></div>
                     )}
                   </div>
                 );
@@ -542,17 +562,17 @@ const DumpsterListPage: React.FC = () => {
               {paginatedDumpsters.map((dumpster, dumpsterIndex) => (
                 <React.Fragment key={dumpster.tong_no}>
                   <div
-                    className={`py-3 px-3 sticky left-0 z-10 bg-white font-medium ${
+                    className={`py-2 px-3 sticky left-0 z-10 bg-white dark:bg-gray-800 font-medium ${
                       dumpster.status === "Available"
-                        ? "text-green-700"
+                        ? "text-green-700 dark:text-green-400"
                         : dumpster.status === "Maintenance"
-                        ? "text-amber-700"
-                        : "text-default-700"
-                    } border-r border-default-200 ${
+                        ? "text-amber-700 dark:text-amber-400"
+                        : "text-default-700 dark:text-gray-200"
+                    } border-r border-default-200 dark:border-gray-700 ${
                       dumpsterIndex < paginatedDumpsters.length - 1
                         ? "border-b"
                         : ""
-                    } hover:bg-default-50 cursor-pointer transition-colors`}
+                    } hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer transition-colors`}
                     onClick={() => handleDumpsterCellClick(dumpster)}
                   >
                     <div className="flex items-center">
@@ -579,14 +599,14 @@ const DumpsterListPage: React.FC = () => {
                     return (
                       <div
                         key={dateIndex}
-                        className={`py-3 px-1 ${
+                        className={`py-2 px-0.5 ${
                           dumpsterIndex < paginatedDumpsters.length - 1
                             ? "border-b"
                             : ""
                         } ${
                           dateIndex < dateRange.length - 1 ? "border-r" : ""
-                        } border-default-200 flex justify-center items-center hover:bg-default-50 cursor-pointer transition-colors ${
-                          isToday ? "bg-sky-50/30" : ""
+                        } border-default-200 dark:border-gray-700 flex justify-center items-center hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
+                          isToday ? "bg-sky-50/30 dark:bg-sky-900/20" : ""
                         }`}
                         onClick={() => handleDumpsterCellClick(dumpster)}
                       >
@@ -595,7 +615,7 @@ const DumpsterListPage: React.FC = () => {
                             status
                           )} cursor-help hover:ring-2 hover:ring-offset-1 hover:ring-default-300 transition-all`}
                           onMouseEnter={(e) =>
-                            handleStatusHover(e, dumpster, date, status)
+                            handleStatusHover(e, dumpster, date, status, dumpsterIndex)
                           }
                           onMouseLeave={handleTooltipLeave}
                         ></div>
@@ -612,7 +632,9 @@ const DumpsterListPage: React.FC = () => {
         {tooltipData &&
           createPortal(
             <div
-              className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-3 transform -translate-x-1/2 -translate-y-full"
+              className={`fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-3 transform -translate-x-1/2 ${
+                tooltipData.rowIndex < 2 ? "" : "-translate-y-full"
+              }`}
               style={{
                 top: `${tooltipData.position.top}px`,
                 left: `${tooltipData.position.left}px`,
@@ -664,7 +686,7 @@ const DumpsterListPage: React.FC = () => {
 
                 {tooltipData.status.type === "rented" &&
                   tooltipData.status.rental && (
-                    <div className="space-y-1.5 text-sm border-t border-default-100 pt-2 mt-1">
+                    <div className="space-y-1.5 text-sm border-t border-default-100 dark:border-gray-700 pt-2 mt-1">
                       <div className="flex items-start gap-2">
                         <IconUser
                           size={16}
@@ -773,9 +795,9 @@ const DumpsterListPage: React.FC = () => {
                 <button
                   key={i}
                   onClick={() => handlePageChange(pageNum)}
-                  className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 active:bg-default-200 ${
+                  className={`inline-flex items-center justify-center rounded-full text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 ${
                     pageNum === currentPage
-                      ? "border border-default-200 font-semibold"
+                      ? "border border-default-200 dark:border-gray-600 font-semibold"
                       : "font-medium"
                   }`}
                 >
