@@ -246,6 +246,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // Ref to store the original saved activities from the work log
   // This preserves the original state even if the employee is deselected and re-selected
   const savedEmployeeActivitiesRef = useRef<Record<string, any[]>>({});
+  // Ref to track which rowKeys have had their products linked (to avoid infinite loops)
+  const productsLinkedRef = useRef<Record<string, string>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -557,6 +559,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     const newDayType = determineDayType(newDate);
     const newDefaultHours = getDefaultHours(e.target.value);
     const oldDefaultHours = getDefaultHours(formData.logDate);
+
+    // Clear products linked ref when date changes (products will be different)
+    if (productsLinkedRef.current) {
+      productsLinkedRef.current = {};
+    }
 
     setFormData({
       ...formData,
@@ -1454,15 +1461,34 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           return;
         }
 
+        const currentActivities = employeeActivities[rowKey] || [];
+        // Skip if activities haven't been loaded yet
+        if (currentActivities.length === 0) {
+          return;
+        }
+
+        // Create a hash of products to detect if they changed
+        const productsHash = JSON.stringify(
+          products.map((p) => ({ id: p.product_id, qty: p.quantity }))
+        );
+
+        // Skip if we've already linked these exact products for this rowKey
+        if (productsLinkedRef.current[rowKey] === productsHash) {
+          return;
+        }
+
+        // Mark as linked
+        productsLinkedRef.current[rowKey] = productsHash;
+
         // For this employee+job combo, update their activities
         setEmployeeActivities((prev) => {
-          const currentActivities = prev[rowKey] || [];
-          if (currentActivities.length === 0) {
+          const prevActivities = prev[rowKey] || [];
+          if (prevActivities.length === 0) {
             return prev;
           }
 
           // Create a new array with updated activities
-          const updatedActivities = [...currentActivities];
+          const updatedActivities = [...prevActivities];
 
           // For each product, find and update the matching pay code
           products.forEach((product) => {
@@ -1513,7 +1539,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         });
       });
     }
-  }, [salesmanProducts, jobConfig?.id]);
+  }, [salesmanProducts, jobConfig?.id, employeeActivities, formData.contextData, formData.logDate, locationTypes]);
 
   // Update employee hours by employee+job combination
   const handleEmployeeHoursChange = (
