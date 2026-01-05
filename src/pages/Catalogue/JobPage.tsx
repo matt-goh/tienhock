@@ -511,9 +511,12 @@ const JobPage: React.FC = () => {
   // --- Main Render ---
   return (
     <div className="space-y-4">
-      <h1 className="text-center text-xl font-semibold text-default-800 dark:text-gray-100">
-        Job & Pay Codes
-      </h1>
+      {/* --- Header: Only show centered when no job selected --- */}
+      {!selectedJob && (
+        <h1 className="text-center text-xl font-semibold text-default-800 dark:text-gray-100">
+          Job & Pay Codes
+        </h1>
+      )}
 
       {/* --- Conditional Rendering: Show Cards or Detail View --- */}
       {!selectedJob && !loadingJobs && (
@@ -568,6 +571,10 @@ const JobPage: React.FC = () => {
                   <IconChevronLeft size={20} />
                   <span className="text-sm font-medium">Back</span>
                 </button>
+                <span className="text-default-300 dark:text-gray-600 pb-1.5">|</span>
+                <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100 pb-1.5">
+                  Job & Pay Codes
+                </h1>
                 <span className="text-default-300 dark:text-gray-600 pb-1.5">|</span>
                 <div>
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
