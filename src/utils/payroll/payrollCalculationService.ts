@@ -140,7 +140,10 @@ export class PayrollCalculationService {
           ) {
             quantity = activity.units_produced;
           } else if (activity.rate_unit === "Fixed") {
-            quantity = 1; // Fixed rates are always quantity 1
+            // For Fixed, use units_produced as direct amount if provided, otherwise quantity = 1
+            quantity = (activity.units_produced !== null && activity.units_produced > 0)
+              ? activity.units_produced
+              : 1;
           }
 
           // Initialize or update aggregated item
@@ -200,7 +203,9 @@ export class PayrollCalculationService {
         amount = calculatePercentage(quantity, rate);
         break;
       case "Fixed":
-        amount = rate; // Fixed rate is just the rate amount
+        // For Fixed, if quantity > 1 it means units were provided as direct amount
+        // Otherwise use the rate
+        amount = quantity > 1 ? quantity : rate;
         break;
       default:
         amount = 0;

@@ -203,8 +203,17 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                           <span className="truncate">@ {activity.rate}%</span>
                         </>
                       )}
-                      {(activity.rateUnit === "Fixed" ||
-                        activity.rateUnit === "Trip" ||
+                      {/* For Fixed: only show base rate if no units provided */}
+                      {activity.rateUnit === "Fixed" &&
+                        !(activity.unitsProduced !== null && activity.unitsProduced !== undefined && activity.unitsProduced > 0) && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate">
+                            @ RM{activity.rate.toFixed(2)}
+                          </span>
+                        </>
+                      )}
+                      {(activity.rateUnit === "Trip" ||
                         activity.rateUnit === "Day") && (
                         <>
                           <span>•</span>
@@ -215,14 +224,14 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       )}
                       {/* Show units produced for non-Hour units or when explicitly available */}
                       {activity.unitsProduced !== null &&
+                        activity.unitsProduced !== undefined &&
+                        activity.unitsProduced > 0 &&
                         activity.rateUnit !== "Hour" &&
-                        activity.rateUnit !== "Bill" &&
-                        activity.rateUnit !== "Fixed" && (
+                        activity.rateUnit !== "Bill" && (
                           <span className="text-default-500 dark:text-gray-400">
-                            • {activity.unitsProduced}{" "}
-                            {activity.rateUnit === "Percent"
-                              ? "Units"
-                              : activity.rateUnit}
+                            • {activity.rateUnit === "Fixed"
+                              ? `RM${activity.unitsProduced.toFixed(2)}`
+                              : `${activity.unitsProduced} ${activity.rateUnit === "Percent" ? "Units" : activity.rateUnit}`}
                           </span>
                         )}
                       {activity.payType === "Overtime" &&
