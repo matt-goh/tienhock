@@ -745,7 +745,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       !loadingPayCodeMappings &&
       expandedEmployees.length > 0
     ) {
-      // Use a longer delay to ensure all initialization state updates are complete
+      // Use a longer delay to ensure all post-initialization effects have completed
+      // (e.g., copying products to SALESMAN_IKUT activities, updating muat activities)
       const timeoutId = setTimeout(() => {
         initialStateSetRef.current = true;
         setInitialState({
@@ -766,7 +767,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           ),
           leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
         });
-      }, 300); // Longer delay to ensure stability
+      }, 800); // Longer delay to ensure all post-initialization effects complete
 
       return () => clearTimeout(timeoutId);
     }
