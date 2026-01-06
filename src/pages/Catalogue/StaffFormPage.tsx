@@ -21,11 +21,13 @@ import {
   EmployeePayCodeDetails,
   useJobPayCodeMappings,
 } from "../../utils/catalogue/useJobPayCodeMappings";
-import AssociatePayCodesWithEmployeeModal from "../../components/Catalogue/AssociatePayCodesWithEmployeeModal";
-import { IconLink, IconChevronDown, IconChevronRight, IconLayoutList, IconLayoutGrid, IconChevronsDown, IconChevronsUp, IconUsers, IconUserPlus, IconCrown, IconExternalLink } from "@tabler/icons-react";
+import BatchManageEmployeePayCodesModal from "../../components/Catalogue/BatchManageEmployeePayCodesModal";
+import { IconLink, IconChevronDown, IconChevronRight, IconLayoutList, IconLayoutGrid, IconChevronsDown, IconChevronsUp, IconUsers, IconUserPlus, IconCrown, IconExternalLink, IconSettings2 } from "@tabler/icons-react";
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
-import { JobPayCodeDetails, PayType } from "../../types/types";
+import BatchManageJobPayCodesModal from "../../components/Catalogue/BatchManageJobPayCodesModal";
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import { JobPayCodeDetails, PayType, Job } from "../../types/types";
 
 type PayCodeViewMode = 'grouped' | 'flat';
 
@@ -126,7 +128,17 @@ const StaffFormPage: React.FC = () => {
   const [payCodeSearchQuery, setPayCodeSearchQuery] = useState<string>("");
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
   const [payCodeViewMode, setPayCodeViewMode] = useState<PayCodeViewMode>('grouped');
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Initialize with all groups collapsed except employee-Base
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set([
+    'employee-Tambahan',
+    'employee-Overtime',
+    'job-Base',
+    'job-Tambahan',
+    'job-Overtime',
+    'shared-Base',
+    'shared-Tambahan',
+    'shared-Overtime',
+  ]));
   const [batchDefaultLoading, setBatchDefaultLoading] = useState<string | null>(null);
   const [batchConfirmDialog, setBatchConfirmDialog] = useState<{
     isOpen: boolean;
@@ -136,6 +148,10 @@ const StaffFormPage: React.FC = () => {
     payCodes: (EmployeePayCodeDetails | JobPayCodeDetails)[];
     onConfirm: () => void;
   } | null>(null);
+
+  // Batch manage job pay codes state
+  const [showBatchManageJobPayCodesModal, setShowBatchManageJobPayCodesModal] = useState(false);
+  const [selectedJobForBatchManage, setSelectedJobForBatchManage] = useState<Job | null>(null);
 
   // Same-name staff state for Head management
   const [sameNameStaff, setSameNameStaff] = useState<SameNameStaff[]>([]);
@@ -1506,9 +1522,72 @@ const StaffFormPage: React.FC = () => {
 
                       {/* Job-linked Pay Codes Section */}
                       <div>
-                        <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                          Job-Linked Pay Codes
-                        </h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-default-700 dark:text-gray-200">
+                            Job-Linked Pay Codes
+                          </h4>
+                          {isEditMode && formData.job && formData.job.length === 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              icon={IconSettings2}
+                              onClick={() => {
+                                const job = jobs.find((j) => j.id === formData.job[0]);
+                                if (job) {
+                                  setSelectedJobForBatchManage(job);
+                                  setShowBatchManageJobPayCodesModal(true);
+                                }
+                              }}
+                            >
+                              Batch Manage
+                            </Button>
+                          )}
+                          {isEditMode && formData.job && formData.job.length > 1 && (
+                            <Menu as="div" className="relative">
+                              <MenuButton
+                                as={Button}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                icon={IconSettings2}
+                              >
+                                Batch Manage
+                              </MenuButton>
+                              <MenuItems className="absolute right-0 mt-1 w-56 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 dark:ring-white/10 focus:outline-none z-10">
+                                <div className="p-1">
+                                  <div className="px-3 py-1.5 text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Select Job
+                                  </div>
+                                  {formData.job.map((jobId) => {
+                                    const jobData = jobs.find((j) => j.id === jobId);
+                                    return (
+                                      <MenuItem key={jobId}>
+                                        {({ focus }) => (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const job = jobs.find((j) => j.id === jobId);
+                                              if (job) {
+                                                setSelectedJobForBatchManage(job);
+                                                setShowBatchManageJobPayCodesModal(true);
+                                              }
+                                            }}
+                                            className={`${
+                                              focus ? "bg-sky-50 dark:bg-sky-900/30" : ""
+                                            } group flex w-full items-center rounded-md px-3 py-2 text-sm text-default-800 dark:text-gray-100`}
+                                          >
+                                            {jobData?.name || jobId}
+                                          </button>
+                                        )}
+                                      </MenuItem>
+                                    );
+                                  })}
+                                </div>
+                              </MenuItems>
+                            </Menu>
+                          )}
+                        </div>
                         {(() => {
                           const { jobPayCodes } = getAllPayCodesForEmployee();
                           return jobPayCodes.length > 0 ? (
@@ -1681,14 +1760,12 @@ const StaffFormPage: React.FC = () => {
         </form>
       </div>
       {isEditMode && formData.id && (
-        <AssociatePayCodesWithEmployeeModal
+        <BatchManageEmployeePayCodesModal
           isOpen={showPayCodeModal}
           onClose={() => setShowPayCodeModal(false)}
           employee={formData}
           availablePayCodes={availablePayCodes}
-          currentPayCodeIds={
-            employeeMappings[formData.id]?.map((pc) => pc.id) || []
-          }
+          currentPayCodeDetails={employeeMappings[formData.id] || []}
           onAssociationComplete={async () => {
             await refreshPayCodeMappings();
             await refreshStaffs();
@@ -1719,6 +1796,23 @@ const StaffFormPage: React.FC = () => {
           }
           payCodeDetail={selectedJobPayCodeForEdit}
           onRatesSaved={async () => {
+            await refreshPayCodeMappings();
+            await refreshStaffs();
+          }}
+        />
+      )}
+      {/* Batch Manage Job Pay Codes Modal */}
+      {isEditMode && selectedJobForBatchManage && (
+        <BatchManageJobPayCodesModal
+          isOpen={showBatchManageJobPayCodesModal}
+          onClose={() => {
+            setShowBatchManageJobPayCodesModal(false);
+            setSelectedJobForBatchManage(null);
+          }}
+          job={selectedJobForBatchManage}
+          allPayCodes={availablePayCodes}
+          currentPayCodeDetails={jobPayCodeDetails[selectedJobForBatchManage.id] || []}
+          onComplete={async () => {
             await refreshPayCodeMappings();
             await refreshStaffs();
           }}
