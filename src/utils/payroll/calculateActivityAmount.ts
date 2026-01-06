@@ -29,6 +29,7 @@ export function calculateActivityAmount(
 
   switch (activity.rateUnit) {
     case "Hour":
+    case "Bill":
       // For overtime pay codes, use hoursApplied if provided (for monthly entries)
       // Otherwise calculate overtime as hours beyond threshold (for daily entries)
       // Saturday threshold: 5 hours, Other days: 8 hours

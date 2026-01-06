@@ -98,3 +98,20 @@ ON CONFLICT DO NOTHING;
 -- WHERE location_id IN ('03', '04') AND voucher_type = 'JVSL'
 --   AND mapping_type IN ('salary', 'overtime')
 -- ORDER BY location_id, mapping_type;
+
+-- ============================================================
+-- Part 5: Add 'Bill' Rate Unit to pay_codes Constraint
+-- Date: 2026-01-06
+-- Reason: Added 'Bill' as a new rate unit type that works
+--         identically to 'Hour' (hours-based calculation).
+--         Also added 'Trip' which was missing from the constraint.
+-- ============================================================
+
+ALTER TABLE pay_codes DROP CONSTRAINT pay_codes_rate_unit_check;
+ALTER TABLE pay_codes ADD CONSTRAINT pay_codes_rate_unit_check
+  CHECK (rate_unit IN ('Hour', 'Bill', 'Day', 'Bag', 'Trip', 'Fixed', 'Percent'));
+
+-- Verify constraint was updated:
+-- SELECT conname, pg_get_constraintdef(oid)
+-- FROM pg_constraint
+-- WHERE conname = 'pay_codes_rate_unit_check';

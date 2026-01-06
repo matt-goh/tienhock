@@ -129,7 +129,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             const activity = activitiesWithContext[i];
 
             // For salesman, deselect Hour-based pay codes
-            if (isSalesman && activity.rateUnit === "Hour") {
+            if (isSalesman && (activity.rateUnit === "Hour" || activity.rateUnit === "Bill")) {
               activity.isSelected = false;
               activity.calculatedAmount = 0;
               continue; // Skip to next activity
@@ -618,6 +618,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     activity.rateUnit !==
                                                       "Hour" &&
                                                     activity.rateUnit !==
+                                                      "Bill" &&
+                                                    activity.rateUnit !==
                                                       "Fixed" && (
                                                       <span className="text-default-500 dark:text-gray-400 ml-2">
                                                         •{" "}
@@ -630,8 +632,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     )}
                                                   {activity.payType ===
                                                     "Overtime" &&
-                                                    activity.rateUnit ===
-                                                      "Hour" && (
+                                                    (activity.rateUnit ===
+                                                      "Hour" || activity.rateUnit === "Bill") && (
                                                       <span className="ml-1 text-amber-600 dark:text-amber-400">
                                                         (Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
                                                       </span>

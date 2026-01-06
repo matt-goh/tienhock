@@ -216,6 +216,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       {/* Show units produced for non-Hour units or when explicitly available */}
                       {activity.unitsProduced !== null &&
                         activity.rateUnit !== "Hour" &&
+                        activity.rateUnit !== "Bill" &&
                         activity.rateUnit !== "Fixed" && (
                           <span className="text-default-500 dark:text-gray-400">
                             • {activity.unitsProduced}{" "}
@@ -225,7 +226,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                           </span>
                         )}
                       {activity.payType === "Overtime" &&
-                        activity.rateUnit === "Hour" && (
+                        (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") && (
                           <span
                             className="text-amber-600 dark:text-amber-400 truncate"
                             title={`(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
