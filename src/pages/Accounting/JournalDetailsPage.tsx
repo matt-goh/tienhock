@@ -16,11 +16,7 @@ import {
   IconFileText,
   IconPencil,
   IconTrash,
-    IconX,
-  IconCalendar,
-  IconHash,
-  IconFileDescription,
-  IconCategory,
+  IconX,
 } from "@tabler/icons-react";
 
 const JournalDetailsPage: React.FC = () => {
@@ -212,7 +208,7 @@ const JournalDetailsPage: React.FC = () => {
                   {getStatusBadge(entry.status)}
                 </div>
                 <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
-                  {getEntryTypeName(entry.entry_type)}
+                  {getEntryTypeName(entry.entry_type)} | {formatDate(entry.entry_date)} | {entry.description || "-"}
                 </p>
               </div>
             </div>
@@ -255,71 +251,6 @@ const JournalDetailsPage: React.FC = () => {
                   Delete
                 </Button>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Entry Details */}
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
-          <div className="grid grid-cols-4 gap-6">
-            {/* Reference No */}
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
-                <IconHash size={18} className="text-default-500 dark:text-gray-400" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wide">
-                  Reference No
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-default-900 dark:text-gray-100 font-mono">
-                  {entry.reference_no}
-                </p>
-              </div>
-            </div>
-
-            {/* Entry Type */}
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
-                <IconCategory size={18} className="text-default-500 dark:text-gray-400" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wide">
-                  Entry Type
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-default-900 dark:text-gray-100">
-                  {getEntryTypeName(entry.entry_type)}
-                </p>
-              </div>
-            </div>
-
-            {/* Date */}
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
-                <IconCalendar size={18} className="text-default-500 dark:text-gray-400" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wide">
-                  Entry Date
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-default-900 dark:text-gray-100">
-                  {formatDate(entry.entry_date)}
-                </p>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
-                <IconFileDescription size={18} className="text-default-500 dark:text-gray-400" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wide">
-                  Description
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-default-900 dark:text-gray-100">
-                  {entry.description || "-"}
-                </p>
-              </div>
             </div>
           </div>
         </div>
