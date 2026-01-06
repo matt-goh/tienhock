@@ -58,6 +58,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
   const rateUnitOptions = [
     { id: "Hour", name: "Hour" },
+    { id: "Bill", name: "Bill" },
     { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
     { id: "Trip", name: "Trip" },

@@ -127,7 +127,7 @@ export class PayrollCalculationService {
           // Determine quantity based on rate unit
           let quantity = 0;
           if (
-            activity.rate_unit === "Hour" &&
+            (activity.rate_unit === "Hour" || activity.rate_unit === "Bill") &&
             activity.hours_applied !== null
           ) {
             quantity = activity.hours_applied;
@@ -190,6 +190,7 @@ export class PayrollCalculationService {
     // Basic calculation based on rate unit
     switch (rate_unit) {
       case "Hour":
+      case "Bill":
       case "Day":
       case "Bag":
       case "Trip":

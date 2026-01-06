@@ -183,7 +183,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     // Create default activities from OFFICE pay codes
     const activities: ActivityItem[] = officePayCodes.map((pc) => {
       const rate = parseFloat(String(pc.override_rate_biasa || pc.rate_biasa || "0"));
-      const calculatedAmount = pc.rate_unit === "Hour"
+      const calculatedAmount = (pc.rate_unit === "Hour" || pc.rate_unit === "Bill")
         ? rate * DEFAULT_HOURS
         : pc.rate_unit === "Fixed"
         ? rate
@@ -195,7 +195,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         payType: pc.pay_type,
         rateUnit: pc.rate_unit,
         rate,
-        hoursApplied: pc.rate_unit === "Hour" ? DEFAULT_HOURS : 0,
+        hoursApplied: (pc.rate_unit === "Hour" || pc.rate_unit === "Bill") ? DEFAULT_HOURS : 0,
         calculatedAmount,
         isSelected: pc.pay_type === "Base",
       };
@@ -225,7 +225,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
 
       // Update activities calculations based on new hours
       const updatedActivities = entry.activities.map((activity) => {
-        if (activity.rateUnit === "Hour") {
+        if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
           const hours = field === "totalHours" ? value : entry.totalHours;
           return {
             ...activity,

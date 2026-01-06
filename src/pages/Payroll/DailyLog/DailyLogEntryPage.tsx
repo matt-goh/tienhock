@@ -1512,7 +1512,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // Auto-deselect Hour-based activities
           updatedActivities.forEach((activity, index) => {
-            if (activity.rateUnit === "Hour") {
+            if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
               updatedActivities[index] = {
                 ...activity,
                 isSelected: false,
@@ -2179,7 +2179,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Then add/override with employee-specific pay codes
           employeePayCodes.forEach((pc) => {
             // For salesman, skip Hour-based pay codes
-            if (isSalesmanJob && pc.rate_unit === "Hour") {
+            if (isSalesmanJob && (pc.rate_unit === "Hour" || pc.rate_unit === "Bill")) {
               return;
             }
             allPayCodes.set(pc.id, { ...pc, source: "employee" });
@@ -2276,7 +2276,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               }
 
               // Always deselect Hour-based pay codes for salesmen
-              if (isSalesmanJob && payCode.rate_unit === "Hour") {
+              if (isSalesmanJob && (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill")) {
                 isSelected = false;
               }
 
@@ -2536,7 +2536,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           isDefault: payCode.is_default_setting,
           isSelected: false, // Default to unselected for unsaved activities
           unitsProduced: payCode.requires_units_input ? 0 : undefined,
-          hoursApplied: payCode.rate_unit === "Hour" ? hours : null,
+          hoursApplied: (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") ? hours : null,
           calculatedAmount: calculateActivityAmount(
             {
               payCodeId: payCode.id,
@@ -2546,7 +2546,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               rate,
               isSelected: false,
               unitsProduced: payCode.requires_units_input ? 0 : undefined,
-              hoursApplied: payCode.rate_unit === "Hour" ? hours : null,
+              hoursApplied: (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") ? hours : null,
             },
             hours,
             formData.contextData,
