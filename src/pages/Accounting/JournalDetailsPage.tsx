@@ -111,7 +111,7 @@ const JournalDetailsPage: React.FC = () => {
     navigate(`/accounting/journal-entries/${id}/edit`);
   };
 
-    const handleConfirmCancel = async () => {
+  const handleConfirmCancel = async () => {
     if (!id) return;
 
     setIsProcessing(true);
@@ -122,7 +122,8 @@ const JournalDetailsPage: React.FC = () => {
       fetchEntry();
     } catch (err: unknown) {
       console.error("Error cancelling entry:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to cancel entry";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to cancel entry";
       toast.error(errorMessage);
     } finally {
       setIsProcessing(false);
@@ -140,7 +141,8 @@ const JournalDetailsPage: React.FC = () => {
       navigate("/accounting/journal-entries");
     } catch (err: unknown) {
       console.error("Error deleting entry:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete entry";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete entry";
       toast.error(errorMessage);
     } finally {
       setIsProcessing(false);
@@ -198,7 +200,10 @@ const JournalDetailsPage: React.FC = () => {
               <BackButton onClick={handleBack} />
               <div className="h-8 w-px bg-default-300 dark:bg-gray-600"></div>
               <div className="p-2 bg-sky-50 dark:bg-sky-900/30 rounded-lg">
-                <IconFileText size={24} className="text-sky-600 dark:text-sky-400" />
+                <IconFileText
+                  size={24}
+                  className="text-sky-600 dark:text-sky-400"
+                />
               </div>
               <div>
                 <div className="flex items-center gap-3">
@@ -208,7 +213,8 @@ const JournalDetailsPage: React.FC = () => {
                   {getStatusBadge(entry.status)}
                 </div>
                 <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
-                  {getEntryTypeName(entry.entry_type)} | {formatDate(entry.entry_date)} | {entry.description || "-"}
+                  {getEntryTypeName(entry.entry_type)} |{" "}
+                  {formatDate(entry.entry_date)} | {entry.description || "-"}
                 </p>
               </div>
             </div>
@@ -227,7 +233,7 @@ const JournalDetailsPage: React.FC = () => {
                   Edit
                 </Button>
               )}
-                            {canCancel && (
+              {canCancel && (
                 <Button
                   onClick={() => setShowCancelDialog(true)}
                   variant="outline"
@@ -303,10 +309,14 @@ const JournalDetailsPage: React.FC = () => {
                         {line.particulars || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
-                        {line.debit_amount > 0 ? formatAmount(line.debit_amount) : "-"}
+                        {line.debit_amount > 0
+                          ? formatAmount(line.debit_amount)
+                          : "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
-                        {line.credit_amount > 0 ? formatAmount(line.credit_amount) : "-"}
+                        {line.credit_amount > 0
+                          ? formatAmount(line.credit_amount)
+                          : "-"}
                       </td>
                     </tr>
                   ))
@@ -323,7 +333,10 @@ const JournalDetailsPage: React.FC = () => {
               </tbody>
               <tfoot>
                 <tr className="bg-default-100 dark:bg-gray-900/50 font-semibold">
-                  <td colSpan={4} className="px-4 py-3 text-sm text-right text-default-700 dark:text-gray-300">
+                  <td
+                    colSpan={4}
+                    className="px-4 py-3 text-sm text-right text-default-700 dark:text-gray-300"
+                  >
                     Total
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
