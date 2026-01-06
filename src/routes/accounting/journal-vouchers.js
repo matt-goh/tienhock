@@ -914,7 +914,8 @@ export default function (pool) {
       });
 
       const staffAccruals = mappingsByLocation["JVSL_00"] || {};
-      const entryDate = new Date(yearInt, monthInt - 1, 1).toISOString().split("T")[0];
+      // Use direct string formatting to avoid timezone issues with Date.toISOString()
+      const entryDate = `${yearInt}-${monthStr}-01`;
 
       // Generate JVDR if requested
       if (voucher_types.includes("JVDR")) {
@@ -1004,6 +1005,15 @@ export default function (pool) {
               );
             }
 
+            // Calculate and update totals
+            const jvdrTotalDebit = debitLines.reduce((sum, l) => sum + l.amount, 0);
+            const jvdrTotalCredit = directorResult.rows.reduce((sum, d) => sum + (parseFloat(d.net_pay) || 0), 0)
+              + otherCreditLines.reduce((sum, l) => sum + l.amount, 0);
+            await client.query(
+              `UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3`,
+              [jvdrTotalDebit, jvdrTotalCredit, entryId]
+            );
+
             results.jvdr = { created: true, id: entryId, reference: jvdrRef };
           } else {
             results.jvdr = { skipped: true, message: "No director salary data for this month" };
@@ -1037,6 +1047,7 @@ export default function (pool) {
             let lineNumber = 1;
             let totalSalary = 0, totalEpf = 0, totalSocso = 0, totalSip = 0, totalPcb = 0, totalNet = 0;
             let totalCommissionMee = 0, totalCommissionBh = 0, totalCutiTahunan = 0;
+            let jvslTotalDebit = 0;
 
             // Insert debit lines for each location
             for (const location of staffData) {
@@ -1085,6 +1096,7 @@ export default function (pool) {
                    VALUES ($1, $2, $3, $4, $5, $6)`,
                   [entryId, lineNumber++, line.account, line.amount, 0, line.desc]
                 );
+                jvslTotalDebit += line.amount;
               }
             }
 
@@ -1104,6 +1116,13 @@ export default function (pool) {
                 [entryId, lineNumber++, line.account, 0, line.amount, line.desc]
               );
             }
+
+            // Calculate and update totals
+            const jvslTotalCredit = creditLines.reduce((sum, l) => sum + l.amount, 0);
+            await client.query(
+              `UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3`,
+              [jvslTotalDebit, jvslTotalCredit, entryId]
+            );
 
             results.jvsl = { created: true, id: entryId, reference: jvslRef };
           } else {
