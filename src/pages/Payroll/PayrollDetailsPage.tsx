@@ -348,10 +348,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {item.rate_unit === "Percent"
             ? `${item.rate}%`
+            : item.rate_unit === "Fixed" && item.total_quantity > 1
+            ? "Fixed"
             : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.total_quantity}
+          {item.rate_unit === "Fixed" && item.total_quantity > 1
+            ? formatCurrency(item.total_quantity)
+            : item.total_quantity}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
           {formatCurrency(item.total_amount)}
@@ -427,10 +431,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {item.rate_unit === "Percent"
             ? `${item.rate}%`
+            : item.rate_unit === "Fixed" && item.quantity > 1
+            ? "Fixed"
             : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.quantity}
+          {item.rate_unit === "Fixed" && item.quantity > 1
+            ? formatCurrency(item.quantity)
+            : item.quantity}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
           {formatCurrency(item.amount)}

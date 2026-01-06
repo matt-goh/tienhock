@@ -605,8 +605,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                       @ {activity.rate}%
                                                     </span>
                                                   )}
+                                                  {/* For Fixed: only show base rate if no units provided */}
                                                   {activity.rateUnit ===
-                                                    "Fixed" && (
+                                                    "Fixed" &&
+                                                    !(activity.unitsProduced !== null && activity.unitsProduced !== undefined && activity.unitsProduced > 0) && (
                                                     <span className="ml-1">
                                                       @ RM
                                                       {activity.rate.toFixed(2)}
@@ -615,19 +617,18 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   {/* Show units produced for non-Hour units or when explicitly available */}
                                                   {activity.unitsProduced !==
                                                     null &&
+                                                    activity.unitsProduced !==
+                                                      undefined &&
+                                                    activity.unitsProduced > 0 &&
                                                     activity.rateUnit !==
                                                       "Hour" &&
                                                     activity.rateUnit !==
-                                                      "Bill" &&
-                                                    activity.rateUnit !==
-                                                      "Fixed" && (
+                                                      "Bill" && (
                                                       <span className="text-default-500 dark:text-gray-400 ml-2">
                                                         •{" "}
-                                                        {activity.unitsProduced}{" "}
-                                                        {activity.rateUnit ===
-                                                        "Percent"
-                                                          ? "Units"
-                                                          : activity.rateUnit}
+                                                        {activity.rateUnit === "Fixed"
+                                                          ? `RM${activity.unitsProduced.toFixed(2)}`
+                                                          : `${activity.unitsProduced} ${activity.rateUnit === "Percent" ? "Units" : activity.rateUnit}`}
                                                       </span>
                                                     )}
                                                   {activity.payType ===
@@ -645,6 +646,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                               {activity.rateUnit === "Bag" ||
                                               activity.rateUnit === "Trip" ||
                                               activity.rateUnit === "Day" ||
+                                              activity.rateUnit === "Fixed" ||
                                               (activity.rateUnit ===
                                                 "Percent" &&
                                                 activity.isContextLinked) ? (
@@ -683,7 +685,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                     /* Standard input for non-salesman units */
                                                     <input
                                                       type="number"
-                                                      className={`w-16 text-center border border-gray-300 dark:border-gray-600 rounded p-1 pl-4 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 ${
+                                                      className={`${activity.rateUnit === "Fixed" ? "w-20" : "w-16"} text-center border border-gray-300 dark:border-gray-600 rounded p-1 pl-4 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 ${
                                                         activity.isContextLinked
                                                           ? "bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
                                                           : "disabled:bg-gray-100 dark:disabled:bg-gray-700"
@@ -706,7 +708,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                         activity.isContextLinked
                                                       }
                                                       min="0"
-                                                      step="1"
+                                                      step={activity.rateUnit === "Fixed" ? "0.01" : "1"}
                                                       readOnly={
                                                         activity.isContextLinked
                                                       }

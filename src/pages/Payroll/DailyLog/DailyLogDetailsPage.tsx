@@ -529,20 +529,23 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                             Job
                                           </span>
                                         )}
-                                        <span className="text-default-500 dark:text-gray-400 ml-2">
-                                          •{" "}
-                                          {activity.rate_unit === "Percent"
-                                            ? `${activity.rate_used}%`
-                                            : `RM${activity.rate_used}`}
-                                        </span>
+                                        {/* For Fixed: only show base rate if no units provided */}
+                                        {!(activity.rate_unit === "Fixed" && activity.units_produced !== null && activity.units_produced > 0) && (
+                                          <span className="text-default-500 dark:text-gray-400 ml-2">
+                                            •{" "}
+                                            {activity.rate_unit === "Percent"
+                                              ? `${activity.rate_used}%`
+                                              : `RM${activity.rate_used}`}
+                                          </span>
+                                        )}
                                         {activity.units_produced !== null &&
+                                          activity.units_produced > 0 &&
                                           activity.rate_unit !== "Hour" &&
                                           activity.rate_unit !== "Bill" && (
                                             <span className="text-default-500 dark:text-gray-400 ml-2">
-                                              • {activity.units_produced}{" "}
-                                              {activity.rate_unit === "Percent"
-                                                ? "Units"
-                                                : activity.rate_unit}
+                                              • {activity.rate_unit === "Fixed"
+                                                ? `RM${activity.units_produced.toFixed(2)}`
+                                                : `${activity.units_produced} ${activity.rate_unit === "Percent" ? "Units" : activity.rate_unit}`}
                                             </span>
                                           )}
                                       </div>
