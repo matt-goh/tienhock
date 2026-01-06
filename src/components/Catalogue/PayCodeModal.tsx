@@ -58,6 +58,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
   const rateUnitOptions = [
     { id: "Hour", name: "Hour" },
+    { id: "Bill", name: "Bill" },
     { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
     { id: "Trip", name: "Trip" },
@@ -133,9 +134,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     (name: keyof Omit<PayCode, "code">) => (value: string) => {
       if (
         name === "rate_unit" &&
-        ["Percent", "Trip", "Day", "Bag"].includes(value)
+        ["Percent", "Trip", "Day", "Bag", "Fixed"].includes(value)
       ) {
-        // When rate unit is Percent, Trip, Day, or Bag, automatically set requires_units_input to true
+        // When rate unit is Percent, Trip, Day, Bag, or Fixed, automatically set requires_units_input to true
         setFormData((prev) => ({
           ...prev,
           [name]: value as RateUnit,
@@ -422,8 +423,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     <div className="flex items-center space-x-2">
                       <Checkbox
                       checked={
-                        formData.rate_unit === "Hour" ||
-                        formData.rate_unit === "Fixed"
+                        formData.rate_unit === "Hour"
                         ? false
                         : !!formData.requires_units_input
                       }
@@ -431,7 +431,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       size={20}
                       checkedColor="text-sky-600"
                       uncheckedColor="text-default-400"
-                      // Disable for Percent, Bag, Day, Trip, Hour, and Fixed
+                      // Disable for Percent, Bag, Day, Trip, Hour, and Fixed (auto-managed)
                       disabled={
                         isSaving ||
                         formData.rate_unit === "Percent" ||
@@ -454,7 +454,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         : formData.rate_unit === "Hour"
                         ? "Requires Units Input (Not Applicable for Hour)"
                         : formData.rate_unit === "Fixed"
-                        ? "Requires Units Input (Not Applicable for Fixed Amount)"
+                        ? "Requires Units Input (Units = Direct Amount)"
                         : "Requires Units Input"
                       }
                       />

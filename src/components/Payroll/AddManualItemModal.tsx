@@ -473,7 +473,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     step={
-                      selectedPayCodeDetails?.rate_unit === "Hour" ? "0.5" : "1"
+                      (selectedPayCodeDetails?.rate_unit === "Hour" || selectedPayCodeDetails?.rate_unit === "Bill") ? "0.5" : "1"
                     }
                     min={0}
                     required

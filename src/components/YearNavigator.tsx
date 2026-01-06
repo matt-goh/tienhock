@@ -101,7 +101,7 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
 
         {/* Year Display - Clickable when not current year */}
         {isCurrentYear ? (
-          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-700")}>
+          <div className={clsx(displayClasses, "bg-default-50 dark:bg-gray-900/50")}>
             {selectedYear}
           </div>
         ) : (
@@ -109,7 +109,7 @@ const YearNavigator: React.FC<YearNavigatorProps> = ({
             onClick={goToCurrentYear}
             className={clsx(
               displayClasses,
-              "bg-default-50 dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900 hover:border-sky-300 dark:hover:border-sky-600 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
+              "bg-default-50 dark:bg-gray-900/50 hover:bg-sky-50 dark:hover:bg-sky-900 hover:border-sky-300 dark:hover:border-sky-600 hover:text-sky-700 dark:hover:text-sky-300 cursor-pointer"
             )}
             title="Click to go to current year"
             aria-label="Go to current year"

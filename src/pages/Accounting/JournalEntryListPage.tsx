@@ -1,6 +1,6 @@
 // src/pages/Accounting/JournalEntryListPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { JournalEntry } from "../../types/types";
@@ -16,9 +16,9 @@ import {
   IconSearch,
   IconPencil,
   IconTrash,
-  IconEye,
   IconCheck,
   IconRefresh,
+  IconX,
 } from "@tabler/icons-react";
 import {
   Listbox,
@@ -32,8 +32,81 @@ interface JournalEntryListItem extends JournalEntry {
   entry_type_name?: string;
 }
 
+const STORAGE_KEY = "journalEntryListDateRange";
+
+// Load cached date range from localStorage
+const loadCachedDateRange = (): { start: Date; end: Date } => {
+  try {
+    const cached = localStorage.getItem(STORAGE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return {
+        start: new Date(parsed.start),
+        end: new Date(parsed.end),
+      };
+    }
+  } catch (e) {
+    console.error("Error loading cached date range:", e);
+  }
+  return { start: new Date(), end: new Date() };
+};
+
+// Helper to parse URL params and return initial state
+const getInitialStateFromParams = (params: URLSearchParams): {
+  search: string;
+  type: string;
+  dateRange: { start: Date; end: Date };
+  selectedMonth: Date;
+} => {
+  const urlSearch = params.get("search");
+  const urlType = params.get("type");
+  const urlYear = params.get("year");
+  const urlMonth = params.get("month");
+  const urlDate = params.get("date");
+
+  // If we have year/month params, use them for date range
+  if (urlYear && urlMonth) {
+    const year = parseInt(urlYear);
+    const month = parseInt(urlMonth) - 1; // JS months are 0-indexed
+    const startDate = new Date(year, month, 1);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(year, month + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+    return {
+      search: urlSearch || "",
+      type: urlType || "All",
+      dateRange: { start: startDate, end: endDate },
+      selectedMonth: startDate,
+    };
+  }
+
+  // If we have a specific date param
+  if (urlDate) {
+    const date = new Date(urlDate);
+    date.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(urlDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    return {
+      search: urlSearch || "",
+      type: urlType || "All",
+      dateRange: { start: date, end: endOfDay },
+      selectedMonth: date,
+    };
+  }
+
+  // Fall back to cached date range
+  const cached = loadCachedDateRange();
+  return {
+    search: urlSearch || "",
+    type: urlType || "All",
+    dateRange: cached,
+    selectedMonth: cached.start,
+  };
+};
+
 const JournalEntryListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Cached entry types
   const { entryTypes } = useJournalEntryTypesCache();
@@ -42,16 +115,28 @@ const JournalEntryListPage: React.FC = () => {
   const [entries, setEntries] = useState<JournalEntryListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
-  // Filters
+  // Filters - load date range from cache initially
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
-  const [dateRange, setDateRange] = useState({
-    start: new Date(),
-    end: new Date(),
-  });
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [dateRange, setDateRange] = useState(loadCachedDateRange);
+  const [selectedMonth, setSelectedMonth] = useState<Date>(
+    () => loadCachedDateRange().start
+  );
+
+  // Apply URL params on mount
+  useEffect(() => {
+    if (!initialized) {
+      const initialState = getInitialStateFromParams(searchParams);
+      setSearchTerm(initialState.search);
+      setSelectedType(initialState.type);
+      setDateRange(initialState.dateRange);
+      setSelectedMonth(initialState.selectedMonth);
+      setInitialized(true);
+    }
+  }, [searchParams, initialized]);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -59,7 +144,8 @@ const JournalEntryListPage: React.FC = () => {
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [entryToDelete, setEntryToDelete] = useState<JournalEntryListItem | null>(null);
+  const [entryToDelete, setEntryToDelete] =
+    useState<JournalEntryListItem | null>(null);
 
   // Helper function to format a Date object into 'YYYY-MM-DD' string in local time
   const formatDateForAPI = (date: Date): string => {
@@ -102,11 +188,16 @@ const JournalEntryListPage: React.FC = () => {
 
       if (searchTerm) params.append("search", searchTerm);
       if (selectedType !== "All") params.append("entry_type", selectedType);
-      if (selectedStatus !== "All") params.append("status", selectedStatus.toLowerCase());
-      if (dateRange.start) params.append("start_date", formatDateForAPI(dateRange.start));
-      if (dateRange.end) params.append("end_date", formatDateForAPI(dateRange.end));
+      if (selectedStatus !== "All")
+        params.append("status", selectedStatus.toLowerCase());
+      if (dateRange.start)
+        params.append("start_date", formatDateForAPI(dateRange.start));
+      if (dateRange.end)
+        params.append("end_date", formatDateForAPI(dateRange.end));
 
-      const response = await api.get(`/api/journal-entries?${params.toString()}`);
+      const response = await api.get(
+        `/api/journal-entries?${params.toString()}`
+      );
       const data = response as {
         entries: JournalEntryListItem[];
         total: number;
@@ -131,6 +222,21 @@ const JournalEntryListPage: React.FC = () => {
     setPage(1);
   }, [searchTerm, selectedType, selectedStatus, dateRange]);
 
+  // Cache date range to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          start: dateRange.start.toISOString(),
+          end: dateRange.end.toISOString(),
+        })
+      );
+    } catch (e) {
+      console.error("Error caching date range:", e);
+    }
+  }, [dateRange]);
+
   // Handlers
   const handleCreateNew = () => {
     navigate("/accounting/journal-entries/new");
@@ -141,15 +247,14 @@ const JournalEntryListPage: React.FC = () => {
   };
 
   const handleEdit = (entry: JournalEntryListItem) => {
-    navigate(`/accounting/journal-entries/${entry.id}`);
+    navigate(`/accounting/journal-entries/${entry.id}/edit`);
   };
 
-  const handleDeleteClick = (entry: JournalEntryListItem, e: React.MouseEvent) => {
+  const handleDeleteClick = (
+    entry: JournalEntryListItem,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
-    if (entry.status === "cancelled") {
-      toast.error("Cancelled entries cannot be deleted");
-      return;
-    }
     setEntryToDelete(entry);
     setShowDeleteDialog(true);
   };
@@ -165,7 +270,8 @@ const JournalEntryListPage: React.FC = () => {
       fetchEntries();
     } catch (error: unknown) {
       console.error("Error deleting entry:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete entry";
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete entry";
       toast.error(errorMessage);
     }
   };
@@ -174,9 +280,6 @@ const JournalEntryListPage: React.FC = () => {
     setSearchTerm("");
     setSelectedType("All");
     setSelectedStatus("All");
-    const today = new Date();
-    setDateRange({ start: today, end: today });
-    setSelectedMonth(today);
   };
 
   // Format date for display
@@ -199,18 +302,16 @@ const JournalEntryListPage: React.FC = () => {
 
   // Status badge
   const getStatusBadge = (status: string) => {
-    const styles = {
-      active: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
-    };
-    const displayStatus = status === "cancelled" ? "Cancelled" : "Active";
+    const isCancelled = status === "cancelled";
     return (
       <span
         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          styles[status as keyof typeof styles] || "bg-green-100 text-green-800"
+          isCancelled
+            ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+            : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
         }`}
       >
-        {displayStatus}
+        {isCancelled ? "Cancelled" : "Active"}
       </span>
     );
   };
@@ -224,10 +325,23 @@ const JournalEntryListPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4">
         {/* Title */}
         <div>
-          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">Journal Entries</h1>
-          <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
-            Manage accounting journal entries
-          </p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
+              Journal Entries
+            </h1>
+            <span className="text-default-400 dark:text-gray-500">|</span>
+            <span className="text-sm text-default-600 dark:text-gray-300">
+              Showing{" "}
+              <span className="font-medium text-default-900 dark:text-gray-100">
+                {entries.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-default-900 dark:text-gray-100">
+                {total}
+              </span>{" "}
+              entries
+            </span>
+          </div>
         </div>
 
         {/* Date Controls and Actions */}
@@ -284,15 +398,26 @@ const JournalEntryListPage: React.FC = () => {
             <input
               type="text"
               placeholder="Search reference or description..."
-              className="w-full rounded-lg border border-default-300 dark:border-gray-600 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100"
+              className="w-full rounded-lg border border-default-300 dark:border-gray-600 py-2 pl-10 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+                title="Clear search"
+              >
+                <IconX size={16} />
+              </button>
+            )}
           </div>
 
           {/* Type Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-default-600 dark:text-gray-300">Type:</span>
+            <span className="text-sm text-default-600 dark:text-gray-300">
+              Type:
+            </span>
             <Listbox value={selectedType} onChange={setSelectedType}>
               <div className="relative w-48">
                 <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 text-default-800 dark:text-gray-100">
@@ -306,13 +431,19 @@ const JournalEntryListPage: React.FC = () => {
                     value="All"
                     className={({ active }) =>
                       `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                        active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100" : "text-gray-900 dark:text-gray-100"
+                        active
+                          ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100"
+                          : "text-gray-900 dark:text-gray-100"
                       }`
                     }
                   >
                     {({ selected }) => (
                       <>
-                        <span className={`block truncate ${selected ? "font-medium" : ""}`}>
+                        <span
+                          className={`block truncate ${
+                            selected ? "font-medium" : ""
+                          }`}
+                        >
                           All
                         </span>
                         {selected && (
@@ -329,13 +460,19 @@ const JournalEntryListPage: React.FC = () => {
                       value={type.code}
                       className={({ active }) =>
                         `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                          active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100" : "text-gray-900 dark:text-gray-100"
+                          active
+                            ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100"
+                            : "text-gray-900 dark:text-gray-100"
                         }`
                       }
                     >
                       {({ selected }) => (
                         <>
-                          <span className={`block truncate ${selected ? "font-medium" : ""}`}>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : ""
+                            }`}
+                          >
                             {type.code} - {type.name}
                           </span>
                           {selected && (
@@ -354,7 +491,9 @@ const JournalEntryListPage: React.FC = () => {
 
           {/* Status Filter */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-default-600 dark:text-gray-300">Status:</span>
+            <span className="text-sm text-default-600 dark:text-gray-300">
+              Status:
+            </span>
             <Listbox value={selectedStatus} onChange={setSelectedStatus}>
               <div className="relative w-32">
                 <ListboxButton className="relative w-full cursor-pointer rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 text-default-800 dark:text-gray-100">
@@ -370,13 +509,19 @@ const JournalEntryListPage: React.FC = () => {
                       value={status}
                       className={({ active }) =>
                         `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
-                          active ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100" : "text-gray-900 dark:text-gray-100"
+                          active
+                            ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-100"
+                            : "text-gray-900 dark:text-gray-100"
                         }`
                       }
                     >
                       {({ selected }) => (
                         <>
-                          <span className={`block truncate ${selected ? "font-medium" : ""}`}>
+                          <span
+                            className={`block truncate ${
+                              selected ? "font-medium" : ""
+                            }`}
+                          >
                             {status}
                           </span>
                           {selected && (
@@ -403,22 +548,6 @@ const JournalEntryListPage: React.FC = () => {
             Clear
           </button>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="mb-4 flex items-center justify-between text-sm text-default-600 dark:text-gray-300">
-        <span>
-          Showing{" "}
-          <span className="font-medium text-default-900 dark:text-gray-100">
-            {entries.length}
-          </span>{" "}
-          of <span className="font-medium text-default-900 dark:text-gray-100">{total}</span> entries
-        </span>
-        {totalPages > 1 && (
-          <span>
-            Page {page} of {totalPages}
-          </span>
-        )}
       </div>
 
       {/* Table */}
@@ -498,16 +627,6 @@ const JournalEntryListPage: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleView(entry);
-                          }}
-                          className="text-default-600 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400"
-                          title="View"
-                        >
-                          <IconEye size={18} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
                             handleEdit(entry);
                           }}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
@@ -515,15 +634,13 @@ const JournalEntryListPage: React.FC = () => {
                         >
                           <IconPencil size={18} />
                         </button>
-                        {entry.status !== "cancelled" && (
-                          <button
-                            onClick={(e) => handleDeleteClick(entry, e)}
-                            className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                            title="Delete"
-                          >
-                            <IconTrash size={18} />
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => handleDeleteClick(entry, e)}
+                          className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                          title="Delete"
+                        >
+                          <IconTrash size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -535,7 +652,9 @@ const JournalEntryListPage: React.FC = () => {
                     className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
                     No journal entries found.{" "}
-                    {(searchTerm || selectedType !== "All" || selectedStatus !== "All") && (
+                    {(searchTerm ||
+                      selectedType !== "All" ||
+                      selectedStatus !== "All") && (
                       <span>Try adjusting your filters or </span>
                     )}
                     <button

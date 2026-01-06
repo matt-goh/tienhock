@@ -260,8 +260,15 @@ export default function (pool) {
       const processedData = result.rows.map((row, index) => {
         const gaji = parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        const gajiBersih = parseFloat(row.net_pay || 0) + parseFloat(row.commission_total || 0);
-        const jumlah = gajiBersih - parseFloat(row.mid_month_amount || 0);
+        // Commission and bonus from commission_records are advances already deducted from net_pay in DB
+        const commissionAdvance = parseFloat(row.commission_total || 0) + parseFloat(row.bonus_total || 0);
+        // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
+        const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
+        // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
+        const jumlah = parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
+        // Rounding: DIGENAPKAN rounds up to nearest whole ringgit
+        const setelah_digenapkan = Math.ceil(jumlah);
+        const digenapkan = setelah_digenapkan - jumlah;
 
         return {
           no: index + 1,
@@ -291,8 +298,8 @@ export default function (pool) {
           gaji_bersih: gajiBersih,
           setengah_bulan: parseFloat(row.mid_month_amount || 0),
           jumlah: jumlah,
-          jumlah_digenapkan: 0, // Empty in new system
-          setelah_digenapkan: jumlah, // Same as jumlah
+          digenapkan: digenapkan,
+          setelah_digenapkan: setelah_digenapkan,
           cuti_tahunan_amount: parseFloat(row.cuti_tahunan_amount || 0),
           // Bank/Pinjam tab data
           gaji_genap: parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0),
@@ -311,7 +318,7 @@ export default function (pool) {
         gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
         epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
         sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
-        setengah_bulan: 0, jumlah: 0, jumlah_digenapkan: 0, setelah_digenapkan: 0
+        setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
       };
       const processedUniqueEmployees = new Set(); // Track unique employees for grand totals
 
@@ -326,7 +333,7 @@ export default function (pool) {
             gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
             epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
             sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
-            setengah_bulan: 0, jumlah: 0, jumlah_digenapkan: 0, setelah_digenapkan: 0
+            setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
           }
         };
       });
@@ -427,8 +434,6 @@ export default function (pool) {
               gaji_bersih: commAmount,
               setengah_bulan: midMonthAmount,
               jumlah: jumlah,
-              jumlah_digenapkan: 0,
-              setelah_digenapkan: jumlah,
               // For Bank/Pinjam tabs
               gaji_genap: commAmount - midMonthAmount,
               total_pinjam: 0,
@@ -443,7 +448,6 @@ export default function (pool) {
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.setengah_bulan += midMonthAmount;
             locationData[locCode].totals.jumlah += jumlah;
-            locationData[locCode].totals.setelah_digenapkan += jumlah;
 
             // Track commission-only employees for main data response
             if (!hasRegularPayroll) {
@@ -457,14 +461,12 @@ export default function (pool) {
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.setengah_bulan += midMonthAmount;
                 grandTotals.jumlah += jumlah;
-                grandTotals.setelah_digenapkan += jumlah;
               } else {
                 // Update existing commission-only employee
                 existingCommOnly.comm += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
                 existingCommOnly.jumlah = existingCommOnly.gaji_bersih - existingCommOnly.setengah_bulan;
-                existingCommOnly.setelah_digenapkan = existingCommOnly.jumlah;
                 existingCommOnly.gaji_genap = existingCommOnly.gaji_bersih - existingCommOnly.mid_month_amount;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
@@ -473,7 +475,6 @@ export default function (pool) {
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.jumlah += commAmount;
-                grandTotals.setelah_digenapkan += commAmount;
               }
             }
           } else {
@@ -482,13 +483,11 @@ export default function (pool) {
             existingEmployee.gaji_kasar += commAmount;
             existingEmployee.gaji_bersih += commAmount;
             existingEmployee.jumlah = existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
-            existingEmployee.setelah_digenapkan = existingEmployee.jumlah;
 
             locationData[locCode].totals.comm += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.jumlah += commAmount;
-            locationData[locCode].totals.setelah_digenapkan += commAmount;
           }
         }
       });
@@ -504,14 +503,12 @@ export default function (pool) {
             sip_majikan: 0, sip_pekerja: 0, pcb: 0,
             gaji_kasar: emp.cuti_tahunan_amount,
             gaji_bersih: emp.cuti_tahunan_amount,
-            jumlah: emp.cuti_tahunan_amount,
-            setelah_digenapkan: emp.cuti_tahunan_amount
+            jumlah: emp.cuti_tahunan_amount
           });
           locationData["23"].totals.comm += emp.cuti_tahunan_amount;
           locationData["23"].totals.gaji_kasar += emp.cuti_tahunan_amount;
           locationData["23"].totals.gaji_bersih += emp.cuti_tahunan_amount;
           locationData["23"].totals.jumlah += emp.cuti_tahunan_amount;
-          locationData["23"].totals.setelah_digenapkan += emp.cuti_tahunan_amount;
         }
       });
 
@@ -572,6 +569,57 @@ export default function (pool) {
           locations: locationsArray,
           grand_totals: grandTotals
         },
+        // Individual employees data for Employee tab (deduplicated, sorted by name)
+        employees: (() => {
+          const seenEmployees = new Set();
+          const result = [];
+
+          // Add regular payroll employees
+          processedData.forEach(emp => {
+            if (!seenEmployees.has(emp.staff_id)) {
+              seenEmployees.add(emp.staff_id);
+              result.push(emp);
+            }
+          });
+
+          // Add commission-only employees
+          commissionOnlyEmployees.forEach(emp => {
+            if (!seenEmployees.has(emp.staff_id)) {
+              seenEmployees.add(emp.staff_id);
+              result.push(emp);
+            }
+          });
+
+          // Sort by staff_name alphabetically
+          result.sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
+
+          // Return with row numbers
+          return result.map((emp, index) => ({
+            no: index + 1,
+            employee_payroll_id: emp.employee_payroll_id,
+            staff_id: emp.staff_id,
+            staff_name: emp.staff_name,
+            gaji: emp.gaji,
+            ot: emp.ot,
+            bonus: emp.bonus,
+            comm: emp.comm,
+            gaji_kasar: emp.gaji_kasar,
+            epf_majikan: emp.epf_majikan,
+            epf_pekerja: emp.epf_pekerja,
+            socso_majikan: emp.socso_majikan,
+            socso_pekerja: emp.socso_pekerja,
+            sip_majikan: emp.sip_majikan,
+            sip_pekerja: emp.sip_pekerja,
+            pcb: emp.pcb,
+            gaji_bersih: emp.gaji_bersih,
+            setengah_bulan: emp.setengah_bulan,
+            jumlah: emp.jumlah,
+            digenapkan: emp.digenapkan,
+            setelah_digenapkan: emp.setelah_digenapkan,
+          }));
+        })(),
+        // Grand totals for the Employee tab
+        employees_grand_totals: grandTotals,
         // Bank table data (unique employees only - avoid duplicates from dual-location)
         // Include both regular payroll and commission-only employees
         bank_data: (() => {
