@@ -3,6 +3,7 @@ import express from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
+import { uploadBackupToS3 } from '../../utils/s3-backup.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -203,6 +204,12 @@ export default function backupRouter(pool) {
 
       const { stdout, stderr } = await executeCommand(command);
       if (stderr) console.error('Backup stderr:', stderr);
+
+      // Upload to S3 (fire-and-forget, doesn't block response)
+      uploadBackupToS3(backupPath, backupFilename, env)
+        .then(() => console.log(`[S3 Backup] Synced: ${backupFilename}`))
+        .catch(err => console.warn(`[S3 Backup] Skipped or failed: ${err.message}`));
+
       res.json({ message: 'Backup created successfully' });
     } catch (error) {
       console.error('Backup failed:', error);

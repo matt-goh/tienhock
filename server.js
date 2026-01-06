@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";
 import { checkAndProcessDueConsolidations } from "./src/utils/invoice/autoConsolidation.js";
+import { createAutoBackup, syncLocalToS3, deleteOldS3Backups } from "./src/utils/s3-backup.js";
 
 dotenv.config();
 
@@ -106,6 +107,56 @@ cron.schedule(
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error in auto-consolidation job:`,
+        error
+      );
+    }
+  },
+  {
+    scheduled: true,
+    timezone: "UTC",
+  }
+);
+
+// --- Weekly automatic backup ---
+cron.schedule(
+  "0 3 * * 0", // Run every Sunday at 3:00 AM UTC (11:00 AM Malaysia time)
+  async () => {
+    console.log(`[${new Date().toISOString()}] Starting weekly automatic backup...`);
+    try {
+      await createAutoBackup();
+      console.log(`[${new Date().toISOString()}] Weekly automatic backup completed`);
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error in weekly backup job:`,
+        error
+      );
+    }
+  },
+  {
+    scheduled: true,
+    timezone: "UTC",
+  }
+);
+
+// --- Daily S3 backup sync (safety net) ---
+cron.schedule(
+  "0 2 * * *", // Run daily at 2:00 AM UTC (10:00 AM Malaysia time)
+  async () => {
+    console.log(`[${new Date().toISOString()}] Starting daily S3 backup sync...`);
+    try {
+      const env = process.env.NODE_ENV || "development";
+      const backupDir = `/var/backups/postgres/${env}`;
+
+      // Sync local backups to S3
+      await syncLocalToS3(backupDir, env);
+
+      // Clean up old S3 backups (3 years = 1095 days)
+      await deleteOldS3Backups(env, 1095);
+
+      console.log(`[${new Date().toISOString()}] Daily S3 backup sync completed`);
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error in S3 sync job:`,
         error
       );
     }
