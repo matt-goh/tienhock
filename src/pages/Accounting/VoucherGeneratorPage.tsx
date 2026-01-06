@@ -38,6 +38,7 @@ interface VoucherLocation {
 interface VoucherData {
   reference: string;
   exists: boolean;
+  entry_id: number | null;
   locations: VoucherLocation[];
   totals?: {
     salary: number;
@@ -155,12 +156,11 @@ const VoucherGeneratorPage: React.FC = () => {
     }).format(amount);
   };
 
-  const handleViewEntry = (reference: string, entryType?: string) => {
-    // Navigate to journal entry list with search, date, and type params for this reference
-    const year = selectedMonth.getFullYear();
-    const month = selectedMonth.getMonth() + 1;
-    const typeParam = entryType ? `&type=${entryType}` : "";
-    navigate(`/accounting/journal-entries?search=${encodeURIComponent(reference)}&year=${year}&month=${month}${typeParam}`);
+  const handleViewEntry = (entryId: number | null) => {
+    if (entryId) {
+      // Navigate directly to the journal entry details page
+      navigate(`/accounting/journal-entries/${entryId}`);
+    }
   };
 
   return (
@@ -228,7 +228,7 @@ const VoucherGeneratorPage: React.FC = () => {
                         Generated
                       </span>
                       <Button
-                        onClick={() => handleViewEntry(previewData.jvdr.reference, "JVDR")}
+                        onClick={() => handleViewEntry(previewData.jvdr.entry_id)}
                         color="default"
                         variant="outline"
                         icon={IconExternalLink}
@@ -353,7 +353,7 @@ const VoucherGeneratorPage: React.FC = () => {
                         Generated
                       </span>
                       <Button
-                        onClick={() => handleViewEntry(previewData.jvsl.reference, "JVSL")}
+                        onClick={() => handleViewEntry(previewData.jvsl.entry_id)}
                         color="default"
                         variant="outline"
                         icon={IconExternalLink}
