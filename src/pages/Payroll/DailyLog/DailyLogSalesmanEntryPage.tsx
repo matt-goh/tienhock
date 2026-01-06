@@ -42,8 +42,6 @@ import {
 import {
   IconChevronDown,
   IconCheck,
-  IconMapPin,
-  IconMapPinOff,
   IconX,
 } from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
@@ -503,6 +501,75 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       (emp) => !leaveEmployees[emp.id]?.selected
     );
   }, [salesmanIkutEmployees, leaveEmployees]);
+
+  // WE product type mapping (based on database product.type field)
+  const WE_PRODUCT_TYPES: Record<string, "MEE" | "BH"> = {
+    "WE-2UDG": "MEE",
+    "WE-3UDG": "MEE",
+    "WE-360": "MEE",
+    "WE-360(5PK)": "MEE",
+    "WE-420": "MEE",
+    "WE-MNL": "MEE",
+    "WE-300G": "BH",
+    "WE-600G": "BH",
+  };
+
+  // Helper function to determine product category
+  const getProductCategory = (productId: string): "MEE" | "BH" | null => {
+    if (productId.startsWith("1-")) return "MEE";
+    if (productId.startsWith("2-")) return "BH";
+    if (productId.startsWith("WE-")) return WE_PRODUCT_TYPES[productId] || null;
+    return null;
+  };
+
+  // Calculate aggregate stats from salesmanProducts for selected salesmen
+  const salesmanProductStats = useMemo(() => {
+    let totalMee = 0;
+    let totalBihun = 0;
+    const productTotals: Record<string, number> = {};
+    const salesmanTotals: Record<string, { name: string; mee: number; bihun: number; total: number }> = {};
+
+    // Get selected SALESMAN employees
+    const selectedSalesmen = salesmanEmployees.filter((emp) =>
+      employeeSelectionState.selectedJobs[emp.id]?.includes("SALESMAN")
+    );
+
+    selectedSalesmen.forEach((emp) => {
+      const products = salesmanProducts[emp.rowKey || ""] || [];
+      let salesmanMee = 0;
+      let salesmanBihun = 0;
+
+      products.forEach((product: { product_id: string; quantity: number }) => {
+        const qty = product.quantity || 0;
+        productTotals[product.product_id] = (productTotals[product.product_id] || 0) + qty;
+
+        const category = getProductCategory(product.product_id);
+        if (category === "MEE") {
+          totalMee += qty;
+          salesmanMee += qty;
+        } else if (category === "BH") {
+          totalBihun += qty;
+          salesmanBihun += qty;
+        }
+      });
+
+      if (salesmanMee + salesmanBihun > 0) {
+        salesmanTotals[emp.id] = {
+          name: emp.name,
+          mee: salesmanMee,
+          bihun: salesmanBihun,
+          total: salesmanMee + salesmanBihun,
+        };
+      }
+    });
+
+    // Sort products by quantity descending
+    const sortedProducts = Object.entries(productTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, qty]) => ({ id, qty }));
+
+    return { totalMee, totalBihun, total: totalMee + totalBihun, productTotals: sortedProducts, salesmanTotals };
+  }, [salesmanEmployees, employeeSelectionState.selectedJobs, salesmanProducts]);
 
   // Get employees followed by each salesman
   const followedBySalesman = useMemo(() => {
@@ -1312,57 +1379,54 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const fetchSalesmanProducts = async () => {
     if (!formData.logDate) return;
 
-    try {
-      // Get all selected salesmen IDs
-      const salesmenIds: string[] = [];
+    // Skip if we've already fetched for this date (optimization to reduce API calls)
+    if (productsFetchedForDateRef.current === formData.logDate) return;
 
-      Object.entries(employeeSelectionState.selectedJobs).forEach(
-        ([employeeId, jobTypes]) => {
-          if (jobTypes.some((jt) => JOB_IDS.includes(jt))) {
-            salesmenIds.push(employeeId);
-          }
-        }
-      );
+    try {
+      // Get ALL salesman IDs (not just selected ones) - fetch once per date
+      const salesmenIds = salesmanEmployees.map((emp) => emp.id);
 
       if (salesmenIds.length === 0) return;
 
       // Pass date as YYYY-MM-DD string to avoid timezone issues between client and server
-      const dateString = formData.logDate; // Already in YYYY-MM-DD format
+      const dateString = formData.logDate;
 
-      // Fetch products for all salesmen in one request
+      // Fetch products for ALL salesmen in one request
       const response = await api.get(
-        `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(
-          ","
-        )}&date=${dateString}`
+        `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(",")}&date=${dateString}`
       );
+
+      // Mark as fetched for this date
+      productsFetchedForDateRef.current = formData.logDate;
 
       // Response might be directly available or in a data property
       const responseData = response.data || response;
 
-      // Create row keys for each salesman and job type combination
+      // Create row keys for each salesman (always use SALESMAN job type)
       const rowKeyProducts: Record<string, any[]> = {};
 
       Object.entries(responseData).forEach(([salesmanId, products]) => {
-        // Find all selected jobs for this employee
-        const selectedJobs =
-          employeeSelectionState.selectedJobs[salesmanId] || [];
+        const rowKey = `${salesmanId}-SALESMAN`;
 
-        // Create row key for each job and set products
-        selectedJobs.forEach((jobType) => {
-          const rowKey = `${salesmanId}-${jobType}`;
+        // Ensure products is always an array and has required fields
+        const productArray = Array.isArray(products) ? products : [];
 
-          // Ensure products is always an array and has required fields
-          const productArray = Array.isArray(products) ? products : [];
+        // Filter to only include products with valid data
+        rowKeyProducts[rowKey] = productArray.filter(
+          (p) =>
+            p &&
+            p.product_id &&
+            typeof p.quantity === "number" &&
+            p.quantity > 0
+        );
+      });
 
-          // Filter to only include products with valid data
-          rowKeyProducts[rowKey] = productArray.filter(
-            (p) =>
-              p &&
-              p.product_id &&
-              typeof p.quantity === "number" &&
-              p.quantity > 0
-          );
-        });
+      // Also add empty arrays for salesmen with no products (for proper clearing)
+      salesmenIds.forEach((salesmanId) => {
+        const rowKey = `${salesmanId}-SALESMAN`;
+        if (!rowKeyProducts[rowKey]) {
+          rowKeyProducts[rowKey] = [];
+        }
       });
 
       setSalesmanProducts(rowKeyProducts);
@@ -1372,109 +1436,143 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     }
   };
 
+  // Track previous date to detect date changes
+  const previousDateRef = useRef<string | null>(null);
+  // Track if products have been fetched for current date (to avoid re-fetching on selection changes)
+  const productsFetchedForDateRef = useRef<string | null>(null);
+
   useEffect(() => {
-    // Fetch salesman products when dependencies change
-    if (
-      formData.logDate &&
-      Object.keys(employeeSelectionState.selectedJobs).length > 0
-    ) {
+    // Clear refs when date changes to force re-linking and re-fetching
+    if (previousDateRef.current !== null && previousDateRef.current !== formData.logDate) {
+      productsLinkedRef.current = {};
+      ikutProductsLinkedRef.current = {};
+      productsFetchedForDateRef.current = null; // Reset so we fetch for new date
+    }
+    previousDateRef.current = formData.logDate;
+
+    // Fetch ALL salesman products once when date changes or employees load
+    // No longer depends on selectedJobs - fetch everything upfront
+    if (formData.logDate && salesmanEmployees.length > 0) {
       fetchSalesmanProducts();
     }
   }, [
     formData.logDate,
-    employeeSelectionState.selectedJobs,
-    JOB_IDS,
+    salesmanEmployees.length, // Only re-fetch when date changes or employees load
   ]);
 
   useEffect(() => {
     // After salesmanProducts are updated, auto-link them to pay codes
-    if (Object.keys(salesmanProducts).length > 0) {
-      // For each row key and its products
-      Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
-        // Skip if there are no products for this employee
-        if (!products || products.length === 0) {
-          return;
-        }
+    // Also clear products for salesmen who no longer have products on this date
 
-        const currentActivities = employeeActivities[rowKey] || [];
-        // Skip if activities haven't been loaded yet
-        if (currentActivities.length === 0) {
-          return;
-        }
+    // Get all SALESMAN rowKeys that should have products checked
+    const salesmanRowKeys = Object.entries(employeeSelectionState.selectedJobs)
+      .flatMap(([employeeId, jobTypes]) =>
+        jobTypes.filter((jt) => jt === "SALESMAN").map((jt) => `${employeeId}-${jt}`)
+      );
 
-        // Create a hash of products to detect if they changed
-        const productsHash = JSON.stringify(
-          products.map((p) => ({ id: p.product_id, qty: p.quantity }))
-        );
+    // For each SALESMAN, check if they have products or need clearing
+    salesmanRowKeys.forEach((rowKey) => {
+      const products = salesmanProducts[rowKey] || [];
+      const currentActivities = employeeActivities[rowKey] || [];
 
-        // Skip if we've already linked these exact products for this rowKey
-        if (productsLinkedRef.current[rowKey] === productsHash) {
-          return;
-        }
+      if (currentActivities.length === 0) return;
 
-        // Mark as linked
-        productsLinkedRef.current[rowKey] = productsHash;
+      // Create hash for current products (empty array = empty hash)
+      const productsHash = JSON.stringify(
+        products.map((p) => ({ id: p.product_id, qty: p.quantity }))
+      );
 
-        // For this employee+job combo, update their activities
-        setEmployeeActivities((prev) => {
-          const prevActivities = prev[rowKey] || [];
-          if (prevActivities.length === 0) {
-            return prev;
-          }
+      // Skip if we've already processed this exact state
+      if (productsLinkedRef.current[rowKey] === productsHash) {
+        return;
+      }
 
-          // Create a new array with updated activities
-          const updatedActivities = [...prevActivities];
+      // Mark as processed
+      productsLinkedRef.current[rowKey] = productsHash;
 
-          // For each product, find and update the matching pay code
-          products.forEach((product) => {
-            const productId = String(product.product_id);
-            const quantity = parseFloat(product.quantity) || 0;
+      setEmployeeActivities((prev) => {
+        const prevActivities = prev[rowKey] || [];
+        if (prevActivities.length === 0) return prev;
 
-            // Find the activity with matching pay code ID
-            const activityIndex = updatedActivities.findIndex(
-              (activity) => String(activity.payCodeId) === productId
-            );
+        const updatedActivities = [...prevActivities];
 
-            if (activityIndex !== -1) {
-              // Update the activity with the product quantity
-              if (quantity > 0) {
-                updatedActivities[activityIndex] = {
-                  ...updatedActivities[activityIndex],
-                  unitsProduced: quantity,
-                  isSelected: true, // Auto-select products with non-zero quantity
-                };
-              }
-            }
-          });
-
-          // Auto-deselect Hour-based activities
+        if (products.length === 0) {
+          // No products for this date - clear all product-based pay codes
+          // Product pay codes are those matching product IDs (like "1-2UDG", "2-BH", etc.)
           updatedActivities.forEach((activity, index) => {
-            if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
+            // Check if this is a product-based paycode (starts with number or "WE-")
+            const payCodeId = String(activity.payCodeId);
+            const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+
+            if (isProductPaycode && activity.unitsProduced > 0) {
               updatedActivities[index] = {
                 ...activity,
+                unitsProduced: 0,
                 isSelected: false,
                 calculatedAmount: 0,
               };
             }
           });
+        } else {
+          // Has products - update quantities
+          // Update or clear each product-based activity
+          updatedActivities.forEach((activity, index) => {
+            const payCodeId = String(activity.payCodeId);
+            const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
 
-          // Recalculate amounts for all activities
-          const recalculatedActivities = calculateActivitiesAmounts(
-            updatedActivities,
-            0, // For salesmen, hours aren't used
-            formData.contextData,
-            locationTypes[rowKey] || "Local",
-            formData.logDate
-          );
+            if (isProductPaycode) {
+              const product = products.find((p) => String(p.product_id) === payCodeId);
+              if (product) {
+                const quantity = parseFloat(product.quantity) || 0;
+                if (quantity > 0) {
+                  const newAmount = quantity * (activity.rate || 0);
+                  updatedActivities[index] = {
+                    ...activity,
+                    unitsProduced: quantity,
+                    isSelected: true,
+                    calculatedAmount: newAmount,
+                  };
+                }
+              } else if (activity.unitsProduced > 0) {
+                // This product no longer has data - clear it
+                updatedActivities[index] = {
+                  ...activity,
+                  unitsProduced: 0,
+                  isSelected: false,
+                  calculatedAmount: 0,
+                };
+              }
+            }
+          });
+        }
 
-          return {
-            ...prev,
-            [rowKey]: recalculatedActivities,
-          };
+        // Auto-deselect Hour-based activities
+        updatedActivities.forEach((activity, index) => {
+          if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
+            updatedActivities[index] = {
+              ...activity,
+              isSelected: false,
+              calculatedAmount: 0,
+            };
+          }
         });
+
+        // Recalculate amounts for all activities
+        const recalculatedActivities = calculateActivitiesAmounts(
+          updatedActivities,
+          0,
+          formData.contextData,
+          locationTypes[rowKey] || "Local",
+          formData.logDate
+        );
+
+        return {
+          ...prev,
+          [rowKey]: recalculatedActivities,
+        };
       });
-    }
-  }, [salesmanProducts, employeeActivities, formData.contextData, formData.logDate, locationTypes]);
+    });
+  }, [salesmanProducts, employeeActivities, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs]);
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
@@ -2284,13 +2382,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           const activities = filteredPayCodes.map((payCode) => {
             const isContextLinked = contextLinkedPayCodes[payCode.id];
 
-            // Find existing activity for this pay code if in edit mode
-            const existingActivity =
-              mode === "edit"
-                ? existingActivitiesForRow.find(
-                    (ea) => ea.payCodeId === payCode.id
-                  )
-                : null;
+            // Find existing activity for this pay code to preserve user-entered data
+            // In edit mode for originally saved employees, use savedActivitiesRef
+            // Otherwise, use current employeeActivities to preserve entered unitsProduced
+            const existingActivity = existingActivitiesForRow.find(
+              (ea) => ea.payCodeId === payCode.id
+            );
 
             // Determine rate based on day type
             let rate = payCode.rate_biasa;
@@ -2323,42 +2420,53 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
               }
             } else {
               // CREATE mode OR employee wasn't in original work log:
-              // Apply auto-selection rules for new entries
-              if (payCode.pay_type === "Tambahan") {
-                // NEVER auto-select Tambahan pay codes
-                isSelected = false;
-              } else if (payCode.pay_type === "Overtime") {
-                // Salesmen don't have hour-based overtime, never auto-select
-                isSelected = false;
-              } else if (payCode.pay_type === "Base") {
-                // Base pay codes follow default settings
-                isSelected = payCode.is_default_setting;
+              // First check if this activity was already selected by user (e.g., product quantities linked)
+              // Preserve existing selection for activities with entered data
+              if (existingActivity && existingActivity.unitsProduced > 0) {
+                // Preserve selection for activities that already have units entered
+                isSelected = existingActivity.isSelected;
+              } else if (existingActivity && existingActivity.isSelected &&
+                         !["Hour", "Bill"].includes(payCode.rate_unit)) {
+                // Preserve manual selection (but not for Hour/Bill which should never be selected)
+                isSelected = existingActivity.isSelected;
               } else {
-                // Fallback to default setting
-                isSelected = payCode.is_default_setting;
-              }
+                // Apply auto-selection rules for new entries
+                if (payCode.pay_type === "Tambahan") {
+                  // NEVER auto-select Tambahan pay codes
+                  isSelected = false;
+                } else if (payCode.pay_type === "Overtime") {
+                  // Salesmen don't have hour-based overtime, never auto-select
+                  isSelected = false;
+                } else if (payCode.pay_type === "Base") {
+                  // Base pay codes follow default settings
+                  isSelected = payCode.is_default_setting;
+                } else {
+                  // Fallback to default setting
+                  isSelected = payCode.is_default_setting;
+                }
 
-              // Special rules for specific rate units
-              if (
-                isContextLinked ||
-                payCode.rate_unit === "Bag" ||
-                payCode.rate_unit === "Trip" ||
-                payCode.rate_unit === "Day"
-              ) {
-                // Don't auto-select these types
-                isSelected = false;
-              }
+                // Special rules for specific rate units
+                if (
+                  isContextLinked ||
+                  payCode.rate_unit === "Bag" ||
+                  payCode.rate_unit === "Trip" ||
+                  payCode.rate_unit === "Day"
+                ) {
+                  // Don't auto-select these types
+                  isSelected = false;
+                }
 
-              // Always deselect Hour-based pay codes for salesmen
-              if (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") {
-                isSelected = false;
-              }
+                // Always deselect Hour-based pay codes for salesmen
+                if (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") {
+                  isSelected = false;
+                }
 
-              // Special logic for SALESMAN_IKUT employees - don't auto-select any allowance paycodes
-              // Let the location-based logic in handleIkutChange handle the selection
-              if (jobType === "SALESMAN_IKUT") {
-                if (payCode.id === "ELAUN_MT" || payCode.id === "ELAUN_MO") {
-                  isSelected = false; // Don't auto-select, let location logic handle it
+                // Special logic for SALESMAN_IKUT employees - don't auto-select any allowance paycodes
+                // Let the location-based logic in handleIkutChange handle the selection
+                if (jobType === "SALESMAN_IKUT") {
+                  if (payCode.id === "ELAUN_MT" || payCode.id === "ELAUN_MO") {
+                    isSelected = false; // Don't auto-select, let location logic handle it
+                  }
                 }
               }
             }
@@ -2413,8 +2521,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         });
       }
     );
-
-    setEmployeeActivities(newEmployeeActivities);
 
     // Apply location-based paycodes to SALESMAN_IKUT employees after activities are loaded
     // This ensures paycodes are applied whenever activities are fetched/refreshed
@@ -2545,8 +2651,43 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       }
     );
 
-    // Update with paycode-applied activities
-    setEmployeeActivities(newEmployeeActivities);
+    // Apply Muat bag counts for SALESMAN_IKUT employees
+    // This ensures bag counts are reapplied when activities are regenerated (e.g., after re-selecting)
+    Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+      if (!newEmployeeActivities[rowKey] || newEmployeeActivities[rowKey].length === 0) return;
+
+      const isDoubled = ikutDoubled[rowKey] || false;
+      const muatMeeQty = isDoubled ? (bagCounts.muatMee || 0) * 2 : bagCounts.muatMee || 0;
+      const muatBihunQty = isDoubled ? (bagCounts.muatBihun || 0) * 2 : bagCounts.muatBihun || 0;
+
+      newEmployeeActivities[rowKey] = newEmployeeActivities[rowKey].map((activity: any) => {
+        if (activity.payCodeId === MUAT_MEE_PAYCODE) {
+          const newAmount = muatMeeQty * (activity.rate || 0);
+          return {
+            ...activity,
+            unitsProduced: muatMeeQty,
+            isSelected: muatMeeQty > 0,
+            calculatedAmount: newAmount,
+          };
+        }
+        if (activity.payCodeId === MUAT_BIHUN_PAYCODE) {
+          const newAmount = muatBihunQty * (activity.rate || 0);
+          return {
+            ...activity,
+            unitsProduced: muatBihunQty,
+            isSelected: muatBihunQty > 0,
+            calculatedAmount: newAmount,
+          };
+        }
+        return activity;
+      });
+    });
+
+    // Update with paycode-applied activities (merge with existing to preserve deselected employees)
+    setEmployeeActivities((prev) => ({
+      ...prev,
+      ...newEmployeeActivities,
+    }));
   };
 
   // New function to fetch and apply activities for leave employees
@@ -3067,6 +3208,42 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             <>
               {/* Main Employee Table */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+                <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 flex items-center justify-between">
+                  <SafeLink
+                    to="/catalogue/job?id=SALESMAN"
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    onNavigateAttempt={safeNavigate}
+                    className="text-sm font-medium text-default-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
+                  >
+                    {jobs.find((j) => j.id === "SALESMAN")?.name || "Salesman"}
+                  </SafeLink>
+                  {salesmanProductStats.total > 0 && (
+                    <div className="flex items-center gap-3 text-xs text-default-500 dark:text-gray-400 truncate min-w-0 flex-1 justify-end ml-4">
+                      <span className="truncate">
+                        {Object.entries(salesmanProductStats.salesmanTotals).map(([id, data], idx) => (
+                          <span key={id}>
+                            {idx > 0 && " · "}
+                            <span className="font-medium">{id}</span>: {data.total}
+                          </span>
+                        ))}
+                      </span>
+                      <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
+                      <span className="truncate">
+                        {salesmanProductStats.productTotals.slice(0, 8).map((p, idx) => (
+                          <span key={p.id}>
+                            {idx > 0 && " · "}
+                            <span className="font-medium">{p.id}</span>: {p.qty}
+                          </span>
+                        ))}
+                        {salesmanProductStats.productTotals.length > 8 && " ..."}
+                      </span>
+                      <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
+                      <span className="flex-shrink-0">Mee: {salesmanProductStats.totalMee} · BH: {salesmanProductStats.totalBihun}</span>
+                      <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
+                      <span className="font-medium flex-shrink-0">Total: {salesmanProductStats.total}</span>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                     <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -3093,12 +3270,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                           className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
                           Name
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                        >
-                          Job
                         </th>
                         <th
                           scope="col"
@@ -3206,174 +3377,46 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                 return null;
                               })()}
                             </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
-                              <SafeLink
-                                to={`/catalogue/job?id=${row.jobType}`}
-                                hasUnsavedChanges={hasUnsavedChanges}
-                                onNavigateAttempt={safeNavigate}
-                                className="hover:underline hover:text-sky-600 dark:text-sky-400"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {row.jobName}
-                              </SafeLink>
-                            </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-left">
-                              <div className="relative w-40 mx-auto">
-                                <Listbox
-                                  value={
-                                    locationTypes[row.rowKey || ""] || "Local"
-                                  }
-                                  onChange={(value) =>
-                                    handleLocationTypeChange(
-                                      row.rowKey,
-                                      value as "Local" | "Outstation"
-                                    )
-                                  }
-                                  disabled={!isSelected}
+                            <td className="px-6 py-2 whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected && !isSaving) {
+                                      handleLocationTypeChange(row.rowKey, "Local");
+                                    }
+                                  }}
+                                  disabled={!isSelected || isSaving}
+                                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                                    (locationTypes[row.rowKey || ""] || "Local") === "Local"
+                                      ? "bg-sky-500 text-white"
+                                      : !isSelected
+                                      ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed"
+                                      : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
+                                  }`}
                                 >
-                                    <div className="relative">
-                                      <ListboxButton
-                                        onClick={(e) => e.stopPropagation()}
-                                        className={`relative w-full pl-3 py-1.5 text-left rounded-md border ${
-                                          !isSelected
-                                            ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
-                                            : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500"
-                                        }`}
-                                      >
-                                        <span className="flex items-center">
-                                          {locationTypes[row.rowKey || ""] ===
-                                          "Outstation" ? (
-                                            <IconMapPinOff
-                                              size={14}
-                                              className="mr-2 text-amber-500"
-                                            />
-                                          ) : (
-                                            <IconMapPin
-                                              size={14}
-                                              className="mr-2 text-sky-500"
-                                            />
-                                          )}
-                                          <span className="block truncate text-sm">
-                                            {locationTypes[row.rowKey || ""] ||
-                                              "Local"}
-                                          </span>
-                                        </span>
-                                        <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                          <IconChevronDown
-                                            className="w-4 h-4 text-default-400 dark:text-gray-500"
-                                            aria-hidden="true"
-                                          />
-                                        </span>
-                                      </ListboxButton>
-                                      <Transition
-                                        as={Fragment}
-                                        leave="transition ease-in duration-100"
-                                        leaveFrom="opacity-100"
-                                        leaveTo="opacity-0"
-                                      >
-                                        <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                          <ListboxOption
-                                            value="Local"
-                                            className={({ active }) =>
-                                              `${
-                                                active
-                                                  ? "bg-sky-100 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100"
-                                                  : "text-default-700 dark:text-gray-200"
-                                              } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
-                                            }
-                                          >
-                                            {({ selected, active }) => (
-                                              <>
-                                                <div className="flex items-center">
-                                                  <IconMapPin
-                                                    size={14}
-                                                    className={`mr-2 ${
-                                                      active
-                                                        ? "text-sky-600"
-                                                        : "text-sky-500"
-                                                    }`}
-                                                  />
-                                                  <span
-                                                    className={`${
-                                                      selected
-                                                        ? "font-medium"
-                                                        : "font-normal"
-                                                    } block truncate`}
-                                                  >
-                                                    Local
-                                                  </span>
-                                                </div>
-                                                {selected ? (
-                                                  <span
-                                                    className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
-                                                      active
-                                                        ? "text-sky-600"
-                                                        : "text-sky-500"
-                                                    }`}
-                                                  >
-                                                    <IconCheck
-                                                      className="w-4 h-4"
-                                                      aria-hidden="true"
-                                                    />
-                                                  </span>
-                                                ) : null}
-                                              </>
-                                            )}
-                                          </ListboxOption>
-                                          <ListboxOption
-                                            value="Outstation"
-                                            className={({ active }) =>
-                                              `${
-                                                active
-                                                  ? "bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100"
-                                                  : "text-default-700 dark:text-gray-200"
-                                              } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
-                                            }
-                                          >
-                                            {({ selected, active }) => (
-                                              <>
-                                                <div className="flex items-center">
-                                                  <IconMapPinOff
-                                                    size={14}
-                                                    className={`mr-2 ${
-                                                      active
-                                                        ? "text-amber-600"
-                                                        : "text-amber-500"
-                                                    }`}
-                                                  />
-                                                  <span
-                                                    className={`${
-                                                      selected
-                                                        ? "font-medium"
-                                                        : "font-normal"
-                                                    } block truncate`}
-                                                  >
-                                                    Outstation
-                                                  </span>
-                                                </div>
-                                                {selected ? (
-                                                  <span
-                                                    className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
-                                                      active
-                                                        ? "text-amber-600"
-                                                        : "text-amber-500"
-                                                    }`}
-                                                  >
-                                                    <IconCheck
-                                                      className="w-4 h-4"
-                                                      aria-hidden="true"
-                                                    />
-                                                  </span>
-                                                ) : null}
-                                              </>
-                                            )}
-                                          </ListboxOption>
-                                        </ListboxOptions>
-                                      </Transition>
-                                    </div>
-                                  </Listbox>
-                                </div>
-                              </td>
+                                  Local
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected && !isSaving) {
+                                      handleLocationTypeChange(row.rowKey, "Outstation");
+                                    }
+                                  }}
+                                  disabled={!isSelected || isSaving}
+                                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                                    locationTypes[row.rowKey || ""] === "Outstation"
+                                      ? "bg-amber-500 text-white"
+                                      : !isSelected
+                                      ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed"
+                                      : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
+                                  }`}
+                                >
+                                  Outstation
+                                </button>
+                              </div>
+                            </td>
                             <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(
@@ -3404,10 +3447,15 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
               {/* SALESMAN_IKUT Table */}
               {salesmanIkutEmployees.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm mt-4">
-                  <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 flex items-center justify-between">
-                    <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                      SALESMAN IKUT LORI
-                    </span>
+                  <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700">
+                    <SafeLink
+                      to="/catalogue/job?id=SALESMAN_IKUT"
+                      hasUnsavedChanges={hasUnsavedChanges}
+                      onNavigateAttempt={safeNavigate}
+                      className="text-sm font-medium text-default-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
+                    >
+                      Salesman Ikut Lori
+                    </SafeLink>
                   </div>
                   <div>
                     <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
