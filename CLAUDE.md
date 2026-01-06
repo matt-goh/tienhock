@@ -113,7 +113,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Work Logs (Daily):**
 - `daily_work_logs` - id, log_date, shift, day_type, context_data, status, created_at, updated_at, section
-- `daily_work_log_entries` - id, work_log_id, employee_id, total_hours, job_id, is_on_leave, leave_type, following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
+- `daily_work_log_entries` - id, work_log_id, employee_id, total_hours, job_id, is_on_leave, leave_type, following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled (boolean, for SALESMAN_IKUT x2 doubling feature)
 - `daily_work_log_activities` - id, log_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added
 
 **Work Logs (Monthly):**
