@@ -115,3 +115,29 @@ ALTER TABLE pay_codes ADD CONSTRAINT pay_codes_rate_unit_check
 -- SELECT conname, pg_get_constraintdef(oid)
 -- FROM pg_constraint
 -- WHERE conname = 'pay_codes_rate_unit_check';
+
+ALTER TABLE daily_work_log_entries
+ADD COLUMN IF NOT EXISTS is_doubled BOOLEAN DEFAULT FALSE;
+
+INSERT INTO product_pay_codes (product_id, pay_code_id) VALUES
+('1-2UDG', 'DME-2UDG'),
+('1-3UDG', 'DME-3UDG'),
+('1-350G', 'DME-350G'),
+('1-MNL', 'DME-MNL'),
+('2-APPLE', 'DME-300G'),
+('2-BH', 'DME-300G'),
+('2-BH2', 'DME-2H'),
+('2-BCM3', 'DME-600G'),
+('2-BNL', 'DME-3.1KG'),
+('2-BNL(5)', 'DME-5KG'),
+('2-MASAK', 'DME-300G'),
+('2-PADI', 'DME-300G'),
+('WE-2UDG', 'DWE-2UDG'),
+('WE-3UDG', 'DWE-3UDG'),
+('WE-300G', 'DWE-300G'),
+('WE-360', 'DWE-350G'),
+('WE-360(5PK)', 'DWE-350G'),
+('WE-420', 'DWE-420G'),
+('WE-600G', 'DWE-600G'),
+('WE-MNL', 'DWE-MNL')
+ON CONFLICT DO NOTHING;
