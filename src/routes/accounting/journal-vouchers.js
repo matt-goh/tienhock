@@ -112,7 +112,7 @@ export default function (pool) {
     // Validate mapping_type
     const validMappingTypes = [
       // Expense types
-      "salary", "overtime", "bonus", "commission", "commission_mee", "commission_bh", "rounding", "cuti_tahunan", "special_ot",
+      "salary", "overtime", "bonus", "commission", "commission_mee", "commission_bh", "cuti_tahunan", "special_ot",
       // Contribution types
       "epf_employer", "socso_employer", "sip_employer",
       // Accrual types
@@ -320,9 +320,6 @@ export default function (pool) {
         return res.status(400).json({ message: "Invalid year or month" });
       }
 
-      // Directors to exclude from JVSL (they go to JVDR)
-      const DIRECTOR_IDS = ['GOH', 'WONG', 'WINNIE', 'WINNIE.G'];
-
       // Get salary data by location from employee_payrolls using job-based location mapping
       const salaryQuery = `
         WITH job_location_map AS (
@@ -397,6 +394,28 @@ export default function (pool) {
             AND EXTRACT(MONTH FROM lr.leave_date) = $2
           GROUP BY sd.location_id
         ),
+        -- Salary amounts by location (excluding overtime)
+        salary_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as salary_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pc.pay_type IN ('Base', 'Tambahan')
+          GROUP BY sd.location_id
+        ),
+        -- Overtime amounts by location
+        overtime_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as overtime_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pc.pay_type = 'Overtime'
+          GROUP BY sd.location_id
+        ),
         employee_summary AS (
           SELECT
             sd.employee_id,
@@ -432,7 +451,9 @@ export default function (pool) {
           SUM(es.net_pay) as total_gaji_bersih,
           COALESCE((SELECT cs.commission_mee FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_mee,
           COALESCE((SELECT cs.commission_bh FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_bh,
-          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan
+          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan,
+          COALESCE((SELECT sl.salary_amount FROM salary_by_location sl WHERE sl.location_id = es.location_id), 0) as salary_amount,
+          COALESCE((SELECT ol.overtime_amount FROM overtime_by_location ol WHERE ol.location_id = es.location_id), 0) as overtime_amount
         FROM employee_summary es
         GROUP BY es.location_id
         ORDER BY es.location_id
@@ -542,7 +563,9 @@ export default function (pool) {
         const mappingKey = `JVSL_${locationId}`;
         const locationMappings = mappingsByLocation[mappingKey] || {};
 
-        const salaryAmount = parseFloat(location.total_gaji_kasar) || 0;
+        const grossPay = parseFloat(location.total_gaji_kasar) || 0;
+        const salaryAmount = parseFloat(location.salary_amount) || 0;
+        const overtimeAmount = parseFloat(location.overtime_amount) || 0;
         const epfAmount = parseFloat(location.total_epf_majikan) || 0;
         const socsoAmount = parseFloat(location.total_socso_majikan) || 0;
         const sipAmount = parseFloat(location.total_sip_majikan) || 0;
@@ -555,7 +578,9 @@ export default function (pool) {
         const entry = {
           location_id: locationId,
           location_name: locationNamesByMapping[mappingKey] || locationNames[locationId] || locationId,
+          gross_pay: grossPay,
           salary: salaryAmount,
+          overtime: overtimeAmount,
           epf_employer: epfAmount,
           socso_employer: socsoAmount,
           sip_employer: sipAmount,
@@ -566,6 +591,7 @@ export default function (pool) {
           cuti_tahunan: cutiTahunan,
           accounts: {
             salary: locationMappings.salary || null,
+            overtime: locationMappings.overtime || null,
             epf_employer: locationMappings.epf_employer || null,
             socso_employer: locationMappings.socso_employer || null,
             sip_employer: locationMappings.sip_employer || null,
@@ -769,6 +795,28 @@ export default function (pool) {
             AND EXTRACT(MONTH FROM lr.leave_date) = $2
           GROUP BY sd.location_id
         ),
+        -- Salary amounts by location (excluding overtime)
+        salary_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as salary_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pc.pay_type IN ('Base', 'Tambahan')
+          GROUP BY sd.location_id
+        ),
+        -- Overtime amounts by location
+        overtime_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as overtime_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pc.pay_type = 'Overtime'
+          GROUP BY sd.location_id
+        ),
         employee_summary AS (
           SELECT
             sd.employee_id,
@@ -791,7 +839,9 @@ export default function (pool) {
           SUM(es.net_pay) as total_gaji_bersih,
           COALESCE((SELECT cs.commission_mee FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_mee,
           COALESCE((SELECT cs.commission_bh FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_bh,
-          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan
+          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan,
+          COALESCE((SELECT sl.salary_amount FROM salary_by_location sl WHERE sl.location_id = es.location_id), 0) as salary_amount,
+          COALESCE((SELECT ol.overtime_amount FROM overtime_by_location ol WHERE ol.location_id = es.location_id), 0) as overtime_amount
         FROM employee_summary es
         GROUP BY es.location_id
         ORDER BY es.location_id
@@ -992,7 +1042,9 @@ export default function (pool) {
             for (const location of staffData) {
               const locationMappings = mappingsByLocation[`JVSL_${location.location_id}`] || {};
 
-              const salary = parseFloat(location.total_gaji_kasar) || 0;
+              const salaryAmount = parseFloat(location.salary_amount) || 0;
+              const overtimeAmount = parseFloat(location.overtime_amount) || 0;
+              const grossPay = parseFloat(location.total_gaji_kasar) || 0;
               const epf = parseFloat(location.total_epf_majikan) || 0;
               const socso = parseFloat(location.total_socso_majikan) || 0;
               const sip = parseFloat(location.total_sip_majikan) || 0;
@@ -1002,7 +1054,7 @@ export default function (pool) {
               const commissionBh = parseFloat(location.commission_bh) || 0;
               const cutiTahunan = parseFloat(location.cuti_tahunan) || 0;
 
-              totalSalary += salary;
+              totalSalary += grossPay;
               totalEpf += epf;
               totalSocso += socso;
               totalSip += sip;
@@ -1013,7 +1065,10 @@ export default function (pool) {
               totalCutiTahunan += cutiTahunan;
 
               const debitLines = [
-                { account: locationMappings.salary, amount: salary, desc: `Salary - Location ${location.location_id}` },
+                // Salary (Base + Tambahan, excluding OT)
+                { account: locationMappings.salary, amount: salaryAmount, desc: `Salary - Location ${location.location_id}` },
+                // Overtime (separate line item)
+                { account: locationMappings.overtime, amount: overtimeAmount, desc: `Overtime - Location ${location.location_id}` },
                 { account: locationMappings.epf_employer, amount: epf, desc: `EPF - Location ${location.location_id}` },
                 { account: locationMappings.socso_employer, amount: socso, desc: `SOCSO - Location ${location.location_id}` },
                 { account: locationMappings.sip_employer, amount: sip, desc: `SIP - Location ${location.location_id}` },
