@@ -44,6 +44,7 @@ import {
   IconCheck,
   IconMapPin,
   IconMapPinOff,
+  IconX,
 } from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
@@ -132,6 +133,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const [ikutBagCounts, setIkutBagCounts] = useState<
     Record<string, { muatMee: number; muatBihun: number }> // rowKey -> bag counts
   >({});
+  const [ikutDoubled, setIkutDoubled] = useState<Record<string, boolean>>({});
   const [leaveEmployees, setLeaveEmployees] = useState<
     Record<string, LeaveEntry>
   >({});
@@ -165,6 +167,37 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const contextLinkedPayCodes = jobConfig
     ? getContextLinkedPayCodes(jobConfig)
     : {};
+
+  // Hardcoded Muat paycodes for SALESMAN_IKUT
+  const MUAT_MEE_PAYCODE = "4-COMM_MUAT_MEE";
+  const MUAT_BIHUN_PAYCODE = "5-COMM_MUAT_BH";
+
+  // Product ID to DME/DWE pay code mapping for SALESMAN_IKUT
+  const PRODUCT_TO_SALESMAN_IKUT_PAYCODE: Record<string, string> = {
+    // MEE products
+    "1-2UDG": "DME-2UDG",
+    "1-3UDG": "DME-3UDG",
+    "1-350G": "DME-350G",
+    "1-MNL": "DME-MNL",
+    // BH products
+    "2-APPLE": "DME-300G",
+    "2-BH": "DME-300G",
+    "2-BH2": "DME-2H",
+    "2-BCM3": "DME-600G",
+    "2-BNL": "DME-3.1KG",
+    "2-BNL(5)": "DME-5KG",
+    "2-MASAK": "DME-300G",
+    "2-PADI": "DME-300G",
+    // WE products
+    "WE-2UDG": "DWE-2UDG",
+    "WE-3UDG": "DWE-3UDG",
+    "WE-300G": "DWE-300G",
+    "WE-360": "DWE-350G",
+    "WE-360(5PK)": "DWE-350G",
+    "WE-420": "DWE-420G",
+    "WE-600G": "DWE-600G",
+    "WE-MNL": "DWE-MNL",
+  };
 
   // Helper function to determine day type based on date
   const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
@@ -227,6 +260,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     locationTypes: Record<string, "Local" | "Outstation">;
     salesmanIkutRelations: Record<string, string>;
     ikutBagCounts: Record<string, { muatMee: number; muatBihun: number }>;
+    ikutDoubled: Record<string, boolean>;
     leaveEmployees: Record<string, LeaveEntry>;
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
     leaveBalances: Record<string, any>;
@@ -242,6 +276,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const savedEmployeeActivitiesRef = useRef<Record<string, any[]>>({});
   // Ref to track which rowKeys have had their products linked (to avoid infinite loops)
   const productsLinkedRef = useRef<Record<string, string>>({});
+  // Ref to track which SALESMAN_IKUT rowKeys have had their products copied (to avoid infinite loops)
+  const ikutProductsLinkedRef = useRef<Record<string, string>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -313,6 +349,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           normalizeForComparison(initialState.salesmanIkutRelations) ||
         normalizeForComparison(ikutBagCounts) !==
           normalizeForComparison(initialState.ikutBagCounts) ||
+        normalizeForComparison(ikutDoubled) !==
+          normalizeForComparison(initialState.ikutDoubled) ||
         normalizeForComparison(leaveEmployees) !==
           normalizeForComparison(initialState.leaveEmployees) ||
         normalizeForComparison(leaveEmployeeActivities) !==
@@ -331,6 +369,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     locationTypes,
     salesmanIkutRelations,
     ikutBagCounts,
+    ikutDoubled,
     leaveEmployees,
     leaveEmployeeActivities,
     leaveBalances,
@@ -493,9 +532,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     const newDefaultHours = getDefaultHours(e.target.value);
     const oldDefaultHours = getDefaultHours(formData.logDate);
 
-    // Clear products linked ref when date changes (products will be different)
+    // Clear products linked refs when date changes (products will be different)
     if (productsLinkedRef.current) {
       productsLinkedRef.current = {};
+    }
+    if (ikutProductsLinkedRef.current) {
+      ikutProductsLinkedRef.current = {};
     }
 
     setFormData({
@@ -650,6 +692,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             JSON.stringify(salesmanIkutRelations)
           ),
           ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+          ikutDoubled: JSON.parse(JSON.stringify(ikutDoubled)),
           leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
           leaveEmployeeActivities: JSON.parse(
             JSON.stringify(leaveEmployeeActivities)
@@ -1509,6 +1552,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
             additionalData.muatBihunBags =
               ikutBagCounts[rowKey]?.muatBihun || 0;
+            additionalData.isDoubled = ikutDoubled[rowKey] || false;
           }
 
           return {
@@ -1564,6 +1608,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           JSON.stringify(salesmanIkutRelations)
         ),
         ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+        ikutDoubled: JSON.parse(JSON.stringify(ikutDoubled)),
         leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
         leaveEmployeeActivities: JSON.parse(
           JSON.stringify(leaveEmployeeActivities)
@@ -1828,18 +1873,218 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const handleBagCountChange = (
     rowKey: string,
     field: "muatMee" | "muatBihun",
-    value: string
+    value: string,
+    isDoubled: boolean = false
   ) => {
-    const numValue = value === "" ? 0 : parseInt(value) || 0;
+    // When x2 is active, user enters doubled value, we store base value (divide by 2)
+    const displayValue = value === "" ? 0 : parseInt(value) || 0;
+    const baseValue = isDoubled ? Math.floor(displayValue / 2) : displayValue;
 
     setIkutBagCounts((prev) => ({
       ...prev,
       [rowKey]: {
         ...prev[rowKey],
-        [field]: numValue,
+        [field]: baseValue,
       },
     }));
   };
+
+  const handleDoubleToggle = (rowKey: string) => {
+    setIkutDoubled((prev) => ({
+      ...prev,
+      [rowKey]: !prev[rowKey],
+    }));
+  };
+
+  // Update Muat activities when ikutBagCounts or ikutDoubled changes
+  useEffect(() => {
+    if (!isInitializationComplete) return;
+
+    Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+      const isDoubled = ikutDoubled[rowKey] || false;
+      // Apply x2 multiplier if active
+      const muatMeeQty = isDoubled
+        ? (bagCounts.muatMee || 0) * 2
+        : bagCounts.muatMee || 0;
+      const muatBihunQty = isDoubled
+        ? (bagCounts.muatBihun || 0) * 2
+        : bagCounts.muatBihun || 0;
+
+      // Only update if activities exist for this employee
+      if (employeeActivities[rowKey] && employeeActivities[rowKey].length > 0) {
+        setEmployeeActivities((prev) => {
+          const activities = prev[rowKey] || [];
+          let hasChanges = false;
+
+          const updatedActivities = activities.map((activity) => {
+            if (activity.payCodeId === MUAT_MEE_PAYCODE) {
+              const newAmount = muatMeeQty * (activity.rate || 0);
+              if (
+                activity.unitsProduced !== muatMeeQty ||
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== (muatMeeQty > 0)
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: muatMeeQty,
+                  isSelected: muatMeeQty > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            if (activity.payCodeId === MUAT_BIHUN_PAYCODE) {
+              const newAmount = muatBihunQty * (activity.rate || 0);
+              if (
+                activity.unitsProduced !== muatBihunQty ||
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== (muatBihunQty > 0)
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: muatBihunQty,
+                  isSelected: muatBihunQty > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            return activity;
+          });
+
+          // Only return new state if there were changes
+          if (hasChanges) {
+            return { ...prev, [rowKey]: updatedActivities };
+          }
+          return prev;
+        });
+      }
+    });
+  }, [ikutBagCounts, ikutDoubled, isInitializationComplete]);
+
+  // Copy products from followed salesman to SALESMAN_IKUT activities
+  // Note: We intentionally exclude employeeActivities from deps to avoid cascading updates.
+  // The ref tracking ensures we process when salesman/products/doubled changes.
+  useEffect(() => {
+    if (!isInitializationComplete) return;
+
+    // Get all DME/DWE paycodes for clearing
+    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+
+    Object.entries(salesmanIkutRelations).forEach(([ikutRowKey, salesmanId]) => {
+      if (!salesmanId) {
+        // Clear the linked ref and reset product quantities if no salesman is followed
+        if (ikutProductsLinkedRef.current[ikutRowKey]) {
+          delete ikutProductsLinkedRef.current[ikutRowKey];
+          // Clear all DME/DWE paycode activities for this employee
+          setEmployeeActivities((prev) => {
+            const activities = prev[ikutRowKey] || [];
+            if (activities.length === 0) return prev;
+
+            let hasChanges = false;
+            const updatedActivities = activities.map((activity) => {
+              // Check if this paycode is one of the DME/DWE mapped ones
+              const isDmePaycode = allDmePaycodes.includes(activity.payCodeId);
+              if (isDmePaycode && (activity.unitsProduced > 0 || activity.isSelected)) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: 0,
+                  isSelected: false,
+                  calculatedAmount: 0,
+                };
+              }
+              return activity;
+            });
+
+            if (hasChanges) {
+              return { ...prev, [ikutRowKey]: updatedActivities };
+            }
+            return prev;
+          });
+        }
+        return;
+      }
+
+      // Find the followed salesman's rowKey (always SALESMAN job type)
+      const salesmanRowKey = `${salesmanId}-SALESMAN`;
+      const salesmanProductList = salesmanProducts[salesmanRowKey] || [];
+      const isDoubled = ikutDoubled[ikutRowKey] || false;
+
+      // Create a hash to track if products/doubled state changed
+      const productsHash = JSON.stringify({
+        products: salesmanProductList.map((p) => ({
+          id: p.product_id,
+          qty: p.quantity,
+        })),
+        isDoubled,
+        salesmanId,
+      });
+
+      // Skip if we've already linked these exact products for this rowKey
+      if (ikutProductsLinkedRef.current[ikutRowKey] === productsHash) {
+        return;
+      }
+
+      // Build a map of DME/DWE paycode -> total quantity
+      // Initialize all DME paycodes to 0 first (to clear old values when switching salesmen)
+      const paycodeQuantities: Record<string, number> = {};
+      allDmePaycodes.forEach((paycode) => {
+        paycodeQuantities[paycode] = 0;
+      });
+
+      // Then apply the new salesman's products
+      salesmanProductList.forEach((product) => {
+        const productId = String(product.product_id);
+        const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+        if (dmePaycode) {
+          const qty = parseFloat(product.quantity) || 0;
+          // Apply x2 multiplier if active
+          const finalQty = isDoubled ? qty * 2 : qty;
+          paycodeQuantities[dmePaycode] = (paycodeQuantities[dmePaycode] || 0) + finalQty;
+        }
+      });
+
+      // Update SALESMAN_IKUT activities with the mapped quantities
+      setEmployeeActivities((prev) => {
+        const activities = prev[ikutRowKey] || [];
+        // Skip if activities haven't been loaded yet - DON'T mark as linked
+        if (activities.length === 0) return prev;
+
+        let hasChanges = false;
+
+        const updatedActivities = activities.map((activity) => {
+          const mappedQty = paycodeQuantities[activity.payCodeId];
+          if (mappedQty !== undefined) {
+            const newAmount = mappedQty * (activity.rate || 0);
+            if (
+              activity.unitsProduced !== mappedQty ||
+              activity.calculatedAmount !== newAmount ||
+              activity.isSelected !== (mappedQty > 0)
+            ) {
+              hasChanges = true;
+              return {
+                ...activity,
+                unitsProduced: mappedQty,
+                isSelected: mappedQty > 0,
+                calculatedAmount: newAmount,
+              };
+            }
+          }
+          return activity;
+        });
+
+        if (hasChanges) {
+          // Only mark as linked when we actually process activities
+          ikutProductsLinkedRef.current[ikutRowKey] = productsHash;
+          return { ...prev, [ikutRowKey]: updatedActivities };
+        }
+        // If no changes were needed, still mark as linked to prevent re-processing
+        ikutProductsLinkedRef.current[ikutRowKey] = productsHash;
+        return prev;
+      });
+    });
+  }, [salesmanIkutRelations, salesmanProducts, ikutDoubled, isInitializationComplete]);
 
   // Update select all state based on individual selections and availability
   useEffect(() => {
@@ -2239,6 +2484,67 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       }
     );
 
+    // Copy products from followed salesman to SALESMAN_IKUT activities
+    // Get all DME/DWE paycodes
+    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        if (!salesmanId) return;
+        if (!newEmployeeActivities[ikutRowKey] || newEmployeeActivities[ikutRowKey].length === 0) return;
+
+        const salesmanRowKey = `${salesmanId}-SALESMAN`;
+        const salesmanProductList = salesmanProducts[salesmanRowKey] || [];
+        const isDoubled = ikutDoubled[ikutRowKey] || false;
+
+        // Build paycode quantities map (initialize all to 0 first)
+        const paycodeQuantities: Record<string, number> = {};
+        allDmePaycodes.forEach((paycode) => {
+          paycodeQuantities[paycode] = 0;
+        });
+
+        // Apply products from followed salesman
+        salesmanProductList.forEach((product) => {
+          const productId = String(product.product_id);
+          const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+          if (dmePaycode) {
+            const qty = parseFloat(product.quantity) || 0;
+            const finalQty = isDoubled ? qty * 2 : qty;
+            paycodeQuantities[dmePaycode] = (paycodeQuantities[dmePaycode] || 0) + finalQty;
+          }
+        });
+
+        // Update SALESMAN_IKUT activities
+        const ikutActivities = newEmployeeActivities[ikutRowKey];
+        const updatedActivities = ikutActivities.map((activity: any) => {
+          const mappedQty = paycodeQuantities[activity.payCodeId];
+          if (mappedQty !== undefined) {
+            const newAmount = mappedQty * (activity.rate || 0);
+            return {
+              ...activity,
+              unitsProduced: mappedQty,
+              isSelected: mappedQty > 0,
+              calculatedAmount: newAmount,
+            };
+          }
+          return activity;
+        });
+
+        newEmployeeActivities[ikutRowKey] = updatedActivities;
+
+        // Update the ref to mark as processed
+        const productsHash = JSON.stringify({
+          products: salesmanProductList.map((p: any) => ({
+            id: p.product_id,
+            qty: p.quantity,
+          })),
+          isDoubled,
+          salesmanId,
+        });
+        ikutProductsLinkedRef.current[ikutRowKey] = productsHash;
+      }
+    );
+
     // Update with paycode-applied activities
     setEmployeeActivities(newEmployeeActivities);
   };
@@ -2417,12 +2723,13 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       const newEmployeeActivities: Record<string, any[]> = {};
       const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
 
-      // Restore SALESMAN_IKUT relations and bag counts
+      // Restore SALESMAN_IKUT relations, bag counts, and doubled state
       const newSalesmanIkutRelations: Record<string, string> = {};
       const newIkutBagCounts: Record<
         string,
         { muatMee: number; muatBihun: number }
       > = {};
+      const newIkutDoubled: Record<string, boolean> = {};
 
       // Clear and populate the saved employee row keys ref
       // This tracks which employees were originally in the work log
@@ -2485,6 +2792,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             muatMee: entry.muat_mee_bags || 0,
             muatBihun: entry.muat_bihun_bags || 0,
           };
+
+          // Restore x2 doubled state
+          newIkutDoubled[rowKey] = entry.is_doubled || false;
         }
 
         // Restore SALESMAN location types
@@ -2502,6 +2812,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       setLocationTypes(newLocationTypes);
       setSalesmanIkutRelations(newSalesmanIkutRelations);
       setIkutBagCounts(newIkutBagCounts);
+      setIkutDoubled(newIkutDoubled);
 
       // Restore leave records if they exist
       if (
@@ -3092,394 +3403,258 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
               {/* SALESMAN_IKUT Table */}
               {salesmanIkutEmployees.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm mt-4">
-                    <div>
-                      <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-                        <thead className="bg-default-50 dark:bg-gray-900/50">
-                          <tr>
-                            <th scope="col" className="px-6 py-1 text-left">
-                              <Checkbox
-                                checked={salesmanIkutAvailableForWork.every(
-                                  (emp) =>
-                                    employeeSelectionState.selectedJobs[
-                                      emp.id
-                                    ]?.includes(emp.jobType)
-                                )}
-                                onChange={() => {
-                                  const allSelected =
-                                    salesmanIkutAvailableForWork.every((emp) =>
-                                      employeeSelectionState.selectedJobs[
-                                        emp.id
-                                      ]?.includes(emp.jobType)
-                                    );
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm mt-4">
+                  <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 flex items-center justify-between">
+                    <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                      SALESMAN IKUT LORI
+                    </span>
+                  </div>
+                  <div>
+                    <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                      <thead className="bg-default-50 dark:bg-gray-900/50">
+                        <tr>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            ID
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Name
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Ikut Salesman
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            <div className="flex flex-col items-center">
+                              <span>Muat (Bags)</span>
+                              <div className="flex gap-4 text-[10px] mt-0.5">
+                                <span className="w-14 text-center">Mee</span>
+                                <span className="w-14 text-center">Bihun</span>
+                              </div>
+                            </div>
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            x2
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                        {salesmanIkutEmployees.map((row, index) => {
+                          const selectedSalesman =
+                            salesmanIkutRelations[row.rowKey || ""] || "";
+                          const isSelected = !!selectedSalesman;
+                          const bagCounts = ikutBagCounts[row.rowKey || ""] || {
+                            muatMee: 0,
+                            muatBihun: 0,
+                          };
+                          const isDoubled = ikutDoubled[row.rowKey || ""] || false;
+                          // Display doubled values when x2 is active
+                          const displayMuatMee = isDoubled
+                            ? (bagCounts.muatMee || 0) * 2
+                            : bagCounts.muatMee || 0;
+                          const displayMuatBihun = isDoubled
+                            ? (bagCounts.muatBihun || 0) * 2
+                            : bagCounts.muatBihun || 0;
 
-                                  setEmployeeSelectionState((prev) => {
-                                    const newState = { ...prev };
-                                    salesmanIkutAvailableForWork.forEach(
-                                      (emp) => {
-                                        if (allSelected) {
-                                          // Deselect all and clear salesman relations
-                                          newState.selectedJobs[emp.id] = (
-                                            newState.selectedJobs[emp.id] || []
-                                          ).filter(
-                                            (job) => job !== emp.jobType
-                                          );
-
-                                          // Clear salesman relation when deselecting
-                                          setSalesmanIkutRelations(
-                                            (prevRelations) => {
-                                              const newRelations = {
-                                                ...prevRelations,
-                                              };
-                                              delete newRelations[
-                                                emp.rowKey || ""
-                                              ];
-                                              return newRelations;
-                                            }
-                                          );
-                                        } else {
-                                          // Don't auto-select - user must choose salesman first
-                                        }
-                                      }
-                                    );
-                                    return newState;
-                                  });
-                                }}
-                                size={20}
-                                checkedColor="text-sky-600"
-                                ariaLabel="Select all ikut lori employees"
-                                buttonClassName="p-1 rounded-lg"
-                                disabled={
-                                  salesmanIkutAvailableForWork.length === 0
-                                }
-                              />
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              ID
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              Name
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              Job
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              Muat Mee (Bag)
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              Muat Bihun (Bag)
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              Ikut
-                            </th>
-                            <th
-                              scope="col"
-                              className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                            >
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                          {salesmanIkutEmployees.map((row, index) => {
-                            const isSelected =
+                          // Get available salesmen (only those selected for work)
+                          const availableSalesmen = salesmanEmployees.filter(
+                            (s) =>
                               employeeSelectionState.selectedJobs[
-                                row.id
-                              ]?.includes(row.jobType);
-                            const selectedSalesman =
-                              salesmanIkutRelations[row.rowKey || ""] || "";
-                            const bagCounts = ikutBagCounts[
-                              row.rowKey || ""
-                            ] || { muatMee: 0, muatBihun: 0 };
-                            const isLastRow =
-                              index === salesmanIkutEmployees.length - 1; // Add this line
+                                s.id
+                              ]?.includes(s.jobType)
+                          );
 
-                            return (
-                              <tr
-                                key={row.rowKey}
-                                onClick={() => {
-                                  if (
-                                    isSaving ||
-                                    leaveEmployees[row.id]?.selected
-                                  )
-                                    return;
-                                  handleEmployeeSelection(row.rowKey);
-                                }}
-                                className={`transition-colors duration-150 ${
-                                  isSaving || leaveEmployees[row.id]?.selected
-                                    ? "bg-default-50 dark:bg-gray-700 cursor-not-allowed"
-                                    : "cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700"
-                                } ${
-                                  isSelected
-                                    ? "bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50"
-                                    : "bg-white dark:bg-gray-800"
-                                }`}
-                              >
-                                <td
-                                  className="px-6 py-2 whitespace-nowrap align-middle cursor-pointer"
-                                  onClickCapture={(e) => {
-                                    e.stopPropagation();
-                                    if (
-                                      !isSaving &&
-                                      !leaveEmployees[row.id]?.selected
-                                    ) {
-                                      handleEmployeeSelection(row.rowKey);
+                          return (
+                            <tr
+                              key={row.rowKey}
+                              className={`transition-colors duration-150 ${
+                                leaveEmployees[row.id]?.selected
+                                  ? "bg-default-50 dark:bg-gray-700"
+                                  : isSelected
+                                  ? "bg-sky-50 dark:bg-sky-900/30"
+                                  : "bg-white dark:bg-gray-800"
+                              }`}
+                            >
+                              <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
+                                <SafeLink
+                                  to={`/catalogue/staff/${row.id}`}
+                                  hasUnsavedChanges={hasUnsavedChanges}
+                                  onNavigateAttempt={safeNavigate}
+                                  className="hover:underline hover:text-sky-600 dark:text-sky-400"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {row.id}
+                                </SafeLink>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
+                                {row.name}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {availableSalesmen.length > 0 ? (
+                                    <>
+                                      {availableSalesmen.map((salesman) => (
+                                        <button
+                                          key={salesman.id}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!isSaving && !leaveEmployees[row.id]?.selected) {
+                                              // Toggle: if already selected, deselect; otherwise select
+                                              const newValue = selectedSalesman === salesman.id ? "" : salesman.id;
+                                              handleIkutChange(row.rowKey || "", newValue);
+                                            }
+                                          }}
+                                          disabled={isSaving || leaveEmployees[row.id]?.selected}
+                                          className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                                            selectedSalesman === salesman.id
+                                              ? "bg-sky-500 text-white"
+                                              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                          } ${
+                                            isSaving || leaveEmployees[row.id]?.selected
+                                              ? "opacity-50 cursor-not-allowed"
+                                              : ""
+                                          }`}
+                                        >
+                                          {salesman.name}
+                                        </button>
+                                      ))}
+                                      {selectedSalesman && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!isSaving && !leaveEmployees[row.id]?.selected) {
+                                              handleIkutChange(row.rowKey || "", "");
+                                            }
+                                          }}
+                                          disabled={isSaving || leaveEmployees[row.id]?.selected}
+                                          className={`p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors ${
+                                            isSaving || leaveEmployees[row.id]?.selected
+                                              ? "opacity-50 cursor-not-allowed"
+                                              : ""
+                                          }`}
+                                          title="Clear selection"
+                                        >
+                                          <IconX size={14} />
+                                        </button>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-default-400 dark:text-gray-500 italic">
+                                      No salesmen selected
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <div className="flex gap-2 justify-center">
+                                  <input
+                                    type="number"
+                                    value={isSelected ? displayMuatMee.toString() : ""}
+                                    onChange={(e) =>
+                                      handleBagCountChange(
+                                        row.rowKey || "",
+                                        "muatMee",
+                                        e.target.value,
+                                        isDoubled
+                                      )
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`w-14 py-1 text-sm text-right border rounded-md text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                      isDoubled && isSelected
+                                        ? "bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-600"
+                                        : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
+                                    }`}
+                                    min="0"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                  <input
+                                    type="number"
+                                    value={isSelected ? displayMuatBihun.toString() : ""}
+                                    onChange={(e) =>
+                                      handleBagCountChange(
+                                        row.rowKey || "",
+                                        "muatBihun",
+                                        e.target.value,
+                                        isDoubled
+                                      )
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`w-14 py-1 text-sm text-right border rounded-md text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                      isDoubled && isSelected
+                                        ? "bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-600"
+                                        : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
+                                    }`}
+                                    min="0"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-center">
+                                <Checkbox
+                                  checked={isDoubled}
+                                  onChange={() => {
+                                    if (!isSaving && !leaveEmployees[row.id]?.selected && isSelected) {
+                                      handleDoubleToggle(row.rowKey || "");
                                     }
                                   }}
-                                >
-                                  <Checkbox
-                                    checked={!!isSelected}
-                                    onChange={() => {}}
-                                    size={20}
-                                    checkedColor="text-sky-600"
-                                    ariaLabel={`Select employee ${row.name}`}
-                                    buttonClassName="p-1 rounded-lg"
-                                    disabled={
-                                      isSaving ||
-                                      leaveEmployees[row.id]?.selected
-                                    }
-                                  />
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
-                                  <SafeLink
-                                    to={`/catalogue/staff/${row.id}`}
-                                    hasUnsavedChanges={hasUnsavedChanges}
-                                    onNavigateAttempt={safeNavigate}
-                                    className="hover:underline hover:text-sky-600 dark:text-sky-400"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {row.id}
-                                  </SafeLink>
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
-                                  {row.name}
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
-                                  <SafeLink
-                                    to={`/catalogue/job?id=${row.jobType}`}
-                                    hasUnsavedChanges={hasUnsavedChanges}
-                                    onNavigateAttempt={safeNavigate}
-                                    className="hover:underline hover:text-sky-600 dark:text-sky-400"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {row.jobName}
-                                  </SafeLink>
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-center">
-                                  <div>
-                                    <input
-                                      type="number"
-                                      value={
-                                        isSelected
-                                          ? (bagCounts.muatMee || 0).toString()
-                                          : ""
-                                      }
-                                      onChange={(e) =>
-                                        handleBagCountChange(
-                                          row.rowKey || "",
-                                          "muatMee",
-                                          e.target.value
-                                        )
-                                      }
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
-                                      min="0"
-                                      disabled={!isSelected}
-                                      placeholder={isSelected ? "0" : "-"}
-                                    />
-                                  </div>
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-center">
-                                  <div>
-                                    <input
-                                      type="number"
-                                      value={
-                                        isSelected
-                                          ? (
-                                              bagCounts.muatBihun || 0
-                                            ).toString()
-                                          : ""
-                                      }
-                                      onChange={(e) =>
-                                        handleBagCountChange(
-                                          row.rowKey || "",
-                                          "muatBihun",
-                                          e.target.value
-                                        )
-                                      }
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
-                                      min="0"
-                                      disabled={!isSelected}
-                                      placeholder={isSelected ? "0" : "-"}
-                                    />
-                                  </div>
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-center">
-                                  <div className="relative w-48 mx-auto">
-                                    <Listbox
-                                      value={selectedSalesman}
-                                      onChange={(value) =>
-                                        handleIkutChange(
-                                          row.rowKey || "",
-                                          value
-                                        )
-                                      }
-                                    >
-                                      <div className="relative">
-                                        <ListboxButton
-                                          onClick={(e) => e.stopPropagation()}
-                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
-                                        >
-                                          <span className="block truncate text-sm">
-                                            {selectedSalesman
-                                              ? salesmanEmployees.find(
-                                                  (s) =>
-                                                    s.id === selectedSalesman
-                                                )?.name || "Select Salesman"
-                                              : "Select Salesman"}
-                                          </span>
-                                          <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                            <IconChevronDown
-                                              className="w-4 h-4 text-default-400 dark:text-gray-500"
-                                              aria-hidden="true"
-                                            />
-                                          </span>
-                                        </ListboxButton>
-                                        <Transition
-                                          as={Fragment}
-                                          leave="transition ease-in duration-100"
-                                          leaveFrom="opacity-100"
-                                          leaveTo="opacity-0"
-                                        >
-                                          <ListboxOptions
-                                            onClick={(e) => e.stopPropagation()}
-                                            className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
-                                              isLastRow
-                                                ? "bottom-full mb-1"
-                                                : "mt-1"
-                                            }`}
-                                          >
-                                            <ListboxOption
-                                              value=""
-                                              className={({ active }) =>
-                                                `${
-                                                  active
-                                                    ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
-                                                    : "text-default-700 dark:text-gray-200"
-                                                } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
-                                              }
-                                            >
-                                              <span className="block truncate">
-                                                None
-                                              </span>
-                                            </ListboxOption>
-                                            {salesmanEmployees
-                                              .filter((s) =>
-                                                employeeSelectionState.selectedJobs[
-                                                  s.id
-                                                ]?.includes(s.jobType)
-                                              )
-                                              .map((salesman) => (
-                                                <ListboxOption
-                                                  key={salesman.id}
-                                                  value={salesman.id}
-                                                  className={({ active }) =>
-                                                    `${
-                                                      active
-                                                        ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200"
-                                                        : "text-default-700 dark:text-gray-200"
-                                                    } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
-                                                  }
-                                                >
-                                                  {({ selected, active }) => (
-                                                    <>
-                                                      <span
-                                                        className={`${
-                                                          selected
-                                                            ? "font-medium"
-                                                            : "font-normal"
-                                                        } block truncate`}
-                                                      >
-                                                        {salesman.name}
-                                                      </span>
-                                                      {selected ? (
-                                                        <span
-                                                          className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
-                                                            active
-                                                              ? "text-sky-600"
-                                                              : "text-sky-500"
-                                                          }`}
-                                                        >
-                                                          <IconCheck
-                                                            className="w-4 h-4"
-                                                            aria-hidden="true"
-                                                          />
-                                                        </span>
-                                                      ) : null}
-                                                    </>
-                                                  )}
-                                                </ListboxOption>
-                                              ))}
-                                          </ListboxOptions>
-                                        </Transition>
-                                      </div>
-                                    </Listbox>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
-                                  <ActivitiesTooltip
-                                    activities={(
-                                      employeeActivities[row.rowKey || ""] ||
-                                      []
-                                    ).filter(
-                                      (activity) => activity.isSelected
-                                    )}
-                                    employeeName={row.name}
-                                    hasUnsavedChanges={hasUnsavedChanges}
-                                    onNavigateAttempt={safeNavigate}
-                                    className={
-                                      !isSelected
-                                        ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                        : ""
-                                    }
-                                    disabled={
-                                      !isSelected ||
-                                      leaveEmployees[row.id]?.selected
-                                    }
-                                    onClick={() =>
-                                      handleManageActivities(row)
-                                    }
-                                    logDate={formData.logDate}
-                                    showBelow={index < 5}
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                  size={18}
+                                  checkedColor="text-amber-500"
+                                  ariaLabel={`Double units for ${row.name}`}
+                                  buttonClassName="p-1 rounded-lg"
+                                  disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
+                                />
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                <ActivitiesTooltip
+                                  activities={(
+                                    employeeActivities[row.rowKey || ""] || []
+                                  ).filter((activity) => activity.isSelected)}
+                                  employeeName={row.name}
+                                  hasUnsavedChanges={hasUnsavedChanges}
+                                  onNavigateAttempt={safeNavigate}
+                                  className={
+                                    !isSelected
+                                      ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                      : ""
+                                  }
+                                  disabled={
+                                    !isSelected ||
+                                    leaveEmployees[row.id]?.selected
+                                  }
+                                  onClick={() => handleManageActivities(row)}
+                                  logDate={formData.logDate}
+                                  showBelow={index < 5}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                )}
+                </div>
+              )}
             </>
           )}
         </div>

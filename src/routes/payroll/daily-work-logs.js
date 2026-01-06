@@ -309,8 +309,8 @@ export default function (pool) {
           const entryQuery = `
           INSERT INTO daily_work_log_entries (
             work_log_id, employee_id, job_id, total_hours,
-            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id
         `;
 
@@ -323,6 +323,7 @@ export default function (pool) {
             entry.muatMeeBags || 0,
             entry.muatBihunBags || 0,
             entry.locationType || "Local",
+            entry.isDoubled || false,
           ]);
 
           const entryId = entryResult.rows[0].id;
@@ -575,9 +576,9 @@ export default function (pool) {
           // Insert employee entry
           const entryQuery = `
           INSERT INTO daily_work_log_entries (
-            work_log_id, employee_id, job_id, total_hours, 
-            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            work_log_id, employee_id, job_id, total_hours,
+            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id
         `;
 
@@ -590,6 +591,7 @@ export default function (pool) {
             entry.muatMeeBags || 0,
             entry.muatBihunBags || 0,
             entry.locationType || "Local",
+            entry.isDoubled || false,
           ]);
 
           const entryId = entryResult.rows[0].id;
