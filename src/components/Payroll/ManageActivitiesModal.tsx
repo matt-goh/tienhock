@@ -382,7 +382,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                           {/* Table wrapper with max height and scrollbar */}
                           <div className="max-h-[30rem] overflow-y-auto">
                             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                              <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
+                              <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                                 <tr>
                                   <th className="w-10 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase flex items-center tracking-wider">
                                     <Checkbox
