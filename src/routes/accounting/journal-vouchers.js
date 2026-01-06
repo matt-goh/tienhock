@@ -112,7 +112,7 @@ export default function (pool) {
     // Validate mapping_type
     const validMappingTypes = [
       // Expense types
-      "salary", "overtime", "bonus", "commission", "commission_mee", "commission_bh", "rounding", "cuti_tahunan", "special_ot",
+      "salary", "overtime", "bonus", "commission", "commission_mee", "commission_bh", "cuti_tahunan", "special_ot",
       // Contribution types
       "epf_employer", "socso_employer", "sip_employer",
       // Accrual types
@@ -320,9 +320,6 @@ export default function (pool) {
         return res.status(400).json({ message: "Invalid year or month" });
       }
 
-      // Directors to exclude from JVSL (they go to JVDR)
-      const DIRECTOR_IDS = ['GOH', 'WONG', 'WINNIE', 'WINNIE.G'];
-
       // Get salary data by location from employee_payrolls using job-based location mapping
       const salaryQuery = `
         WITH job_location_map AS (
@@ -397,6 +394,30 @@ export default function (pool) {
             AND EXTRACT(MONTH FROM lr.leave_date) = $2
           GROUP BY sd.location_id
         ),
+        -- Salary amounts by location (excluding overtime and commission-related pay codes)
+        salary_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as salary_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          LEFT JOIN product_pay_codes ppc ON pi.pay_code_id = ppc.pay_code_id
+          WHERE pc.pay_type IN ('Base', 'Tambahan')
+            AND ppc.pay_code_id IS NULL  -- Exclude commission-related pay codes linked to products
+          GROUP BY sd.location_id
+        ),
+        -- Overtime amounts by location
+        overtime_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as overtime_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pc.pay_type = 'Overtime'
+          GROUP BY sd.location_id
+        ),
         employee_summary AS (
           SELECT
             sd.employee_id,
@@ -432,7 +453,9 @@ export default function (pool) {
           SUM(es.net_pay) as total_gaji_bersih,
           COALESCE((SELECT cs.commission_mee FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_mee,
           COALESCE((SELECT cs.commission_bh FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_bh,
-          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan
+          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan,
+          COALESCE((SELECT sl.salary_amount FROM salary_by_location sl WHERE sl.location_id = es.location_id), 0) as salary_amount,
+          COALESCE((SELECT ol.overtime_amount FROM overtime_by_location ol WHERE ol.location_id = es.location_id), 0) as overtime_amount
         FROM employee_summary es
         GROUP BY es.location_id
         ORDER BY es.location_id
@@ -542,7 +565,9 @@ export default function (pool) {
         const mappingKey = `JVSL_${locationId}`;
         const locationMappings = mappingsByLocation[mappingKey] || {};
 
-        const salaryAmount = parseFloat(location.total_gaji_kasar) || 0;
+        const grossPay = parseFloat(location.total_gaji_kasar) || 0;
+        const salaryAmount = parseFloat(location.salary_amount) || 0;
+        const overtimeAmount = parseFloat(location.overtime_amount) || 0;
         const epfAmount = parseFloat(location.total_epf_majikan) || 0;
         const socsoAmount = parseFloat(location.total_socso_majikan) || 0;
         const sipAmount = parseFloat(location.total_sip_majikan) || 0;
@@ -555,7 +580,9 @@ export default function (pool) {
         const entry = {
           location_id: locationId,
           location_name: locationNamesByMapping[mappingKey] || locationNames[locationId] || locationId,
+          gross_pay: grossPay,
           salary: salaryAmount,
+          overtime: overtimeAmount,
           epf_employer: epfAmount,
           socso_employer: socsoAmount,
           sip_employer: sipAmount,
@@ -566,6 +593,7 @@ export default function (pool) {
           cuti_tahunan: cutiTahunan,
           accounts: {
             salary: locationMappings.salary || null,
+            overtime: locationMappings.overtime || null,
             epf_employer: locationMappings.epf_employer || null,
             socso_employer: locationMappings.socso_employer || null,
             sip_employer: locationMappings.sip_employer || null,
@@ -643,7 +671,7 @@ export default function (pool) {
 
       // Check if vouchers already exist for this month
       const existingVouchersQuery = `
-        SELECT reference_no FROM journal_entries
+        SELECT id, reference_no FROM journal_entries
         WHERE reference_no LIKE $1 OR reference_no LIKE $2
       `;
       const monthStr = monthInt.toString().padStart(2, "0");
@@ -653,19 +681,28 @@ export default function (pool) {
         `JVSL/${monthStr}/${yearStr}`,
       ]);
 
-      const existingVouchers = existingResult.rows.map(r => r.reference_no);
+      // Build a map of reference_no -> id
+      const existingVouchersMap = {};
+      existingResult.rows.forEach(r => {
+        existingVouchersMap[r.reference_no] = r.id;
+      });
+
+      const jvdrRef = `JVDR/${monthStr}/${yearStr}`;
+      const jvslRef = `JVSL/${monthStr}/${yearStr}`;
 
       res.json({
         year: yearInt,
         month: monthInt,
         jvdr: {
-          reference: `JVDR/${monthStr}/${yearStr}`,
-          exists: existingVouchers.includes(`JVDR/${monthStr}/${yearStr}`),
+          reference: jvdrRef,
+          exists: !!existingVouchersMap[jvdrRef],
+          entry_id: existingVouchersMap[jvdrRef] || null,
           locations: jvdrData,
         },
         jvsl: {
-          reference: `JVSL/${monthStr}/${yearStr}`,
-          exists: existingVouchers.includes(`JVSL/${monthStr}/${yearStr}`),
+          reference: jvslRef,
+          exists: !!existingVouchersMap[jvslRef],
+          entry_id: existingVouchersMap[jvslRef] || null,
           locations: jvslData,
           totals: jvslTotals,
         },
@@ -769,6 +806,30 @@ export default function (pool) {
             AND EXTRACT(MONTH FROM lr.leave_date) = $2
           GROUP BY sd.location_id
         ),
+        -- Salary amounts by location (excluding overtime and commission-related pay codes)
+        salary_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as salary_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          LEFT JOIN product_pay_codes ppc ON pi.pay_code_id = ppc.pay_code_id
+          WHERE pc.pay_type IN ('Base', 'Tambahan')
+            AND ppc.pay_code_id IS NULL  -- Exclude commission-related pay codes linked to products
+          GROUP BY sd.location_id
+        ),
+        -- Overtime amounts by location
+        overtime_by_location AS (
+          SELECT
+            sd.location_id,
+            COALESCE(SUM(pi.amount), 0) as overtime_amount
+          FROM staff_data sd
+          JOIN payroll_items pi ON sd.employee_payroll_id = pi.employee_payroll_id
+          JOIN pay_codes pc ON pi.pay_code_id = pc.id
+          WHERE pc.pay_type = 'Overtime'
+          GROUP BY sd.location_id
+        ),
         employee_summary AS (
           SELECT
             sd.employee_id,
@@ -791,7 +852,9 @@ export default function (pool) {
           SUM(es.net_pay) as total_gaji_bersih,
           COALESCE((SELECT cs.commission_mee FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_mee,
           COALESCE((SELECT cs.commission_bh FROM commission_split cs WHERE cs.location_id = es.location_id), 0) as commission_bh,
-          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan
+          COALESCE((SELECT ct.cuti_tahunan_amount FROM cuti_tahunan_data ct WHERE ct.location_id = es.location_id), 0) as cuti_tahunan,
+          COALESCE((SELECT sl.salary_amount FROM salary_by_location sl WHERE sl.location_id = es.location_id), 0) as salary_amount,
+          COALESCE((SELECT ol.overtime_amount FROM overtime_by_location ol WHERE ol.location_id = es.location_id), 0) as overtime_amount
         FROM employee_summary es
         GROUP BY es.location_id
         ORDER BY es.location_id
@@ -864,7 +927,8 @@ export default function (pool) {
       });
 
       const staffAccruals = mappingsByLocation["JVSL_00"] || {};
-      const entryDate = new Date(yearInt, monthInt - 1, 1).toISOString().split("T")[0];
+      // Use direct string formatting to avoid timezone issues with Date.toISOString()
+      const entryDate = `${yearInt}-${monthStr}-01`;
 
       // Generate JVDR if requested
       if (voucher_types.includes("JVDR")) {
@@ -954,6 +1018,15 @@ export default function (pool) {
               );
             }
 
+            // Calculate and update totals
+            const jvdrTotalDebit = debitLines.reduce((sum, l) => sum + l.amount, 0);
+            const jvdrTotalCredit = directorResult.rows.reduce((sum, d) => sum + (parseFloat(d.net_pay) || 0), 0)
+              + otherCreditLines.reduce((sum, l) => sum + l.amount, 0);
+            await client.query(
+              `UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3`,
+              [jvdrTotalDebit, jvdrTotalCredit, entryId]
+            );
+
             results.jvdr = { created: true, id: entryId, reference: jvdrRef };
           } else {
             results.jvdr = { skipped: true, message: "No director salary data for this month" };
@@ -984,15 +1057,31 @@ export default function (pool) {
             );
             const entryId = entryResult.rows[0].id;
 
-            let lineNumber = 1;
             let totalSalary = 0, totalEpf = 0, totalSocso = 0, totalSip = 0, totalPcb = 0, totalNet = 0;
             let totalCommissionMee = 0, totalCommissionBh = 0, totalCutiTahunan = 0;
+            let jvslTotalDebit = 0;
 
-            // Insert debit lines for each location
+            // Define type priority for sorting (lower number = higher priority)
+            const typePriority = {
+              salary: 1,
+              overtime: 2,
+              epf_employer: 3,
+              socso_employer: 4,
+              sip_employer: 5,
+              commission_mee: 6,
+              commission_bh: 7,
+              cuti_tahunan: 8,
+            };
+
+            // Collect all debit lines first
+            const allDebitLines = [];
+
             for (const location of staffData) {
               const locationMappings = mappingsByLocation[`JVSL_${location.location_id}`] || {};
 
-              const salary = parseFloat(location.total_gaji_kasar) || 0;
+              const salaryAmount = parseFloat(location.salary_amount) || 0;
+              const overtimeAmount = parseFloat(location.overtime_amount) || 0;
+              const grossPay = parseFloat(location.total_gaji_kasar) || 0;
               const epf = parseFloat(location.total_epf_majikan) || 0;
               const socso = parseFloat(location.total_socso_majikan) || 0;
               const sip = parseFloat(location.total_sip_majikan) || 0;
@@ -1002,7 +1091,7 @@ export default function (pool) {
               const commissionBh = parseFloat(location.commission_bh) || 0;
               const cutiTahunan = parseFloat(location.cuti_tahunan) || 0;
 
-              totalSalary += salary;
+              totalSalary += grossPay;
               totalEpf += epf;
               totalSocso += socso;
               totalSip += sip;
@@ -1013,27 +1102,42 @@ export default function (pool) {
               totalCutiTahunan += cutiTahunan;
 
               const debitLines = [
-                { account: locationMappings.salary, amount: salary, desc: `Salary - Location ${location.location_id}` },
-                { account: locationMappings.epf_employer, amount: epf, desc: `EPF - Location ${location.location_id}` },
-                { account: locationMappings.socso_employer, amount: socso, desc: `SOCSO - Location ${location.location_id}` },
-                { account: locationMappings.sip_employer, amount: sip, desc: `SIP - Location ${location.location_id}` },
-                // Commission MEE/BH for locations 03 and 04
-                { account: locationMappings.commission_mee, amount: commissionMee, desc: `Commission MEE - Location ${location.location_id}` },
-                { account: locationMappings.commission_bh, amount: commissionBh, desc: `Commission BH - Location ${location.location_id}` },
-                // Cuti Tahunan
-                { account: locationMappings.cuti_tahunan, amount: cutiTahunan, desc: `Cuti Tahunan - Location ${location.location_id}` },
+                { account: locationMappings.salary, amount: salaryAmount, desc: `Salary - Location ${location.location_id}`, type: "salary", locationId: location.location_id },
+                { account: locationMappings.overtime, amount: overtimeAmount, desc: `Overtime - Location ${location.location_id}`, type: "overtime", locationId: location.location_id },
+                { account: locationMappings.epf_employer, amount: epf, desc: `EPF - Location ${location.location_id}`, type: "epf_employer", locationId: location.location_id },
+                { account: locationMappings.socso_employer, amount: socso, desc: `SOCSO - Location ${location.location_id}`, type: "socso_employer", locationId: location.location_id },
+                { account: locationMappings.sip_employer, amount: sip, desc: `SIP - Location ${location.location_id}`, type: "sip_employer", locationId: location.location_id },
+                { account: locationMappings.commission_mee, amount: commissionMee, desc: `Commission MEE - Location ${location.location_id}`, type: "commission_mee", locationId: location.location_id },
+                { account: locationMappings.commission_bh, amount: commissionBh, desc: `Commission BH - Location ${location.location_id}`, type: "commission_bh", locationId: location.location_id },
+                { account: locationMappings.cuti_tahunan, amount: cutiTahunan, desc: `Cuti Tahunan - Location ${location.location_id}`, type: "cuti_tahunan", locationId: location.location_id },
               ].filter(l => l.account && l.amount > 0);
 
-              for (const line of debitLines) {
-                await client.query(
-                  `INSERT INTO journal_entry_lines (journal_entry_id, line_number, account_code, debit_amount, credit_amount, particulars)
-                   VALUES ($1, $2, $3, $4, $5, $6)`,
-                  [entryId, lineNumber++, line.account, line.amount, 0, line.desc]
-                );
-              }
+              allDebitLines.push(...debitLines);
             }
 
-            // Insert credit lines (totals to accrual accounts)
+            // Sort debit lines by: 1) type priority, 2) location
+            allDebitLines.sort((a, b) => {
+              // First sort by type priority
+              const typeDiff = (typePriority[a.type] || 99) - (typePriority[b.type] || 99);
+              if (typeDiff !== 0) {
+                return typeDiff;
+              }
+              // Then by location
+              return a.locationId.localeCompare(b.locationId);
+            });
+
+            // Insert sorted debit lines
+            let lineNumber = 1;
+            for (const line of allDebitLines) {
+              await client.query(
+                `INSERT INTO journal_entry_lines (journal_entry_id, line_number, account_code, debit_amount, credit_amount, particulars)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [entryId, lineNumber++, line.account, line.amount, 0, line.desc]
+              );
+              jvslTotalDebit += line.amount;
+            }
+
+            // Insert credit lines (totals to accrual accounts) - already in logical order
             const creditLines = [
               { account: staffAccruals.accrual_salary, amount: totalNet, desc: "Total Salary Payable" },
               { account: staffAccruals.accrual_epf, amount: totalEpf, desc: "Total EPF Payable" },
@@ -1049,6 +1153,13 @@ export default function (pool) {
                 [entryId, lineNumber++, line.account, 0, line.amount, line.desc]
               );
             }
+
+            // Calculate and update totals
+            const jvslTotalCredit = creditLines.reduce((sum, l) => sum + l.amount, 0);
+            await client.query(
+              `UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3`,
+              [jvslTotalDebit, jvslTotalCredit, entryId]
+            );
 
             results.jvsl = { created: true, id: entryId, reference: jvslRef };
           } else {

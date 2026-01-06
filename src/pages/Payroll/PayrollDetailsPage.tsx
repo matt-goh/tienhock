@@ -9,7 +9,7 @@ import {
   IconReceipt,
   IconCoins,
   IconClock,
-  IconHammer,
+  IconBusinessplan,
   IconCalendarEvent,
   IconCirclePlus,
   IconList,
@@ -348,10 +348,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {item.rate_unit === "Percent"
             ? `${item.rate}%`
+            : item.rate_unit === "Fixed" && item.total_quantity > 1
+            ? "Fixed"
             : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.total_quantity}
+          {item.rate_unit === "Fixed" && item.total_quantity > 1
+            ? formatCurrency(item.total_quantity)
+            : item.total_quantity}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
           {formatCurrency(item.total_amount)}
@@ -427,10 +431,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {item.rate_unit === "Percent"
             ? `${item.rate}%`
+            : item.rate_unit === "Fixed" && item.quantity > 1
+            ? "Fixed"
             : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.quantity}
+          {item.rate_unit === "Fixed" && item.quantity > 1
+            ? formatCurrency(item.quantity)
+            : item.quantity}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
           {formatCurrency(item.amount)}
@@ -1025,6 +1033,37 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Digenapkan (Rounding) - Only show if there's an adjustment */}
+            {(() => {
+              const isMainten = payroll.job_type === "MAINTEN";
+              const cutiTahunanAmount = monthlyLeaveRecords
+                .filter((record) => record.leave_type === "cuti_tahunan")
+                .reduce((sum, record) => sum + record.amount_paid, 0);
+              const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
+              const commissionAdvance = commissionRecords.reduce(
+                (sum, r) => sum + Number(r.amount),
+                0
+              );
+              const finalPayment =
+                payroll.net_pay -
+                (midMonthPayroll?.amount || 0) -
+                additionalMaintenDeduction -
+                commissionAdvance;
+              // Use stored rounding values if available, otherwise calculate
+              const digenapkan = payroll.digenapkan ?? (Math.ceil(finalPayment) - finalPayment);
+
+              return digenapkan > 0.001 ? (
+                <div className="flex justify-between text-sm mt-2">
+                  <span className="text-default-600 dark:text-gray-300">
+                    Digenapkan
+                  </span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    + {formatCurrency(digenapkan)}
+                  </span>
+                </div>
+              ) : null;
+            })()}
+
             {/* Take Home Pay - Highlighted */}
             <div className="bg-sky-100 dark:bg-sky-900/30 -mx-4 -mb-4 mt-4 px-4 py-4 border-t border-sky-200 dark:border-sky-800/50 rounded-b-lg">
               <div className="flex justify-between items-center">
@@ -1043,11 +1082,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       const additionalMaintenDeduction = isMainten
                         ? cutiTahunanAmount
                         : 0;
-                      return (
+                      const commissionAdvance = commissionRecords.reduce(
+                        (sum, r) => sum + Number(r.amount),
+                        0
+                      );
+                      const finalPayment =
                         payroll.net_pay -
                         (midMonthPayroll?.amount || 0) -
-                        additionalMaintenDeduction
-                      );
+                        additionalMaintenDeduction -
+                        commissionAdvance;
+                      // Use stored rounding values if available, otherwise calculate on-the-fly
+                      return payroll.setelah_digenapkan ?? Math.ceil(finalPayment);
                     })()
                   )}
                 </span>
@@ -1399,7 +1444,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           Total Base Pay
                           {(() => {
                             const baseGroupedByHours = groupedItems["Base"]
-                              .filter((item) => item.rate_unit === "Hour")
+                              .filter((item) => item.rate_unit === "Hour" || item.rate_unit === "Bill")
                               .reduce((acc, item) => {
                                 const existing = acc.find(
                                   (group) => group.hours === item.quantity
@@ -1611,7 +1656,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-100 dark:border-teal-800/50">
               <h3 className="text-md font-semibold text-teal-800 dark:text-teal-300 flex items-center gap-2">
-                <IconHammer size={18} className="text-teal-600 dark:text-teal-400" />
+                <IconBusinessplan size={18} className="text-teal-600 dark:text-teal-400" />
                 {commissionRecords
                   .map((record) => record.description)
                   .join(" + ")}

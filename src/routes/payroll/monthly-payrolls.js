@@ -1105,12 +1105,39 @@ export default function (pool) {
           const totalEmployeeDeductions = deductions.reduce((sum, d) => sum + d.employee_amount, 0);
           const netPay = grossPay - totalEmployeeDeductions - commissionGrossPay;
 
+          // Fetch mid-month payroll for rounding calculation
+          const midMonthResult = await client.query(
+            `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+             WHERE employee_id = $1 AND year = $2 AND month = $3`,
+            [primaryEmployee.employeeId, year, month]
+          );
+          const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);
+
+          // Get unique job types to check for MAINTEN
+          const uniqueJobTypes = [...new Set(employeeJobCombos.map(c => c.jobType))].sort();
+          const jobTypes = uniqueJobTypes.join(", ");
+          const isMainten = jobTypes === 'MAINTEN' || jobTypes.includes('MAINTEN');
+
+          // For MAINTEN, get cuti_tahunan advance (approved annual leave amount)
+          let cutiTahunanAdvance = 0;
+          if (isMainten) {
+            const cutiResult = await client.query(`
+              SELECT COALESCE(SUM(amount_paid), 0) as total FROM leave_records
+              WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
+                AND EXTRACT(MONTH FROM leave_date) = $3 AND status = 'approved'
+                AND leave_type = 'cuti_tahunan'
+            `, [primaryEmployee.employeeId, year, month]);
+            cutiTahunanAdvance = parseFloat(cutiResult.rows[0]?.total || 0);
+          }
+
+          // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
+          const jumlah = netPay - midMonthAmount - cutiTahunanAdvance;
+          const setelahDigenapkan = Math.ceil(jumlah);
+          const digenapkan = setelahDigenapkan - jumlah;
+
           // Get job section
           const job = jobsMap.get(primaryEmployee.jobType);
           const section = Array.isArray(job?.section) ? job.section[0] : (job?.section || "Unknown");
-          // Get unique job types and sort alphabetically to ensure consistent ordering
-          const uniqueJobTypes = [...new Set(employeeJobCombos.map(c => c.jobType))].sort();
-          const jobTypes = uniqueJobTypes.join(", ");
 
           // 6. Save to database - Check if payroll exists by employee NAME (not just ID)
           // This ensures employees with same name but different IDs are properly combined
@@ -1147,10 +1174,10 @@ export default function (pool) {
               );
             }
 
-            // Update existing - also update job_type, employee_id, and employee_job_mapping for traceability
+            // Update existing - also update job_type, employee_id, employee_job_mapping, and rounding columns for traceability
             await client.query(
-              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5, employee_job_mapping = $6 WHERE id = $7`,
-              [grossPay.toFixed(2), netPay.toFixed(2), section, jobTypes, primaryEmployee.employeeId, JSON.stringify(employeeJobMapping), employeePayrollId]
+              `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, section = $3, job_type = $4, employee_id = $5, employee_job_mapping = $6, digenapkan = $7, setelah_digenapkan = $8 WHERE id = $9`,
+              [grossPay.toFixed(2), netPay.toFixed(2), section, jobTypes, primaryEmployee.employeeId, JSON.stringify(employeeJobMapping), digenapkan.toFixed(2), setelahDigenapkan.toFixed(2), employeePayrollId]
             );
             // Delete non-manual items
             await client.query(
@@ -1163,11 +1190,11 @@ export default function (pool) {
               [employeePayrollId]
             );
           } else {
-            // Create new - include employee_job_mapping for traceability
+            // Create new - include employee_job_mapping and rounding columns for traceability
             const insertResult = await client.query(
-              `INSERT INTO employee_payrolls (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, employee_job_mapping)
-               VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-              [id, primaryEmployee.employeeId, jobTypes, section, grossPay.toFixed(2), netPay.toFixed(2), JSON.stringify(employeeJobMapping)]
+              `INSERT INTO employee_payrolls (monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, employee_job_mapping, digenapkan, setelah_digenapkan)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+              [id, primaryEmployee.employeeId, jobTypes, section, grossPay.toFixed(2), netPay.toFixed(2), JSON.stringify(employeeJobMapping), digenapkan.toFixed(2), setelahDigenapkan.toFixed(2)]
             );
             employeePayrollId = insertResult.rows[0].id;
           }

@@ -16,7 +16,8 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPencil,
-  IconSearch, // For Edit Rates button
+  IconSearch,
+  IconSettings2,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { Link, useLocation } from "react-router-dom";
@@ -30,6 +31,7 @@ import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappin
 import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import AssociateEmployeesWithJobModal from "../../components/Catalogue/AssociateEmployeesWithJobModal";
+import BatchManageJobPayCodesModal from "../../components/Catalogue/BatchManageJobPayCodesModal";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useNavigate } from "react-router-dom";
@@ -113,6 +115,7 @@ const JobPage: React.FC = () => {
     useState<JobPayCodeDetails | null>(null); // Data for edit modal
   const [showAssociateEmployeesModal, setShowAssociateEmployeesModal] =
     useState(false); // For AssociateEmployeesWithJobModal
+  const [showBatchManageModal, setShowBatchManageModal] = useState(false); // For BatchManageJobPayCodesModal
 
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -791,6 +794,18 @@ const JobPage: React.FC = () => {
                   )}
                 </div>
 
+                {/* Batch Manage Button */}
+                <Button
+                  onClick={() => setShowBatchManageModal(true)}
+                  color="sky"
+                  variant="outline"
+                  icon={IconSettings2}
+                  size="md"
+                  disabled={!selectedJob}
+                >
+                  Batch Manage
+                </Button>
+
                 {/* Add Pay Code Button */}
                 <Button
                   onClick={() => setShowAddPayCodeModal(true)}
@@ -986,6 +1001,16 @@ const JobPage: React.FC = () => {
         currentEmployeeIds={associatedStaff.map((s) => s.id)}
         onAssociationComplete={async () => {
           await refreshStaffs(); // Refresh staffs cache to reflect the changes
+        }}
+      />
+      <BatchManageJobPayCodesModal
+        isOpen={showBatchManageModal}
+        onClose={() => setShowBatchManageModal(false)}
+        job={selectedJob}
+        allPayCodes={availablePayCodes}
+        currentPayCodeDetails={jobPayCodesDetails}
+        onComplete={async () => {
+          await refreshPayCodeMappings();
         }}
       />
 

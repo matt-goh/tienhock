@@ -598,7 +598,7 @@ export interface SelectOption {
 }
 
 export type PayType = "Base" | "Tambahan" | "Overtime";
-export type RateUnit = "Hour" | "Bag" | "Percent" | "Fixed" | "Day" | "Trip";
+export type RateUnit = "Hour" | "Bill" | "Bag" | "Percent" | "Fixed" | "Day" | "Trip";
 
 export interface PayCode {
   id: string;
@@ -679,6 +679,9 @@ export interface EmployeePayroll {
   commission_records?: CommissionRecord[];
   // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
   employee_job_mapping?: Record<string, string>;
+  // Rounding adjustment values
+  digenapkan?: number;          // Rounding adjustment amount
+  setelah_digenapkan?: number;  // Final rounded amount
 }
 
 export interface CommissionRecord {

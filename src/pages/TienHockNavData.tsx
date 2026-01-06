@@ -16,6 +16,7 @@ import AccountCodeListPage from "./Accounting/AccountCodeListPage";
 import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
 import JournalEntryListPage from "./Accounting/JournalEntryListPage";
 import JournalEntryPage from "./Accounting/JournalEntryPage";
+import JournalDetailsPage from "./Accounting/JournalDetailsPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 
 // Accounting - Location Mappings
@@ -40,6 +41,9 @@ import DailyLogListPage from "./Payroll/DailyLog/DailyLogListPage";
 import DailyLogEntryPage from "./Payroll/DailyLog/DailyLogEntryPage";
 import DailyLogDetailsPage from "./Payroll/DailyLog/DailyLogDetailsPage";
 import DailyLogEditPage from "./Payroll/DailyLog/DailyLogEditPage";
+// Payroll - DailyLog (Salesman-specific)
+import DailyLogSalesmanEntryPage from "./Payroll/DailyLog/DailyLogSalesmanEntryPage";
+import DailyLogSalesmanEditPage from "./Payroll/DailyLog/DailyLogSalesmanEditPage";
 
 // Payroll - MonthlyLog
 import MonthlyLogListPage from "./Payroll/MonthlyLog/MonthlyLogListPage";
@@ -154,8 +158,41 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           },
         ],
       });
+    } else if (jobConfig.id === "SALESMAN") {
+      // SALESMAN-specific routes using dedicated pages
+      payrollSubItems.push({
+        name: jobConfig.name,
+        path: `/payroll/${jobTypeLower}-production`,
+        component: (props: any) => (
+          <DailyLogListPage jobType={jobConfig.id} {...props} />
+        ),
+        subItems: [
+          {
+            name: `New ${jobConfig.name} Entry`,
+            path: `/payroll/${jobTypeLower}-entry`,
+            component: (props: any) => (
+              <DailyLogSalesmanEntryPage {...props} />
+            ),
+            showInPopover: true,
+          },
+          {
+            name: "View Log",
+            path: `/payroll/${jobTypeLower}-production/:id`,
+            component: (props: any) => (
+              <DailyLogDetailsPage jobType={jobConfig.id} {...props} />
+            ),
+          },
+          {
+            name: "Edit Log",
+            path: `/payroll/${jobTypeLower}-production/:id/edit`,
+            component: (props: any) => (
+              <DailyLogSalesmanEditPage {...props} />
+            ),
+          },
+        ],
+      });
     } else {
-      // Daily job routes (MEE, BIHUN, BOILER, SALESMAN)
+      // Daily job routes (MEE, BIHUN, BOILER)
       payrollSubItems.push({
         name: jobConfig.name,
         path: `/payroll/${jobTypeLower}-production`,
@@ -240,8 +277,13 @@ export const TienHockNavData: SidebarItem[] = [
             showInPopover: true,
           },
           {
-            name: "Edit Entry",
+            name: "View Entry",
             path: "/accounting/journal-entries/:id",
+            component: JournalDetailsPage,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id/edit",
             component: JournalEntryPage,
           },
         ],

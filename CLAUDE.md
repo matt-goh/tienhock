@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 11. If needed during planning, access the dev database to understand the system better, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
 12. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
 13. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
-14. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
+14. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
 
 ## Architecture Overview
 
@@ -95,10 +95,10 @@ This is a comprehensive ERP system supporting three companies:
 - `employee_job_location_exclusions` - id, employee_id, job_id, location_code, reason, created_at, created_by (excludes employee-job combinations from appearing in specific location salary reports)
 
 **Payroll:**
-- `pay_codes` - id, description, pay_type, rate_unit, rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, created_at, updated_at
+- `pay_codes` - id, description, pay_type, rate_unit (constraint: Hour/Bill/Day/Bag/Trip/Fixed/Percent), rate_biasa, rate_ahad, rate_umum, is_active, requires_units_input, created_at, updated_at
 - `employee_pay_codes` - id, employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
-- `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping
+- `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping, digenapkan, setelah_digenapkan
 - `payroll_items` - id, employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, created_at, job_type, source_employee_id, source_date, work_log_id, work_log_type
 - `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
@@ -113,7 +113,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Work Logs (Daily):**
 - `daily_work_logs` - id, log_date, shift, day_type, context_data, status, created_at, updated_at, section
-- `daily_work_log_entries` - id, work_log_id, employee_id, total_hours, job_id, is_on_leave, leave_type, following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type
+- `daily_work_log_entries` - id, work_log_id, employee_id, total_hours, job_id, is_on_leave, leave_type, following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled (boolean, for SALESMAN_IKUT x2 doubling feature)
 - `daily_work_log_activities` - id, log_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added
 
 **Work Logs (Monthly):**

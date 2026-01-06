@@ -36,7 +36,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   selectedMonth,
   onChange,
   className,
-  showGoToCurrentButton = true,
+  showGoToCurrentButton = false,
   formatDisplay,
   allowFutureMonths = false,
   label,

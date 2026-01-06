@@ -1,4 +1,5 @@
-// src/pages/Payroll/DailyLogEntryPage.tsx
+// src/pages/Payroll/DailyLog/DailyLogSalesmanEntryPage.tsx
+// Dedicated entry page for SALESMAN job type
 import React, {
   useState,
   useEffect,
@@ -9,7 +10,6 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
-import { FormListbox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
 import { format } from "date-fns";
@@ -28,7 +28,6 @@ import {
   getContextLinkedPayCodes,
   getJobIds,
 } from "../../../configs/payrollJobConfigs";
-import DynamicContextForm from "../../../components/Payroll/DynamicContextForm";
 import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
@@ -40,7 +39,11 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconCheck,
+  IconX,
+} from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -66,11 +69,10 @@ interface DailyLogFormData {
   employees: EmployeeWithHours[];
 }
 
-interface DailyLogEntryPageProps {
+interface DailyLogSalesmanEntryPageProps {
   mode?: "create" | "edit";
   existingWorkLog?: any;
   onCancel?: () => void;
-  jobType?: string;
 }
 
 type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan";
@@ -94,12 +96,13 @@ interface ActivityItem {
   source?: "job" | "employee";
 }
 
-const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
+const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   mode = "create",
   existingWorkLog,
   onCancel,
-  jobType = "MEE",
 }) => {
+  // Hardcode jobType for salesman page
+  const jobType = "SALESMAN";
   const navigate = useNavigate();
   const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
@@ -116,6 +119,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [employeeActivities, setEmployeeActivities] = useState<
     Record<string, any[]>
   >({});
+  const [locationTypes, setLocationTypes] = useState<
+    Record<string, "Local" | "Outstation">
+  >({});
+  const [salesmanProducts, setSalesmanProducts] = useState<
+    Record<string, any[]>
+  >({});
+  const [salesmanIkutRelations, setSalesmanIkutRelations] = useState<
+    Record<string, string> // rowKey of SALESMAN_IKUT -> SALESMAN employee ID
+  >({});
+  const [ikutBagCounts, setIkutBagCounts] = useState<
+    Record<string, { muatMee: number; muatBihun: number }> // rowKey -> bag counts
+  >({});
+  const [ikutDoubled, setIkutDoubled] = useState<Record<string, boolean>>({});
   const [leaveEmployees, setLeaveEmployees] = useState<
     Record<string, LeaveEntry>
   >({});
@@ -149,6 +165,37 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const contextLinkedPayCodes = jobConfig
     ? getContextLinkedPayCodes(jobConfig)
     : {};
+
+  // Hardcoded Muat paycodes for SALESMAN_IKUT
+  const MUAT_MEE_PAYCODE = "4-COMM_MUAT_MEE";
+  const MUAT_BIHUN_PAYCODE = "5-COMM_MUAT_BH";
+
+  // Product ID to DME/DWE pay code mapping for SALESMAN_IKUT
+  const PRODUCT_TO_SALESMAN_IKUT_PAYCODE: Record<string, string> = {
+    // MEE products
+    "1-2UDG": "DME-2UDG",
+    "1-3UDG": "DME-3UDG",
+    "1-350G": "DME-350G",
+    "1-MNL": "DME-MNL",
+    // BH products
+    "2-APPLE": "DME-300G",
+    "2-BH": "DME-300G",
+    "2-BH2": "DME-2H",
+    "2-BCM3": "DME-600G",
+    "2-BNL": "DME-3.1KG",
+    "2-BNL(5)": "DME-5KG",
+    "2-MASAK": "DME-300G",
+    "2-PADI": "DME-300G",
+    // WE products
+    "WE-2UDG": "DWE-2UDG",
+    "WE-3UDG": "DWE-3UDG",
+    "WE-300G": "DWE-300G",
+    "WE-360": "DWE-350G",
+    "WE-360(5PK)": "DWE-350G",
+    "WE-420": "DWE-420G",
+    "WE-600G": "DWE-600G",
+    "WE-MNL": "DWE-MNL",
+  };
 
   // Helper function to determine day type based on date
   const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
@@ -188,16 +235,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       };
     }
 
-    // Initialize with default values from config
-    const defaultContextData: Record<string, any> = {};
-    jobConfig?.contextFields.forEach((field) => {
-      defaultContextData[field.id] = field.defaultValue;
-    });
-
+    // SALESMAN has no context fields, use empty object
     return {
       logDate: format(new Date(), "yyyy-MM-dd"),
       shift: "1",
-      contextData: defaultContextData,
+      contextData: {},
       dayType: determineDayType(new Date()),
       employees: [],
     };
@@ -213,6 +255,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     formData: DailyLogFormData;
     employeeSelectionState: any;
     employeeActivities: Record<string, any[]>;
+    locationTypes: Record<string, "Local" | "Outstation">;
+    salesmanIkutRelations: Record<string, string>;
+    ikutBagCounts: Record<string, { muatMee: number; muatBihun: number }>;
+    ikutDoubled: Record<string, boolean>;
     leaveEmployees: Record<string, LeaveEntry>;
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
     leaveBalances: Record<string, any>;
@@ -226,6 +272,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // Ref to store the original saved activities from the work log
   // This preserves the original state even if the employee is deselected and re-selected
   const savedEmployeeActivitiesRef = useRef<Record<string, any[]>>({});
+  // Ref to track which rowKeys have had their products linked (to avoid infinite loops)
+  const productsLinkedRef = useRef<Record<string, string>>({});
+  // Ref to track which SALESMAN_IKUT rowKeys have had their products copied (to avoid infinite loops)
+  const ikutProductsLinkedRef = useRef<Record<string, string>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -291,6 +341,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           normalizeForComparison(initialState.employeeSelectionState) ||
         normalizeForComparison(employeeActivities) !==
           normalizeForComparison(initialState.employeeActivities) ||
+        normalizeForComparison(locationTypes) !==
+          normalizeForComparison(initialState.locationTypes) ||
+        normalizeForComparison(salesmanIkutRelations) !==
+          normalizeForComparison(initialState.salesmanIkutRelations) ||
+        normalizeForComparison(ikutBagCounts) !==
+          normalizeForComparison(initialState.ikutBagCounts) ||
+        normalizeForComparison(ikutDoubled) !==
+          normalizeForComparison(initialState.ikutDoubled) ||
         normalizeForComparison(leaveEmployees) !==
           normalizeForComparison(initialState.leaveEmployees) ||
         normalizeForComparison(leaveEmployeeActivities) !==
@@ -306,6 +364,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     formData,
     employeeSelectionState,
     employeeActivities,
+    locationTypes,
+    salesmanIkutRelations,
+    ikutBagCounts,
+    ikutDoubled,
     leaveEmployees,
     leaveEmployeeActivities,
     leaveBalances,
@@ -327,55 +389,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       "You have unsaved changes. Are you sure you want to leave this page?",
   });
 
-  // Update activities when context values change for linked pay codes
-  useEffect(() => {
-    if (!jobConfig) return;
-
-    // For each context field that has a linked pay code
-    jobConfig.contextFields.forEach((field) => {
-      if (field.linkedPayCode) {
-        const contextValue = formData.contextData[field.id];
-
-        // Update all employee activities for this pay code
-        setEmployeeActivities((prev) => {
-          const updatedActivities = { ...prev };
-
-          Object.keys(updatedActivities).forEach((rowKey) => {
-            // First update the units for context-linked activities
-            const updatedRowActivities = updatedActivities[rowKey].map(
-              (activity) => {
-                if (activity.payCodeId === field.linkedPayCode) {
-                  // Auto-update units for context-linked pay codes
-                  return {
-                    ...activity,
-                    unitsProduced: contextValue || 0,
-                    isContextLinked: true,
-                  };
-                }
-                return activity;
-              }
-            );
-
-            // Get the employee's hours for this row
-            const [employeeId, jobType] = rowKey.split("-");
-            const hours =
-              employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-
-            // Then recalculate all activities using our centralized function
-            updatedActivities[rowKey] = calculateActivitiesAmounts(
-              updatedRowActivities,
-              hours,
-              formData.contextData,
-              undefined,
-              formData.logDate
-            );
-          });
-
-          return updatedActivities;
-        });
-      }
-    });
-  }, [formData.contextData, jobConfig, employeeSelectionState.jobHours]);
+  // Note: SALESMAN has no context fields, so no context-linked activity updates needed
 
   // Clear Cuti Umum selections when day type changes from holiday to non-holiday
   useEffect(() => {
@@ -403,9 +417,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }));
   }, [allJobs, JOB_IDS]);
 
-  // Update available employees based on dynamic job types
+  // Available employees (excluding KILANG and TIMOTHY.G for salesman)
   const availableEmployees = useMemo(() => {
+    const excludedIds = ["KILANG", "TIMOTHY.G"];
     return allStaffs
+      .filter((staff) => !excludedIds.includes(staff.id))
       .filter((staff) => {
         if (!staff.job || !Array.isArray(staff.job)) return false;
         return staff.job.some((jobId: string) => JOB_IDS.includes(jobId));
@@ -457,10 +473,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   }, [expandedEmployees]);
 
-  // Helper function to get employees available for work (not on leave)
-  const availableForWork = useMemo(() => {
-    return expandedEmployees.filter((emp) => !leaveEmployees[emp.id]?.selected);
-  }, [expandedEmployees, leaveEmployees]);
+  // Salesman employees (job type SALESMAN only)
+  const salesmanEmployees = useMemo(() => {
+    return expandedEmployees.filter(
+      (emp: { jobType: string; id: string }) => emp.jobType === "SALESMAN"
+    );
+  }, [expandedEmployees]);
+
+  // Salesman Ikut employees (job type SALESMAN_IKUT only)
+  const salesmanIkutEmployees = useMemo(() => {
+    return expandedEmployees.filter(
+      (emp: { jobType: string }) => emp.jobType === "SALESMAN_IKUT"
+    );
+  }, [expandedEmployees]);
 
   // Helper function to get employees available for leave (not working)
   const availableForLeave = useMemo(() => {
@@ -470,12 +495,117 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   }, [uniqueEmployees, employeeSelectionState.selectedJobs]);
 
+  // SALESMAN_IKUT employees available for work (not on leave)
+  const salesmanIkutAvailableForWork = useMemo(() => {
+    return salesmanIkutEmployees.filter(
+      (emp) => !leaveEmployees[emp.id]?.selected
+    );
+  }, [salesmanIkutEmployees, leaveEmployees]);
+
+  // WE product type mapping (based on database product.type field)
+  const WE_PRODUCT_TYPES: Record<string, "MEE" | "BH"> = {
+    "WE-2UDG": "MEE",
+    "WE-3UDG": "MEE",
+    "WE-360": "MEE",
+    "WE-360(5PK)": "MEE",
+    "WE-420": "MEE",
+    "WE-MNL": "MEE",
+    "WE-300G": "BH",
+    "WE-600G": "BH",
+  };
+
+  // Helper function to determine product category
+  const getProductCategory = (productId: string): "MEE" | "BH" | null => {
+    if (productId.startsWith("1-")) return "MEE";
+    if (productId.startsWith("2-")) return "BH";
+    if (productId.startsWith("WE-")) return WE_PRODUCT_TYPES[productId] || null;
+    return null;
+  };
+
+  // Calculate aggregate stats from salesmanProducts for selected salesmen
+  const salesmanProductStats = useMemo(() => {
+    let totalMee = 0;
+    let totalBihun = 0;
+    const productTotals: Record<string, number> = {};
+    const salesmanTotals: Record<string, { name: string; mee: number; bihun: number; total: number }> = {};
+
+    // Get selected SALESMAN employees
+    const selectedSalesmen = salesmanEmployees.filter((emp) =>
+      employeeSelectionState.selectedJobs[emp.id]?.includes("SALESMAN")
+    );
+
+    selectedSalesmen.forEach((emp) => {
+      const products = salesmanProducts[emp.rowKey || ""] || [];
+      let salesmanMee = 0;
+      let salesmanBihun = 0;
+
+      products.forEach((product: { product_id: string; quantity: number }) => {
+        const qty = product.quantity || 0;
+        productTotals[product.product_id] = (productTotals[product.product_id] || 0) + qty;
+
+        const category = getProductCategory(product.product_id);
+        if (category === "MEE") {
+          totalMee += qty;
+          salesmanMee += qty;
+        } else if (category === "BH") {
+          totalBihun += qty;
+          salesmanBihun += qty;
+        }
+      });
+
+      if (salesmanMee + salesmanBihun > 0) {
+        salesmanTotals[emp.id] = {
+          name: emp.name,
+          mee: salesmanMee,
+          bihun: salesmanBihun,
+          total: salesmanMee + salesmanBihun,
+        };
+      }
+    });
+
+    // Sort products by quantity descending
+    const sortedProducts = Object.entries(productTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, qty]) => ({ id, qty }));
+
+    return { totalMee, totalBihun, total: totalMee + totalBihun, productTotals: sortedProducts, salesmanTotals };
+  }, [salesmanEmployees, employeeSelectionState.selectedJobs, salesmanProducts]);
+
+  // Get employees followed by each salesman
+  const followedBySalesman = useMemo(() => {
+    const followedMap: Record<string, string[]> = {};
+
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        const ikutEmployee = salesmanIkutEmployees.find(
+          (emp) => emp.rowKey === ikutRowKey
+        );
+        if (ikutEmployee) {
+          if (!followedMap[salesmanId]) {
+            followedMap[salesmanId] = [];
+          }
+          followedMap[salesmanId].push(ikutEmployee.id);
+        }
+      }
+    );
+
+    return followedMap;
+  }, [salesmanIkutRelations, salesmanIkutEmployees]);
+
   // Update day type and hours when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = new Date(e.target.value);
     const newDayType = determineDayType(newDate);
     const newDefaultHours = getDefaultHours(e.target.value);
     const oldDefaultHours = getDefaultHours(formData.logDate);
+
+    // Clear products linked refs when date changes (products will be different)
+    if (productsLinkedRef.current) {
+      productsLinkedRef.current = {};
+    }
+    if (ikutProductsLinkedRef.current) {
+      ikutProductsLinkedRef.current = {};
+    }
 
     setFormData({
       ...formData,
@@ -624,6 +754,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             JSON.stringify(employeeSelectionState)
           ),
           employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+          locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+          salesmanIkutRelations: JSON.parse(
+            JSON.stringify(salesmanIkutRelations)
+          ),
+          ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+          ikutDoubled: JSON.parse(JSON.stringify(ikutDoubled)),
           leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
           leaveEmployeeActivities: JSON.parse(
             JSON.stringify(leaveEmployeeActivities)
@@ -663,6 +799,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           Object.keys(employeeSelectionState.selectedJobs).length > 0;
         if (!hasSelectedEmployees) {
           return false;
+        }
+
+        // Wait for products to be fetched if there are selected salesmen
+        const hasSelectedSalesmen = Object.entries(
+          employeeSelectionState.selectedJobs
+        ).some(([_, jobTypes]) =>
+          jobTypes.some((jt) => JOB_IDS.includes(jt))
+        );
+        if (
+          hasSelectedSalesmen &&
+          Object.keys(salesmanProducts).length === 0
+        ) {
+          return false; // Still waiting for products
         }
 
         // Check if activities have been fetched for selected employees
@@ -709,9 +858,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     expandedEmployees.length,
     employeeSelectionState.selectedJobs,
     employeeActivities,
+    salesmanProducts,
     mode,
     existingWorkLog,
-    jobConfig?.id,
     JOB_IDS,
     isInitializationComplete,
   ]);
@@ -728,19 +877,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }));
       }
 
-      // Validate required context fields
-      if (jobConfig) {
-        const requiredContextFields = jobConfig.contextFields.filter(
-          (field) => field.required
-        );
-        for (const field of requiredContextFields) {
-          const value = formData.contextData[field.id];
-          if (value === undefined || value === null || value === "") {
-            toast.error(`${field.label} is required`);
-            return;
-          }
-        }
-      }
+      // SALESMAN has no required context fields to validate
     }
   }, [holidays, formData.logDate]);
 
@@ -993,25 +1130,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
   };
 
-  // Handle hours blur event
-  const handleHoursBlur = (rowKey: string | undefined) => {
-    if (!rowKey) return;
-
-    // Recalculate activities when hours change
-    fetchAndApplyActivities();
-  };
-
-  // Handle context data changes
-  const handleContextChange = (fieldId: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      contextData: {
-        ...prev.contextData,
-        [fieldId]: value,
-      },
-    }));
-  };
-
   const handleBack = () => {
     safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
   };
@@ -1045,6 +1163,111 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }
       }
 
+      // Handle SALESMAN selection/deselection cascading to SALESMAN_IKUT employees
+      if (jobType === "SALESMAN") {
+        const followedEmployees = followedBySalesman[employeeId] || [];
+
+        followedEmployees.forEach((ikutEmployeeId) => {
+          const ikutCurrentSelectedJobs =
+            updatedSelectedJobs[ikutEmployeeId] || [];
+
+          if (wasSelected) {
+            // Deselecting SALESMAN - also deselect following SALESMAN_IKUT employees
+            updatedSelectedJobs[ikutEmployeeId] =
+              ikutCurrentSelectedJobs.filter((j) => j !== "SALESMAN_IKUT");
+          } else {
+            // Selecting SALESMAN - also select following SALESMAN_IKUT employees (if not already selected)
+            if (!ikutCurrentSelectedJobs.includes("SALESMAN_IKUT")) {
+              updatedSelectedJobs[ikutEmployeeId] = [
+                ...ikutCurrentSelectedJobs,
+                "SALESMAN_IKUT",
+              ];
+            }
+            // Initialize hours for auto-selected SALESMAN_IKUT employees
+            if (!updatedJobHours[ikutEmployeeId]) {
+              updatedJobHours[ikutEmployeeId] = {};
+            }
+            if (!updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"]) {
+              updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
+            }
+          }
+        });
+
+        // Apply location-based paycodes to auto-selected SALESMAN_IKUT employees
+        if (!wasSelected && followedEmployees.length > 0) {
+          setTimeout(() => {
+            const salesmanRowKey = `${employeeId}-SALESMAN`;
+            const salesmanLocationType =
+              locationTypes[salesmanRowKey] || "Local";
+
+            // Apply paycode to each auto-selected SALESMAN_IKUT employee - exact same pattern as handleLocationTypeChange
+            followedEmployees.forEach((ikutEmployeeId) => {
+              const ikutRowKey = `${ikutEmployeeId}-SALESMAN_IKUT`;
+
+              // Check if this SALESMAN_IKUT employee is selected and has activities
+              if (employeeActivities[ikutRowKey]) {
+                const ikutActivities = employeeActivities[ikutRowKey] || [];
+
+                // Update activities for the SALESMAN_IKUT employee
+                const updatedIkutActivities = ikutActivities.map((activity) => {
+                  // Apply location-based paycode logic
+                  if (
+                    salesmanLocationType === "Local" &&
+                    activity.payCodeId === "ELAUN_MT"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: true,
+                    };
+                  } else if (
+                    salesmanLocationType === "Local" &&
+                    activity.payCodeId === "ELAUN_MO"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: false,
+                    };
+                  } else if (
+                    salesmanLocationType === "Outstation" &&
+                    activity.payCodeId === "ELAUN_MO"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: true,
+                    };
+                  } else if (
+                    salesmanLocationType === "Outstation" &&
+                    activity.payCodeId === "ELAUN_MT"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: false,
+                    };
+                  }
+
+                  return activity;
+                });
+
+                // Recalculate amounts for the SALESMAN_IKUT employee
+                const recalculatedIkutActivities = calculateActivitiesAmounts(
+                  updatedIkutActivities,
+                  0, // No hours needed for allowance paycodes
+                  formData.contextData,
+                  undefined,
+                  formData.logDate
+                );
+
+                // Individual setEmployeeActivities call for each employee - same as handleLocationTypeChange
+                setEmployeeActivities((prev) => ({
+                  ...prev,
+                  [ikutRowKey]: recalculatedIkutActivities,
+                }));
+              }
+            });
+          }, 200); // Single delay to ensure activities are loaded
+        }
+      }
+
       return {
         selectedJobs: updatedSelectedJobs,
         jobHours: updatedJobHours,
@@ -1052,29 +1275,304 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
-  // Update employee hours by employee+job combination
-  const handleEmployeeHoursChange = (
+  const handleLocationTypeChange = (
     rowKey: string | undefined,
-    hours: string
+    locationType: "Local" | "Outstation"
   ) => {
     if (!rowKey) return;
 
     const [employeeId, jobType] = rowKey.split("-");
-    const hoursNum = hours === "" ? 0 : parseFloat(hours);
 
-    setEmployeeSelectionState((prev) => {
-      return {
+    setLocationTypes((prev) => ({
+      ...prev,
+      [rowKey]: locationType,
+    }));
+
+    // Recalculate activities when location type changes
+    const activities = employeeActivities[rowKey] || [];
+
+    // Update activities based on location type for the salesman
+    if (activities.length > 0) {
+      const recalculatedActivities = calculateActivitiesAmounts(
+        activities,
+        0, // Hours don't matter for salesmen
+        formData.contextData,
+        locationType,
+        formData.logDate
+      );
+
+      setEmployeeActivities((prev) => ({
         ...prev,
-        jobHours: {
-          ...prev.jobHours,
-          [employeeId]: {
-            ...(prev.jobHours[employeeId] || {}),
-            [jobType]: hoursNum,
-          },
-        },
-      };
-    });
+        [rowKey]: recalculatedActivities,
+      }));
+    }
+
+    // Apply location-based paycodes to SALESMAN_IKUT employees following this salesman
+    if (jobType === "SALESMAN") {
+      const followedEmployees = followedBySalesman[employeeId] || [];
+
+      followedEmployees.forEach((ikutEmployeeId) => {
+        // Find the SALESMAN_IKUT row key for this employee
+        const ikutRowKey = `${ikutEmployeeId}-SALESMAN_IKUT`;
+
+        // Check if this SALESMAN_IKUT employee is selected and has activities
+        if (employeeActivities[ikutRowKey]) {
+          const ikutActivities = employeeActivities[ikutRowKey] || [];
+
+          // Update activities for the SALESMAN_IKUT employee
+          const updatedIkutActivities = ikutActivities.map((activity) => {
+            // Apply location-based paycode logic
+            if (locationType === "Local" && activity.payCodeId === "ELAUN_MT") {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              locationType === "Local" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            } else if (
+              locationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              locationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            }
+
+            return activity;
+          });
+
+          // Recalculate amounts for the SALESMAN_IKUT employee
+          const recalculatedIkutActivities = calculateActivitiesAmounts(
+            updatedIkutActivities,
+            employeeSelectionState.jobHours[ikutEmployeeId]?.[
+              "SALESMAN_IKUT"
+            ] || getDefaultHours(formData.logDate),
+            formData.contextData,
+            undefined,
+            formData.logDate
+          );
+
+          setEmployeeActivities((prev) => ({
+            ...prev,
+            [ikutRowKey]: recalculatedIkutActivities,
+          }));
+        }
+      });
+    }
   };
+
+  const fetchSalesmanProducts = async () => {
+    if (!formData.logDate) return;
+
+    // Skip if we've already fetched for this date (optimization to reduce API calls)
+    if (productsFetchedForDateRef.current === formData.logDate) return;
+
+    try {
+      // Get ALL salesman IDs (not just selected ones) - fetch once per date
+      const salesmenIds = salesmanEmployees.map((emp) => emp.id);
+
+      if (salesmenIds.length === 0) return;
+
+      // Pass date as YYYY-MM-DD string to avoid timezone issues between client and server
+      const dateString = formData.logDate;
+
+      // Fetch products for ALL salesmen in one request
+      const response = await api.get(
+        `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(",")}&date=${dateString}`
+      );
+
+      // Mark as fetched for this date
+      productsFetchedForDateRef.current = formData.logDate;
+
+      // Response might be directly available or in a data property
+      const responseData = response.data || response;
+
+      // Create row keys for each salesman (always use SALESMAN job type)
+      const rowKeyProducts: Record<string, any[]> = {};
+
+      Object.entries(responseData).forEach(([salesmanId, products]) => {
+        const rowKey = `${salesmanId}-SALESMAN`;
+
+        // Ensure products is always an array and has required fields
+        const productArray = Array.isArray(products) ? products : [];
+
+        // Filter to only include products with valid data
+        rowKeyProducts[rowKey] = productArray.filter(
+          (p) =>
+            p &&
+            p.product_id &&
+            typeof p.quantity === "number" &&
+            p.quantity > 0
+        );
+      });
+
+      // Also add empty arrays for salesmen with no products (for proper clearing)
+      salesmenIds.forEach((salesmanId) => {
+        const rowKey = `${salesmanId}-SALESMAN`;
+        if (!rowKeyProducts[rowKey]) {
+          rowKeyProducts[rowKey] = [];
+        }
+      });
+
+      setSalesmanProducts(rowKeyProducts);
+    } catch (error) {
+      console.error("Error fetching salesman products:", error);
+      toast.error("Failed to fetch salesman products");
+    }
+  };
+
+  // Track previous date to detect date changes
+  const previousDateRef = useRef<string | null>(null);
+  // Track if products have been fetched for current date (to avoid re-fetching on selection changes)
+  const productsFetchedForDateRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Clear refs when date changes to force re-linking and re-fetching
+    if (previousDateRef.current !== null && previousDateRef.current !== formData.logDate) {
+      productsLinkedRef.current = {};
+      ikutProductsLinkedRef.current = {};
+      productsFetchedForDateRef.current = null; // Reset so we fetch for new date
+    }
+    previousDateRef.current = formData.logDate;
+
+    // Fetch ALL salesman products once when date changes or employees load
+    // No longer depends on selectedJobs - fetch everything upfront
+    if (formData.logDate && salesmanEmployees.length > 0) {
+      fetchSalesmanProducts();
+    }
+  }, [
+    formData.logDate,
+    salesmanEmployees.length, // Only re-fetch when date changes or employees load
+  ]);
+
+  useEffect(() => {
+    // After salesmanProducts are updated, auto-link them to pay codes
+    // Also clear products for salesmen who no longer have products on this date
+
+    // Get all SALESMAN rowKeys that should have products checked
+    const salesmanRowKeys = Object.entries(employeeSelectionState.selectedJobs)
+      .flatMap(([employeeId, jobTypes]) =>
+        jobTypes.filter((jt) => jt === "SALESMAN").map((jt) => `${employeeId}-${jt}`)
+      );
+
+    // For each SALESMAN, check if they have products or need clearing
+    salesmanRowKeys.forEach((rowKey) => {
+      const products = salesmanProducts[rowKey] || [];
+      const currentActivities = employeeActivities[rowKey] || [];
+
+      if (currentActivities.length === 0) return;
+
+      // Create hash for current products (empty array = empty hash)
+      const productsHash = JSON.stringify(
+        products.map((p) => ({ id: p.product_id, qty: p.quantity }))
+      );
+
+      // Skip if we've already processed this exact state
+      if (productsLinkedRef.current[rowKey] === productsHash) {
+        return;
+      }
+
+      // Mark as processed
+      productsLinkedRef.current[rowKey] = productsHash;
+
+      setEmployeeActivities((prev) => {
+        const prevActivities = prev[rowKey] || [];
+        if (prevActivities.length === 0) return prev;
+
+        const updatedActivities = [...prevActivities];
+
+        if (products.length === 0) {
+          // No products for this date - clear all product-based pay codes
+          // Product pay codes are those matching product IDs (like "1-2UDG", "2-BH", etc.)
+          updatedActivities.forEach((activity, index) => {
+            // Check if this is a product-based paycode (starts with number or "WE-")
+            const payCodeId = String(activity.payCodeId);
+            const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+
+            if (isProductPaycode && activity.unitsProduced > 0) {
+              updatedActivities[index] = {
+                ...activity,
+                unitsProduced: 0,
+                isSelected: false,
+                calculatedAmount: 0,
+              };
+            }
+          });
+        } else {
+          // Has products - update quantities
+          // Update or clear each product-based activity
+          updatedActivities.forEach((activity, index) => {
+            const payCodeId = String(activity.payCodeId);
+            const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+
+            if (isProductPaycode) {
+              const product = products.find((p) => String(p.product_id) === payCodeId);
+              if (product) {
+                const quantity = parseFloat(product.quantity) || 0;
+                if (quantity > 0) {
+                  const newAmount = quantity * (activity.rate || 0);
+                  updatedActivities[index] = {
+                    ...activity,
+                    unitsProduced: quantity,
+                    isSelected: true,
+                    calculatedAmount: newAmount,
+                  };
+                }
+              } else if (activity.unitsProduced > 0) {
+                // This product no longer has data - clear it
+                updatedActivities[index] = {
+                  ...activity,
+                  unitsProduced: 0,
+                  isSelected: false,
+                  calculatedAmount: 0,
+                };
+              }
+            }
+          });
+        }
+
+        // Auto-deselect Hour-based activities
+        updatedActivities.forEach((activity, index) => {
+          if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
+            updatedActivities[index] = {
+              ...activity,
+              isSelected: false,
+              calculatedAmount: 0,
+            };
+          }
+        });
+
+        // Recalculate amounts for all activities
+        const recalculatedActivities = calculateActivitiesAmounts(
+          updatedActivities,
+          0,
+          formData.contextData,
+          locationTypes[rowKey] || "Local",
+          formData.logDate
+        );
+
+        return {
+          ...prev,
+          [rowKey]: recalculatedActivities,
+        };
+      });
+    });
+  }, [salesmanProducts, employeeActivities, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs]);
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
@@ -1084,6 +1582,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       );
       return;
     }
+
+    // Get the products for this specific employee and job
+    const rowKey = employee.rowKey;
+    const productsForEmployee = salesmanProducts[rowKey] || [];
 
     // First set selectedEmployee, then open the modal
     setSelectedEmployee(employee);
@@ -1108,30 +1610,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
 
     // Filter out excluded employees directly when building selected employees list
-    const allSelectedEmployees = Object.entries(
+    let allSelectedEmployees = Object.entries(
       employeeSelectionState.selectedJobs
     ).filter(([_, jobTypes]) => jobTypes.length > 0);
+
+    // Remove excluded employees
+    const excludedEmployees = ["KILANG", "TIMOTHY.G"];
+    allSelectedEmployees = allSelectedEmployees.filter(
+      ([employeeId, _]) => !excludedEmployees.includes(employeeId)
+    );
 
     if (allSelectedEmployees.length === 0 && leaveEntries.length === 0) {
       toast.error("Please select at least one employee for work or leave.");
       return;
     }
 
-    // Validate that all selected employees have hours
-    const invalidEmployees = allSelectedEmployees.filter(
-      ([employeeId, jobTypes]) => {
-        return jobTypes.some((jobType) => {
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-          return hours <= 0;
-        });
-      }
-    );
-
-    if (invalidEmployees.length > 0) {
-      toast.error("All selected employees must have hours greater than 0");
-      return;
-    }
+    // Note: Salesmen don't require hours validation
 
     // Build the employee data with all selected jobs
     const selectedEmployeeData = allSelectedEmployees
@@ -1141,12 +1635,30 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
           const rowKey = `${employeeId}-${jobType}`;
           const activities = employeeActivities[rowKey] || [];
+          const employeeObject = expandedEmployees.find(
+            (e) => e.rowKey === rowKey
+          );
+
+          // Add salesman-specific additional data
+          const additionalData: any = {
+            locationType: employeeObject
+              ? getEffectiveLocationType(employeeObject)
+              : "Local",
+          };
+          if (jobType === "SALESMAN_IKUT") {
+            additionalData.followingSalesmanId = salesmanIkutRelations[rowKey];
+            additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
+            additionalData.muatBihunBags =
+              ikutBagCounts[rowKey]?.muatBihun || 0;
+            additionalData.isDoubled = ikutDoubled[rowKey] || false;
+          }
 
           return {
             employeeId,
             jobType,
             hours,
             activities,
+            ...additionalData,
           };
         });
       })
@@ -1189,6 +1701,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           JSON.stringify(employeeSelectionState)
         ),
         employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+        locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+        salesmanIkutRelations: JSON.parse(
+          JSON.stringify(salesmanIkutRelations)
+        ),
+        ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
+        ikutDoubled: JSON.parse(JSON.stringify(ikutDoubled)),
         leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
         leaveEmployeeActivities: JSON.parse(
           JSON.stringify(leaveEmployeeActivities)
@@ -1218,6 +1736,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         const employeeId = employee.id;
         const jobType = employee.jobType;
 
+        // Skip SALESMAN_IKUT employees from default selection
+        if (jobType === "SALESMAN_IKUT") {
+          return;
+        }
+
         // Initialize the arrays if they don't exist yet
         if (!newSelectedJobs[employeeId]) {
           newSelectedJobs[employeeId] = [];
@@ -1243,16 +1766,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
-    // Check if all available employees are selected
-    const allAvailableSelected = availableForWork.every((emp) =>
+    // Check if all salesman employees are selected
+    const allAvailableSelected = salesmanEmployees.every((emp) =>
       employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
     );
 
     setEmployeeSelectionState((prev) => {
       if (allAvailableSelected) {
-        // Deselect all available employees
+        // Deselect all salesman employees
         const newSelectedJobs = { ...prev.selectedJobs };
-        availableForWork.forEach((emp) => {
+        salesmanEmployees.forEach((emp) => {
           if (newSelectedJobs[emp.id]) {
             newSelectedJobs[emp.id] = newSelectedJobs[emp.id].filter(
               (job) => job !== emp.jobType
@@ -1268,11 +1791,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           jobHours: prev.jobHours,
         };
       } else {
-        // Select all available employees
+        // Select all salesman employees
         const newSelectedJobs = { ...prev.selectedJobs };
         const newJobHours = { ...prev.jobHours };
 
-        availableForWork.forEach((emp) => {
+        salesmanEmployees.forEach((emp) => {
           if (!newSelectedJobs[emp.id]) {
             newSelectedJobs[emp.id] = [];
           }
@@ -1379,11 +1902,292 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   };
 
+  const handleIkutChange = (ikutRowKey: string, salesmanId: string) => {
+    setSalesmanIkutRelations((prev) => ({
+      ...prev,
+      [ikutRowKey]: salesmanId,
+    }));
+
+    // Auto-select the SALESMAN_IKUT employee when a salesman is chosen
+    if (salesmanId) {
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+          const newJobHours = { ...prevState.jobHours };
+
+          // Initialize if needed
+          if (!newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = [];
+          }
+          if (!newJobHours[ikutEmployee.id]) {
+            newJobHours[ikutEmployee.id] = {};
+          }
+
+          // Add SALESMAN_IKUT to selected jobs if not already selected
+          if (!newSelectedJobs[ikutEmployee.id].includes("SALESMAN_IKUT")) {
+            newSelectedJobs[ikutEmployee.id].push("SALESMAN_IKUT");
+          }
+
+          // Set default hours if not already set (5 for Saturday, 7 for other days)
+          if (!newJobHours[ikutEmployee.id]["SALESMAN_IKUT"]) {
+            newJobHours[ikutEmployee.id]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: newJobHours,
+          };
+        });
+
+        // No need for setTimeout - paycode application now happens automatically in fetchAndApplyActivities
+      }
+    } else {
+      // Auto-deselect the SALESMAN_IKUT employee when salesman selection is cleared
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+
+          if (newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = newSelectedJobs[
+              ikutEmployee.id
+            ].filter((jobType) => jobType !== "SALESMAN_IKUT");
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: prevState.jobHours, // Keep hours for potential re-selection
+          };
+        });
+      }
+    }
+  };
+
+  const handleBagCountChange = (
+    rowKey: string,
+    field: "muatMee" | "muatBihun",
+    value: string,
+    isDoubled: boolean = false
+  ) => {
+    // When x2 is active, user enters doubled value, we store base value (divide by 2)
+    const displayValue = value === "" ? 0 : parseInt(value) || 0;
+    const baseValue = isDoubled ? Math.floor(displayValue / 2) : displayValue;
+
+    setIkutBagCounts((prev) => ({
+      ...prev,
+      [rowKey]: {
+        ...prev[rowKey],
+        [field]: baseValue,
+      },
+    }));
+  };
+
+  const handleDoubleToggle = (rowKey: string) => {
+    setIkutDoubled((prev) => ({
+      ...prev,
+      [rowKey]: !prev[rowKey],
+    }));
+  };
+
+  // Update Muat activities when ikutBagCounts or ikutDoubled changes
+  useEffect(() => {
+    if (!isInitializationComplete) return;
+
+    Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+      const isDoubled = ikutDoubled[rowKey] || false;
+      // Apply x2 multiplier if active
+      const muatMeeQty = isDoubled
+        ? (bagCounts.muatMee || 0) * 2
+        : bagCounts.muatMee || 0;
+      const muatBihunQty = isDoubled
+        ? (bagCounts.muatBihun || 0) * 2
+        : bagCounts.muatBihun || 0;
+
+      // Only update if activities exist for this employee
+      if (employeeActivities[rowKey] && employeeActivities[rowKey].length > 0) {
+        setEmployeeActivities((prev) => {
+          const activities = prev[rowKey] || [];
+          let hasChanges = false;
+
+          const updatedActivities = activities.map((activity) => {
+            if (activity.payCodeId === MUAT_MEE_PAYCODE) {
+              const newAmount = muatMeeQty * (activity.rate || 0);
+              if (
+                activity.unitsProduced !== muatMeeQty ||
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== (muatMeeQty > 0)
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: muatMeeQty,
+                  isSelected: muatMeeQty > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            if (activity.payCodeId === MUAT_BIHUN_PAYCODE) {
+              const newAmount = muatBihunQty * (activity.rate || 0);
+              if (
+                activity.unitsProduced !== muatBihunQty ||
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== (muatBihunQty > 0)
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: muatBihunQty,
+                  isSelected: muatBihunQty > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            return activity;
+          });
+
+          // Only return new state if there were changes
+          if (hasChanges) {
+            return { ...prev, [rowKey]: updatedActivities };
+          }
+          return prev;
+        });
+      }
+    });
+  }, [ikutBagCounts, ikutDoubled, isInitializationComplete]);
+
+  // Copy products from followed salesman to SALESMAN_IKUT activities
+  // Note: We intentionally exclude employeeActivities from deps to avoid cascading updates.
+  // The ref tracking ensures we process when salesman/products/doubled changes.
+  useEffect(() => {
+    if (!isInitializationComplete) return;
+
+    // Get all DME/DWE paycodes for clearing
+    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+
+    Object.entries(salesmanIkutRelations).forEach(([ikutRowKey, salesmanId]) => {
+      if (!salesmanId) {
+        // Clear the linked ref and reset product quantities if no salesman is followed
+        if (ikutProductsLinkedRef.current[ikutRowKey]) {
+          delete ikutProductsLinkedRef.current[ikutRowKey];
+          // Clear all DME/DWE paycode activities for this employee
+          setEmployeeActivities((prev) => {
+            const activities = prev[ikutRowKey] || [];
+            if (activities.length === 0) return prev;
+
+            let hasChanges = false;
+            const updatedActivities = activities.map((activity) => {
+              // Check if this paycode is one of the DME/DWE mapped ones
+              const isDmePaycode = allDmePaycodes.includes(activity.payCodeId);
+              if (isDmePaycode && (activity.unitsProduced > 0 || activity.isSelected)) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: 0,
+                  isSelected: false,
+                  calculatedAmount: 0,
+                };
+              }
+              return activity;
+            });
+
+            if (hasChanges) {
+              return { ...prev, [ikutRowKey]: updatedActivities };
+            }
+            return prev;
+          });
+        }
+        return;
+      }
+
+      // Find the followed salesman's rowKey (always SALESMAN job type)
+      const salesmanRowKey = `${salesmanId}-SALESMAN`;
+      const salesmanProductList = salesmanProducts[salesmanRowKey] || [];
+      const isDoubled = ikutDoubled[ikutRowKey] || false;
+
+      // Create a hash to track if products/doubled state changed
+      const productsHash = JSON.stringify({
+        products: salesmanProductList.map((p) => ({
+          id: p.product_id,
+          qty: p.quantity,
+        })),
+        isDoubled,
+        salesmanId,
+      });
+
+      // Skip if we've already linked these exact products for this rowKey
+      if (ikutProductsLinkedRef.current[ikutRowKey] === productsHash) {
+        return;
+      }
+
+      // Build a map of DME/DWE paycode -> total quantity
+      // Initialize all DME paycodes to 0 first (to clear old values when switching salesmen)
+      const paycodeQuantities: Record<string, number> = {};
+      allDmePaycodes.forEach((paycode) => {
+        paycodeQuantities[paycode] = 0;
+      });
+
+      // Then apply the new salesman's products
+      salesmanProductList.forEach((product) => {
+        const productId = String(product.product_id);
+        const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+        if (dmePaycode) {
+          const qty = parseFloat(product.quantity) || 0;
+          // Apply x2 multiplier if active
+          const finalQty = isDoubled ? qty * 2 : qty;
+          paycodeQuantities[dmePaycode] = (paycodeQuantities[dmePaycode] || 0) + finalQty;
+        }
+      });
+
+      // Update SALESMAN_IKUT activities with the mapped quantities
+      setEmployeeActivities((prev) => {
+        const activities = prev[ikutRowKey] || [];
+        // Skip if activities haven't been loaded yet - DON'T mark as linked
+        if (activities.length === 0) return prev;
+
+        let hasChanges = false;
+
+        const updatedActivities = activities.map((activity) => {
+          const mappedQty = paycodeQuantities[activity.payCodeId];
+          if (mappedQty !== undefined) {
+            const newAmount = mappedQty * (activity.rate || 0);
+            if (
+              activity.unitsProduced !== mappedQty ||
+              activity.calculatedAmount !== newAmount ||
+              activity.isSelected !== (mappedQty > 0)
+            ) {
+              hasChanges = true;
+              return {
+                ...activity,
+                unitsProduced: mappedQty,
+                isSelected: mappedQty > 0,
+                calculatedAmount: newAmount,
+              };
+            }
+          }
+          return activity;
+        });
+
+        if (hasChanges) {
+          // Only mark as linked when we actually process activities
+          ikutProductsLinkedRef.current[ikutRowKey] = productsHash;
+          return { ...prev, [ikutRowKey]: updatedActivities };
+        }
+        // If no changes were needed, still mark as linked to prevent re-processing
+        ikutProductsLinkedRef.current[ikutRowKey] = productsHash;
+        return prev;
+      });
+    });
+  }, [salesmanIkutRelations, salesmanProducts, ikutDoubled, isInitializationComplete]);
+
   // Update select all state based on individual selections and availability
   useEffect(() => {
-    const availableEmployees = availableForWork;
-    const totalAvailable = availableEmployees.length;
-    const selectedAvailable = availableEmployees.filter((emp) =>
+    const totalAvailable = salesmanEmployees.length;
+    const selectedAvailable = salesmanEmployees.filter((emp) =>
       employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
     ).length;
 
@@ -1400,11 +2204,33 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
   }, [
     employeeSelectionState.selectedJobs,
-    availableForWork,
-    jobConfig?.id,
+    salesmanEmployees,
     leaveEmployees,
     availableForLeave,
   ]);
+
+  // Auto-deselect excluded employees (KILANG, TIMOTHY.G)
+  useEffect(() => {
+    const excludedEmployees = ["KILANG", "TIMOTHY.G"];
+    let needsUpdate = false;
+
+    setEmployeeSelectionState((prev) => {
+      const updatedSelectedJobs = { ...prev.selectedJobs };
+
+      excludedEmployees.forEach((employeeId) => {
+        if (updatedSelectedJobs[employeeId]?.includes("SALESMAN")) {
+          updatedSelectedJobs[employeeId] = updatedSelectedJobs[
+            employeeId
+          ].filter((jobType) => jobType !== "SALESMAN");
+          needsUpdate = true;
+        }
+      });
+
+      return needsUpdate
+        ? { ...prev, selectedJobs: updatedSelectedJobs }
+        : prev;
+    });
+  }, []);
 
   // Use a one-time initialization effect
   const initializedRef = useRef(false);
@@ -1429,6 +2255,43 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     initializeDefaultSelections,
     mode,
   ]);
+
+  useEffect(() => {
+    // Update activities based on ikutBagCounts changes
+    setEmployeeActivities((prev) => {
+      const updatedActivities = { ...prev };
+
+      Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+        const currentActivities = updatedActivities[rowKey] || [];
+
+        const updatedRowActivities = currentActivities.map((activity) => {
+          // Link Muat Mee paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_MEE_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatMee,
+              isContextLinked: true,
+            };
+          }
+
+          // Link Muat Bihun paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_BIHUN_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatBihun,
+              isContextLinked: true,
+            };
+          }
+
+          return activity;
+        });
+
+        updatedActivities[rowKey] = updatedRowActivities;
+      });
+
+      return updatedActivities;
+    });
+  }, [ikutBagCounts]);
 
   // Separate effect for fetching activities after selection changes
   useEffect(() => {
@@ -1477,9 +2340,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       ([employeeId, jobTypes]) => {
         jobTypes.forEach((jobType) => {
           const rowKey = `${employeeId}-${jobType}`;
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-
           // Get job pay codes from cache
           const jobPayCodes = jobPayCodeDetails[jobType] || [];
 
@@ -1496,6 +2356,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // Then add/override with employee-specific pay codes
           employeePayCodes.forEach((pc) => {
+            // Skip Hour-based and Bill-based pay codes for salesmen
+            if (pc.rate_unit === "Hour" || pc.rate_unit === "Bill") {
+              return;
+            }
             allPayCodes.set(pc.id, { ...pc, source: "employee" });
           });
 
@@ -1511,24 +2375,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             ? savedEmployeeActivitiesRef.current[rowKey] || []
             : employeeActivities[rowKey] || [];
 
-          // Use day-specific OT threshold (5 for Saturday, 8 for others)
-          const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
-          const filteredPayCodes =
-            hours > otThreshold
-              ? mergedPayCodes
-              : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
+          // Salesmen don't filter by hours since hours aren't applicable
+          const filteredPayCodes = mergedPayCodes;
 
           // Convert to activity format
           const activities = filteredPayCodes.map((payCode) => {
             const isContextLinked = contextLinkedPayCodes[payCode.id];
 
-            // Find existing activity for this pay code if in edit mode
-            const existingActivity =
-              mode === "edit"
-                ? existingActivitiesForRow.find(
-                    (ea) => ea.payCodeId === payCode.id
-                  )
-                : null;
+            // Find existing activity for this pay code to preserve user-entered data
+            // In edit mode for originally saved employees, use savedActivitiesRef
+            // Otherwise, use current employeeActivities to preserve entered unitsProduced
+            const existingActivity = existingActivitiesForRow.find(
+              (ea) => ea.payCodeId === payCode.id
+            );
 
             // Determine rate based on day type
             let rate = payCode.rate_biasa;
@@ -1561,30 +2420,54 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               }
             } else {
               // CREATE mode OR employee wasn't in original work log:
-              // Apply auto-selection rules for new entries
-              if (payCode.pay_type === "Tambahan") {
-                // NEVER auto-select Tambahan pay codes
-                isSelected = false;
-              } else if (payCode.pay_type === "Overtime") {
-                // Only auto-select OT codes if hours exceed threshold AND is_default_setting is true
-                isSelected = hours > otThreshold && payCode.is_default_setting;
-              } else if (payCode.pay_type === "Base") {
-                // Base pay codes follow default settings
-                isSelected = payCode.is_default_setting;
+              // First check if this activity was already selected by user (e.g., product quantities linked)
+              // Preserve existing selection for activities with entered data
+              if (existingActivity && existingActivity.unitsProduced > 0) {
+                // Preserve selection for activities that already have units entered
+                isSelected = existingActivity.isSelected;
+              } else if (existingActivity && existingActivity.isSelected &&
+                         !["Hour", "Bill"].includes(payCode.rate_unit)) {
+                // Preserve manual selection (but not for Hour/Bill which should never be selected)
+                isSelected = existingActivity.isSelected;
               } else {
-                // Fallback to default setting
-                isSelected = payCode.is_default_setting;
-              }
+                // Apply auto-selection rules for new entries
+                if (payCode.pay_type === "Tambahan") {
+                  // NEVER auto-select Tambahan pay codes
+                  isSelected = false;
+                } else if (payCode.pay_type === "Overtime") {
+                  // Salesmen don't have hour-based overtime, never auto-select
+                  isSelected = false;
+                } else if (payCode.pay_type === "Base") {
+                  // Base pay codes follow default settings
+                  isSelected = payCode.is_default_setting;
+                } else {
+                  // Fallback to default setting
+                  isSelected = payCode.is_default_setting;
+                }
 
-              // Special rules for specific rate units
-              if (
-                isContextLinked ||
-                payCode.rate_unit === "Bag" ||
-                payCode.rate_unit === "Trip" ||
-                payCode.rate_unit === "Day"
-              ) {
-                // Don't auto-select these types
-                isSelected = false;
+                // Special rules for specific rate units
+                if (
+                  isContextLinked ||
+                  payCode.rate_unit === "Bag" ||
+                  payCode.rate_unit === "Trip" ||
+                  payCode.rate_unit === "Day"
+                ) {
+                  // Don't auto-select these types
+                  isSelected = false;
+                }
+
+                // Always deselect Hour-based pay codes for salesmen
+                if (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") {
+                  isSelected = false;
+                }
+
+                // Special logic for SALESMAN_IKUT employees - don't auto-select any allowance paycodes
+                // Let the location-based logic in handleIkutChange handle the selection
+                if (jobType === "SALESMAN_IKUT") {
+                  if (payCode.id === "ELAUN_MT" || payCode.id === "ELAUN_MO") {
+                    isSelected = false; // Don't auto-select, let location logic handle it
+                  }
+                }
               }
             }
 
@@ -1618,7 +2501,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   rate,
                   unitsProduced,
                 },
-                hours,
+                0, // Salesmen don't track hours
                 formData.contextData,
                 undefined,
                 formData.logDate
@@ -1629,7 +2512,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Apply auto-deselection logic to all activities
           const processedActivities = calculateActivitiesAmounts(
             activities,
-            hours,
+            0, // Salesmen don't track hours
             formData.contextData,
             undefined,
             formData.logDate
@@ -1639,7 +2522,172 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     );
 
-    setEmployeeActivities(newEmployeeActivities);
+    // Apply location-based paycodes to SALESMAN_IKUT employees after activities are loaded
+    // This ensures paycodes are applied whenever activities are fetched/refreshed
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        // Check if this SALESMAN_IKUT employee has activities loaded
+        if (
+          newEmployeeActivities[ikutRowKey] &&
+          newEmployeeActivities[ikutRowKey].length > 0
+        ) {
+          const salesmanRowKey = `${salesmanId}-SALESMAN`;
+          const salesmanLocationType = locationTypes[salesmanRowKey] || "Local";
+          const ikutActivities = newEmployeeActivities[ikutRowKey];
+
+          // Update activities for the SALESMAN_IKUT employee
+          const updatedIkutActivities = ikutActivities.map((activity) => {
+            // Apply location-based paycode logic
+            if (
+              salesmanLocationType === "Local" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              salesmanLocationType === "Local" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            } else if (
+              salesmanLocationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              salesmanLocationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            }
+
+            return activity;
+          });
+
+          // Recalculate amounts for the SALESMAN_IKUT employee
+          const recalculatedIkutActivities = calculateActivitiesAmounts(
+            updatedIkutActivities,
+            0, // No hours needed for allowance paycodes
+            formData.contextData,
+            undefined,
+            formData.logDate
+          );
+
+          // Update the activities immediately
+          newEmployeeActivities[ikutRowKey] = recalculatedIkutActivities;
+        }
+      }
+    );
+
+    // Copy products from followed salesman to SALESMAN_IKUT activities
+    // Get all DME/DWE paycodes
+    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        if (!salesmanId) return;
+        if (!newEmployeeActivities[ikutRowKey] || newEmployeeActivities[ikutRowKey].length === 0) return;
+
+        const salesmanRowKey = `${salesmanId}-SALESMAN`;
+        const salesmanProductList = salesmanProducts[salesmanRowKey] || [];
+        const isDoubled = ikutDoubled[ikutRowKey] || false;
+
+        // Build paycode quantities map (initialize all to 0 first)
+        const paycodeQuantities: Record<string, number> = {};
+        allDmePaycodes.forEach((paycode) => {
+          paycodeQuantities[paycode] = 0;
+        });
+
+        // Apply products from followed salesman
+        salesmanProductList.forEach((product) => {
+          const productId = String(product.product_id);
+          const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+          if (dmePaycode) {
+            const qty = parseFloat(product.quantity) || 0;
+            const finalQty = isDoubled ? qty * 2 : qty;
+            paycodeQuantities[dmePaycode] = (paycodeQuantities[dmePaycode] || 0) + finalQty;
+          }
+        });
+
+        // Update SALESMAN_IKUT activities
+        const ikutActivities = newEmployeeActivities[ikutRowKey];
+        const updatedActivities = ikutActivities.map((activity: any) => {
+          const mappedQty = paycodeQuantities[activity.payCodeId];
+          if (mappedQty !== undefined) {
+            const newAmount = mappedQty * (activity.rate || 0);
+            return {
+              ...activity,
+              unitsProduced: mappedQty,
+              isSelected: mappedQty > 0,
+              calculatedAmount: newAmount,
+            };
+          }
+          return activity;
+        });
+
+        newEmployeeActivities[ikutRowKey] = updatedActivities;
+
+        // Update the ref to mark as processed
+        const productsHash = JSON.stringify({
+          products: salesmanProductList.map((p: any) => ({
+            id: p.product_id,
+            qty: p.quantity,
+          })),
+          isDoubled,
+          salesmanId,
+        });
+        ikutProductsLinkedRef.current[ikutRowKey] = productsHash;
+      }
+    );
+
+    // Apply Muat bag counts for SALESMAN_IKUT employees
+    // This ensures bag counts are reapplied when activities are regenerated (e.g., after re-selecting)
+    Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+      if (!newEmployeeActivities[rowKey] || newEmployeeActivities[rowKey].length === 0) return;
+
+      const isDoubled = ikutDoubled[rowKey] || false;
+      const muatMeeQty = isDoubled ? (bagCounts.muatMee || 0) * 2 : bagCounts.muatMee || 0;
+      const muatBihunQty = isDoubled ? (bagCounts.muatBihun || 0) * 2 : bagCounts.muatBihun || 0;
+
+      newEmployeeActivities[rowKey] = newEmployeeActivities[rowKey].map((activity: any) => {
+        if (activity.payCodeId === MUAT_MEE_PAYCODE) {
+          const newAmount = muatMeeQty * (activity.rate || 0);
+          return {
+            ...activity,
+            unitsProduced: muatMeeQty,
+            isSelected: muatMeeQty > 0,
+            calculatedAmount: newAmount,
+          };
+        }
+        if (activity.payCodeId === MUAT_BIHUN_PAYCODE) {
+          const newAmount = muatBihunQty * (activity.rate || 0);
+          return {
+            ...activity,
+            unitsProduced: muatBihunQty,
+            isSelected: muatBihunQty > 0,
+            calculatedAmount: newAmount,
+          };
+        }
+        return activity;
+      });
+    });
+
+    // Update with paycode-applied activities (merge with existing to preserve deselected employees)
+    setEmployeeActivities((prev) => ({
+      ...prev,
+      ...newEmployeeActivities,
+    }));
   };
 
   // New function to fetch and apply activities for leave employees
@@ -1814,6 +2862,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
       const newEmployeeActivities: Record<string, any[]> = {};
+      const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
+
+      // Restore SALESMAN_IKUT relations, bag counts, and doubled state
+      const newSalesmanIkutRelations: Record<string, string> = {};
+      const newIkutBagCounts: Record<
+        string,
+        { muatMee: number; muatBihun: number }
+      > = {};
+      const newIkutDoubled: Record<string, boolean> = {};
 
       // Clear and populate the saved employee row keys ref
       // This tracks which employees were originally in the work log
@@ -1865,6 +2922,26 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Also store in ref to preserve original state for deselect/re-select cycles
           savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
         }
+
+        // Restore SALESMAN_IKUT specific data
+        if (entry.job_id === "SALESMAN_IKUT") {
+          if (entry.following_salesman_id) {
+            newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
+          }
+
+          newIkutBagCounts[rowKey] = {
+            muatMee: entry.muat_mee_bags || 0,
+            muatBihun: entry.muat_bihun_bags || 0,
+          };
+
+          // Restore x2 doubled state
+          newIkutDoubled[rowKey] = entry.is_doubled || false;
+        }
+
+        // Restore SALESMAN location types
+        if (entry.job_id === "SALESMAN") {
+          newLocationTypes[rowKey] = entry.location_type || "Local";
+        }
       });
 
       // Apply all the restored state
@@ -1873,6 +2950,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         jobHours: newJobHours,
       });
       setEmployeeActivities(newEmployeeActivities);
+      setLocationTypes(newLocationTypes);
+      setSalesmanIkutRelations(newSalesmanIkutRelations);
+      setIkutBagCounts(newIkutBagCounts);
+      setIkutDoubled(newIkutDoubled);
 
       // Restore leave records if they exist
       if (
@@ -1991,15 +3072,49 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     generateLeaveActivitiesWithSavedSelection,
   ]);
 
+  // Helper function to get the effective location type for any employee
+  const getEffectiveLocationType = (
+    employee: EmployeeWithHours
+  ): "Local" | "Outstation" => {
+    if (!employee.rowKey) return "Local";
+
+    // For SALESMAN employees, use their direct location
+    if (employee.jobType === "SALESMAN") {
+      return locationTypes[employee.rowKey] || "Local";
+    }
+
+    // For SALESMAN_IKUT employees, use the location of the salesman they're following
+    if (employee.jobType === "SALESMAN_IKUT") {
+      const salesmanId = salesmanIkutRelations[employee.rowKey];
+      if (salesmanId) {
+        const salesmanRowKey = `${salesmanId}-SALESMAN`;
+        return locationTypes[salesmanRowKey] || "Local";
+      }
+    }
+
+    // For other employees, return Local as default
+    return "Local";
+  };
+
   // Update handleActivitiesUpdated to store all activities, not just selected:
   const handleActivitiesUpdated = (activities: any[]) => {
     if (!selectedEmployee?.rowKey) return;
 
     const rowKey = selectedEmployee.rowKey;
+    const locationType = getEffectiveLocationType(selectedEmployee);
+
+    // Recalculate activities with location type
+    const recalculatedActivities = calculateActivitiesAmounts(
+      activities,
+      0, // Hours don't matter for salesmen
+      formData.contextData,
+      locationType,
+      formData.logDate
+    );
 
     setEmployeeActivities((prev) => ({
       ...prev,
-      [rowKey]: activities,
+      [rowKey]: recalculatedActivities,
     }));
 
     toast.success(`Activities updated for ${selectedEmployee.name}`);
@@ -2079,46 +3194,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               )}
           </span>
 
-          {/* Shift Field */}
-          <div className="w-32">
-            <FormListbox
-              name="shift"
-              label="Shift"
-              value={formData.shift}
-              onChange={(value) => setFormData({ ...formData, shift: value })}
-              options={[
-                { id: "1", name: "Day Shift" },
-                { id: "2", name: "Night Shift" },
-              ]}
-              required
-            />
-          </div>
-
-          {/* Show Context Form here only if 3 or fewer fields */}
-          {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
-            <DynamicContextForm
-              contextFields={jobConfig?.contextFields || []}
-              contextData={formData.contextData}
-              onChange={handleContextChange}
-              disabled={isSaving}
-            />
-          )}
+          {/* Shift is always Day Shift for Salesman - no selector needed */}
         </div>
-
-        {/* Show Context Form below if more than 3 fields */}
-        {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
-          <div className="mb-4">
-            <span className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3">
-              Production Details
-            </span>
-            <DynamicContextForm
-              contextFields={jobConfig?.contextFields || []}
-              contextData={formData.contextData}
-              onChange={handleContextChange}
-              disabled={isSaving}
-            />
-          </div>
-        )}
 
         {/* Employees Section */}
         <div className="border-t border-default-200 dark:border-gray-700 pt-4">
@@ -2131,6 +3208,42 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             <>
               {/* Main Employee Table */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
+                <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 flex items-center justify-between">
+                  <SafeLink
+                    to="/catalogue/job?id=SALESMAN"
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    onNavigateAttempt={safeNavigate}
+                    className="text-sm font-medium text-default-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
+                  >
+                    {jobs.find((j) => j.id === "SALESMAN")?.name || "Salesman"}
+                  </SafeLink>
+                  {salesmanProductStats.total > 0 && (
+                    <div className="flex items-center gap-3 text-xs text-default-500 dark:text-gray-400 truncate min-w-0 flex-1 justify-end ml-4">
+                      <span className="truncate">
+                        {Object.entries(salesmanProductStats.salesmanTotals).map(([id, data], idx) => (
+                          <span key={id}>
+                            {idx > 0 && " · "}
+                            <span className="font-medium">{id}</span>: {data.total}
+                          </span>
+                        ))}
+                      </span>
+                      <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
+                      <span className="truncate">
+                        {salesmanProductStats.productTotals.slice(0, 8).map((p, idx) => (
+                          <span key={p.id}>
+                            {idx > 0 && " · "}
+                            <span className="font-medium">{p.id}</span>: {p.qty}
+                          </span>
+                        ))}
+                        {salesmanProductStats.productTotals.length > 8 && " ..."}
+                      </span>
+                      <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
+                      <span className="flex-shrink-0">Mee: {salesmanProductStats.totalMee} · BH: {salesmanProductStats.totalBihun}</span>
+                      <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
+                      <span className="font-medium flex-shrink-0">Total: {salesmanProductStats.total}</span>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                     <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -2143,7 +3256,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             checkedColor="text-sky-600"
                             ariaLabel="Select all employees"
                             buttonClassName="p-1 rounded-lg"
-                            disabled={availableForWork.length === 0}
+                            disabled={false}
                           />
                         </th>
                         <th
@@ -2160,15 +3273,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Job
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                        >
-                          Hours
+                          Location
                         </th>
                         <th
                           scope="col"
@@ -2179,17 +3286,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                      {expandedEmployees.map((row, index) => {
+                      {salesmanEmployees.map((row, index) => {
                         const isSelected =
                           employeeSelectionState.selectedJobs[row.id]?.includes(
                             row.jobType
                           ) || false;
-                        const hours =
-                          employeeSelectionState.jobHours[row.id]?.[
-                            row.jobType
-                          ] ??
-                          jobConfig?.defaultHours ??
-                          7;
 
                         return (
                           <tr
@@ -2246,47 +3347,74 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                               <span className="font-medium">{row.name}</span>
+                              {(() => {
+                                // Only show followed employees that are actually selected
+                                const selectedFollowers = (
+                                  followedBySalesman[row.id] || []
+                                ).filter((ikutEmployeeId) =>
+                                  employeeSelectionState.selectedJobs[
+                                    ikutEmployeeId
+                                  ]?.includes("SALESMAN_IKUT")
+                                );
+
+                                if (selectedFollowers.length > 0) {
+                                  return (
+                                    <span className="text-xs text-default-500 dark:text-gray-400 block mt-1">
+                                      (Followed by{" "}
+                                      {selectedFollowers
+                                        .map((ikutEmployeeId) => {
+                                          const ikutEmployee =
+                                            availableEmployees.find(
+                                              (emp) => emp.id === ikutEmployeeId
+                                            );
+                                          return ikutEmployee?.name;
+                                        })
+                                        .join(", ")}
+                                      )
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
-                              <SafeLink
-                                to={`/catalogue/job?id=${row.jobType}`}
-                                hasUnsavedChanges={hasUnsavedChanges}
-                                onNavigateAttempt={safeNavigate}
-                                className="hover:underline hover:text-sky-600 dark:text-sky-400"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {row.jobName}
-                              </SafeLink>
-                            </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-right">
-                              <div className="flex justify-end">
-                                <input
-                                  type="number"
-                                  value={isSelected ? hours.toString() : ""}
-                                  onChange={(e) =>
-                                    handleEmployeeHoursChange(
-                                      row.rowKey,
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={() => handleHoursBlur(row.rowKey)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={`max-w-[80px] py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
-                                    hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) &&
-                                    jobConfig?.requiresOvertimeCalc
-                                      ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
-                                      : "border-default-300 dark:border-gray-600"
+                            <td className="px-6 py-2 whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected && !isSaving) {
+                                      handleLocationTypeChange(row.rowKey, "Local");
+                                    }
+                                  }}
+                                  disabled={!isSelected || isSaving}
+                                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                                    (locationTypes[row.rowKey || ""] || "Local") === "Local"
+                                      ? "bg-sky-500 text-white"
+                                      : !isSelected
+                                      ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed"
+                                      : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
                                   }`}
-                                  step="0.5"
-                                  min="0"
-                                  max="24"
-                                  disabled={
-                                    !isSelected ||
-                                    isSaving ||
-                                    leaveEmployees[row.id]?.selected
-                                  }
-                                  placeholder={isSelected ? "0" : "-"}
-                                />
+                                >
+                                  Local
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected && !isSaving) {
+                                      handleLocationTypeChange(row.rowKey, "Outstation");
+                                    }
+                                  }}
+                                  disabled={!isSelected || isSaving}
+                                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                                    locationTypes[row.rowKey || ""] === "Outstation"
+                                      ? "bg-amber-500 text-white"
+                                      : !isSelected
+                                      ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed"
+                                      : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
+                                  }`}
+                                >
+                                  Outstation
+                                </button>
                               </div>
                             </td>
                             <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
@@ -2316,6 +3444,265 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 </div>
               </div>
 
+              {/* SALESMAN_IKUT Table */}
+              {salesmanIkutEmployees.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm mt-4">
+                  <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700">
+                    <SafeLink
+                      to="/catalogue/job?id=SALESMAN_IKUT"
+                      hasUnsavedChanges={hasUnsavedChanges}
+                      onNavigateAttempt={safeNavigate}
+                      className="text-sm font-medium text-default-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
+                    >
+                      Salesman Ikut Lori
+                    </SafeLink>
+                  </div>
+                  <div>
+                    <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                      <thead className="bg-default-50 dark:bg-gray-900/50">
+                        <tr>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            ID
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Name
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Ikut Salesman
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            <div className="flex flex-col items-center">
+                              <span>Muat (Bags)</span>
+                              <div className="flex gap-4 text-[10px] mt-0.5">
+                                <span className="w-14 text-center">Mee</span>
+                                <span className="w-14 text-center">Bihun</span>
+                              </div>
+                            </div>
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            x2
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                        {salesmanIkutEmployees.map((row, index) => {
+                          const selectedSalesman =
+                            salesmanIkutRelations[row.rowKey || ""] || "";
+                          const isSelected = !!selectedSalesman;
+                          const bagCounts = ikutBagCounts[row.rowKey || ""] || {
+                            muatMee: 0,
+                            muatBihun: 0,
+                          };
+                          const isDoubled = ikutDoubled[row.rowKey || ""] || false;
+                          // Display doubled values when x2 is active
+                          const displayMuatMee = isDoubled
+                            ? (bagCounts.muatMee || 0) * 2
+                            : bagCounts.muatMee || 0;
+                          const displayMuatBihun = isDoubled
+                            ? (bagCounts.muatBihun || 0) * 2
+                            : bagCounts.muatBihun || 0;
+
+                          // Get available salesmen (only those selected for work)
+                          const availableSalesmen = salesmanEmployees.filter(
+                            (s) =>
+                              employeeSelectionState.selectedJobs[
+                                s.id
+                              ]?.includes(s.jobType)
+                          );
+
+                          return (
+                            <tr
+                              key={row.rowKey}
+                              className={`transition-colors duration-150 ${
+                                leaveEmployees[row.id]?.selected
+                                  ? "bg-default-50 dark:bg-gray-700"
+                                  : isSelected
+                                  ? "bg-sky-50 dark:bg-sky-900/30"
+                                  : "bg-white dark:bg-gray-800"
+                              }`}
+                            >
+                              <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
+                                <SafeLink
+                                  to={`/catalogue/staff/${row.id}`}
+                                  hasUnsavedChanges={hasUnsavedChanges}
+                                  onNavigateAttempt={safeNavigate}
+                                  className="hover:underline hover:text-sky-600 dark:text-sky-400"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {row.id}
+                                </SafeLink>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
+                                {row.name}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {availableSalesmen.length > 0 ? (
+                                    <>
+                                      {availableSalesmen.map((salesman) => (
+                                        <button
+                                          key={salesman.id}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!isSaving && !leaveEmployees[row.id]?.selected) {
+                                              // Toggle: if already selected, deselect; otherwise select
+                                              const newValue = selectedSalesman === salesman.id ? "" : salesman.id;
+                                              handleIkutChange(row.rowKey || "", newValue);
+                                            }
+                                          }}
+                                          disabled={isSaving || leaveEmployees[row.id]?.selected}
+                                          className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                                            selectedSalesman === salesman.id
+                                              ? "bg-sky-500 text-white"
+                                              : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                          } ${
+                                            isSaving || leaveEmployees[row.id]?.selected
+                                              ? "opacity-50 cursor-not-allowed"
+                                              : ""
+                                          }`}
+                                        >
+                                          {salesman.name}
+                                        </button>
+                                      ))}
+                                      {selectedSalesman && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!isSaving && !leaveEmployees[row.id]?.selected) {
+                                              handleIkutChange(row.rowKey || "", "");
+                                            }
+                                          }}
+                                          disabled={isSaving || leaveEmployees[row.id]?.selected}
+                                          className={`p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors ${
+                                            isSaving || leaveEmployees[row.id]?.selected
+                                              ? "opacity-50 cursor-not-allowed"
+                                              : ""
+                                          }`}
+                                          title="Clear selection"
+                                        >
+                                          <IconX size={14} />
+                                        </button>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-default-400 dark:text-gray-500 italic">
+                                      No salesmen selected
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <div className="flex gap-2 justify-center">
+                                  <input
+                                    type="number"
+                                    value={isSelected ? displayMuatMee.toString() : ""}
+                                    onChange={(e) =>
+                                      handleBagCountChange(
+                                        row.rowKey || "",
+                                        "muatMee",
+                                        e.target.value,
+                                        isDoubled
+                                      )
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`w-14 py-1 text-sm text-right border rounded-md text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                      isDoubled && isSelected
+                                        ? "bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-600"
+                                        : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
+                                    }`}
+                                    min="0"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                  <input
+                                    type="number"
+                                    value={isSelected ? displayMuatBihun.toString() : ""}
+                                    onChange={(e) =>
+                                      handleBagCountChange(
+                                        row.rowKey || "",
+                                        "muatBihun",
+                                        e.target.value,
+                                        isDoubled
+                                      )
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`w-14 py-1 text-sm text-right border rounded-md text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                      isDoubled && isSelected
+                                        ? "bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-600"
+                                        : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
+                                    }`}
+                                    min="0"
+                                    disabled={!isSelected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-center">
+                                <Checkbox
+                                  checked={isDoubled}
+                                  onChange={() => {
+                                    if (!isSaving && !leaveEmployees[row.id]?.selected && isSelected) {
+                                      handleDoubleToggle(row.rowKey || "");
+                                    }
+                                  }}
+                                  size={18}
+                                  checkedColor="text-amber-500"
+                                  ariaLabel={`Double units for ${row.name}`}
+                                  buttonClassName="p-1 rounded-lg"
+                                  disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
+                                />
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                <ActivitiesTooltip
+                                  activities={(
+                                    employeeActivities[row.rowKey || ""] || []
+                                  ).filter((activity) => activity.isSelected)}
+                                  employeeName={row.name}
+                                  hasUnsavedChanges={hasUnsavedChanges}
+                                  onNavigateAttempt={safeNavigate}
+                                  className={
+                                    !isSelected
+                                      ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                      : ""
+                                  }
+                                  disabled={
+                                    !isSelected ||
+                                    leaveEmployees[row.id]?.selected
+                                  }
+                                  onClick={() => handleManageActivities(row)}
+                                  logDate={formData.logDate}
+                                  showBelow={index < 5}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2615,6 +4002,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         existingActivities={employeeActivities[selectedEmployee?.rowKey || ""]}
         contextLinkedPayCodes={contextLinkedPayCodes}
         contextData={formData.contextData}
+        salesmanProducts={
+          selectedEmployee && selectedEmployee.rowKey
+            ? salesmanProducts[selectedEmployee.rowKey] || []
+            : []
+        }
+        locationType={
+          selectedEmployee && selectedEmployee.rowKey
+            ? getEffectiveLocationType(selectedEmployee)
+            : "Local"
+        }
         hasUnsavedChanges={hasUnsavedChanges}
         onNavigateAttempt={safeNavigate}
         logDate={formData.logDate}
@@ -2651,4 +4048,4 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   );
 };
 
-export default DailyLogEntryPage;
+export default DailyLogSalesmanEntryPage;

@@ -438,10 +438,43 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     const totalCommissionDeductions = commissionGrossPay;
     const netPay = grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 
-    // Update gross pay and net pay
+    // Fetch job_type to check for MAINTEN
+    const payrollJobTypeRes = await pool.query(
+      "SELECT job_type FROM employee_payrolls WHERE id = $1",
+      [employeePayrollId]
+    );
+    const jobTypes = payrollJobTypeRes.rows[0]?.job_type || "";
+    const isMainten = jobTypes === 'MAINTEN' || jobTypes.includes('MAINTEN');
+
+    // Get mid-month payroll for rounding calculation
+    const midMonthRes = await pool.query(
+      `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+       WHERE employee_id = $1 AND year = $2 AND month = $3`,
+      [employee_id, year, month]
+    );
+    const midMonthAmount = parseFloat(midMonthRes.rows[0]?.amount || 0);
+
+    // For MAINTEN, get cuti_tahunan advance (approved annual leave amount)
+    let cutiTahunanAdvance = 0;
+    if (isMainten) {
+      const cutiRes = await pool.query(`
+        SELECT COALESCE(SUM(amount_paid), 0) as total FROM leave_records
+        WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
+          AND EXTRACT(MONTH FROM leave_date) = $3 AND status = 'approved'
+          AND leave_type = 'cuti_tahunan'
+      `, [employee_id, year, month]);
+      cutiTahunanAdvance = parseFloat(cutiRes.rows[0]?.total || 0);
+    }
+
+    // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
+    const jumlah = netPay - midMonthAmount - cutiTahunanAdvance;
+    const setelahDigenapkan = Math.ceil(jumlah);
+    const digenapkan = setelahDigenapkan - jumlah;
+
+    // Update gross pay, net pay, and rounding columns
     await pool.query(
-      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2 WHERE id = $3`,
-      [grossPay.toFixed(2), netPay.toFixed(2), employeePayrollId]
+      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4 WHERE id = $5`,
+      [grossPay.toFixed(2), netPay.toFixed(2), digenapkan.toFixed(2), setelahDigenapkan.toFixed(2), employeePayrollId]
     );
 
     // Save the newly calculated deductions
