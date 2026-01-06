@@ -15,10 +15,13 @@ import {
   IconAlertTriangle,
   IconClock,
 } from "@tabler/icons-react";
-import { API_BASE_URL, DB_NAME, NODE_ENV } from "../configs/config";
+import { API_BASE_URL, DB_NAME } from "../configs/config";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "./ConfirmationDialog";
 import { sessionService } from "../services/SessionService";
+
+// Use Vite's built-in MODE for frontend environment detection
+const NODE_ENV = import.meta.env.MODE;
 
 interface BackupModalProps {
   isOpen: boolean;
