@@ -671,7 +671,7 @@ export default function (pool) {
 
       // Check if vouchers already exist for this month
       const existingVouchersQuery = `
-        SELECT reference_no FROM journal_entries
+        SELECT id, reference_no FROM journal_entries
         WHERE reference_no LIKE $1 OR reference_no LIKE $2
       `;
       const monthStr = monthInt.toString().padStart(2, "0");
@@ -681,19 +681,28 @@ export default function (pool) {
         `JVSL/${monthStr}/${yearStr}`,
       ]);
 
-      const existingVouchers = existingResult.rows.map(r => r.reference_no);
+      // Build a map of reference_no -> id
+      const existingVouchersMap = {};
+      existingResult.rows.forEach(r => {
+        existingVouchersMap[r.reference_no] = r.id;
+      });
+
+      const jvdrRef = `JVDR/${monthStr}/${yearStr}`;
+      const jvslRef = `JVSL/${monthStr}/${yearStr}`;
 
       res.json({
         year: yearInt,
         month: monthInt,
         jvdr: {
-          reference: `JVDR/${monthStr}/${yearStr}`,
-          exists: existingVouchers.includes(`JVDR/${monthStr}/${yearStr}`),
+          reference: jvdrRef,
+          exists: !!existingVouchersMap[jvdrRef],
+          entry_id: existingVouchersMap[jvdrRef] || null,
           locations: jvdrData,
         },
         jvsl: {
-          reference: `JVSL/${monthStr}/${yearStr}`,
-          exists: existingVouchers.includes(`JVSL/${monthStr}/${yearStr}`),
+          reference: jvslRef,
+          exists: !!existingVouchersMap[jvslRef],
+          entry_id: existingVouchersMap[jvslRef] || null,
           locations: jvslData,
           totals: jvslTotals,
         },
