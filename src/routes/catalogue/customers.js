@@ -1,5 +1,6 @@
 // src/routes/catalogue/customers.js
 import { Router } from "express";
+import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -48,6 +49,14 @@ export default function (pool) {
 
   // Get all customers with products and branch info
   router.get("/", async (req, res) => {
+    const cacheKey = CACHE_KEYS.CUSTOMERS;
+
+    // Check cache first
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const client = await pool.connect();
 
     try {
@@ -151,6 +160,10 @@ export default function (pool) {
       }));
 
       await client.query("COMMIT");
+
+      // Cache the result
+      cache.set(cacheKey, enhancedCustomers, CACHE_TTL.LONG);
+
       res.json(enhancedCustomers);
     } catch (error) {
       await client.query("ROLLBACK");
@@ -314,6 +327,10 @@ export default function (pool) {
       `;
 
       const result = await pool.query(query, transformedValues);
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.CUSTOMERS);
+
       res.status(201).json({
         message: "Customer created successfully",
         customer: result.rows[0],
@@ -417,6 +434,10 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.CUSTOMERS);
+
       res.json({
         message: "Customer deleted successfully",
         customer: result.rows[0],
@@ -546,6 +567,9 @@ export default function (pool) {
 
           await client.query("COMMIT");
 
+          // Invalidate cache
+          cache.invalidate(CACHE_KEYS.CUSTOMERS);
+
           res.json({
             message: "Customer ID changed successfully",
             customer: insertResult.rows[0],
@@ -608,6 +632,9 @@ export default function (pool) {
           }
 
           await client.query("COMMIT");
+
+          // Invalidate cache
+          cache.invalidate(CACHE_KEYS.CUSTOMERS);
 
           res.json({
             message: "Customer updated successfully",

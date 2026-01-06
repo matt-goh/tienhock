@@ -1,5 +1,6 @@
 // src/routes/catalogue/entities/locations.js
 import { Router } from "express";
+import cache, { CACHE_TTL, CACHE_KEYS } from "../../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -18,6 +19,10 @@ export default function (pool) {
       const values = [id, name];
 
       const result = await pool.query(query, values);
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.LOCATIONS);
+
       res.status(201).json({
         message: "Location created successfully",
         location: result.rows[0],
@@ -38,8 +43,20 @@ export default function (pool) {
   // Get all locations
   router.get("/", async (req, res) => {
     try {
+      const cacheKey = CACHE_KEYS.LOCATIONS;
+
+      // Check cache first
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const query = `SELECT * FROM locations ORDER BY id`;
       const result = await pool.query(query);
+
+      // Cache the result
+      cache.set(cacheKey, result.rows, CACHE_TTL.VERY_LONG);
+
       res.json(result.rows);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -156,6 +173,10 @@ export default function (pool) {
           await client.query("DELETE FROM locations WHERE id = $1", [id]);
 
           await client.query("COMMIT");
+
+          // Invalidate cache
+          cache.invalidate(CACHE_KEYS.LOCATIONS);
+
           res.json({
             message: "Location updated successfully",
             location: { id: newId, name },
@@ -173,6 +194,10 @@ export default function (pool) {
           }
 
           await client.query("COMMIT");
+
+          // Invalidate cache
+          cache.invalidate(CACHE_KEYS.LOCATIONS);
+
           res.json({
             message: "Location updated successfully",
             location: result.rows[0],
@@ -252,6 +277,9 @@ export default function (pool) {
       // No dependencies, proceed with delete
       const deleteQuery = `DELETE FROM locations WHERE id = ANY($1::text[]) RETURNING id`;
       const result = await pool.query(deleteQuery, [locationIds]);
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.LOCATIONS);
 
       const deletedIds = result.rows.map((row) => row.id);
       res.status(200).json({
