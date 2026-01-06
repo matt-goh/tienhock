@@ -1,4 +1,5 @@
-// src/pages/Payroll/DailyLogEntryPage.tsx
+// src/pages/Payroll/DailyLog/DailyLogSalesmanEntryPage.tsx
+// Dedicated entry page for SALESMAN job type
 import React, {
   useState,
   useEffect,
@@ -9,7 +10,6 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/Button";
-import { FormListbox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
 import { format } from "date-fns";
@@ -28,7 +28,6 @@ import {
   getContextLinkedPayCodes,
   getJobIds,
 } from "../../../configs/payrollJobConfigs";
-import DynamicContextForm from "../../../components/Payroll/DynamicContextForm";
 import {
   calculateActivityAmount,
   calculateActivitiesAmounts,
@@ -40,7 +39,12 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconCheck,
+  IconMapPin,
+  IconMapPinOff,
+} from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -66,11 +70,10 @@ interface DailyLogFormData {
   employees: EmployeeWithHours[];
 }
 
-interface DailyLogEntryPageProps {
+interface DailyLogSalesmanEntryPageProps {
   mode?: "create" | "edit";
   existingWorkLog?: any;
   onCancel?: () => void;
-  jobType?: string;
 }
 
 type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan";
@@ -94,12 +97,13 @@ interface ActivityItem {
   source?: "job" | "employee";
 }
 
-const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
+const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   mode = "create",
   existingWorkLog,
   onCancel,
-  jobType = "MEE",
 }) => {
+  // Hardcode jobType for salesman page
+  const jobType = "SALESMAN";
   const navigate = useNavigate();
   const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
@@ -115,6 +119,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     useState<EmployeeWithHours | null>(null);
   const [employeeActivities, setEmployeeActivities] = useState<
     Record<string, any[]>
+  >({});
+  const [locationTypes, setLocationTypes] = useState<
+    Record<string, "Local" | "Outstation">
+  >({});
+  const [salesmanProducts, setSalesmanProducts] = useState<
+    Record<string, any[]>
+  >({});
+  const [salesmanIkutRelations, setSalesmanIkutRelations] = useState<
+    Record<string, string> // rowKey of SALESMAN_IKUT -> SALESMAN employee ID
+  >({});
+  const [ikutBagCounts, setIkutBagCounts] = useState<
+    Record<string, { muatMee: number; muatBihun: number }> // rowKey -> bag counts
   >({});
   const [leaveEmployees, setLeaveEmployees] = useState<
     Record<string, LeaveEntry>
@@ -188,16 +204,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       };
     }
 
-    // Initialize with default values from config
-    const defaultContextData: Record<string, any> = {};
-    jobConfig?.contextFields.forEach((field) => {
-      defaultContextData[field.id] = field.defaultValue;
-    });
-
+    // SALESMAN has no context fields, use empty object
     return {
       logDate: format(new Date(), "yyyy-MM-dd"),
       shift: "1",
-      contextData: defaultContextData,
+      contextData: {},
       dayType: determineDayType(new Date()),
       employees: [],
     };
@@ -213,6 +224,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     formData: DailyLogFormData;
     employeeSelectionState: any;
     employeeActivities: Record<string, any[]>;
+    locationTypes: Record<string, "Local" | "Outstation">;
+    salesmanIkutRelations: Record<string, string>;
+    ikutBagCounts: Record<string, { muatMee: number; muatBihun: number }>;
     leaveEmployees: Record<string, LeaveEntry>;
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
     leaveBalances: Record<string, any>;
@@ -226,6 +240,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // Ref to store the original saved activities from the work log
   // This preserves the original state even if the employee is deselected and re-selected
   const savedEmployeeActivitiesRef = useRef<Record<string, any[]>>({});
+  // Ref to track which rowKeys have had their products linked (to avoid infinite loops)
+  const productsLinkedRef = useRef<Record<string, string>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -291,6 +307,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           normalizeForComparison(initialState.employeeSelectionState) ||
         normalizeForComparison(employeeActivities) !==
           normalizeForComparison(initialState.employeeActivities) ||
+        normalizeForComparison(locationTypes) !==
+          normalizeForComparison(initialState.locationTypes) ||
+        normalizeForComparison(salesmanIkutRelations) !==
+          normalizeForComparison(initialState.salesmanIkutRelations) ||
+        normalizeForComparison(ikutBagCounts) !==
+          normalizeForComparison(initialState.ikutBagCounts) ||
         normalizeForComparison(leaveEmployees) !==
           normalizeForComparison(initialState.leaveEmployees) ||
         normalizeForComparison(leaveEmployeeActivities) !==
@@ -306,6 +328,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     formData,
     employeeSelectionState,
     employeeActivities,
+    locationTypes,
+    salesmanIkutRelations,
+    ikutBagCounts,
     leaveEmployees,
     leaveEmployeeActivities,
     leaveBalances,
@@ -327,55 +352,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       "You have unsaved changes. Are you sure you want to leave this page?",
   });
 
-  // Update activities when context values change for linked pay codes
-  useEffect(() => {
-    if (!jobConfig) return;
-
-    // For each context field that has a linked pay code
-    jobConfig.contextFields.forEach((field) => {
-      if (field.linkedPayCode) {
-        const contextValue = formData.contextData[field.id];
-
-        // Update all employee activities for this pay code
-        setEmployeeActivities((prev) => {
-          const updatedActivities = { ...prev };
-
-          Object.keys(updatedActivities).forEach((rowKey) => {
-            // First update the units for context-linked activities
-            const updatedRowActivities = updatedActivities[rowKey].map(
-              (activity) => {
-                if (activity.payCodeId === field.linkedPayCode) {
-                  // Auto-update units for context-linked pay codes
-                  return {
-                    ...activity,
-                    unitsProduced: contextValue || 0,
-                    isContextLinked: true,
-                  };
-                }
-                return activity;
-              }
-            );
-
-            // Get the employee's hours for this row
-            const [employeeId, jobType] = rowKey.split("-");
-            const hours =
-              employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-
-            // Then recalculate all activities using our centralized function
-            updatedActivities[rowKey] = calculateActivitiesAmounts(
-              updatedRowActivities,
-              hours,
-              formData.contextData,
-              undefined,
-              formData.logDate
-            );
-          });
-
-          return updatedActivities;
-        });
-      }
-    });
-  }, [formData.contextData, jobConfig, employeeSelectionState.jobHours]);
+  // Note: SALESMAN has no context fields, so no context-linked activity updates needed
 
   // Clear Cuti Umum selections when day type changes from holiday to non-holiday
   useEffect(() => {
@@ -403,9 +380,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }));
   }, [allJobs, JOB_IDS]);
 
-  // Update available employees based on dynamic job types
+  // Available employees (excluding KILANG and TIMOTHY.G for salesman)
   const availableEmployees = useMemo(() => {
+    const excludedIds = ["KILANG", "TIMOTHY.G"];
     return allStaffs
+      .filter((staff) => !excludedIds.includes(staff.id))
       .filter((staff) => {
         if (!staff.job || !Array.isArray(staff.job)) return false;
         return staff.job.some((jobId: string) => JOB_IDS.includes(jobId));
@@ -457,10 +436,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   }, [expandedEmployees]);
 
-  // Helper function to get employees available for work (not on leave)
-  const availableForWork = useMemo(() => {
-    return expandedEmployees.filter((emp) => !leaveEmployees[emp.id]?.selected);
-  }, [expandedEmployees, leaveEmployees]);
+  // Salesman employees (job type SALESMAN only)
+  const salesmanEmployees = useMemo(() => {
+    return expandedEmployees.filter(
+      (emp: { jobType: string; id: string }) => emp.jobType === "SALESMAN"
+    );
+  }, [expandedEmployees]);
+
+  // Salesman Ikut employees (job type SALESMAN_IKUT only)
+  const salesmanIkutEmployees = useMemo(() => {
+    return expandedEmployees.filter(
+      (emp: { jobType: string }) => emp.jobType === "SALESMAN_IKUT"
+    );
+  }, [expandedEmployees]);
 
   // Helper function to get employees available for leave (not working)
   const availableForLeave = useMemo(() => {
@@ -470,12 +458,45 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   }, [uniqueEmployees, employeeSelectionState.selectedJobs]);
 
+  // SALESMAN_IKUT employees available for work (not on leave)
+  const salesmanIkutAvailableForWork = useMemo(() => {
+    return salesmanIkutEmployees.filter(
+      (emp) => !leaveEmployees[emp.id]?.selected
+    );
+  }, [salesmanIkutEmployees, leaveEmployees]);
+
+  // Get employees followed by each salesman
+  const followedBySalesman = useMemo(() => {
+    const followedMap: Record<string, string[]> = {};
+
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        const ikutEmployee = salesmanIkutEmployees.find(
+          (emp) => emp.rowKey === ikutRowKey
+        );
+        if (ikutEmployee) {
+          if (!followedMap[salesmanId]) {
+            followedMap[salesmanId] = [];
+          }
+          followedMap[salesmanId].push(ikutEmployee.id);
+        }
+      }
+    );
+
+    return followedMap;
+  }, [salesmanIkutRelations, salesmanIkutEmployees]);
+
   // Update day type and hours when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = new Date(e.target.value);
     const newDayType = determineDayType(newDate);
     const newDefaultHours = getDefaultHours(e.target.value);
     const oldDefaultHours = getDefaultHours(formData.logDate);
+
+    // Clear products linked ref when date changes (products will be different)
+    if (productsLinkedRef.current) {
+      productsLinkedRef.current = {};
+    }
 
     setFormData({
       ...formData,
@@ -624,6 +645,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             JSON.stringify(employeeSelectionState)
           ),
           employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+          locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+          salesmanIkutRelations: JSON.parse(
+            JSON.stringify(salesmanIkutRelations)
+          ),
+          ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
           leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
           leaveEmployeeActivities: JSON.parse(
             JSON.stringify(leaveEmployeeActivities)
@@ -663,6 +689,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           Object.keys(employeeSelectionState.selectedJobs).length > 0;
         if (!hasSelectedEmployees) {
           return false;
+        }
+
+        // Wait for products to be fetched if there are selected salesmen
+        const hasSelectedSalesmen = Object.entries(
+          employeeSelectionState.selectedJobs
+        ).some(([_, jobTypes]) =>
+          jobTypes.some((jt) => JOB_IDS.includes(jt))
+        );
+        if (
+          hasSelectedSalesmen &&
+          Object.keys(salesmanProducts).length === 0
+        ) {
+          return false; // Still waiting for products
         }
 
         // Check if activities have been fetched for selected employees
@@ -709,9 +748,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     expandedEmployees.length,
     employeeSelectionState.selectedJobs,
     employeeActivities,
+    salesmanProducts,
     mode,
     existingWorkLog,
-    jobConfig?.id,
     JOB_IDS,
     isInitializationComplete,
   ]);
@@ -728,19 +767,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }));
       }
 
-      // Validate required context fields
-      if (jobConfig) {
-        const requiredContextFields = jobConfig.contextFields.filter(
-          (field) => field.required
-        );
-        for (const field of requiredContextFields) {
-          const value = formData.contextData[field.id];
-          if (value === undefined || value === null || value === "") {
-            toast.error(`${field.label} is required`);
-            return;
-          }
-        }
-      }
+      // SALESMAN has no required context fields to validate
     }
   }, [holidays, formData.logDate]);
 
@@ -993,25 +1020,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
   };
 
-  // Handle hours blur event
-  const handleHoursBlur = (rowKey: string | undefined) => {
-    if (!rowKey) return;
-
-    // Recalculate activities when hours change
-    fetchAndApplyActivities();
-  };
-
-  // Handle context data changes
-  const handleContextChange = (fieldId: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      contextData: {
-        ...prev.contextData,
-        [fieldId]: value,
-      },
-    }));
-  };
-
   const handleBack = () => {
     safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
   };
@@ -1045,6 +1053,111 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         }
       }
 
+      // Handle SALESMAN selection/deselection cascading to SALESMAN_IKUT employees
+      if (jobType === "SALESMAN") {
+        const followedEmployees = followedBySalesman[employeeId] || [];
+
+        followedEmployees.forEach((ikutEmployeeId) => {
+          const ikutCurrentSelectedJobs =
+            updatedSelectedJobs[ikutEmployeeId] || [];
+
+          if (wasSelected) {
+            // Deselecting SALESMAN - also deselect following SALESMAN_IKUT employees
+            updatedSelectedJobs[ikutEmployeeId] =
+              ikutCurrentSelectedJobs.filter((j) => j !== "SALESMAN_IKUT");
+          } else {
+            // Selecting SALESMAN - also select following SALESMAN_IKUT employees (if not already selected)
+            if (!ikutCurrentSelectedJobs.includes("SALESMAN_IKUT")) {
+              updatedSelectedJobs[ikutEmployeeId] = [
+                ...ikutCurrentSelectedJobs,
+                "SALESMAN_IKUT",
+              ];
+            }
+            // Initialize hours for auto-selected SALESMAN_IKUT employees
+            if (!updatedJobHours[ikutEmployeeId]) {
+              updatedJobHours[ikutEmployeeId] = {};
+            }
+            if (!updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"]) {
+              updatedJobHours[ikutEmployeeId]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
+            }
+          }
+        });
+
+        // Apply location-based paycodes to auto-selected SALESMAN_IKUT employees
+        if (!wasSelected && followedEmployees.length > 0) {
+          setTimeout(() => {
+            const salesmanRowKey = `${employeeId}-SALESMAN`;
+            const salesmanLocationType =
+              locationTypes[salesmanRowKey] || "Local";
+
+            // Apply paycode to each auto-selected SALESMAN_IKUT employee - exact same pattern as handleLocationTypeChange
+            followedEmployees.forEach((ikutEmployeeId) => {
+              const ikutRowKey = `${ikutEmployeeId}-SALESMAN_IKUT`;
+
+              // Check if this SALESMAN_IKUT employee is selected and has activities
+              if (employeeActivities[ikutRowKey]) {
+                const ikutActivities = employeeActivities[ikutRowKey] || [];
+
+                // Update activities for the SALESMAN_IKUT employee
+                const updatedIkutActivities = ikutActivities.map((activity) => {
+                  // Apply location-based paycode logic
+                  if (
+                    salesmanLocationType === "Local" &&
+                    activity.payCodeId === "ELAUN_MT"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: true,
+                    };
+                  } else if (
+                    salesmanLocationType === "Local" &&
+                    activity.payCodeId === "ELAUN_MO"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: false,
+                    };
+                  } else if (
+                    salesmanLocationType === "Outstation" &&
+                    activity.payCodeId === "ELAUN_MO"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: true,
+                    };
+                  } else if (
+                    salesmanLocationType === "Outstation" &&
+                    activity.payCodeId === "ELAUN_MT"
+                  ) {
+                    return {
+                      ...activity,
+                      isSelected: false,
+                    };
+                  }
+
+                  return activity;
+                });
+
+                // Recalculate amounts for the SALESMAN_IKUT employee
+                const recalculatedIkutActivities = calculateActivitiesAmounts(
+                  updatedIkutActivities,
+                  0, // No hours needed for allowance paycodes
+                  formData.contextData,
+                  undefined,
+                  formData.logDate
+                );
+
+                // Individual setEmployeeActivities call for each employee - same as handleLocationTypeChange
+                setEmployeeActivities((prev) => ({
+                  ...prev,
+                  [ikutRowKey]: recalculatedIkutActivities,
+                }));
+              }
+            });
+          }, 200); // Single delay to ensure activities are loaded
+        }
+      }
+
       return {
         selectedJobs: updatedSelectedJobs,
         jobHours: updatedJobHours,
@@ -1052,29 +1165,273 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
-  // Update employee hours by employee+job combination
-  const handleEmployeeHoursChange = (
+  const handleLocationTypeChange = (
     rowKey: string | undefined,
-    hours: string
+    locationType: "Local" | "Outstation"
   ) => {
     if (!rowKey) return;
 
     const [employeeId, jobType] = rowKey.split("-");
-    const hoursNum = hours === "" ? 0 : parseFloat(hours);
 
-    setEmployeeSelectionState((prev) => {
-      return {
+    setLocationTypes((prev) => ({
+      ...prev,
+      [rowKey]: locationType,
+    }));
+
+    // Recalculate activities when location type changes
+    const activities = employeeActivities[rowKey] || [];
+
+    // Update activities based on location type for the salesman
+    if (activities.length > 0) {
+      const recalculatedActivities = calculateActivitiesAmounts(
+        activities,
+        0, // Hours don't matter for salesmen
+        formData.contextData,
+        locationType,
+        formData.logDate
+      );
+
+      setEmployeeActivities((prev) => ({
         ...prev,
-        jobHours: {
-          ...prev.jobHours,
-          [employeeId]: {
-            ...(prev.jobHours[employeeId] || {}),
-            [jobType]: hoursNum,
-          },
-        },
-      };
-    });
+        [rowKey]: recalculatedActivities,
+      }));
+    }
+
+    // Apply location-based paycodes to SALESMAN_IKUT employees following this salesman
+    if (jobType === "SALESMAN") {
+      const followedEmployees = followedBySalesman[employeeId] || [];
+
+      followedEmployees.forEach((ikutEmployeeId) => {
+        // Find the SALESMAN_IKUT row key for this employee
+        const ikutRowKey = `${ikutEmployeeId}-SALESMAN_IKUT`;
+
+        // Check if this SALESMAN_IKUT employee is selected and has activities
+        if (employeeActivities[ikutRowKey]) {
+          const ikutActivities = employeeActivities[ikutRowKey] || [];
+
+          // Update activities for the SALESMAN_IKUT employee
+          const updatedIkutActivities = ikutActivities.map((activity) => {
+            // Apply location-based paycode logic
+            if (locationType === "Local" && activity.payCodeId === "ELAUN_MT") {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              locationType === "Local" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            } else if (
+              locationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              locationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            }
+
+            return activity;
+          });
+
+          // Recalculate amounts for the SALESMAN_IKUT employee
+          const recalculatedIkutActivities = calculateActivitiesAmounts(
+            updatedIkutActivities,
+            employeeSelectionState.jobHours[ikutEmployeeId]?.[
+              "SALESMAN_IKUT"
+            ] || getDefaultHours(formData.logDate),
+            formData.contextData,
+            undefined,
+            formData.logDate
+          );
+
+          setEmployeeActivities((prev) => ({
+            ...prev,
+            [ikutRowKey]: recalculatedIkutActivities,
+          }));
+        }
+      });
+    }
   };
+
+  const fetchSalesmanProducts = async () => {
+    if (!formData.logDate) return;
+
+    try {
+      // Get all selected salesmen IDs
+      const salesmenIds: string[] = [];
+
+      Object.entries(employeeSelectionState.selectedJobs).forEach(
+        ([employeeId, jobTypes]) => {
+          if (jobTypes.some((jt) => JOB_IDS.includes(jt))) {
+            salesmenIds.push(employeeId);
+          }
+        }
+      );
+
+      if (salesmenIds.length === 0) return;
+
+      // Pass date as YYYY-MM-DD string to avoid timezone issues between client and server
+      const dateString = formData.logDate; // Already in YYYY-MM-DD format
+
+      // Fetch products for all salesmen in one request
+      const response = await api.get(
+        `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(
+          ","
+        )}&date=${dateString}`
+      );
+
+      // Response might be directly available or in a data property
+      const responseData = response.data || response;
+
+      // Create row keys for each salesman and job type combination
+      const rowKeyProducts: Record<string, any[]> = {};
+
+      Object.entries(responseData).forEach(([salesmanId, products]) => {
+        // Find all selected jobs for this employee
+        const selectedJobs =
+          employeeSelectionState.selectedJobs[salesmanId] || [];
+
+        // Create row key for each job and set products
+        selectedJobs.forEach((jobType) => {
+          const rowKey = `${salesmanId}-${jobType}`;
+
+          // Ensure products is always an array and has required fields
+          const productArray = Array.isArray(products) ? products : [];
+
+          // Filter to only include products with valid data
+          rowKeyProducts[rowKey] = productArray.filter(
+            (p) =>
+              p &&
+              p.product_id &&
+              typeof p.quantity === "number" &&
+              p.quantity > 0
+          );
+        });
+      });
+
+      setSalesmanProducts(rowKeyProducts);
+    } catch (error) {
+      console.error("Error fetching salesman products:", error);
+      toast.error("Failed to fetch salesman products");
+    }
+  };
+
+  useEffect(() => {
+    // Fetch salesman products when dependencies change
+    if (
+      formData.logDate &&
+      Object.keys(employeeSelectionState.selectedJobs).length > 0
+    ) {
+      fetchSalesmanProducts();
+    }
+  }, [
+    formData.logDate,
+    employeeSelectionState.selectedJobs,
+    JOB_IDS,
+  ]);
+
+  useEffect(() => {
+    // After salesmanProducts are updated, auto-link them to pay codes
+    if (Object.keys(salesmanProducts).length > 0) {
+      // For each row key and its products
+      Object.entries(salesmanProducts).forEach(([rowKey, products]) => {
+        // Skip if there are no products for this employee
+        if (!products || products.length === 0) {
+          return;
+        }
+
+        const currentActivities = employeeActivities[rowKey] || [];
+        // Skip if activities haven't been loaded yet
+        if (currentActivities.length === 0) {
+          return;
+        }
+
+        // Create a hash of products to detect if they changed
+        const productsHash = JSON.stringify(
+          products.map((p) => ({ id: p.product_id, qty: p.quantity }))
+        );
+
+        // Skip if we've already linked these exact products for this rowKey
+        if (productsLinkedRef.current[rowKey] === productsHash) {
+          return;
+        }
+
+        // Mark as linked
+        productsLinkedRef.current[rowKey] = productsHash;
+
+        // For this employee+job combo, update their activities
+        setEmployeeActivities((prev) => {
+          const prevActivities = prev[rowKey] || [];
+          if (prevActivities.length === 0) {
+            return prev;
+          }
+
+          // Create a new array with updated activities
+          const updatedActivities = [...prevActivities];
+
+          // For each product, find and update the matching pay code
+          products.forEach((product) => {
+            const productId = String(product.product_id);
+            const quantity = parseFloat(product.quantity) || 0;
+
+            // Find the activity with matching pay code ID
+            const activityIndex = updatedActivities.findIndex(
+              (activity) => String(activity.payCodeId) === productId
+            );
+
+            if (activityIndex !== -1) {
+              // Update the activity with the product quantity
+              if (quantity > 0) {
+                updatedActivities[activityIndex] = {
+                  ...updatedActivities[activityIndex],
+                  unitsProduced: quantity,
+                  isSelected: true, // Auto-select products with non-zero quantity
+                };
+              }
+            }
+          });
+
+          // Auto-deselect Hour-based activities
+          updatedActivities.forEach((activity, index) => {
+            if (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") {
+              updatedActivities[index] = {
+                ...activity,
+                isSelected: false,
+                calculatedAmount: 0,
+              };
+            }
+          });
+
+          // Recalculate amounts for all activities
+          const recalculatedActivities = calculateActivitiesAmounts(
+            updatedActivities,
+            0, // For salesmen, hours aren't used
+            formData.contextData,
+            locationTypes[rowKey] || "Local",
+            formData.logDate
+          );
+
+          return {
+            ...prev,
+            [rowKey]: recalculatedActivities,
+          };
+        });
+      });
+    }
+  }, [salesmanProducts, employeeActivities, formData.contextData, formData.logDate, locationTypes]);
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
@@ -1084,6 +1441,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       );
       return;
     }
+
+    // Get the products for this specific employee and job
+    const rowKey = employee.rowKey;
+    const productsForEmployee = salesmanProducts[rowKey] || [];
 
     // First set selectedEmployee, then open the modal
     setSelectedEmployee(employee);
@@ -1108,30 +1469,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
 
     // Filter out excluded employees directly when building selected employees list
-    const allSelectedEmployees = Object.entries(
+    let allSelectedEmployees = Object.entries(
       employeeSelectionState.selectedJobs
     ).filter(([_, jobTypes]) => jobTypes.length > 0);
+
+    // Remove excluded employees
+    const excludedEmployees = ["KILANG", "TIMOTHY.G"];
+    allSelectedEmployees = allSelectedEmployees.filter(
+      ([employeeId, _]) => !excludedEmployees.includes(employeeId)
+    );
 
     if (allSelectedEmployees.length === 0 && leaveEntries.length === 0) {
       toast.error("Please select at least one employee for work or leave.");
       return;
     }
 
-    // Validate that all selected employees have hours
-    const invalidEmployees = allSelectedEmployees.filter(
-      ([employeeId, jobTypes]) => {
-        return jobTypes.some((jobType) => {
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-          return hours <= 0;
-        });
-      }
-    );
-
-    if (invalidEmployees.length > 0) {
-      toast.error("All selected employees must have hours greater than 0");
-      return;
-    }
+    // Note: Salesmen don't require hours validation
 
     // Build the employee data with all selected jobs
     const selectedEmployeeData = allSelectedEmployees
@@ -1141,12 +1494,29 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
           const rowKey = `${employeeId}-${jobType}`;
           const activities = employeeActivities[rowKey] || [];
+          const employeeObject = expandedEmployees.find(
+            (e) => e.rowKey === rowKey
+          );
+
+          // Add salesman-specific additional data
+          const additionalData: any = {
+            locationType: employeeObject
+              ? getEffectiveLocationType(employeeObject)
+              : "Local",
+          };
+          if (jobType === "SALESMAN_IKUT") {
+            additionalData.followingSalesmanId = salesmanIkutRelations[rowKey];
+            additionalData.muatMeeBags = ikutBagCounts[rowKey]?.muatMee || 0;
+            additionalData.muatBihunBags =
+              ikutBagCounts[rowKey]?.muatBihun || 0;
+          }
 
           return {
             employeeId,
             jobType,
             hours,
             activities,
+            ...additionalData,
           };
         });
       })
@@ -1189,6 +1559,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           JSON.stringify(employeeSelectionState)
         ),
         employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
+        locationTypes: JSON.parse(JSON.stringify(locationTypes)),
+        salesmanIkutRelations: JSON.parse(
+          JSON.stringify(salesmanIkutRelations)
+        ),
+        ikutBagCounts: JSON.parse(JSON.stringify(ikutBagCounts)),
         leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
         leaveEmployeeActivities: JSON.parse(
           JSON.stringify(leaveEmployeeActivities)
@@ -1218,6 +1593,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         const employeeId = employee.id;
         const jobType = employee.jobType;
 
+        // Skip SALESMAN_IKUT employees from default selection
+        if (jobType === "SALESMAN_IKUT") {
+          return;
+        }
+
         // Initialize the arrays if they don't exist yet
         if (!newSelectedJobs[employeeId]) {
           newSelectedJobs[employeeId] = [];
@@ -1243,16 +1623,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
-    // Check if all available employees are selected
-    const allAvailableSelected = availableForWork.every((emp) =>
+    // Check if all salesman employees are selected
+    const allAvailableSelected = salesmanEmployees.every((emp) =>
       employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
     );
 
     setEmployeeSelectionState((prev) => {
       if (allAvailableSelected) {
-        // Deselect all available employees
+        // Deselect all salesman employees
         const newSelectedJobs = { ...prev.selectedJobs };
-        availableForWork.forEach((emp) => {
+        salesmanEmployees.forEach((emp) => {
           if (newSelectedJobs[emp.id]) {
             newSelectedJobs[emp.id] = newSelectedJobs[emp.id].filter(
               (job) => job !== emp.jobType
@@ -1268,11 +1648,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           jobHours: prev.jobHours,
         };
       } else {
-        // Select all available employees
+        // Select all salesman employees
         const newSelectedJobs = { ...prev.selectedJobs };
         const newJobHours = { ...prev.jobHours };
 
-        availableForWork.forEach((emp) => {
+        salesmanEmployees.forEach((emp) => {
           if (!newSelectedJobs[emp.id]) {
             newSelectedJobs[emp.id] = [];
           }
@@ -1379,11 +1759,92 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   };
 
+  const handleIkutChange = (ikutRowKey: string, salesmanId: string) => {
+    setSalesmanIkutRelations((prev) => ({
+      ...prev,
+      [ikutRowKey]: salesmanId,
+    }));
+
+    // Auto-select the SALESMAN_IKUT employee when a salesman is chosen
+    if (salesmanId) {
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+          const newJobHours = { ...prevState.jobHours };
+
+          // Initialize if needed
+          if (!newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = [];
+          }
+          if (!newJobHours[ikutEmployee.id]) {
+            newJobHours[ikutEmployee.id] = {};
+          }
+
+          // Add SALESMAN_IKUT to selected jobs if not already selected
+          if (!newSelectedJobs[ikutEmployee.id].includes("SALESMAN_IKUT")) {
+            newSelectedJobs[ikutEmployee.id].push("SALESMAN_IKUT");
+          }
+
+          // Set default hours if not already set (5 for Saturday, 7 for other days)
+          if (!newJobHours[ikutEmployee.id]["SALESMAN_IKUT"]) {
+            newJobHours[ikutEmployee.id]["SALESMAN_IKUT"] = getDefaultHours(formData.logDate);
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: newJobHours,
+          };
+        });
+
+        // No need for setTimeout - paycode application now happens automatically in fetchAndApplyActivities
+      }
+    } else {
+      // Auto-deselect the SALESMAN_IKUT employee when salesman selection is cleared
+      const ikutEmployee = salesmanIkutEmployees.find(
+        (emp) => emp.rowKey === ikutRowKey
+      );
+      if (ikutEmployee) {
+        setEmployeeSelectionState((prevState) => {
+          const newSelectedJobs = { ...prevState.selectedJobs };
+
+          if (newSelectedJobs[ikutEmployee.id]) {
+            newSelectedJobs[ikutEmployee.id] = newSelectedJobs[
+              ikutEmployee.id
+            ].filter((jobType) => jobType !== "SALESMAN_IKUT");
+          }
+
+          return {
+            selectedJobs: newSelectedJobs,
+            jobHours: prevState.jobHours, // Keep hours for potential re-selection
+          };
+        });
+      }
+    }
+  };
+
+  const handleBagCountChange = (
+    rowKey: string,
+    field: "muatMee" | "muatBihun",
+    value: string
+  ) => {
+    const numValue = value === "" ? 0 : parseInt(value) || 0;
+
+    setIkutBagCounts((prev) => ({
+      ...prev,
+      [rowKey]: {
+        ...prev[rowKey],
+        [field]: numValue,
+      },
+    }));
+  };
+
   // Update select all state based on individual selections and availability
   useEffect(() => {
-    const availableEmployees = availableForWork;
-    const totalAvailable = availableEmployees.length;
-    const selectedAvailable = availableEmployees.filter((emp) =>
+    const totalAvailable = salesmanEmployees.length;
+    const selectedAvailable = salesmanEmployees.filter((emp) =>
       employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
     ).length;
 
@@ -1400,11 +1861,33 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
   }, [
     employeeSelectionState.selectedJobs,
-    availableForWork,
-    jobConfig?.id,
+    salesmanEmployees,
     leaveEmployees,
     availableForLeave,
   ]);
+
+  // Auto-deselect excluded employees (KILANG, TIMOTHY.G)
+  useEffect(() => {
+    const excludedEmployees = ["KILANG", "TIMOTHY.G"];
+    let needsUpdate = false;
+
+    setEmployeeSelectionState((prev) => {
+      const updatedSelectedJobs = { ...prev.selectedJobs };
+
+      excludedEmployees.forEach((employeeId) => {
+        if (updatedSelectedJobs[employeeId]?.includes("SALESMAN")) {
+          updatedSelectedJobs[employeeId] = updatedSelectedJobs[
+            employeeId
+          ].filter((jobType) => jobType !== "SALESMAN");
+          needsUpdate = true;
+        }
+      });
+
+      return needsUpdate
+        ? { ...prev, selectedJobs: updatedSelectedJobs }
+        : prev;
+    });
+  }, []);
 
   // Use a one-time initialization effect
   const initializedRef = useRef(false);
@@ -1429,6 +1912,43 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     initializeDefaultSelections,
     mode,
   ]);
+
+  useEffect(() => {
+    // Update activities based on ikutBagCounts changes
+    setEmployeeActivities((prev) => {
+      const updatedActivities = { ...prev };
+
+      Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
+        const currentActivities = updatedActivities[rowKey] || [];
+
+        const updatedRowActivities = currentActivities.map((activity) => {
+          // Link Muat Mee paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_MEE_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatMee,
+              isContextLinked: true,
+            };
+          }
+
+          // Link Muat Bihun paycode (you'll need to define the paycode ID)
+          if (activity.payCodeId === "MUAT_BIHUN_PAYCODE_ID") {
+            return {
+              ...activity,
+              unitsProduced: bagCounts.muatBihun,
+              isContextLinked: true,
+            };
+          }
+
+          return activity;
+        });
+
+        updatedActivities[rowKey] = updatedRowActivities;
+      });
+
+      return updatedActivities;
+    });
+  }, [ikutBagCounts]);
 
   // Separate effect for fetching activities after selection changes
   useEffect(() => {
@@ -1477,9 +1997,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       ([employeeId, jobTypes]) => {
         jobTypes.forEach((jobType) => {
           const rowKey = `${employeeId}-${jobType}`;
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-
           // Get job pay codes from cache
           const jobPayCodes = jobPayCodeDetails[jobType] || [];
 
@@ -1496,6 +2013,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // Then add/override with employee-specific pay codes
           employeePayCodes.forEach((pc) => {
+            // Skip Hour-based and Bill-based pay codes for salesmen
+            if (pc.rate_unit === "Hour" || pc.rate_unit === "Bill") {
+              return;
+            }
             allPayCodes.set(pc.id, { ...pc, source: "employee" });
           });
 
@@ -1511,12 +2032,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             ? savedEmployeeActivitiesRef.current[rowKey] || []
             : employeeActivities[rowKey] || [];
 
-          // Use day-specific OT threshold (5 for Saturday, 8 for others)
-          const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
-          const filteredPayCodes =
-            hours > otThreshold
-              ? mergedPayCodes
-              : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
+          // Salesmen don't filter by hours since hours aren't applicable
+          const filteredPayCodes = mergedPayCodes;
 
           // Convert to activity format
           const activities = filteredPayCodes.map((payCode) => {
@@ -1566,8 +2083,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
-                // Only auto-select OT codes if hours exceed threshold AND is_default_setting is true
-                isSelected = hours > otThreshold && payCode.is_default_setting;
+                // Salesmen don't have hour-based overtime, never auto-select
+                isSelected = false;
               } else if (payCode.pay_type === "Base") {
                 // Base pay codes follow default settings
                 isSelected = payCode.is_default_setting;
@@ -1585,6 +2102,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               ) {
                 // Don't auto-select these types
                 isSelected = false;
+              }
+
+              // Always deselect Hour-based pay codes for salesmen
+              if (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") {
+                isSelected = false;
+              }
+
+              // Special logic for SALESMAN_IKUT employees - don't auto-select any allowance paycodes
+              // Let the location-based logic in handleIkutChange handle the selection
+              if (jobType === "SALESMAN_IKUT") {
+                if (payCode.id === "ELAUN_MT" || payCode.id === "ELAUN_MO") {
+                  isSelected = false; // Don't auto-select, let location logic handle it
+                }
               }
             }
 
@@ -1618,7 +2148,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   rate,
                   unitsProduced,
                 },
-                hours,
+                0, // Salesmen don't track hours
                 formData.contextData,
                 undefined,
                 formData.logDate
@@ -1629,7 +2159,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Apply auto-deselection logic to all activities
           const processedActivities = calculateActivitiesAmounts(
             activities,
-            hours,
+            0, // Salesmen don't track hours
             formData.contextData,
             undefined,
             formData.logDate
@@ -1639,6 +2169,77 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     );
 
+    setEmployeeActivities(newEmployeeActivities);
+
+    // Apply location-based paycodes to SALESMAN_IKUT employees after activities are loaded
+    // This ensures paycodes are applied whenever activities are fetched/refreshed
+    Object.entries(salesmanIkutRelations).forEach(
+      ([ikutRowKey, salesmanId]) => {
+        // Check if this SALESMAN_IKUT employee has activities loaded
+        if (
+          newEmployeeActivities[ikutRowKey] &&
+          newEmployeeActivities[ikutRowKey].length > 0
+        ) {
+          const salesmanRowKey = `${salesmanId}-SALESMAN`;
+          const salesmanLocationType = locationTypes[salesmanRowKey] || "Local";
+          const ikutActivities = newEmployeeActivities[ikutRowKey];
+
+          // Update activities for the SALESMAN_IKUT employee
+          const updatedIkutActivities = ikutActivities.map((activity) => {
+            // Apply location-based paycode logic
+            if (
+              salesmanLocationType === "Local" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              salesmanLocationType === "Local" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            } else if (
+              salesmanLocationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MO"
+            ) {
+              return {
+                ...activity,
+                isSelected: true,
+              };
+            } else if (
+              salesmanLocationType === "Outstation" &&
+              activity.payCodeId === "ELAUN_MT"
+            ) {
+              return {
+                ...activity,
+                isSelected: false,
+              };
+            }
+
+            return activity;
+          });
+
+          // Recalculate amounts for the SALESMAN_IKUT employee
+          const recalculatedIkutActivities = calculateActivitiesAmounts(
+            updatedIkutActivities,
+            0, // No hours needed for allowance paycodes
+            formData.contextData,
+            undefined,
+            formData.logDate
+          );
+
+          // Update the activities immediately
+          newEmployeeActivities[ikutRowKey] = recalculatedIkutActivities;
+        }
+      }
+    );
+
+    // Update with paycode-applied activities
     setEmployeeActivities(newEmployeeActivities);
   };
 
@@ -1814,6 +2415,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
       const newEmployeeActivities: Record<string, any[]> = {};
+      const newLocationTypes: Record<string, "Local" | "Outstation"> = {};
+
+      // Restore SALESMAN_IKUT relations and bag counts
+      const newSalesmanIkutRelations: Record<string, string> = {};
+      const newIkutBagCounts: Record<
+        string,
+        { muatMee: number; muatBihun: number }
+      > = {};
 
       // Clear and populate the saved employee row keys ref
       // This tracks which employees were originally in the work log
@@ -1865,6 +2474,23 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Also store in ref to preserve original state for deselect/re-select cycles
           savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
         }
+
+        // Restore SALESMAN_IKUT specific data
+        if (entry.job_id === "SALESMAN_IKUT") {
+          if (entry.following_salesman_id) {
+            newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
+          }
+
+          newIkutBagCounts[rowKey] = {
+            muatMee: entry.muat_mee_bags || 0,
+            muatBihun: entry.muat_bihun_bags || 0,
+          };
+        }
+
+        // Restore SALESMAN location types
+        if (entry.job_id === "SALESMAN") {
+          newLocationTypes[rowKey] = entry.location_type || "Local";
+        }
       });
 
       // Apply all the restored state
@@ -1873,6 +2499,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         jobHours: newJobHours,
       });
       setEmployeeActivities(newEmployeeActivities);
+      setLocationTypes(newLocationTypes);
+      setSalesmanIkutRelations(newSalesmanIkutRelations);
+      setIkutBagCounts(newIkutBagCounts);
 
       // Restore leave records if they exist
       if (
@@ -1991,15 +2620,49 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     generateLeaveActivitiesWithSavedSelection,
   ]);
 
+  // Helper function to get the effective location type for any employee
+  const getEffectiveLocationType = (
+    employee: EmployeeWithHours
+  ): "Local" | "Outstation" => {
+    if (!employee.rowKey) return "Local";
+
+    // For SALESMAN employees, use their direct location
+    if (employee.jobType === "SALESMAN") {
+      return locationTypes[employee.rowKey] || "Local";
+    }
+
+    // For SALESMAN_IKUT employees, use the location of the salesman they're following
+    if (employee.jobType === "SALESMAN_IKUT") {
+      const salesmanId = salesmanIkutRelations[employee.rowKey];
+      if (salesmanId) {
+        const salesmanRowKey = `${salesmanId}-SALESMAN`;
+        return locationTypes[salesmanRowKey] || "Local";
+      }
+    }
+
+    // For other employees, return Local as default
+    return "Local";
+  };
+
   // Update handleActivitiesUpdated to store all activities, not just selected:
   const handleActivitiesUpdated = (activities: any[]) => {
     if (!selectedEmployee?.rowKey) return;
 
     const rowKey = selectedEmployee.rowKey;
+    const locationType = getEffectiveLocationType(selectedEmployee);
+
+    // Recalculate activities with location type
+    const recalculatedActivities = calculateActivitiesAmounts(
+      activities,
+      0, // Hours don't matter for salesmen
+      formData.contextData,
+      locationType,
+      formData.logDate
+    );
 
     setEmployeeActivities((prev) => ({
       ...prev,
-      [rowKey]: activities,
+      [rowKey]: recalculatedActivities,
     }));
 
     toast.success(`Activities updated for ${selectedEmployee.name}`);
@@ -2079,46 +2742,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               )}
           </span>
 
-          {/* Shift Field */}
-          <div className="w-32">
-            <FormListbox
-              name="shift"
-              label="Shift"
-              value={formData.shift}
-              onChange={(value) => setFormData({ ...formData, shift: value })}
-              options={[
-                { id: "1", name: "Day Shift" },
-                { id: "2", name: "Night Shift" },
-              ]}
-              required
-            />
-          </div>
-
-          {/* Show Context Form here only if 3 or fewer fields */}
-          {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
-            <DynamicContextForm
-              contextFields={jobConfig?.contextFields || []}
-              contextData={formData.contextData}
-              onChange={handleContextChange}
-              disabled={isSaving}
-            />
-          )}
+          {/* Shift is always Day Shift for Salesman - no selector needed */}
         </div>
-
-        {/* Show Context Form below if more than 3 fields */}
-        {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
-          <div className="mb-4">
-            <span className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3">
-              Production Details
-            </span>
-            <DynamicContextForm
-              contextFields={jobConfig?.contextFields || []}
-              contextData={formData.contextData}
-              onChange={handleContextChange}
-              disabled={isSaving}
-            />
-          </div>
-        )}
 
         {/* Employees Section */}
         <div className="border-t border-default-200 dark:border-gray-700 pt-4">
@@ -2143,7 +2768,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             checkedColor="text-sky-600"
                             ariaLabel="Select all employees"
                             buttonClassName="p-1 rounded-lg"
-                            disabled={availableForWork.length === 0}
+                            disabled={false}
                           />
                         </th>
                         <th
@@ -2166,9 +2791,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         </th>
                         <th
                           scope="col"
-                          className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Hours
+                          Location
                         </th>
                         <th
                           scope="col"
@@ -2179,17 +2804,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                      {expandedEmployees.map((row, index) => {
+                      {salesmanEmployees.map((row, index) => {
                         const isSelected =
                           employeeSelectionState.selectedJobs[row.id]?.includes(
                             row.jobType
                           ) || false;
-                        const hours =
-                          employeeSelectionState.jobHours[row.id]?.[
-                            row.jobType
-                          ] ??
-                          jobConfig?.defaultHours ??
-                          7;
 
                         return (
                           <tr
@@ -2246,6 +2865,35 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             <td className="px-6 py-2 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                               <span className="font-medium">{row.name}</span>
+                              {(() => {
+                                // Only show followed employees that are actually selected
+                                const selectedFollowers = (
+                                  followedBySalesman[row.id] || []
+                                ).filter((ikutEmployeeId) =>
+                                  employeeSelectionState.selectedJobs[
+                                    ikutEmployeeId
+                                  ]?.includes("SALESMAN_IKUT")
+                                );
+
+                                if (selectedFollowers.length > 0) {
+                                  return (
+                                    <span className="text-xs text-default-500 dark:text-gray-400 block mt-1">
+                                      (Followed by{" "}
+                                      {selectedFollowers
+                                        .map((ikutEmployeeId) => {
+                                          const ikutEmployee =
+                                            availableEmployees.find(
+                                              (emp) => emp.id === ikutEmployeeId
+                                            );
+                                          return ikutEmployee?.name;
+                                        })
+                                        .join(", ")}
+                                      )
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </td>
                             <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
                               <SafeLink
@@ -2258,37 +2906,163 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 {row.jobName}
                               </SafeLink>
                             </td>
-                            <td className="px-6 py-2 whitespace-nowrap text-right">
-                              <div className="flex justify-end">
-                                <input
-                                  type="number"
-                                  value={isSelected ? hours.toString() : ""}
-                                  onChange={(e) =>
-                                    handleEmployeeHoursChange(
+                            <td className="px-6 py-2 whitespace-nowrap text-left">
+                              <div className="relative w-40 mx-auto">
+                                <Listbox
+                                  value={
+                                    locationTypes[row.rowKey || ""] || "Local"
+                                  }
+                                  onChange={(value) =>
+                                    handleLocationTypeChange(
                                       row.rowKey,
-                                      e.target.value
+                                      value as "Local" | "Outstation"
                                     )
                                   }
-                                  onBlur={() => handleHoursBlur(row.rowKey)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={`max-w-[80px] py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
-                                    hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) &&
-                                    jobConfig?.requiresOvertimeCalc
-                                      ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
-                                      : "border-default-300 dark:border-gray-600"
-                                  }`}
-                                  step="0.5"
-                                  min="0"
-                                  max="24"
-                                  disabled={
-                                    !isSelected ||
-                                    isSaving ||
-                                    leaveEmployees[row.id]?.selected
-                                  }
-                                  placeholder={isSelected ? "0" : "-"}
-                                />
-                              </div>
-                            </td>
+                                  disabled={!isSelected}
+                                >
+                                    <div className="relative">
+                                      <ListboxButton
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`relative w-full pl-3 py-1.5 text-left rounded-md border ${
+                                          !isSelected
+                                            ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
+                                            : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                        }`}
+                                      >
+                                        <span className="flex items-center">
+                                          {locationTypes[row.rowKey || ""] ===
+                                          "Outstation" ? (
+                                            <IconMapPinOff
+                                              size={14}
+                                              className="mr-2 text-amber-500"
+                                            />
+                                          ) : (
+                                            <IconMapPin
+                                              size={14}
+                                              className="mr-2 text-sky-500"
+                                            />
+                                          )}
+                                          <span className="block truncate text-sm">
+                                            {locationTypes[row.rowKey || ""] ||
+                                              "Local"}
+                                          </span>
+                                        </span>
+                                        <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                          <IconChevronDown
+                                            className="w-4 h-4 text-default-400 dark:text-gray-500"
+                                            aria-hidden="true"
+                                          />
+                                        </span>
+                                      </ListboxButton>
+                                      <Transition
+                                        as={Fragment}
+                                        leave="transition ease-in duration-100"
+                                        leaveFrom="opacity-100"
+                                        leaveTo="opacity-0"
+                                      >
+                                        <ListboxOptions className="absolute z-10 w-full py-1 mt-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                          <ListboxOption
+                                            value="Local"
+                                            className={({ active }) =>
+                                              `${
+                                                active
+                                                  ? "bg-sky-100 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100"
+                                                  : "text-default-700 dark:text-gray-200"
+                                              } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
+                                            }
+                                          >
+                                            {({ selected, active }) => (
+                                              <>
+                                                <div className="flex items-center">
+                                                  <IconMapPin
+                                                    size={14}
+                                                    className={`mr-2 ${
+                                                      active
+                                                        ? "text-sky-600"
+                                                        : "text-sky-500"
+                                                    }`}
+                                                  />
+                                                  <span
+                                                    className={`${
+                                                      selected
+                                                        ? "font-medium"
+                                                        : "font-normal"
+                                                    } block truncate`}
+                                                  >
+                                                    Local
+                                                  </span>
+                                                </div>
+                                                {selected ? (
+                                                  <span
+                                                    className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                      active
+                                                        ? "text-sky-600"
+                                                        : "text-sky-500"
+                                                    }`}
+                                                  >
+                                                    <IconCheck
+                                                      className="w-4 h-4"
+                                                      aria-hidden="true"
+                                                    />
+                                                  </span>
+                                                ) : null}
+                                              </>
+                                            )}
+                                          </ListboxOption>
+                                          <ListboxOption
+                                            value="Outstation"
+                                            className={({ active }) =>
+                                              `${
+                                                active
+                                                  ? "bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100"
+                                                  : "text-default-700 dark:text-gray-200"
+                                              } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
+                                            }
+                                          >
+                                            {({ selected, active }) => (
+                                              <>
+                                                <div className="flex items-center">
+                                                  <IconMapPinOff
+                                                    size={14}
+                                                    className={`mr-2 ${
+                                                      active
+                                                        ? "text-amber-600"
+                                                        : "text-amber-500"
+                                                    }`}
+                                                  />
+                                                  <span
+                                                    className={`${
+                                                      selected
+                                                        ? "font-medium"
+                                                        : "font-normal"
+                                                    } block truncate`}
+                                                  >
+                                                    Outstation
+                                                  </span>
+                                                </div>
+                                                {selected ? (
+                                                  <span
+                                                    className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                      active
+                                                        ? "text-amber-600"
+                                                        : "text-amber-500"
+                                                    }`}
+                                                  >
+                                                    <IconCheck
+                                                      className="w-4 h-4"
+                                                      aria-hidden="true"
+                                                    />
+                                                  </span>
+                                                ) : null}
+                                              </>
+                                            )}
+                                          </ListboxOption>
+                                        </ListboxOptions>
+                                      </Transition>
+                                    </div>
+                                  </Listbox>
+                                </div>
+                              </td>
                             <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(
@@ -2316,6 +3090,396 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 </div>
               </div>
 
+              {/* SALESMAN_IKUT Table */}
+              {salesmanIkutEmployees.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm mt-4">
+                    <div>
+                      <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                        <thead className="bg-default-50 dark:bg-gray-900/50">
+                          <tr>
+                            <th scope="col" className="px-6 py-1 text-left">
+                              <Checkbox
+                                checked={salesmanIkutAvailableForWork.every(
+                                  (emp) =>
+                                    employeeSelectionState.selectedJobs[
+                                      emp.id
+                                    ]?.includes(emp.jobType)
+                                )}
+                                onChange={() => {
+                                  const allSelected =
+                                    salesmanIkutAvailableForWork.every((emp) =>
+                                      employeeSelectionState.selectedJobs[
+                                        emp.id
+                                      ]?.includes(emp.jobType)
+                                    );
+
+                                  setEmployeeSelectionState((prev) => {
+                                    const newState = { ...prev };
+                                    salesmanIkutAvailableForWork.forEach(
+                                      (emp) => {
+                                        if (allSelected) {
+                                          // Deselect all and clear salesman relations
+                                          newState.selectedJobs[emp.id] = (
+                                            newState.selectedJobs[emp.id] || []
+                                          ).filter(
+                                            (job) => job !== emp.jobType
+                                          );
+
+                                          // Clear salesman relation when deselecting
+                                          setSalesmanIkutRelations(
+                                            (prevRelations) => {
+                                              const newRelations = {
+                                                ...prevRelations,
+                                              };
+                                              delete newRelations[
+                                                emp.rowKey || ""
+                                              ];
+                                              return newRelations;
+                                            }
+                                          );
+                                        } else {
+                                          // Don't auto-select - user must choose salesman first
+                                        }
+                                      }
+                                    );
+                                    return newState;
+                                  });
+                                }}
+                                size={20}
+                                checkedColor="text-sky-600"
+                                ariaLabel="Select all ikut lori employees"
+                                buttonClassName="p-1 rounded-lg"
+                                disabled={
+                                  salesmanIkutAvailableForWork.length === 0
+                                }
+                              />
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              ID
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              Name
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              Job
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              Muat Mee (Bag)
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              Muat Bihun (Bag)
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              Ikut
+                            </th>
+                            <th
+                              scope="col"
+                              className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                            >
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                          {salesmanIkutEmployees.map((row, index) => {
+                            const isSelected =
+                              employeeSelectionState.selectedJobs[
+                                row.id
+                              ]?.includes(row.jobType);
+                            const selectedSalesman =
+                              salesmanIkutRelations[row.rowKey || ""] || "";
+                            const bagCounts = ikutBagCounts[
+                              row.rowKey || ""
+                            ] || { muatMee: 0, muatBihun: 0 };
+                            const isLastRow =
+                              index === salesmanIkutEmployees.length - 1; // Add this line
+
+                            return (
+                              <tr
+                                key={row.rowKey}
+                                onClick={() => {
+                                  if (
+                                    isSaving ||
+                                    leaveEmployees[row.id]?.selected
+                                  )
+                                    return;
+                                  handleEmployeeSelection(row.rowKey);
+                                }}
+                                className={`transition-colors duration-150 ${
+                                  isSaving || leaveEmployees[row.id]?.selected
+                                    ? "bg-default-50 dark:bg-gray-700 cursor-not-allowed"
+                                    : "cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700"
+                                } ${
+                                  isSelected
+                                    ? "bg-sky-50 dark:bg-sky-900/30 hover:bg-sky-100 dark:hover:bg-sky-900/50"
+                                    : "bg-white dark:bg-gray-800"
+                                }`}
+                              >
+                                <td
+                                  className="px-6 py-2 whitespace-nowrap align-middle cursor-pointer"
+                                  onClickCapture={(e) => {
+                                    e.stopPropagation();
+                                    if (
+                                      !isSaving &&
+                                      !leaveEmployees[row.id]?.selected
+                                    ) {
+                                      handleEmployeeSelection(row.rowKey);
+                                    }
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={!!isSelected}
+                                    onChange={() => {}}
+                                    size={20}
+                                    checkedColor="text-sky-600"
+                                    ariaLabel={`Select employee ${row.name}`}
+                                    buttonClassName="p-1 rounded-lg"
+                                    disabled={
+                                      isSaving ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
+                                  />
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm font-medium text-default-700 dark:text-gray-200">
+                                  <SafeLink
+                                    to={`/catalogue/staff/${row.id}`}
+                                    hasUnsavedChanges={hasUnsavedChanges}
+                                    onNavigateAttempt={safeNavigate}
+                                    className="hover:underline hover:text-sky-600 dark:text-sky-400"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {row.id}
+                                  </SafeLink>
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
+                                  {row.name}
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-default-700 dark:text-gray-200">
+                                  <SafeLink
+                                    to={`/catalogue/job?id=${row.jobType}`}
+                                    hasUnsavedChanges={hasUnsavedChanges}
+                                    onNavigateAttempt={safeNavigate}
+                                    className="hover:underline hover:text-sky-600 dark:text-sky-400"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {row.jobName}
+                                  </SafeLink>
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-center">
+                                  <div>
+                                    <input
+                                      type="number"
+                                      value={
+                                        isSelected
+                                          ? (bagCounts.muatMee || 0).toString()
+                                          : ""
+                                      }
+                                      onChange={(e) =>
+                                        handleBagCountChange(
+                                          row.rowKey || "",
+                                          "muatMee",
+                                          e.target.value
+                                        )
+                                      }
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
+                                      min="0"
+                                      disabled={!isSelected}
+                                      placeholder={isSelected ? "0" : "-"}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-center">
+                                  <div>
+                                    <input
+                                      type="number"
+                                      value={
+                                        isSelected
+                                          ? (
+                                              bagCounts.muatBihun || 0
+                                            ).toString()
+                                          : ""
+                                      }
+                                      onChange={(e) =>
+                                        handleBagCountChange(
+                                          row.rowKey || "",
+                                          "muatBihun",
+                                          e.target.value
+                                        )
+                                      }
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-20 mx-auto py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
+                                      min="0"
+                                      disabled={!isSelected}
+                                      placeholder={isSelected ? "0" : "-"}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-center">
+                                  <div className="relative w-48 mx-auto">
+                                    <Listbox
+                                      value={selectedSalesman}
+                                      onChange={(value) =>
+                                        handleIkutChange(
+                                          row.rowKey || "",
+                                          value
+                                        )
+                                      }
+                                    >
+                                      <div className="relative">
+                                        <ListboxButton
+                                          onClick={(e) => e.stopPropagation()}
+                                          className={`relative w-full pl-3 pr-8 py-1.5 text-center rounded-md border bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500`}
+                                        >
+                                          <span className="block truncate text-sm">
+                                            {selectedSalesman
+                                              ? salesmanEmployees.find(
+                                                  (s) =>
+                                                    s.id === selectedSalesman
+                                                )?.name || "Select Salesman"
+                                              : "Select Salesman"}
+                                          </span>
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                            <IconChevronDown
+                                              className="w-4 h-4 text-default-400 dark:text-gray-500"
+                                              aria-hidden="true"
+                                            />
+                                          </span>
+                                        </ListboxButton>
+                                        <Transition
+                                          as={Fragment}
+                                          leave="transition ease-in duration-100"
+                                          leaveFrom="opacity-100"
+                                          leaveTo="opacity-0"
+                                        >
+                                          <ListboxOptions
+                                            onClick={(e) => e.stopPropagation()}
+                                            className={`absolute z-10 w-full py-1 overflow-auto text-left text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none ${
+                                              isLastRow
+                                                ? "bottom-full mb-1"
+                                                : "mt-1"
+                                            }`}
+                                          >
+                                            <ListboxOption
+                                              value=""
+                                              className={({ active }) =>
+                                                `${
+                                                  active
+                                                    ? "bg-default-100 dark:bg-gray-700 text-default-900 dark:text-gray-100"
+                                                    : "text-default-700 dark:text-gray-200"
+                                                } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
+                                              }
+                                            >
+                                              <span className="block truncate">
+                                                None
+                                              </span>
+                                            </ListboxOption>
+                                            {salesmanEmployees
+                                              .filter((s) =>
+                                                employeeSelectionState.selectedJobs[
+                                                  s.id
+                                                ]?.includes(s.jobType)
+                                              )
+                                              .map((salesman) => (
+                                                <ListboxOption
+                                                  key={salesman.id}
+                                                  value={salesman.id}
+                                                  className={({ active }) =>
+                                                    `${
+                                                      active
+                                                        ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-200"
+                                                        : "text-default-700 dark:text-gray-200"
+                                                    } cursor-pointer select-none relative py-1.5 pl-3 pr-8`
+                                                  }
+                                                >
+                                                  {({ selected, active }) => (
+                                                    <>
+                                                      <span
+                                                        className={`${
+                                                          selected
+                                                            ? "font-medium"
+                                                            : "font-normal"
+                                                        } block truncate`}
+                                                      >
+                                                        {salesman.name}
+                                                      </span>
+                                                      {selected ? (
+                                                        <span
+                                                          className={`absolute inset-y-0 right-0 flex items-center pr-2 ${
+                                                            active
+                                                              ? "text-sky-600"
+                                                              : "text-sky-500"
+                                                          }`}
+                                                        >
+                                                          <IconCheck
+                                                            className="w-4 h-4"
+                                                            aria-hidden="true"
+                                                          />
+                                                        </span>
+                                                      ) : null}
+                                                    </>
+                                                  )}
+                                                </ListboxOption>
+                                              ))}
+                                          </ListboxOptions>
+                                        </Transition>
+                                      </div>
+                                    </Listbox>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                  <ActivitiesTooltip
+                                    activities={(
+                                      employeeActivities[row.rowKey || ""] ||
+                                      []
+                                    ).filter(
+                                      (activity) => activity.isSelected
+                                    )}
+                                    employeeName={row.name}
+                                    hasUnsavedChanges={hasUnsavedChanges}
+                                    onNavigateAttempt={safeNavigate}
+                                    className={
+                                      !isSelected
+                                        ? "disabled:text-default-300 disabled:cursor-not-allowed"
+                                        : ""
+                                    }
+                                    disabled={
+                                      !isSelected ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
+                                    onClick={() =>
+                                      handleManageActivities(row)
+                                    }
+                                    logDate={formData.logDate}
+                                    showBelow={index < 5}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
             </>
           )}
         </div>
@@ -2615,6 +3779,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         existingActivities={employeeActivities[selectedEmployee?.rowKey || ""]}
         contextLinkedPayCodes={contextLinkedPayCodes}
         contextData={formData.contextData}
+        salesmanProducts={
+          selectedEmployee && selectedEmployee.rowKey
+            ? salesmanProducts[selectedEmployee.rowKey] || []
+            : []
+        }
+        locationType={
+          selectedEmployee && selectedEmployee.rowKey
+            ? getEffectiveLocationType(selectedEmployee)
+            : "Local"
+        }
         hasUnsavedChanges={hasUnsavedChanges}
         onNavigateAttempt={safeNavigate}
         logDate={formData.logDate}
@@ -2651,4 +3825,4 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   );
 };
 
-export default DailyLogEntryPage;
+export default DailyLogSalesmanEntryPage;

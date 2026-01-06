@@ -583,7 +583,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                     );
                   })}
               </tbody>
-              <tfoot className="bg-sky-50 dark:bg-sky-900/20 border-t-2 border-sky-200 dark:border-sky-800">
+              <tfoot className="bg-sky-50 dark:bg-gray-800 border-t-2 border-sky-200 dark:border-sky-700 sticky bottom-0 z-10">
                 <tr>
                   <td
                     colSpan={3}
