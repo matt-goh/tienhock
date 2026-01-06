@@ -536,7 +536,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                             : `RM${activity.rate_used}`}
                                         </span>
                                         {activity.units_produced !== null &&
-                                          activity.rate_unit !== "Hour" && (
+                                          activity.rate_unit !== "Hour" &&
+                                          activity.rate_unit !== "Bill" && (
                                             <span className="text-default-500 dark:text-gray-400 ml-2">
                                               • {activity.units_produced}{" "}
                                               {activity.rate_unit === "Percent"

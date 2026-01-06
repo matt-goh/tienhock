@@ -527,7 +527,7 @@ const buildMainPayrollPage = (
     ]);
   }
 
-  // Jumlah row
+  // Jumlah row (raw final payment before rounding)
   if (midMonthPayroll || commissionRecords.length > 0 || (isMainten && cutiTahunanAmount > 0)) {
     tableBody.push([
       { text: '', fontSize: 8, fillColor: '#f8f9fa' },
@@ -537,12 +537,26 @@ const buildMainPayrollPage = (
     ]);
   }
 
-  // Jumlah Digenapkan (Grand Total)
+  // Use stored rounding values if available, otherwise calculate on-the-fly (backward compatibility)
+  const digenapkan = payroll.digenapkan ?? (Math.ceil(finalPayment) - finalPayment);
+  const setelahDigenapkan = payroll.setelah_digenapkan ?? Math.ceil(finalPayment);
+
+  // Digenapkan row (rounding adjustment) - only show if there's an adjustment
+  if (digenapkan > 0.001) {
+    tableBody.push([
+      { text: '', fontSize: 8 },
+      { text: '', fontSize: 8 },
+      { text: 'Digenapkan', fontSize: 8 },
+      { text: formatCurrency(digenapkan), alignment: 'right', fontSize: 8 },
+    ]);
+  }
+
+  // Jumlah Digenapkan (Grand Total - rounded amount)
   tableBody.push([
     { text: '', fillColor: '#f8f9fa', fontSize: 8 },
     { text: '', fillColor: '#f8f9fa', fontSize: 8 },
     { text: 'Jumlah Digenapkan', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
-    { text: formatCurrency(finalPayment), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
+    { text: formatCurrency(setelahDigenapkan), alignment: 'right', bold: true, fillColor: '#f8f9fa', fontSize: 8 },
   ]);
 
   // Build content array
