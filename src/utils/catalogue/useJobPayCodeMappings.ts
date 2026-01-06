@@ -41,7 +41,7 @@ export const useJobPayCodeMappings = () => {
   const [error, setError] = useState<string | null>(null);
 
   const CACHE_KEY = "payCodeData";
-  const CACHE_DURATION = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+  const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
   const clearCache = useCallback(() => {
     try {

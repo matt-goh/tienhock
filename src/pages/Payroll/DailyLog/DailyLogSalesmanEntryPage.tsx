@@ -1976,7 +1976,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   ) => {
     // When x2 is active, user enters doubled value, we store base value (divide by 2)
     const displayValue = value === "" ? 0 : parseInt(value) || 0;
-    const baseValue = isDoubled ? Math.floor(displayValue / 2) : displayValue;
+    // When doubled, round to nearest even number then divide by 2
+    const baseValue = isDoubled ? Math.round(displayValue / 2) : displayValue;
 
     setIkutBagCounts((prev) => ({
       ...prev,
@@ -3632,6 +3633,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                         : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
                                     }`}
                                     min="0"
+                                    step={isDoubled ? 2 : 1}
                                     disabled={!isSelected}
                                     placeholder={isSelected ? "0" : "-"}
                                   />
@@ -3653,6 +3655,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                         : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
                                     }`}
                                     min="0"
+                                    step={isDoubled ? 2 : 1}
                                     disabled={!isSelected}
                                     placeholder={isSelected ? "0" : "-"}
                                   />
