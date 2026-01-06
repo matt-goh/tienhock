@@ -1,5 +1,6 @@
 // src/routes/catalogue/pay-codes.js
 import { Router } from "express";
+import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -7,6 +8,14 @@ export default function (pool) {
   // GET / - Remove 'code' from SELECT
   router.get("/", async (req, res) => {
     try {
+      const cacheKey = CACHE_KEYS.PAY_CODES;
+
+      // Check cache first
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       // Select all columns EXCEPT code
       const query = `
         SELECT
@@ -24,6 +33,10 @@ export default function (pool) {
         rate_ahad: pc.rate_ahad === null ? null : parseFloat(pc.rate_ahad),
         rate_umum: pc.rate_umum === null ? null : parseFloat(pc.rate_umum),
       }));
+
+      // Cache the result (12 hours since pay codes rarely change)
+      cache.set(cacheKey, payCodes, CACHE_TTL.VERY_LONG);
+
       res.json(payCodes);
     } catch (error) {
       console.error("Error fetching pay codes:", error);
@@ -133,6 +146,10 @@ export default function (pool) {
       ];
 
       const result = await pool.query(query, values);
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.PAY_CODES);
+
       // Parse numeric values in returned object
       const newPayCode = {
         ...result.rows[0],
@@ -240,6 +257,10 @@ export default function (pool) {
         console.error(`Pay code ${id} found initially but failed to update.`);
         return res.status(500).json({ message: "Update failed unexpectedly." });
       }
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.PAY_CODES);
+
       // Parse numeric values in returned object
       const updatedPayCode = {
         ...result.rows[0],
@@ -295,6 +316,10 @@ export default function (pool) {
           .status(404)
           .json({ error: true, message: "Pay code not found" });
       }
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.PAY_CODES);
+
       res.json({
         error: false,
         message: "Pay code deleted successfully",
