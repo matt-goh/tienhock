@@ -9,7 +9,7 @@ import {
   IconReceipt,
   IconCoins,
   IconClock,
-  IconHammer,
+  IconBusinessplan,
   IconCalendarEvent,
   IconCirclePlus,
   IconList,
@@ -1043,10 +1043,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       const additionalMaintenDeduction = isMainten
                         ? cutiTahunanAmount
                         : 0;
+                      const commissionAdvance = commissionRecords.reduce(
+                        (sum, r) => sum + Number(r.amount),
+                        0
+                      );
                       return (
                         payroll.net_pay -
                         (midMonthPayroll?.amount || 0) -
-                        additionalMaintenDeduction
+                        additionalMaintenDeduction -
+                        commissionAdvance
                       );
                     })()
                   )}
@@ -1611,7 +1616,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-100 dark:border-teal-800/50">
               <h3 className="text-md font-semibold text-teal-800 dark:text-teal-300 flex items-center gap-2">
-                <IconHammer size={18} className="text-teal-600 dark:text-teal-400" />
+                <IconBusinessplan size={18} className="text-teal-600 dark:text-teal-400" />
                 {commissionRecords
                   .map((record) => record.description)
                   .join(" + ")}
