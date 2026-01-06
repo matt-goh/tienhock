@@ -50,6 +50,12 @@ export const {
   // Jelly Polly MyInvois Configuration
   MYINVOIS_JP_CLIENT_ID,
   MYINVOIS_JP_CLIENT_SECRET,
+
+  // AWS S3 Backup Configuration
+  AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY,
+  AWS_REGION,
+  S3_BUCKET_NAME,
 } = {
   // API Configuration
   API_BASE_URL: getEnvVariable("API_BASE_URL", getDefaultApiBaseUrl()),
@@ -76,6 +82,17 @@ export const {
   // JellyPolly MyInvois Configuration
   MYINVOIS_JP_CLIENT_ID: getEnvVariable("MYINVOIS_JP_CLIENT_ID", ""),
   MYINVOIS_JP_CLIENT_SECRET: getEnvVariable("MYINVOIS_JP_CLIENT_SECRET", ""),
+
+  // AWS S3 Backup Configuration (empty = disabled)
+  AWS_ACCESS_KEY_ID: getEnvVariable("AWS_ACCESS_KEY_ID", ""),
+  AWS_SECRET_ACCESS_KEY: getEnvVariable("AWS_SECRET_ACCESS_KEY", ""),
+  AWS_REGION: getEnvVariable("AWS_REGION", "ap-southeast-1"),
+  S3_BUCKET_NAME: getEnvVariable("S3_BUCKET_NAME", ""),
+};
+
+// Helper to check if S3 backup is configured
+export const isS3BackupEnabled = () => {
+  return !!(AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY && S3_BUCKET_NAME);
 };
 
 // Debug logging in development

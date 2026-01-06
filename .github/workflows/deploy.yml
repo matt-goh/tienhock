@@ -21,24 +21,49 @@ jobs:
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         run: |
+          # Create a temporary env file with AWS credentials (handles special characters safely)
+          cat > /tmp/aws_env.txt << 'ENVFILE'
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          ENVFILE
+
+          # Copy the env file to EC2
+          scp -i ~/.ssh/deploy_key /tmp/aws_env.txt ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/tmp/aws_env.txt
+
           ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             # Navigate to application directory
             cd ~/tienhock-erp
-            
+
             # Check available disk space
             echo "Disk space before cleanup:"
             df -h
-            
+
             # Pull latest changes
             git checkout production
             git pull origin production
-            
+
             # Make sure backup script is executable
             chmod +x backup.sh
-            
-            # Stop containers (preserves volumes/database)
+
+            # Update AWS S3 credentials in prod/.env from temp file
             cd prod
+            touch .env
+
+            # Remove old AWS entries and append new ones
+            grep -v "^AWS_ACCESS_KEY_ID=" .env | grep -v "^AWS_SECRET_ACCESS_KEY=" | grep -v "^AWS_REGION=" | grep -v "^S3_BUCKET_NAME=" > .env.tmp || true
+            cat /tmp/aws_env.txt | sed 's/^[[:space:]]*//' >> .env.tmp
+            mv .env.tmp .env
+            rm -f /tmp/aws_env.txt
+
+            # Stop containers (preserves volumes/database)
             docker-compose down
             
             # Clean up Docker to free space (PRESERVES VOLUMES)
