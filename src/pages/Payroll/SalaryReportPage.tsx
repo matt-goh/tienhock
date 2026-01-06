@@ -96,9 +96,7 @@ interface LocationSalaryData {
     pcb: number; // Income tax
     gaji_bersih: number; // Net pay + commission
     setengah_bulan: number; // Mid month pay
-    jumlah: number; // GAJI BERSIH - 1/2 BULAN
-    jumlah_digenapkan: number; // Rounding (empty in new system)
-    setelah_digenapkan: number; // Same as JUMLAH
+    jumlah: number; // GAJI BERSIH - 1/2 BULAN (final amount)
   }[];
   totals: {
     gaji: number;
@@ -116,8 +114,6 @@ interface LocationSalaryData {
     gaji_bersih: number;
     setengah_bulan: number;
     jumlah: number;
-    jumlah_digenapkan: number;
-    setelah_digenapkan: number;
   };
 }
 
@@ -141,8 +137,6 @@ interface ComprehensiveSalaryData {
     gaji_bersih: number;
     setengah_bulan: number;
     jumlah: number;
-    jumlah_digenapkan: number;
-    setelah_digenapkan: number;
   };
 }
 
@@ -630,12 +624,6 @@ const SalaryReportPage: React.FC = () => {
               <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
-                JUMLAH DIGENAPKAN
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
-                SETELAH DIGENAPKAN
-              </th>
             </tr>
             <tr>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
@@ -667,8 +655,6 @@ const SalaryReportPage: React.FC = () => {
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
               <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
-              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
-              <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -677,7 +663,7 @@ const SalaryReportPage: React.FC = () => {
                 return (
                   <tr key={`header-${index}`} className="bg-default-100 dark:bg-gray-800">
                     <td
-                      colSpan={19}
+                      colSpan={17}
                       className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-300 border-t border-default-300 dark:border-gray-600"
                     >
                       {item.text}
@@ -906,25 +892,6 @@ const SalaryReportPage: React.FC = () => {
                       formatCurrency={(v) => formatCurrency(v)}
                     />
                   </td>
-                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    {formatCurrency(
-                      locationData?.totals.jumlah_digenapkan || 0
-                    )}
-                  </td>
-                  <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
-                    <SalaryAmountTooltip
-                      amount={locationData?.totals.setelah_digenapkan || 0}
-                      breakdown={locationData?.employees?.filter(e => e.setelah_digenapkan !== 0).map(e => ({
-                        description: e.staff_name,
-                        amount: e.setelah_digenapkan,
-                        link: e.employee_payroll_id
-                          ? `/payroll/employee-payroll/${e.employee_payroll_id}`
-                          : `/payroll/incentives?year=${currentYear}&month=${currentMonth}`
-                      })) || []}
-                      label="Setelah Digenapkan"
-                      formatCurrency={(v) => formatCurrency(v)}
-                    />
-                  </td>
                 </tr>
               );
             })}
@@ -999,16 +966,6 @@ const SalaryReportPage: React.FC = () => {
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
-              </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.jumlah_digenapkan
-                )}
-              </td>
-              <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.setelah_digenapkan
-                )}
               </td>
             </tr>
           </tfoot>

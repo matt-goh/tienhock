@@ -62,12 +62,6 @@ const JVDR_ACCOUNT_CODES: ExpectedAccountCode[] = [
     mappingTypes: ["salary"],
   },
   {
-    code: "MBDRS",
-    description: "Directors Remuneration (Rounding)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
     code: "MBDRE",
     description: "EPF Contribution-Director's",
     category: "epf",
@@ -136,15 +130,15 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
   // ========== SALARY/WAGES BASE (16 entries) ==========
   {
     code: "MBS_O",
-    description: "Office (Salary)",
+    description: "Office (Salary/OT/Bonus)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime", "bonus"],
   },
   {
     code: "MS_SM",
-    description: "Salesman-Commission Mee",
+    description: "Salesman-Commission Mee/Bonus",
     category: "salary",
-    mappingTypes: ["commission_mee"],
+    mappingTypes: ["commission_mee", "bonus"],
   },
   {
     code: "BS_SM",
@@ -190,183 +184,45 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
   },
   {
     code: "MBS_JB",
-    description: "Jaga Boiler (Salary)",
+    description: "Jaga Boiler (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime"],
   },
   {
     code: "MS_MM",
-    description: "Mesin & Sangkut Mee (Salary)",
+    description: "Mesin & Sangkut Mee (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime"],
   },
   {
     code: "MS_PM",
-    description: "Packing Mee (Salary)",
+    description: "Packing Mee (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime"],
   },
   {
     code: "BS_MB",
-    description: "Mesin & Sangkut Bihun (Salary)",
+    description: "Mesin & Sangkut Bihun (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime"],
   },
   {
     code: "BS_PB",
-    description: "Packing Bihun (Salary)",
+    description: "Packing Bihun (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime"],
   },
   {
     code: "MBS_TS",
-    description: "Tukang Sapu (Salary)",
+    description: "Tukang Sapu (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
+    mappingTypes: ["salary", "overtime"],
   },
   {
     code: "MBS_M",
-    description: "Maintenance (Kerja Luar Kilang)",
+    description: "Maint/Comm/Bonus/Cuti (Salary/OT)",
     category: "salary",
-    mappingTypes: ["salary"],
-  },
-
-  // ========== BONUS (3 entries) ==========
-  {
-    code: "MBS_O",
-    description: "Office (Bonus)",
-    category: "salary",
-    mappingTypes: ["bonus"],
-  },
-  {
-    code: "MS_SM",
-    description: "Salesman-(Bonus) Mee",
-    category: "salary",
-    mappingTypes: ["bonus"],
-  },
-  {
-    code: "BS_SM",
-    description: "Salesman-Commission Bihun (Bonus)",
-    category: "salary",
-    mappingTypes: ["bonus"],
-  },
-
-  // ========== OVERTIME (7 entries) ==========
-  {
-    code: "MBS_O",
-    description: "Office (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-  {
-    code: "MBS_JB",
-    description: "Jaga Boiler (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-  {
-    code: "MS_MM",
-    description: "Mesin & Sangkut Mee (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-  {
-    code: "MS_PM",
-    description: "Packing Mee (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-  {
-    code: "BS_MB",
-    description: "Mesin & Sangkut Bihun (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-  {
-    code: "MBS_TS",
-    description: "Tukang Sapu (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-  {
-    code: "MBS_M",
-    description: "Maintenance (Kerja Luar Kilang) (OT)",
-    category: "salary",
-    mappingTypes: ["overtime"],
-  },
-
-  // ========== ROUNDING (12 entries) ==========
-  {
-    code: "MBS_O",
-    description: "Office (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MS_SM",
-    description: "Salesman-Commission Mee (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "BS_SM",
-    description: "Salesman-Commission Bihun (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MS_IL",
-    description: "Ikut Lori-Commission Mee (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "BS_IL",
-    description: "Ikut Lori-Commission Bihun (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MBS_JB",
-    description: "Jaga Boiler (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MS_MM",
-    description: "Mesin & Sangkut Mee (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MS_PM",
-    description: "Packing Mee (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "BS_MB",
-    description: "Mesin & Sangkut Bihun (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "BS_PB",
-    description: "Packing Bihun (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MBS_TS",
-    description: "Tukang Sapu (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
-  },
-  {
-    code: "MBS_M",
-    description: "Maintenance (Kerja Luar Kilang) (RND)",
-    category: "salary",
-    mappingTypes: ["rounding"],
+    mappingTypes: ["salary", "overtime"],
   },
 
   // ========== EPF EMPLOYER (10 entries) ==========
@@ -547,74 +403,6 @@ const JVSL_ACCOUNT_CODES: ExpectedAccountCode[] = [
     description: "SIP Contributions (Maintenance)",
     category: "sip",
     mappingTypes: ["sip_employer"],
-  },
-
-  // ========== CUTI TAHUNAN (11 entries) ==========
-  {
-    code: "MBS_M",
-    description: "Cuti Tahunan & Bonus",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_O",
-    description: "Cuti Tahunan - Office",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_SM",
-    description: "Cuti Tahunan - Salesman",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_IL",
-    description: "Cuti Tahunan - Ikut Lori",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_JB",
-    description: "Cuti Tahunan - Jaga Boiler",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_MM",
-    description: "Cuti Tahunan - Mesin Mee",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_PM",
-    description: "Cuti Tahunan - Packing Mee",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_MB",
-    description: "Cuti Tahunan - Mesin Bihun",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_PB",
-    description: "Cuti Tahunan - Packing Bihun",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_TS",
-    description: "Cuti Tahunan - Tukang Sapu",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
-  },
-  {
-    code: "MCTB_M",
-    description: "Cuti Tahunan - Maintenance",
-    category: "salary",
-    mappingTypes: ["cuti_tahunan"],
   },
 
   // ========== ACCRUALS - CREDIT (5 entries) ==========
@@ -884,7 +672,6 @@ const LocationAccountMappingsPage: React.FC = () => {
       commission: "Comm",
       commission_mee: "Comm-MEE",
       commission_bh: "Comm-BH",
-      rounding: "Rnd",
       cuti_tahunan: "CT",
       special_ot: "SOT",
       epf_employer: "EPF",
