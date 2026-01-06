@@ -16,6 +16,7 @@ import AccountCodeListPage from "./Accounting/AccountCodeListPage";
 import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
 import JournalEntryListPage from "./Accounting/JournalEntryListPage";
 import JournalEntryPage from "./Accounting/JournalEntryPage";
+import JournalDetailsPage from "./Accounting/JournalDetailsPage";
 import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 
 // Accounting - Location Mappings
@@ -240,8 +241,13 @@ export const TienHockNavData: SidebarItem[] = [
             showInPopover: true,
           },
           {
-            name: "Edit Entry",
+            name: "View Entry",
             path: "/accounting/journal-entries/:id",
+            component: JournalDetailsPage,
+          },
+          {
+            name: "Edit Entry",
+            path: "/accounting/journal-entries/:id/edit",
             component: JournalEntryPage,
           },
         ],

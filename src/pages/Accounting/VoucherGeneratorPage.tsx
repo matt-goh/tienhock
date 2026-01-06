@@ -1,6 +1,6 @@
 // src/pages/Accounting/VoucherGeneratorPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -58,10 +58,31 @@ interface PreviewData {
 
 const VoucherGeneratorPage: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialize selectedMonth from URL params or default to current month
+  const getInitialMonth = (): Date => {
+    const urlYear = searchParams.get("year");
+    const urlMonth = searchParams.get("month");
+    if (urlYear && urlMonth) {
+      return new Date(parseInt(urlYear), parseInt(urlMonth) - 1, 1);
+    }
+    return new Date();
+  };
+
+  const [selectedMonth, setSelectedMonth] = useState<Date>(getInitialMonth);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+
+  // Update URL params when month changes
+  const handleMonthChange = (date: Date) => {
+    setSelectedMonth(date);
+    setSearchParams({
+      year: date.getFullYear().toString(),
+      month: (date.getMonth() + 1).toString(),
+    });
+  };
 
   // Fetch preview data
   const fetchPreview = useCallback(async () => {
@@ -134,9 +155,12 @@ const VoucherGeneratorPage: React.FC = () => {
     }).format(amount);
   };
 
-  const handleViewEntry = (reference: string) => {
-    // Navigate to journal entry list with search for this reference
-    navigate(`/accounting/journal-entries?search=${encodeURIComponent(reference)}`);
+  const handleViewEntry = (reference: string, entryType?: string) => {
+    // Navigate to journal entry list with search, date, and type params for this reference
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth() + 1;
+    const typeParam = entryType ? `&type=${entryType}` : "";
+    navigate(`/accounting/journal-entries?search=${encodeURIComponent(reference)}&year=${year}&month=${month}${typeParam}`);
   };
 
   return (
@@ -155,8 +179,8 @@ const VoucherGeneratorPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <MonthNavigator
             selectedMonth={selectedMonth}
-            onChange={setSelectedMonth}
-            showGoToCurrentButton={true}
+            onChange={handleMonthChange}
+            showGoToCurrentButton={false}
           />
           <Button
             onClick={() => handleGenerate(["JVDR", "JVSL"])}
@@ -199,12 +223,12 @@ const VoucherGeneratorPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   {previewData.jvdr.exists ? (
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                         <IconCheck size={14} />
                         Generated
                       </span>
                       <Button
-                        onClick={() => handleViewEntry(previewData.jvdr.reference)}
+                        onClick={() => handleViewEntry(previewData.jvdr.reference, "JVDR")}
                         color="default"
                         variant="outline"
                         icon={IconExternalLink}
@@ -324,12 +348,12 @@ const VoucherGeneratorPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   {previewData.jvsl.exists ? (
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                         <IconCheck size={14} />
                         Generated
                       </span>
                       <Button
-                        onClick={() => handleViewEntry(previewData.jvsl.reference)}
+                        onClick={() => handleViewEntry(previewData.jvsl.reference, "JVSL")}
                         color="default"
                         variant="outline"
                         icon={IconExternalLink}

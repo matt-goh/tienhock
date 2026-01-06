@@ -584,7 +584,7 @@ export default function (pool) {
     }
   });
 
-  // DELETE /:id - Delete a draft journal entry
+  // DELETE /:id - Delete a journal entry (except posted)
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
 
@@ -601,10 +601,10 @@ export default function (pool) {
       }
 
       const status = checkResult.rows[0].status;
-      if (status === "posted" || status === "cancelled") {
+      if (status === "posted") {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: `Cannot delete ${status} entries`,
+          message: "Cannot delete posted entries",
         });
       }
 
