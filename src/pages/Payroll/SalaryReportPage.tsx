@@ -5,7 +5,6 @@ import {
   IconRefresh,
   IconFileText,
   IconPrinter,
-  IconDownload,
   IconFileExport,
   IconLink,
 } from "@tabler/icons-react";
@@ -201,6 +200,17 @@ const SalaryReportPage: React.FC = () => {
   // Sub-view mode for Employee tab
   const [employeeViewMode, setEmployeeViewMode] = useState<'individual' | 'location'>('individual');
 
+  // Period type toggle (monthly/yearly) - initialize from URL params
+  const [periodType, setPeriodType] = useState<'monthly' | 'yearly'>(() => {
+    const periodParam = searchParams.get("period");
+    return periodParam === 'yearly' ? 'yearly' : 'monthly';
+  });
+
+  // Yearly data states
+  const [yearlyReportData, setYearlyReportData] = useState<SalaryReportResponse | null>(null);
+  const [yearlyComprehensiveSalaryData, setYearlyComprehensiveSalaryData] = useState<ComprehensiveSalaryData | null>(null);
+  const [isLoadingYearly, setIsLoadingYearly] = useState<boolean>(false);
+
   // Filters - use Date for month navigation, initialize from URL params
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const yearParam = searchParams.get("year");
@@ -231,17 +241,19 @@ const SalaryReportPage: React.FC = () => {
     return tabIndex >= 0 && tabIndex <= 3 ? tabIndex : 0;
   }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam
 
-  // Update URL params when tab, year, or month changes
+  // Update URL params when tab, year, month, or period changes
   useEffect(() => {
-    setSearchParams(
-      {
-        tab: activeTab.toString(),
-        year: currentYear.toString(),
-        month: currentMonth.toString(),
-      },
-      { replace: true }
-    );
-  }, [activeTab, currentYear, currentMonth, setSearchParams]);
+    const params: Record<string, string> = {
+      tab: activeTab.toString(),
+      year: currentYear.toString(),
+      period: periodType,
+    };
+    // Only include month in URL when in monthly mode
+    if (periodType === 'monthly') {
+      params.month = currentMonth.toString();
+    }
+    setSearchParams(params, { replace: true });
+  }, [activeTab, currentYear, currentMonth, periodType, setSearchParams]);
 
   // Staff data
   const { staffs } = useStaffsCache();
@@ -344,10 +356,18 @@ const SalaryReportPage: React.FC = () => {
     setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
   };
 
-  // Load salary report on mount and filter changes
+  // Load monthly salary report - always on mount and when month changes
+  // Bank and Pinjam tabs always need monthly data
   useEffect(() => {
     fetchSalaryReport();
   }, [selectedMonth]);
+
+  // Load yearly salary report when year or period changes
+  useEffect(() => {
+    if (periodType === 'yearly') {
+      fetchYearlySalaryReport();
+    }
+  }, [currentYear, periodType]);
 
   const fetchSalaryReport = async () => {
     setIsLoading(true);
@@ -365,6 +385,26 @@ const SalaryReportPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const fetchYearlySalaryReport = async () => {
+    setIsLoadingYearly(true);
+    try {
+      const response = await api.get(`/api/salary-report/yearly?year=${currentYear}`);
+      setYearlyReportData(response);
+      setYearlyComprehensiveSalaryData(response.comprehensive);
+    } catch (error) {
+      console.error("Error fetching yearly salary report:", error);
+      setYearlyReportData(null);
+      setYearlyComprehensiveSalaryData(null);
+    } finally {
+      setIsLoadingYearly(false);
+    }
+  };
+
+  // Active data based on period type
+  const activeReportData = periodType === 'yearly' ? yearlyReportData : reportData;
+  const activeComprehensiveData = periodType === 'yearly' ? yearlyComprehensiveSalaryData : comprehensiveSalaryData;
+  const activeLoading = periodType === 'yearly' ? isLoadingYearly : isLoading;
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
@@ -641,8 +681,8 @@ const SalaryReportPage: React.FC = () => {
 
   // Employee Salary Table Component (individual employees)
   const EmployeeSalaryTable = () => {
-    const employees = reportData?.employees || [];
-    const grandTotals = reportData?.employees_grand_totals;
+    const employees = activeReportData?.employees || [];
+    const grandTotals = activeReportData?.employees_grand_totals;
 
     if (employees.length === 0) return null;
 
@@ -882,11 +922,11 @@ const SalaryReportPage: React.FC = () => {
 
   // Location Grouped Table Component - shows employees grouped by location
   const LocationGroupedTable = () => {
-    if (!comprehensiveSalaryData) return null;
+    if (!activeComprehensiveData) return null;
 
     // Process locations: merge 16-24 into 14
     const processedLocations = useMemo(() => {
-      const locationsCopy = JSON.parse(JSON.stringify(comprehensiveSalaryData.locations)) as LocationSalaryData[];
+      const locationsCopy = JSON.parse(JSON.stringify(activeComprehensiveData.locations)) as LocationSalaryData[];
 
       // Find location 14 or create it
       let location14 = locationsCopy.find(loc => loc.location === '14');
@@ -963,11 +1003,11 @@ const SalaryReportPage: React.FC = () => {
         .sort((a, b) => parseInt(a.location, 10) - parseInt(b.location, 10));
 
       return filteredLocations;
-    }, [comprehensiveSalaryData]);
+    }, [activeComprehensiveData]);
 
-    // Use the same deduplicated employees_grand_totals from reportData as the Individual view
+    // Use the same deduplicated employees_grand_totals from activeReportData as the Individual view
     // This ensures both views show identical grand totals
-    const grandTotals = reportData?.employees_grand_totals;
+    const grandTotals = activeReportData?.employees_grand_totals;
 
     if (processedLocations.length === 0 || !grandTotals) return null;
 
@@ -1329,7 +1369,7 @@ const SalaryReportPage: React.FC = () => {
 
   // Comprehensive Salary Table Component
   const ComprehensiveSalaryTable = () => {
-    if (!comprehensiveSalaryData) return null;
+    if (!activeComprehensiveData) return null;
 
     return (
       <div className="overflow-auto mb-2 max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
@@ -1443,7 +1483,7 @@ const SalaryReportPage: React.FC = () => {
                 );
               }
 
-              const locationData = comprehensiveSalaryData.locations.find(
+              const locationData = activeComprehensiveData.locations.find(
                 (loc) => loc.location === item.id
               );
               const locationNumber = item.id!;
@@ -1704,73 +1744,73 @@ const SalaryReportPage: React.FC = () => {
                 GRAND TOTAL
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
+                {formatCurrency(activeComprehensiveData.grand_totals.gaji)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
+                {formatCurrency(activeComprehensiveData.grand_totals.ot)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
+                {formatCurrency(activeComprehensiveData.grand_totals.bonus)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
+                {formatCurrency(activeComprehensiveData.grand_totals.comm)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.gaji_kasar
+                  activeComprehensiveData.grand_totals.gaji_kasar
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.epf_majikan
+                  activeComprehensiveData.grand_totals.epf_majikan
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.epf_pekerja
+                  activeComprehensiveData.grand_totals.epf_pekerja
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.socso_majikan
+                  activeComprehensiveData.grand_totals.socso_majikan
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.socso_pekerja
+                  activeComprehensiveData.grand_totals.socso_pekerja
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.sip_majikan
+                  activeComprehensiveData.grand_totals.sip_majikan
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.sip_pekerja
+                  activeComprehensiveData.grand_totals.sip_pekerja
                 )}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
+                {formatCurrency(activeComprehensiveData.grand_totals.pcb)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.gaji_bersih
+                  activeComprehensiveData.grand_totals.gaji_bersih
                 )}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.setengah_bulan
+                  activeComprehensiveData.grand_totals.setengah_bulan
                 )}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
+                {formatCurrency(activeComprehensiveData.grand_totals.jumlah)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.digenapkan)}
+                {formatCurrency(activeComprehensiveData.grand_totals.digenapkan)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.setelah_digenapkan)}
+                {formatCurrency(activeComprehensiveData.grand_totals.setelah_digenapkan)}
               </td>
             </tr>
           </tfoot>
@@ -1983,12 +2023,13 @@ const SalaryReportPage: React.FC = () => {
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
-            <div className="flex flex-wrap items-center gap-3">
+          {/* Large screens (2xl/1536px+): Single row layout */}
+          <div className="hidden 2xl:flex 2xl:justify-between 2xl:items-center gap-3">
+            <div className="flex items-center gap-3">
               <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
                 Salary Report
               </h2>
-              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              <span className="text-default-300 dark:text-gray-600">|</span>
               {/* Tab buttons */}
               <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
                 {tabLabels.map((label, index) => (
@@ -2005,39 +2046,10 @@ const SalaryReportPage: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-              <div className="flex items-center gap-2">
-                <YearNavigator
-                  selectedYear={currentYear}
-                  onChange={handleYearChange}
-                  showGoToCurrentButton={false}
-                />
-                <MonthNavigator
-                  selectedMonth={selectedMonth}
-                  onChange={setSelectedMonth}
-                  showGoToCurrentButton={false}
-                  formatDisplay={(date) =>
-                    date.toLocaleDateString("en-MY", { month: "long" })
-                  }
-                />
-              </div>
-              {reportData && (
-                <>
-                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
-                    <span className="font-medium">
-                      {reportData.total_records} employees
-                    </span>
-                    <span className="font-medium">
-                      Total: {formatCurrency(reportData.employees_grand_totals?.setelah_digenapkan || 0)}
-                    </span>
-                  </div>
-                </>
-              )}
-              {/* Sub-view toggle for Employee tab */}
+              {/* Sub-view toggle for Employee tab - right after tabs */}
               {activeTab === 0 && (
                 <>
-                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
                     <button
                       onClick={() => setEmployeeViewMode('individual')}
@@ -2062,13 +2074,72 @@ const SalaryReportPage: React.FC = () => {
                   </div>
                 </>
               )}
+              {/* Period Toggle - only for tabs 0 (Employee) and 1 (Location) */}
+              {(activeTab === 0 || activeTab === 1) && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      onClick={() => setPeriodType('monthly')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        periodType === 'monthly'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setPeriodType('yearly')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        periodType === 'yearly'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Yearly
+                    </button>
+                  </div>
+                </>
+              )}
+              <span className="text-default-300 dark:text-gray-600">|</span>
+              <div className="flex items-center gap-2">
+                <YearNavigator
+                  selectedYear={currentYear}
+                  onChange={handleYearChange}
+                  showGoToCurrentButton={false}
+                />
+                {periodType === 'monthly' && (
+                  <MonthNavigator
+                    selectedMonth={selectedMonth}
+                    onChange={setSelectedMonth}
+                    showGoToCurrentButton={false}
+                    formatDisplay={(date) =>
+                      date.toLocaleDateString("en-MY", { month: "long" })
+                    }
+                  />
+                )}
+              </div>
+              {activeReportData && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
+                    <span className="font-medium">
+                      {activeReportData.total_records} employees
+                    </span>
+                    <span className="font-medium">
+                      Total: {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <Button
-                onClick={fetchSalaryReport}
+                onClick={periodType === 'yearly' ? fetchYearlySalaryReport : fetchSalaryReport}
                 icon={IconRefresh}
                 variant="outline"
-                disabled={isLoading}
+                disabled={activeLoading}
                 size="sm"
               >
                 Refresh
@@ -2079,27 +2150,13 @@ const SalaryReportPage: React.FC = () => {
                 color="green"
                 variant="outline"
                 disabled={
-                  !reportData ||
-                  reportData.data.length === 0 ||
+                  !activeReportData ||
+                  activeReportData.data.length === 0 ||
                   isGeneratingPDF
                 }
                 size="sm"
               >
                 Print
-              </Button>
-              <Button
-                onClick={() => generatePDF("download")}
-                icon={IconDownload}
-                color="blue"
-                variant="outline"
-                disabled={
-                  !reportData ||
-                  reportData.data.length === 0 ||
-                  isGeneratingPDF
-                }
-                size="sm"
-              >
-                Download
               </Button>
               {activeTab === 2 && (
                 <>
@@ -2109,8 +2166,8 @@ const SalaryReportPage: React.FC = () => {
                     color="purple"
                     variant="outline"
                     disabled={
-                      !reportData ||
-                      reportData.data.length === 0 ||
+                      !activeReportData ||
+                      activeReportData.data.length === 0 ||
                       isGeneratingExport
                     }
                     size="sm"
@@ -2130,19 +2187,187 @@ const SalaryReportPage: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Smaller screens (<2xl/1536px): Multi-row layout */}
+          <div className="2xl:hidden space-y-3">
+            {/* Row 1: Title + Tabs + Action buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
+                  Salary Report
+                </h2>
+                <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                {/* Tab buttons */}
+                <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                  {tabLabels.map((label, index) => (
+                    <button
+                      key={label}
+                      onClick={() => setActiveTab(index)}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        activeTab === index
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {/* Sub-view toggle for Employee tab - right after tabs */}
+                {activeTab === 0 && (
+                  <>
+                    <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                    <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                      <button
+                        onClick={() => setEmployeeViewMode('individual')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          employeeViewMode === 'individual'
+                            ? "bg-sky-500 text-white"
+                            : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        Individual
+                      </button>
+                      <button
+                        onClick={() => setEmployeeViewMode('location')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                          employeeViewMode === 'location'
+                            ? "bg-sky-500 text-white"
+                            : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        Location
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Action buttons on the right */}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={periodType === 'yearly' ? fetchYearlySalaryReport : fetchSalaryReport}
+                  icon={IconRefresh}
+                  variant="outline"
+                  disabled={activeLoading}
+                  size="sm"
+                >
+                  Refresh
+                </Button>
+                <Button
+                  onClick={() => generatePDF("print")}
+                  icon={IconPrinter}
+                  color="green"
+                  variant="outline"
+                  disabled={
+                    !activeReportData ||
+                    activeReportData.data.length === 0 ||
+                    isGeneratingPDF
+                  }
+                  size="sm"
+                >
+                  Print
+                </Button>
+                {activeTab === 2 && (
+                  <>
+                    <Button
+                      onClick={generateTextExport}
+                      icon={IconFileExport}
+                      color="purple"
+                      variant="outline"
+                      disabled={
+                        !activeReportData ||
+                        activeReportData.data.length === 0 ||
+                        isGeneratingExport
+                      }
+                      size="sm"
+                    >
+                      Export
+                    </Button>
+                    <Button
+                      onClick={() => setShowExportDialog(true)}
+                      icon={IconLink}
+                      color="orange"
+                      variant="outline"
+                      size="sm"
+                    >
+                      Export Link
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Period toggle + Navigators + Stats + View toggle */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Period Toggle - only for tabs 0 (Employee) and 1 (Location) */}
+              {(activeTab === 0 || activeTab === 1) && (
+                <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                  <button
+                    onClick={() => setPeriodType('monthly')}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                      periodType === 'monthly'
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setPeriodType('yearly')}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                      periodType === 'yearly'
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Yearly
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <YearNavigator
+                  selectedYear={currentYear}
+                  onChange={handleYearChange}
+                  showGoToCurrentButton={false}
+                />
+                {periodType === 'monthly' && (
+                  <MonthNavigator
+                    selectedMonth={selectedMonth}
+                    onChange={setSelectedMonth}
+                    showGoToCurrentButton={false}
+                    formatDisplay={(date) =>
+                      date.toLocaleDateString("en-MY", { month: "long" })
+                    }
+                  />
+                )}
+              </div>
+              {activeReportData && (
+                <>
+                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
+                    <span className="font-medium">
+                      {activeReportData.total_records} employees
+                    </span>
+                    <span className="font-medium">
+                      Total: {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        {isLoading ? (
+        {activeLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : !reportData || reportData.data.length === 0 ? (
+        ) : !activeReportData || activeReportData.data.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No salary data found</p>
             <p>
-              No salary data available for {getMonthName(currentMonth)}{" "}
-              {currentYear}
+              No salary data available for {periodType === 'yearly' ? currentYear : `${getMonthName(currentMonth)} ${currentYear}`}
             </p>
           </div>
         ) : (
@@ -2163,25 +2388,25 @@ const SalaryReportPage: React.FC = () => {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
                 <div className="text-sm text-default-600 dark:text-gray-300">
                   <span className="font-medium">Total Records:</span>{" "}
-                  {reportData.total_records}
+                  {activeReportData.total_records}
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Gaji/Genap:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(reportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                      {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Pinjam:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(reportData.summary.total_pinjam)}
+                      {formatCurrency(activeReportData.summary.total_pinjam)}
                     </span>
                   </div>
                   <div className="text-sky-700 dark:text-sky-400">
                     <span className="font-semibold">Grand Total:</span>{" "}
                     <span className="font-bold text-sky-800 dark:text-sky-300">
-                      {formatCurrency(reportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                      {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                 </div>
