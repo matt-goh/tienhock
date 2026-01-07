@@ -710,6 +710,29 @@ export default function (pool) {
           SELECT employee_id, job_id, location_code
           FROM employee_job_location_exclusions
         ),
+        -- Calculate setelah_digenapkan per employee-per-month using CEIL (for accurate yearly totals)
+        -- This ensures yearly total = sum of monthly totals exactly
+        employee_monthly_rounded AS (
+          SELECT
+            ep.employee_id,
+            ep.net_pay,
+            COALESCE(mmp.amount, 0) as mid_month_amount,
+            CEIL(ep.net_pay - COALESCE(mmp.amount, 0)) as setelah_digenapkan
+          FROM employee_payrolls ep
+          JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+          LEFT JOIN mid_month_payrolls mmp ON mmp.employee_id = ep.employee_id
+            AND mmp.year = mp.year AND mmp.month = mp.month
+          WHERE mp.year = $1
+        ),
+        -- Aggregate the per-month calculated values by employee
+        employee_yearly_rounded AS (
+          SELECT
+            employee_id,
+            SUM(setelah_digenapkan) as total_setelah_digenapkan,
+            SUM(setelah_digenapkan - (net_pay - mid_month_amount)) as total_digenapkan
+          FROM employee_monthly_rounded
+          GROUP BY employee_id
+        ),
         -- Base payroll data aggregated by employee for the year
         employee_payroll_base AS (
           SELECT
@@ -721,6 +744,9 @@ export default function (pool) {
             s.payment_preference,
             SUM(ep.gross_pay) as gross_pay,
             SUM(ep.net_pay) as net_pay,
+            -- Use calculated per-month digenapkan values (ensures yearly = sum of monthly totals)
+            COALESCE(eyr.total_digenapkan, 0) as total_digenapkan,
+            COALESCE(eyr.total_setelah_digenapkan, 0) as total_setelah_digenapkan,
             -- Use the most recent job_type for location mapping
             (ARRAY_AGG(ep.job_type ORDER BY mp.month DESC))[1] as job_type,
             (ARRAY_AGG(ep.section ORDER BY mp.month DESC))[1] as section,
@@ -744,9 +770,12 @@ export default function (pool) {
           ) head_jlm ON head_s.id IS NOT NULL
           -- Direct job location mapping (fallback)
           LEFT JOIN job_location_map jlm ON ep.job_type = jlm.job_id
+          -- Join with pre-calculated yearly rounded values
+          LEFT JOIN employee_yearly_rounded eyr ON eyr.employee_id = ep.employee_id
           WHERE mp.year = $1
           AND (s.date_resigned IS NULL OR s.date_resigned > CURRENT_DATE)
-          GROUP BY ep.employee_id, s.id, s.name, s.ic_no, s.bank_account_number, s.payment_preference
+          GROUP BY ep.employee_id, s.id, s.name, s.ic_no, s.bank_account_number, s.payment_preference,
+                   eyr.total_digenapkan, eyr.total_setelah_digenapkan
         ),
         -- UNION all location sources (employee appears in all applicable locations)
         employee_all_locations AS (
@@ -789,6 +818,8 @@ export default function (pool) {
             location_code,
             gross_pay,
             net_pay,
+            total_digenapkan,
+            total_setelah_digenapkan,
             job_type,
             section,
             location_source
@@ -936,9 +967,10 @@ export default function (pool) {
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
         const jumlah = parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
-        // Rounding: DIGENAPKAN rounds up to nearest whole ringgit
-        const setelah_digenapkan = Math.ceil(jumlah);
-        const digenapkan = setelah_digenapkan - jumlah;
+        // Use pre-calculated digenapkan values from monthly payrolls (summed across months)
+        // This ensures yearly totals match sum of monthly totals exactly
+        const setelah_digenapkan = parseFloat(row.total_setelah_digenapkan || 0);
+        const digenapkan = parseFloat(row.total_digenapkan || 0);
 
         return {
           no: index + 1,
