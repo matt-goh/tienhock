@@ -590,8 +590,8 @@ const StaffFormPage: React.FC = () => {
             <span className="text-xs opacity-75">({filteredPayCodes.length})</span>
           </button>
 
-          {/* Right: Batch buttons (only for Base and Overtime, only in edit mode) */}
-          {isEditMode && payType !== "Tambahan" && onBatchSetDefault && (
+          {/* Right: Batch buttons (only in edit mode) */}
+          {isEditMode && onBatchSetDefault && (
             <div
               className="flex items-center gap-1.5 ml-2"
               onClick={(e) => e.stopPropagation()}
