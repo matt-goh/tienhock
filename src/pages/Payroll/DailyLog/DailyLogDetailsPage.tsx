@@ -4,7 +4,6 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   IconPencil,
   IconUsers,
-  IconClock,
   IconLock,
   IconSun,
   IconMoon,
@@ -163,7 +162,9 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   if (!workLog) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500 dark:text-gray-400">Work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">
+          Work log not found
+        </p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
           Back to List
         </Button>
@@ -234,9 +235,15 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             {/* Inline Stats */}
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
               <div className="flex items-center gap-1.5">
-                <IconCalendarEvent size={16} className="text-sky-600 dark:text-sky-400" />
+                <IconCalendarEvent
+                  size={16}
+                  className="text-sky-600 dark:text-sky-400"
+                />
                 <span
-                  className={`font-medium ${getDayTypeColor(workLog.day_type, workLog.log_date)}`}
+                  className={`font-medium ${getDayTypeColor(
+                    workLog.day_type,
+                    workLog.log_date
+                  )}`}
                 >
                   {getDisplayDayType(workLog.day_type, workLog.log_date)}
                   {getDisplayDayType(workLog.day_type, workLog.log_date) !==
@@ -246,9 +253,15 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
                 {workLog.shift === 1 ? (
-                  <IconSun size={16} className="text-amber-500 dark:text-amber-400" />
+                  <IconSun
+                    size={16}
+                    className="text-amber-500 dark:text-amber-400"
+                  />
                 ) : (
-                  <IconMoon size={16} className="text-indigo-500 dark:text-indigo-400" />
+                  <IconMoon
+                    size={16}
+                    className="text-indigo-500 dark:text-indigo-400"
+                  />
                 )}
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.shift === 1 ? "Day" : "Night"}
@@ -282,10 +295,14 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           getContextFieldValue(
                             jobConfig.contextFields[index - 1]?.id
                           ) !== null && (
-                            <span className="text-default-300 dark:text-gray-600">•</span>
+                            <span className="text-default-300 dark:text-gray-600">
+                              •
+                            </span>
                           )}
                         <div className="flex items-center gap-1.5">
-                          <span className="text-default-500 dark:text-gray-400">{field.label}:</span>
+                          <span className="text-default-500 dark:text-gray-400">
+                            {field.label}:
+                          </span>
                           <span className="font-medium text-default-700 dark:text-gray-200">
                             {value}
                           </span>
@@ -319,7 +336,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
           <div className="px-4 py-2.5 bg-sky-50 dark:bg-sky-900/20 border-b border-sky-100 dark:border-sky-800">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-2">
-                <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
+                <IconUsers
+                  size={16}
+                  className="text-sky-600 dark:text-sky-400"
+                />
                 Employee Details
               </h3>
               <div className="flex items-center gap-3 text-xs text-sky-700 dark:text-sky-400">
@@ -376,7 +396,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                       entry.activities
                     );
 
-                    const totalActivities = contextLinked.length + regular.length;
+                    const totalActivities =
+                      contextLinked.length + regular.length;
                     const needsExpansion = totalActivities > 10;
                     const isExpanded =
                       expandedEntries[String(entry.id)] || false;
@@ -491,7 +512,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                           )}
                                       </div>
                                       <div className="font-medium text-default-700 dark:text-gray-200">
-                                        RM{activity.calculated_amount.toFixed(2)}
+                                        RM
+                                        {activity.calculated_amount.toFixed(2)}
                                       </div>
                                     </div>
                                   ))}
@@ -530,7 +552,11 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                           </span>
                                         )}
                                         {/* For Fixed: only show base rate if no units provided */}
-                                        {!(activity.rate_unit === "Fixed" && activity.units_produced !== null && activity.units_produced > 0) && (
+                                        {!(
+                                          activity.rate_unit === "Fixed" &&
+                                          activity.units_produced !== null &&
+                                          activity.units_produced > 0
+                                        ) && (
                                           <span className="text-default-500 dark:text-gray-400 ml-2">
                                             •{" "}
                                             {activity.rate_unit === "Percent"
@@ -543,14 +569,23 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                           activity.rate_unit !== "Hour" &&
                                           activity.rate_unit !== "Bill" && (
                                             <span className="text-default-500 dark:text-gray-400 ml-2">
-                                              • {activity.rate_unit === "Fixed"
-                                                ? `RM${activity.units_produced.toFixed(2)}`
-                                                : `${activity.units_produced} ${activity.rate_unit === "Percent" ? "Units" : activity.rate_unit}`}
+                                              •{" "}
+                                              {activity.rate_unit === "Fixed"
+                                                ? `RM${activity.units_produced.toFixed(
+                                                    2
+                                                  )}`
+                                                : `${activity.units_produced} ${
+                                                    activity.rate_unit ===
+                                                    "Percent"
+                                                      ? "Units"
+                                                      : activity.rate_unit
+                                                  }`}
                                             </span>
                                           )}
                                       </div>
                                       <div className="font-medium text-default-700 dark:text-gray-200">
-                                        RM{activity.calculated_amount.toFixed(2)}
+                                        RM
+                                        {activity.calculated_amount.toFixed(2)}
                                       </div>
                                     </div>
                                   ))}
@@ -608,7 +643,10 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
           <div className="px-4 py-2.5 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-100 dark:border-rose-800">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
-                <IconBeach size={16} className="text-rose-600 dark:text-rose-400" />
+                <IconBeach
+                  size={16}
+                  className="text-rose-600 dark:text-rose-400"
+                />
                 Leave Records
               </h3>
               <span className="text-xs font-medium text-rose-700 dark:text-rose-400">
