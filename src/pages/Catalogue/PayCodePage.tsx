@@ -32,6 +32,7 @@ import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import AssociatePayCodesWithJobsModal from "../../components/Catalogue/AssociatePayCodesWithJobsModal";
 import AssociatePayCodesWithEmployeesModal from "../../components/Catalogue/AssociatePayCodesWithEmployeesModal";
 import JobsAndEmployeesUsingPayCodeTooltip from "../../components/Catalogue/JobsAndEmployeesUsingPayCodeTooltip";
+import RefreshPayCodeCacheButton from "../../components/Catalogue/RefreshPayCodeCacheButton";
 
 const PayCodePage: React.FC = () => {
   const location = useLocation();
@@ -187,11 +188,15 @@ const PayCodePage: React.FC = () => {
       .map(([jobId]) => jobId);
   };
 
-  const getAssociatedEmployeeIds = (payCodeId: string): string[] => {
-    const associatedEmployees: string[] = [];
+  const getAssociatedEmployeeDetails = (payCodeId: string): { id: string; is_default: boolean }[] => {
+    const associatedEmployees: { id: string; is_default: boolean }[] = [];
     Object.entries(employeeMappings).forEach(([employeeId, payCodeDetails]) => {
-      if (payCodeDetails.some((detail) => detail.id === payCodeId)) {
-        associatedEmployees.push(employeeId);
+      const matchingPayCode = payCodeDetails.find((detail) => detail.id === payCodeId);
+      if (matchingPayCode) {
+        associatedEmployees.push({
+          id: employeeId,
+          is_default: matchingPayCode.is_default_setting || false,
+        });
       }
     });
     return associatedEmployees;
@@ -569,17 +574,23 @@ const PayCodePage: React.FC = () => {
               </button>
             )}
           </div>
-          <Button
-            onClick={handleAddClick}
-            color="sky"
-            variant="filled"
-            icon={IconPlus}
-            iconPosition="left"
-            size="md"
-            className="w-full md:w-auto"
-          >
-            Add Pay Code
-          </Button>
+          <div className="flex space-x-2">
+            <RefreshPayCodeCacheButton
+              onRefresh={refreshPayCodeMappings}
+              size="md"
+            />
+            <Button
+              onClick={handleAddClick}
+              color="sky"
+              variant="filled"
+              icon={IconPlus}
+              iconPosition="left"
+              size="md"
+              className="w-full md:w-auto"
+            >
+              Add Pay Code
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -778,9 +789,9 @@ const PayCodePage: React.FC = () => {
         onClose={() => setShowAssociateEmployeesModal(false)}
         payCode={payCodeToAssociateWithEmployees}
         availableEmployees={allEmployees}
-        currentEmployeeIds={
+        currentEmployeeDetails={
           payCodeToAssociateWithEmployees
-            ? getAssociatedEmployeeIds(payCodeToAssociateWithEmployees.id)
+            ? getAssociatedEmployeeDetails(payCodeToAssociateWithEmployees.id)
             : []
         }
         onAssociationComplete={refreshPayCodeMappings}

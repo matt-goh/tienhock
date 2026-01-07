@@ -44,6 +44,7 @@ import { IconChevronDown, IconCheck } from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import RefreshPayCodeCacheButton from "../../../components/Catalogue/RefreshPayCodeCacheButton";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -206,6 +207,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     employeeMappings,
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
+    refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
@@ -1195,7 +1197,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         ),
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
       });
-      navigate(`/payroll/${jobType.toLowerCase()}-production`);
+      // Navigate to details page after edit, list page after create
+      if (mode === "edit" && existingWorkLog) {
+        navigate(`/payroll/${jobType.toLowerCase()}-production/${existingWorkLog.id}`);
+      } else {
+        navigate(`/payroll/${jobType.toLowerCase()}-production`);
+      }
     } catch (error: any) {
       console.error("Error saving work log:", error);
       toast.error(
@@ -2019,6 +2026,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </h1>
           </div>
           <div className="flex space-x-2">
+            <RefreshPayCodeCacheButton
+              onRefresh={refreshPayCodeMappings}
+              size="sm"
+            />
             <Button
               variant="outline"
               size="sm"

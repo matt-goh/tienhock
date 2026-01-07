@@ -47,6 +47,7 @@ import {
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import RefreshPayCodeCacheButton from "../../../components/Catalogue/RefreshPayCodeCacheButton";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -129,7 +130,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     Record<string, string> // rowKey of SALESMAN_IKUT -> SALESMAN employee ID
   >({});
   const [ikutBagCounts, setIkutBagCounts] = useState<
-    Record<string, { muatMee: number; muatBihun: number }> // rowKey -> bag counts
+    Record<string, { muatMee: number; muatBihun: number; billUnits: number }> // rowKey -> bag counts and bill units
   >({});
   const [ikutDoubled, setIkutDoubled] = useState<Record<string, boolean>>({});
   const [leaveEmployees, setLeaveEmployees] = useState<
@@ -248,6 +249,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     employeeMappings,
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
+    refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
@@ -257,7 +259,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     employeeActivities: Record<string, any[]>;
     locationTypes: Record<string, "Local" | "Outstation">;
     salesmanIkutRelations: Record<string, string>;
-    ikutBagCounts: Record<string, { muatMee: number; muatBihun: number }>;
+    ikutBagCounts: Record<string, { muatMee: number; muatBihun: number; billUnits: number }>;
     ikutDoubled: Record<string, boolean>;
     leaveEmployees: Record<string, LeaveEntry>;
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
@@ -745,7 +747,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       !loadingPayCodeMappings &&
       expandedEmployees.length > 0
     ) {
-      // Use a longer delay to ensure all initialization state updates are complete
+      // Use a longer delay to ensure all post-initialization effects have completed
+      // (e.g., copying products to SALESMAN_IKUT activities, updating muat activities)
       const timeoutId = setTimeout(() => {
         initialStateSetRef.current = true;
         setInitialState({
@@ -766,7 +769,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           ),
           leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
         });
-      }, 300); // Longer delay to ensure stability
+      }, 800); // Longer delay to ensure all post-initialization effects complete
 
       return () => clearTimeout(timeoutId);
     }
@@ -1713,7 +1716,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         ),
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
       });
-      navigate(`/payroll/${jobType.toLowerCase()}-production`);
+      // Navigate to details page after edit, list page after create
+      if (mode === "edit" && existingWorkLog) {
+        navigate(`/payroll/${jobType.toLowerCase()}-production/${existingWorkLog.id}`);
+      } else {
+        navigate(`/payroll/${jobType.toLowerCase()}-production`);
+      }
     } catch (error: any) {
       console.error("Error saving work log:", error);
       toast.error(
@@ -1970,7 +1978,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
   const handleBagCountChange = (
     rowKey: string,
-    field: "muatMee" | "muatBihun",
+    field: "muatMee" | "muatBihun" | "billUnits",
     value: string,
     isDoubled: boolean = false
   ) => {
@@ -1995,7 +2003,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     }));
   };
 
-  // Update Muat activities when ikutBagCounts or ikutDoubled changes
+  // Update Muat, BILL, ELAUN_MT, and IKUT activities when ikutBagCounts or ikutDoubled changes
   useEffect(() => {
     if (!isInitializationComplete) return;
 
@@ -2008,6 +2016,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       const muatBihunQty = isDoubled
         ? (bagCounts.muatBihun || 0) * 2
         : bagCounts.muatBihun || 0;
+      const billQty = isDoubled
+        ? (bagCounts.billUnits || 0) * 2
+        : bagCounts.billUnits || 0;
 
       // Only update if activities exist for this employee
       if (employeeActivities[rowKey] && employeeActivities[rowKey].length > 0) {
@@ -2044,6 +2055,62 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                   ...activity,
                   unitsProduced: muatBihunQty,
                   isSelected: muatBihunQty > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            // Handle BILL paycode doubling (Bill rate_unit)
+            if (activity.payCodeId === "BILL") {
+              const newAmount = billQty * (activity.rate || 0);
+              if (
+                activity.unitsProduced !== billQty ||
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== (billQty > 0)
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: billQty,
+                  isSelected: billQty > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            // Handle ELAUN_MT paycode doubling (Fixed rate_unit)
+            if (activity.payCodeId === "ELAUN_MT" && activity.isSelected) {
+              const newAmount = isDoubled
+                ? (activity.rate || 0) * 2
+                : activity.rate || 0;
+              if (activity.calculatedAmount !== newAmount) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            // Handle ELAUN_MO paycode doubling (Fixed rate_unit)
+            if (activity.payCodeId === "ELAUN_MO" && activity.isSelected) {
+              const newAmount = isDoubled
+                ? (activity.rate || 0) * 2
+                : activity.rate || 0;
+              if (activity.calculatedAmount !== newAmount) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            // Handle IKUT paycode doubling (Fixed rate_unit)
+            if (activity.payCodeId === "IKUT" && activity.isSelected) {
+              const newAmount = isDoubled
+                ? (activity.rate || 0) * 2
+                : activity.rate || 0;
+              if (activity.calculatedAmount !== newAmount) {
+                hasChanges = true;
+                return {
+                  ...activity,
                   calculatedAmount: newAmount,
                 };
               }
@@ -2652,16 +2719,35 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       }
     );
 
-    // Apply Muat bag counts for SALESMAN_IKUT employees
-    // This ensures bag counts are reapplied when activities are regenerated (e.g., after re-selecting)
-    Object.entries(ikutBagCounts).forEach(([rowKey, bagCounts]) => {
-      if (!newEmployeeActivities[rowKey] || newEmployeeActivities[rowKey].length === 0) return;
+    // Apply Muat bag counts, BILL, ELAUN_MT, and IKUT for SALESMAN_IKUT employees
+    // This ensures values are reapplied when activities are regenerated (e.g., after re-selecting)
+    // Also initializes billUnits for new SALESMAN_IKUT selections
+    const newIkutBagCounts = { ...ikutBagCounts };
+
+    Object.entries(newEmployeeActivities).forEach(([rowKey, activities]) => {
+      // Only process SALESMAN_IKUT rows
+      if (!rowKey.endsWith("-SALESMAN_IKUT") || !activities || activities.length === 0) return;
 
       const isDoubled = ikutDoubled[rowKey] || false;
+      const currentBagCounts = ikutBagCounts[rowKey] || { muatMee: 0, muatBihun: 0, billUnits: 0 };
+
+      // Initialize billUnits from BILL activity if not already set
+      if (!ikutBagCounts[rowKey]) {
+        const billActivity = activities.find((a: any) => a.payCodeId === "BILL");
+        const billUnits = billActivity?.unitsProduced || 0;
+        newIkutBagCounts[rowKey] = {
+          muatMee: 0,
+          muatBihun: 0,
+          billUnits: billUnits,
+        };
+      }
+
+      const bagCounts = newIkutBagCounts[rowKey] || currentBagCounts;
       const muatMeeQty = isDoubled ? (bagCounts.muatMee || 0) * 2 : bagCounts.muatMee || 0;
       const muatBihunQty = isDoubled ? (bagCounts.muatBihun || 0) * 2 : bagCounts.muatBihun || 0;
+      const billQty = isDoubled ? (bagCounts.billUnits || 0) * 2 : bagCounts.billUnits || 0;
 
-      newEmployeeActivities[rowKey] = newEmployeeActivities[rowKey].map((activity: any) => {
+      newEmployeeActivities[rowKey] = activities.map((activity: any) => {
         if (activity.payCodeId === MUAT_MEE_PAYCODE) {
           const newAmount = muatMeeQty * (activity.rate || 0);
           return {
@@ -2680,9 +2766,48 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             calculatedAmount: newAmount,
           };
         }
+        // Handle BILL paycode
+        if (activity.payCodeId === "BILL") {
+          const newAmount = billQty * (activity.rate || 0);
+          return {
+            ...activity,
+            unitsProduced: billQty,
+            isSelected: billQty > 0,
+            calculatedAmount: newAmount,
+          };
+        }
+        // Handle ELAUN_MT paycode (Fixed)
+        if (activity.payCodeId === "ELAUN_MT" && activity.isSelected) {
+          const newAmount = isDoubled ? (activity.rate || 0) * 2 : activity.rate || 0;
+          return {
+            ...activity,
+            calculatedAmount: newAmount,
+          };
+        }
+        // Handle ELAUN_MO paycode (Fixed)
+        if (activity.payCodeId === "ELAUN_MO" && activity.isSelected) {
+          const newAmount = isDoubled ? (activity.rate || 0) * 2 : activity.rate || 0;
+          return {
+            ...activity,
+            calculatedAmount: newAmount,
+          };
+        }
+        // Handle IKUT paycode (Fixed)
+        if (activity.payCodeId === "IKUT" && activity.isSelected) {
+          const newAmount = isDoubled ? (activity.rate || 0) * 2 : activity.rate || 0;
+          return {
+            ...activity,
+            calculatedAmount: newAmount,
+          };
+        }
         return activity;
       });
     });
+
+    // Update ikutBagCounts if new entries were initialized
+    if (Object.keys(newIkutBagCounts).length > Object.keys(ikutBagCounts).length) {
+      setIkutBagCounts(newIkutBagCounts);
+    }
 
     // Update with paycode-applied activities (merge with existing to preserve deselected employees)
     setEmployeeActivities((prev) => ({
@@ -2869,7 +2994,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       const newSalesmanIkutRelations: Record<string, string> = {};
       const newIkutBagCounts: Record<
         string,
-        { muatMee: number; muatBihun: number }
+        { muatMee: number; muatBihun: number; billUnits: number }
       > = {};
       const newIkutDoubled: Record<string, boolean> = {};
 
@@ -2930,9 +3055,21 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             newSalesmanIkutRelations[rowKey] = entry.following_salesman_id;
           }
 
+          // Calculate base billUnits from saved BILL activity
+          // When is_doubled is true, the saved value is doubled, so we divide by 2 to get base
+          const activitiesForRow = newEmployeeActivities[rowKey] || [];
+          const savedBillActivity = activitiesForRow.find(
+            (a: ActivityItem) => a.payCodeId === "BILL"
+          );
+          const savedBillUnits = savedBillActivity?.unitsProduced || 0;
+          const baseBillUnits = entry.is_doubled
+            ? Math.round(savedBillUnits / 2)
+            : savedBillUnits;
+
           newIkutBagCounts[rowKey] = {
             muatMee: entry.muat_mee_bags || 0,
             muatBihun: entry.muat_bihun_bags || 0,
+            billUnits: baseBillUnits,
           };
 
           // Restore x2 doubled state
@@ -3135,6 +3272,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             </h1>
           </div>
           <div className="flex space-x-2">
+            <RefreshPayCodeCacheButton
+              onRefresh={refreshPayCodeMappings}
+              size="sm"
+            />
             <Button
               variant="outline"
               size="sm"
@@ -3496,6 +3637,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                             scope="col"
                             className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
+                            Bill
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
                             x2
                           </th>
                           <th
@@ -3514,6 +3661,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                           const bagCounts = ikutBagCounts[row.rowKey || ""] || {
                             muatMee: 0,
                             muatBihun: 0,
+                            billUnits: 0,
                           };
                           const isDoubled = ikutDoubled[row.rowKey || ""] || false;
                           // Display doubled values when x2 is active
@@ -3523,6 +3671,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                           const displayMuatBihun = isDoubled
                             ? (bagCounts.muatBihun || 0) * 2
                             : bagCounts.muatBihun || 0;
+                          const displayBillUnits = isDoubled
+                            ? (bagCounts.billUnits || 0) * 2
+                            : bagCounts.billUnits || 0;
 
                           // Get available salesmen (only those selected for work)
                           const availableSalesmen = salesmanEmployees.filter(
@@ -3662,6 +3813,30 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                 </div>
                               </td>
                               <td className="px-4 py-2 whitespace-nowrap text-center">
+                                <input
+                                  type="number"
+                                  value={isSelected ? displayBillUnits.toString() : ""}
+                                  onChange={(e) =>
+                                    handleBagCountChange(
+                                      row.rowKey || "",
+                                      "billUnits",
+                                      e.target.value,
+                                      isDoubled
+                                    )
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`w-14 py-1 text-sm text-right border rounded-md text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                    isDoubled && isSelected
+                                      ? "bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-600"
+                                      : "bg-white dark:bg-gray-700 border-default-300 dark:border-gray-600"
+                                  }`}
+                                  min="0"
+                                  step={isDoubled ? 2 : 1}
+                                  disabled={!isSelected}
+                                  placeholder={isSelected ? "0" : "-"}
+                                />
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-center">
                                 <Checkbox
                                   checked={isDoubled}
                                   onChange={() => {
@@ -3695,7 +3870,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                   }
                                   onClick={() => handleManageActivities(row)}
                                   logDate={formData.logDate}
-                                  showBelow={index < 5}
+                                  isDoubled={isDoubled}
                                 />
                               </td>
                             </tr>
@@ -4018,6 +4193,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         hasUnsavedChanges={hasUnsavedChanges}
         onNavigateAttempt={safeNavigate}
         logDate={formData.logDate}
+        isDoubled={
+          selectedEmployee?.jobType === "SALESMAN_IKUT"
+            ? ikutDoubled[selectedEmployee?.rowKey || ""] || false
+            : false
+        }
       />
       <ManageActivitiesModal
         isOpen={showLeaveActivitiesModal}
