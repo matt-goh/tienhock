@@ -1716,7 +1716,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         ),
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
       });
-      navigate(`/payroll/${jobType.toLowerCase()}-production`);
+      // Navigate to details page after edit, list page after create
+      if (mode === "edit" && existingWorkLog) {
+        navigate(`/payroll/${jobType.toLowerCase()}-production/${existingWorkLog.id}`);
+      } else {
+        navigate(`/payroll/${jobType.toLowerCase()}-production`);
+      }
     } catch (error: any) {
       console.error("Error saving work log:", error);
       toast.error(
