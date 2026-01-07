@@ -47,6 +47,7 @@ import {
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
+import RefreshPayCodeCacheButton from "../../../components/Catalogue/RefreshPayCodeCacheButton";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -248,6 +249,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     employeeMappings,
     detailedMappings: jobPayCodeDetails,
     loading: loadingPayCodeMappings,
+    refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const [isSaving, setIsSaving] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
@@ -3265,6 +3267,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             </h1>
           </div>
           <div className="flex space-x-2">
+            <RefreshPayCodeCacheButton
+              onRefresh={refreshPayCodeMappings}
+              size="sm"
+            />
             <Button
               variant="outline"
               size="sm"
