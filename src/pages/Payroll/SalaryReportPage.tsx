@@ -198,6 +198,9 @@ const SalaryReportPage: React.FC = () => {
     new Date().getMonth() + 1
   );
 
+  // Sub-view mode for Employee tab
+  const [employeeViewMode, setEmployeeViewMode] = useState<'individual' | 'location'>('individual');
+
   // Filters - use Date for month navigation, initialize from URL params
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const yearParam = searchParams.get("year");
@@ -644,7 +647,7 @@ const SalaryReportPage: React.FC = () => {
     if (employees.length === 0) return null;
 
     return (
-      <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+      <div className="overflow-auto mb-2 max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="w-full">
           <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
@@ -877,12 +880,459 @@ const SalaryReportPage: React.FC = () => {
     );
   };
 
+  // Location Grouped Table Component - shows employees grouped by location
+  const LocationGroupedTable = () => {
+    if (!comprehensiveSalaryData) return null;
+
+    // Process locations: merge 16-24 into 14
+    const processedLocations = useMemo(() => {
+      const locationsCopy = JSON.parse(JSON.stringify(comprehensiveSalaryData.locations)) as LocationSalaryData[];
+
+      // Find location 14 or create it
+      let location14 = locationsCopy.find(loc => loc.location === '14');
+      if (!location14) {
+        location14 = {
+          location: '14',
+          employees: [],
+          totals: {
+            gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
+            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
+            sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
+            setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
+          }
+        };
+        locationsCopy.push(location14);
+      }
+
+      // Merge employees from locations 16-24 into location 14
+      // Use a Map to deduplicate employees by staff_id (aggregate their values)
+      const commissionLocations = ['16', '17', '18', '19', '20', '21', '22', '23', '24'];
+      type LocationEmployee = LocationSalaryData['employees'][0];
+      const mergedEmployeesMap = new Map<string, LocationEmployee>();
+
+      // First, add existing location 14 employees to the map
+      location14.employees.forEach(emp => {
+        mergedEmployeesMap.set(emp.staff_id, { ...emp });
+      });
+
+      // Merge commission location employees
+      commissionLocations.forEach(locId => {
+        const commissionLoc = locationsCopy.find(loc => loc.location === locId);
+        if (commissionLoc && commissionLoc.employees.length > 0) {
+          commissionLoc.employees.forEach(emp => {
+            const existing = mergedEmployeesMap.get(emp.staff_id);
+            if (existing) {
+              // Aggregate values for the same employee
+              existing.gaji += emp.gaji;
+              existing.ot += emp.ot;
+              existing.bonus += emp.bonus;
+              existing.comm += emp.comm;
+              existing.gaji_kasar += emp.gaji_kasar;
+              existing.epf_majikan += emp.epf_majikan;
+              existing.epf_pekerja += emp.epf_pekerja;
+              existing.socso_majikan += emp.socso_majikan;
+              existing.socso_pekerja += emp.socso_pekerja;
+              existing.sip_majikan += emp.sip_majikan;
+              existing.sip_pekerja += emp.sip_pekerja;
+              existing.pcb += emp.pcb;
+              existing.gaji_bersih += emp.gaji_bersih;
+              existing.setengah_bulan += emp.setengah_bulan;
+              existing.jumlah += emp.jumlah;
+              existing.digenapkan += emp.digenapkan;
+              existing.setelah_digenapkan += emp.setelah_digenapkan;
+            } else {
+              mergedEmployeesMap.set(emp.staff_id, { ...emp });
+            }
+          });
+          // Add totals to location 14
+          Object.keys(location14!.totals).forEach(key => {
+            const k = key as keyof typeof location14.totals;
+            location14!.totals[k] += commissionLoc.totals[k];
+          });
+        }
+      });
+
+      // Replace location 14 employees with deduplicated merged employees
+      location14.employees = Array.from(mergedEmployeesMap.values());
+
+      // Filter out commission locations (16-24) and empty locations
+      // Sort numerically by location code
+      const filteredLocations = locationsCopy
+        .filter(loc => !commissionLocations.includes(loc.location))
+        .filter(loc => loc.employees.length > 0)
+        .sort((a, b) => parseInt(a.location, 10) - parseInt(b.location, 10));
+
+      return filteredLocations;
+    }, [comprehensiveSalaryData]);
+
+    // Use the same deduplicated employees_grand_totals from reportData as the Individual view
+    // This ensures both views show identical grand totals
+    const grandTotals = reportData?.employees_grand_totals;
+
+    if (processedLocations.length === 0 || !grandTotals) return null;
+
+    return (
+      <div className="space-y-3">
+        {processedLocations.map((locationData) => {
+          const locationName = LOCATION_MAP[locationData.location] || `Location ${locationData.location}`;
+
+          return (
+            <div key={locationData.location} className="overflow-auto border border-default-200 dark:border-gray-700 rounded-lg">
+              {/* Location Header */}
+              <div className="bg-sky-50 dark:bg-sky-900/20 px-4 py-2 border-b border-default-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                  {locationData.location} - {locationName.toUpperCase()}
+                </h3>
+              </div>
+
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[40px]" />
+                  <col className="w-[140px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[110px]" />
+                </colgroup>
+                <thead className="bg-default-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      BIL
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      NAMA PEKERJA
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      GAJI
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      OT
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      BONUS
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      COMM
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      GAJI KASAR
+                    </th>
+                    <th
+                      className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                      colSpan={2}
+                    >
+                      EPF
+                    </th>
+                    <th
+                      className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                      colSpan={2}
+                    >
+                      SOCSO
+                    </th>
+                    <th
+                      className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                      colSpan={2}
+                    >
+                      SIP
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900">
+                      PCB
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      GAJI BERSIH
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      1/2 BULAN
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      JUMLAH
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      DIGENAPKAN
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      SETELAH DIGENAPKAN
+                    </th>
+                  </tr>
+                  <tr>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      MAJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      PKJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      MAJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      PKJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      MAJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      PKJ
+                    </th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                  {locationData.employees.map((emp, index) => (
+                    <tr
+                      key={`${emp.staff_id}-${index}`}
+                      className={`${index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"} ${emp.employee_payroll_id ? "cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700" : ""}`}
+                      onClick={() => emp.employee_payroll_id && window.open(`/payroll/employee-payroll/${emp.employee_payroll_id}`, '_blank')}
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {index + 1}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[100px]">
+                        <span className="block truncate" title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}>
+                          {emp.staff_id.toUpperCase()} - {emp.staff_name.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.gaji)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.ot)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.bonus)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.comm)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.gaji_kasar)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.epf_majikan)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.epf_pekerja)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.socso_majikan)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.socso_pekerja)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.sip_majikan)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.sip_pekerja)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.pcb)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.gaji_bersih)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.setengah_bulan)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.jumlah)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.digenapkan)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.setelah_digenapkan)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+                    >
+                      SUBTOTAL
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.gaji)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.ot)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.bonus)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.comm)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.gaji_kasar)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.epf_majikan)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.epf_pekerja)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.socso_majikan)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.socso_pekerja)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.sip_majikan)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.sip_pekerja)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.pcb)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.gaji_bersih)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.setengah_bulan)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.jumlah)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.digenapkan)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.setelah_digenapkan)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          );
+        })}
+
+        {/* Grand Total Section */}
+        <div className="overflow-auto border-2 border-sky-500 dark:border-sky-600 rounded-lg">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-[40px]" />
+              <col className="w-[140px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[90px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[90px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[110px]" />
+            </colgroup>
+            <tbody>
+              <tr>
+                <td
+                  colSpan={2}
+                  className="px-2 py-3 text-sm font-bold text-white text-center bg-sky-600 dark:bg-sky-700"
+                >
+                  GRAND TOTAL
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.gaji)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.ot)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.bonus)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.comm)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.gaji_kasar)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.epf_majikan)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.epf_pekerja)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.socso_majikan)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.socso_pekerja)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.sip_majikan)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.sip_pekerja)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.pcb)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.gaji_bersih)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.setengah_bulan)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.jumlah)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.digenapkan)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.setelah_digenapkan)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   // Comprehensive Salary Table Component
   const ComprehensiveSalaryTable = () => {
     if (!comprehensiveSalaryData) return null;
 
     return (
-      <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+      <div className="overflow-auto mb-2 max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="w-full">
           <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
@@ -1491,24 +1941,24 @@ const SalaryReportPage: React.FC = () => {
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
           {reportData?.data.map((item, index) => (
             <tr key={item.staff_id} className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}>
-              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100">
+              <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100">
                 {item.no}
               </td>
-              <td className="px-2 py-2">
+              <td className="px-2 py-1">
                 <div className="text-sm text-default-900 dark:text-gray-100 font-medium">
                   {item.staff_id} - {item.staff_name}
                 </div>
               </td>
-              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-right">
+              <td className="px-2 py-1 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.gaji_genap)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-right">
+              <td className="px-2 py-1 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.total_pinjam)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 font-medium text-right">
+              <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100 font-medium text-right">
                 {formatCurrency(item.final_total)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100 text-center">
                 <span
                   className={`inline-flex px-2 py-1 text-sm font-semibold rounded-full ${
                     item.payment_preference === "Bank"
@@ -1526,7 +1976,7 @@ const SalaryReportPage: React.FC = () => {
     </div>
   );
 
-  const tabLabels = ["Employee", "Salary", "Bank", "Pinjam"];
+  const tabLabels = ["Employee", "Location", "Bank", "Pinjam"];
 
   return (
     <div className="space-y-3">
@@ -1579,8 +2029,36 @@ const SalaryReportPage: React.FC = () => {
                       {reportData.total_records} employees
                     </span>
                     <span className="font-medium">
-                      Total: {formatCurrency(reportData.summary.total_final)}
+                      Total: {formatCurrency(reportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
+                  </div>
+                </>
+              )}
+              {/* Sub-view toggle for Employee tab */}
+              {activeTab === 0 && (
+                <>
+                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      onClick={() => setEmployeeViewMode('individual')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        employeeViewMode === 'individual'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Individual
+                    </button>
+                    <button
+                      onClick={() => setEmployeeViewMode('location')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        employeeViewMode === 'location'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Location
+                    </button>
                   </div>
                 </>
               )}
@@ -1669,8 +2147,12 @@ const SalaryReportPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="px-6 py-4">
-              {activeTab === 0 && <EmployeeSalaryTable />}
+            <div className="px-6 pt-2">
+              {activeTab === 0 && (
+                employeeViewMode === 'individual'
+                  ? <EmployeeSalaryTable />
+                  : <LocationGroupedTable />
+              )}
               {activeTab === 1 && <ComprehensiveSalaryTable />}
               {activeTab === 2 && <BankTable />}
               {activeTab === 3 && <PinjamTable />}
@@ -1687,7 +2169,7 @@ const SalaryReportPage: React.FC = () => {
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Gaji/Genap:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(reportData.summary.total_gaji_genap)}
+                      {formatCurrency(reportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                   <div className="text-default-700 dark:text-gray-200">
@@ -1699,7 +2181,7 @@ const SalaryReportPage: React.FC = () => {
                   <div className="text-sky-700 dark:text-sky-400">
                     <span className="font-semibold">Grand Total:</span>{" "}
                     <span className="font-bold text-sky-800 dark:text-sky-300">
-                      {formatCurrency(reportData.summary.total_final)}
+                      {formatCurrency(reportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                 </div>
