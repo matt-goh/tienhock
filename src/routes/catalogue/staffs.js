@@ -1,5 +1,6 @@
 // src/routes/staff.js
 import { Router } from "express";
+import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -25,14 +26,21 @@ export default function (pool) {
   router.get("/", async (req, res) => {
     try {
       const { salesmenOnly } = req.query;
+      const cacheKey = `${CACHE_KEYS.STAFFS}:${salesmenOnly || 'all'}`;
+
+      // Check cache first
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
 
       // Dynamically build column selection based on salesmenOnly parameter
       const columns =
         salesmenOnly === "true"
           ? "s.id" // Only select ID for salesmen
-          : `s.id, 
-           s.name, 
-           s.ic_no as "icNo", 
+          : `s.id,
+           s.name,
+           s.ic_no as "icNo",
            s.telephone_no as "telephoneNo",
            s.email,
            s.gender,
@@ -94,6 +102,9 @@ export default function (pool) {
                 ? staff.dateResigned.toISOString().split("T")[0]
                 : "",
             }));
+
+      // Cache the result
+      cache.set(cacheKey, staffs, CACHE_TTL.LONG);
 
       res.json(staffs);
     } catch (error) {
@@ -209,6 +220,10 @@ export default function (pool) {
       ];
 
       const result = await pool.query(query, values);
+
+      // Invalidate cache
+      cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+
       res.status(201).json({
         message: "Staff member created successfully",
         staff: result.rows[0],
@@ -345,6 +360,9 @@ export default function (pool) {
         );
 
         await client.query("COMMIT");
+
+        // Invalidate cache
+        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
 
         res.json({
           message: "Head staff updated successfully",
@@ -498,6 +516,10 @@ export default function (pool) {
         }
 
         await client.query("COMMIT");
+
+        // Invalidate cache
+        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+
         res.json({
           message: "Staff jobs updated successfully",
           addedCount,
@@ -568,6 +590,10 @@ export default function (pool) {
         }
 
         await client.query("COMMIT");
+
+        // Invalidate cache
+        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+
         res.json({
           message: "Staff locations updated successfully",
           addedCount,
@@ -691,6 +717,10 @@ export default function (pool) {
         }
 
         await client.query("COMMIT");
+
+        // Invalidate cache
+        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+
         res.json({
           message: "Staff member updated successfully",
           staff: result.rows[0],
@@ -738,6 +768,10 @@ export default function (pool) {
         }
 
         await client.query("COMMIT");
+
+        // Invalidate cache
+        cache.invalidatePrefix(CACHE_KEYS.STAFFS);
+
         res.json({
           message: "Staff member deleted successfully",
           staff: result.rows[0],

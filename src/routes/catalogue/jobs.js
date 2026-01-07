@@ -1,5 +1,6 @@
 // src/routes/jobs.js
 import { Router } from "express";
+import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -23,6 +24,14 @@ export default function (pool) {
   // Get all jobs
   router.get("/", async (req, res) => {
     try {
+      const cacheKey = CACHE_KEYS.JOBS;
+
+      // Check cache first
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const query = "SELECT * FROM jobs";
       const result = await pool.query(query);
 
@@ -30,6 +39,9 @@ export default function (pool) {
         ...job,
         section: job.section ? job.section.split(", ") : [],
       }));
+
+      // Cache the result
+      cache.set(cacheKey, jobs, CACHE_TTL.VERY_LONG);
 
       res.json(jobs);
     } catch (error) {
@@ -72,6 +84,10 @@ export default function (pool) {
       ];
 
       const result = await pool.query(query, values);
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.JOBS);
+
       res
         .status(201)
         .json({ message: "Job created successfully", job: result.rows[0] });
@@ -178,6 +194,10 @@ export default function (pool) {
       await pool.query(deleteJobQuery, [id]);
 
       await pool.query("COMMIT");
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.JOBS);
+
       res
         .status(200)
         .json({ message: "Job deleted successfully" });
@@ -226,6 +246,9 @@ export default function (pool) {
       const values = [name, id];
 
       const result = await pool.query(query, values);
+
+      // Invalidate cache
+      cache.invalidate(CACHE_KEYS.JOBS);
 
       res.json({ message: "Job updated successfully", job: result.rows[0] });
     } catch (error) {

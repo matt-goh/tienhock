@@ -26,6 +26,7 @@ import { IconLink, IconChevronDown, IconChevronRight, IconLayoutList, IconLayout
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import BatchManageJobPayCodesModal from "../../components/Catalogue/BatchManageJobPayCodesModal";
+import RefreshPayCodeCacheButton from "../../components/Catalogue/RefreshPayCodeCacheButton";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { JobPayCodeDetails, PayType, Job } from "../../types/types";
 
@@ -590,8 +591,8 @@ const StaffFormPage: React.FC = () => {
             <span className="text-xs opacity-75">({filteredPayCodes.length})</span>
           </button>
 
-          {/* Right: Batch buttons (only for Base and Overtime, only in edit mode) */}
-          {isEditMode && payType !== "Tambahan" && onBatchSetDefault && (
+          {/* Right: Batch buttons (only in edit mode) */}
+          {isEditMode && onBatchSetDefault && (
             <div
               className="flex items-center gap-1.5 ml-2"
               onClick={(e) => e.stopPropagation()}
@@ -1445,6 +1446,10 @@ const StaffFormPage: React.FC = () => {
                           )}
                         </button>
                       )}
+                      <RefreshPayCodeCacheButton
+                        onRefresh={refreshPayCodeMappings}
+                        size="sm"
+                      />
                       {isEditMode && (
                         <Button
                           type="button"

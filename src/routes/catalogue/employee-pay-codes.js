@@ -153,6 +153,239 @@ export default function (pool) {
     }
   });
 
+  // Batch insert multiple employee-pay code associations
+  router.post("/batch", async (req, res) => {
+    const { associations } = req.body;
+
+    if (
+      !associations ||
+      !Array.isArray(associations) ||
+      associations.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({ message: "An array of associations is required" });
+    }
+
+    try {
+      // Validate all entries first
+      for (const entry of associations) {
+        const { employee_id, pay_code_id } = entry;
+        if (!employee_id || !pay_code_id) {
+          return res.status(400).json({
+            message: "All entries must have employee_id and pay_code_id",
+            invalid_entry: entry,
+          });
+        }
+      }
+
+      const results = [];
+      const errors = [];
+      let successCount = 0;
+      const affectedEmployees = new Set();
+      const affectedPayCodes = new Set();
+
+      await pool.query("BEGIN");
+
+      for (const entry of associations) {
+        const { employee_id, pay_code_id, is_default = true } = entry;
+
+        try {
+          // Check if the association already exists
+          const checkQuery =
+            "SELECT 1 FROM employee_pay_codes WHERE employee_id = $1 AND pay_code_id = $2";
+          const checkResult = await pool.query(checkQuery, [
+            employee_id,
+            pay_code_id,
+          ]);
+
+          if (checkResult.rows.length > 0) {
+            errors.push({
+              employee_id,
+              pay_code_id,
+              message: "Association already exists",
+            });
+            continue;
+          }
+
+          // Insert with default NULL overrides
+          const insertQuery = `
+            INSERT INTO employee_pay_codes (employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
+            VALUES ($1, $2, $3, NULL, NULL, NULL)
+            RETURNING *
+          `;
+          const result = await pool.query(insertQuery, [
+            employee_id,
+            pay_code_id,
+            is_default,
+          ]);
+          results.push(result.rows[0]);
+          successCount++;
+
+          affectedEmployees.add(employee_id);
+          affectedPayCodes.add(pay_code_id);
+        } catch (error) {
+          errors.push({
+            employee_id,
+            pay_code_id,
+            message:
+              error.code === "23503"
+                ? "Invalid employee_id or pay_code_id"
+                : error.message,
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        // Update timestamps for all affected employees
+        for (const employeeId of affectedEmployees) {
+          const updateStaffQuery = `
+            UPDATE staffs
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+          `;
+          await pool.query(updateStaffQuery, [employeeId]);
+        }
+
+        // Update pay code timestamps
+        if (affectedPayCodes.size > 0) {
+          const updatePayCodeQuery = `
+            UPDATE pay_codes
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ANY($1::text[])
+          `;
+          await pool.query(updatePayCodeQuery, [Array.from(affectedPayCodes)]);
+        }
+
+        await pool.query("COMMIT");
+        return res.status(201).json({
+          message: `Successfully added ${successCount} of ${associations.length} associations`,
+          added: results,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } else {
+        await pool.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Failed to add any associations",
+          errors,
+        });
+      }
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error in batch association:", error);
+      res.status(500).json({
+        message: "Error processing batch association",
+        error: error.message,
+      });
+    }
+  });
+
+  // Batch delete multiple employee-pay code associations
+  router.post("/batch-delete", async (req, res) => {
+    const { items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "An array of items to delete is required" });
+    }
+
+    try {
+      // Validate all entries first
+      for (const item of items) {
+        const { employee_id, pay_code_id } = item;
+        if (!employee_id || !pay_code_id) {
+          return res.status(400).json({
+            message: "All items must have employee_id and pay_code_id",
+            invalid_item: item,
+          });
+        }
+      }
+
+      await pool.query("BEGIN");
+
+      const results = [];
+      const errors = [];
+      let successCount = 0;
+      const affectedEmployees = new Set();
+      const affectedPayCodes = new Set();
+
+      for (const item of items) {
+        const { employee_id, pay_code_id } = item;
+
+        try {
+          const query = `
+            DELETE FROM employee_pay_codes
+            WHERE employee_id = $1 AND pay_code_id = $2
+            RETURNING employee_id, pay_code_id
+          `;
+          const result = await pool.query(query, [employee_id, pay_code_id]);
+
+          if (result.rows.length > 0) {
+            results.push(result.rows[0]);
+            successCount++;
+            affectedEmployees.add(employee_id);
+            affectedPayCodes.add(pay_code_id);
+          } else {
+            errors.push({
+              employee_id,
+              pay_code_id,
+              message: "Association not found",
+            });
+          }
+        } catch (error) {
+          errors.push({
+            employee_id,
+            pay_code_id,
+            message: error.message,
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        // Update timestamps for all affected employees
+        for (const employeeId of affectedEmployees) {
+          const updateStaffQuery = `
+            UPDATE staffs
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+          `;
+          await pool.query(updateStaffQuery, [employeeId]);
+        }
+
+        // Update pay code timestamps
+        if (affectedPayCodes.size > 0) {
+          const updatePayCodeQuery = `
+            UPDATE pay_codes
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ANY($1::text[])
+          `;
+          await pool.query(updatePayCodeQuery, [Array.from(affectedPayCodes)]);
+        }
+
+        await pool.query("COMMIT");
+        return res.status(200).json({
+          message: `Successfully removed ${successCount} of ${items.length} associations`,
+          removed: results,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } else {
+        await pool.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Failed to remove any associations",
+          errors,
+        });
+      }
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      console.error("Error in batch deletion:", error);
+      res.status(500).json({
+        message: "Error processing batch deletion",
+        error: error.message,
+      });
+    }
+  });
+
   // Add a pay code association to an employee
   router.post("/", async (req, res) => {
     const { employee_id, pay_code_id, is_default = false } = req.body;
@@ -342,53 +575,82 @@ export default function (pool) {
   });
 
   // Batch update is_default for multiple employee-pay code associations
+  // Supports two modes:
+  // 1. By employee: { employee_id, pay_code_ids, is_default } - update multiple pay codes for one employee
+  // 2. By pay code: { pay_code_id, employee_ids, is_default } - update multiple employees for one pay code
   router.put("/batch-default", async (req, res) => {
-    const { employee_id, pay_code_ids, is_default } = req.body;
-
-    if (!employee_id) {
-      return res.status(400).json({ message: "Employee ID is required" });
-    }
-
-    if (!Array.isArray(pay_code_ids) || pay_code_ids.length === 0) {
-      return res.status(400).json({ message: "Pay code IDs array is required and must not be empty" });
-    }
+    const { employee_id, pay_code_ids, pay_code_id, employee_ids, is_default } = req.body;
 
     if (typeof is_default !== "boolean") {
       return res.status(400).json({ message: "is_default must be a boolean value" });
     }
 
+    // Mode 1: By employee (employee_id + pay_code_ids)
+    const isByEmployee = employee_id && Array.isArray(pay_code_ids) && pay_code_ids.length > 0;
+    // Mode 2: By pay code (pay_code_id + employee_ids)
+    const isByPayCode = pay_code_id && Array.isArray(employee_ids) && employee_ids.length > 0;
+
+    if (!isByEmployee && !isByPayCode) {
+      return res.status(400).json({
+        message: "Must provide either (employee_id + pay_code_ids) or (pay_code_id + employee_ids)",
+      });
+    }
+
     try {
       await pool.query("BEGIN");
 
-      // Update is_default for all specified pay codes
-      const updateQuery = `
-        UPDATE employee_pay_codes
-        SET is_default = $1
-        WHERE employee_id = $2 AND pay_code_id = ANY($3::text[])
-        RETURNING pay_code_id
-      `;
-      const result = await pool.query(updateQuery, [is_default, employee_id, pay_code_ids]);
+      let result;
+      let affectedEmployeeIds = [];
+      let affectedPayCodeIds = [];
 
-      // Update the staff's updated_at timestamp
-      const updateStaffQuery = `
-        UPDATE staffs
-        SET updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `;
-      await pool.query(updateStaffQuery, [employee_id]);
+      if (isByEmployee) {
+        // Mode 1: Update multiple pay codes for one employee
+        const updateQuery = `
+          UPDATE employee_pay_codes
+          SET is_default = $1
+          WHERE employee_id = $2 AND pay_code_id = ANY($3::text[])
+          RETURNING pay_code_id
+        `;
+        result = await pool.query(updateQuery, [is_default, employee_id, pay_code_ids]);
+        affectedEmployeeIds = [employee_id];
+        affectedPayCodeIds = pay_code_ids;
+      } else {
+        // Mode 2: Update multiple employees for one pay code
+        const updateQuery = `
+          UPDATE employee_pay_codes
+          SET is_default = $1
+          WHERE pay_code_id = $2 AND employee_id = ANY($3::text[])
+          RETURNING employee_id
+        `;
+        result = await pool.query(updateQuery, [is_default, pay_code_id, employee_ids]);
+        affectedEmployeeIds = employee_ids;
+        affectedPayCodeIds = [pay_code_id];
+      }
+
+      // Update the staff's updated_at timestamps
+      if (affectedEmployeeIds.length > 0) {
+        const updateStaffQuery = `
+          UPDATE staffs
+          SET updated_at = CURRENT_TIMESTAMP
+          WHERE id = ANY($1::text[])
+        `;
+        await pool.query(updateStaffQuery, [affectedEmployeeIds]);
+      }
 
       // Update pay codes' updated_at timestamps
-      const updatePayCodesQuery = `
-        UPDATE pay_codes
-        SET updated_at = CURRENT_TIMESTAMP
-        WHERE id = ANY($1::text[])
-      `;
-      await pool.query(updatePayCodesQuery, [pay_code_ids]);
+      if (affectedPayCodeIds.length > 0) {
+        const updatePayCodesQuery = `
+          UPDATE pay_codes
+          SET updated_at = CURRENT_TIMESTAMP
+          WHERE id = ANY($1::text[])
+        `;
+        await pool.query(updatePayCodesQuery, [affectedPayCodeIds]);
+      }
 
       await pool.query("COMMIT");
 
       res.json({
-        message: `Successfully updated ${result.rowCount} pay code(s)`,
+        message: `Successfully updated ${result.rowCount} association(s)`,
         updated_count: result.rowCount,
       });
     } catch (error) {

@@ -32,6 +32,7 @@ import NewPayCodeModal from "../../components/Catalogue/NewPayCodeModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import AssociateEmployeesWithJobModal from "../../components/Catalogue/AssociateEmployeesWithJobModal";
 import BatchManageJobPayCodesModal from "../../components/Catalogue/BatchManageJobPayCodesModal";
+import RefreshPayCodeCacheButton from "../../components/Catalogue/RefreshPayCodeCacheButton";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useNavigate } from "react-router-dom";
@@ -793,6 +794,12 @@ const JobPage: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                {/* Refresh Pay Code Cache Button */}
+                <RefreshPayCodeCacheButton
+                  onRefresh={refreshPayCodeMappings}
+                  size="md"
+                />
 
                 {/* Batch Manage Button */}
                 <Button

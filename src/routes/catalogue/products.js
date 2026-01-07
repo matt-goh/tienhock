@@ -1,5 +1,6 @@
 // src/routes/catalogue/products.js
 import { Router } from "express";
+import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
   const router = Router();
@@ -9,6 +10,13 @@ export default function (pool) {
     try {
       // Check for specific type filters
       const { type, all } = req.query;
+      const cacheKey = `${CACHE_KEYS.PRODUCTS}:${all !== undefined ? 'all' : type || 'default'}`;
+
+      // Check cache first
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
 
       let query;
       let whereClause = "";
@@ -58,6 +66,9 @@ export default function (pool) {
         return a.id.localeCompare(b.id);
       });
 
+      // Cache the result
+      cache.set(cacheKey, sortedProducts, CACHE_TTL.LONG);
+
       res.status(200).json(sortedProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -81,6 +92,10 @@ export default function (pool) {
       const values = [id, description, price_per_unit, type, tax];
 
       const result = await pool.query(query, values);
+
+      // Invalidate cache
+      cache.invalidatePrefix(CACHE_KEYS.PRODUCTS);
+
       res.status(201).json({
         message: "Product created successfully",
         product: result.rows[0],
@@ -110,6 +125,9 @@ export default function (pool) {
     try {
       const query = "DELETE FROM products WHERE id = ANY($1) RETURNING id";
       const result = await pool.query(query, [productIds]);
+
+      // Invalidate cache
+      cache.invalidatePrefix(CACHE_KEYS.PRODUCTS);
 
       const deletedIds = result.rows.map((row) => row.id);
       res.status(200).json({
@@ -188,6 +206,10 @@ export default function (pool) {
         }
 
         await client.query("COMMIT");
+
+        // Invalidate cache
+        cache.invalidatePrefix(CACHE_KEYS.PRODUCTS);
+
         res.json({
           message: "Products processed successfully",
           products: processedProducts,
@@ -226,6 +248,9 @@ export default function (pool) {
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Product not found" });
       }
+
+      // Invalidate cache
+      cache.invalidatePrefix(CACHE_KEYS.PRODUCTS);
 
       res.json({
         message: "Product updated successfully",
