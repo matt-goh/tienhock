@@ -1155,6 +1155,13 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
+      // Fetch year and month from monthly_payroll for digenapkan calculation
+      const monthlyPayrollResult = await client.query(
+        `SELECT year, month FROM monthly_payrolls WHERE id = $1`,
+        [monthly_payroll_id]
+      );
+      const { year: payrollYear, month: payrollMonth } = monthlyPayrollResult.rows[0] || {};
+
       // Process each employee payroll
       for (let i = 0; i < employee_payrolls.length; i++) {
         const payroll = employee_payrolls[i];
@@ -1170,6 +1177,19 @@ export default function (pool) {
         } = payroll;
 
         try {
+          // Fetch mid_month_payroll amount for digenapkan calculation
+          const midMonthResult = await client.query(
+            `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+             WHERE employee_id = $1 AND year = $2 AND month = $3`,
+            [employee_id, payrollYear, payrollMonth]
+          );
+          const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);
+
+          // Calculate digenapkan (round UP to nearest whole ringgit)
+          const jumlah = (net_pay || 0) - midMonthAmount;
+          const setelahDigenapkan = Math.ceil(jumlah);
+          const digenapkan = setelahDigenapkan - jumlah;
+
           // Check if employee payroll exists
           const checkQuery = `
             SELECT id FROM employee_payrolls 
@@ -1189,8 +1209,9 @@ export default function (pool) {
 
             const updateQuery = `
               UPDATE employee_payrolls
-              SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5
-              WHERE id = $6
+              SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5,
+                  digenapkan = $6, setelah_digenapkan = $7
+              WHERE id = $8
               RETURNING *
             `;
 
@@ -1200,6 +1221,8 @@ export default function (pool) {
               gross_pay || 0,
               net_pay || 0,
               status,
+              digenapkan.toFixed(2),
+              setelahDigenapkan.toFixed(2),
               employeePayrollId,
             ]);
 
@@ -1213,9 +1236,9 @@ export default function (pool) {
             const insertQuery = `
               INSERT INTO employee_payrolls (
                 monthly_payroll_id, employee_id, job_type, section,
-                gross_pay, net_pay, status
+                gross_pay, net_pay, status, digenapkan, setelah_digenapkan
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
               RETURNING id
             `;
 
@@ -1227,6 +1250,8 @@ export default function (pool) {
               gross_pay || 0,
               net_pay || 0,
               status,
+              digenapkan.toFixed(2),
+              setelahDigenapkan.toFixed(2),
             ]);
 
             employeePayrollId = insertResult.rows[0].id;
@@ -1353,9 +1378,29 @@ export default function (pool) {
     try {
       await pool.query("BEGIN");
 
+      // Fetch year and month from monthly_payroll for digenapkan calculation
+      const monthlyPayrollResult = await pool.query(
+        `SELECT year, month FROM monthly_payrolls WHERE id = $1`,
+        [monthly_payroll_id]
+      );
+      const { year: payrollYear, month: payrollMonth } = monthlyPayrollResult.rows[0] || {};
+
+      // Fetch mid_month_payroll amount for digenapkan calculation
+      const midMonthResult = await pool.query(
+        `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+         WHERE employee_id = $1 AND year = $2 AND month = $3`,
+        [employee_id, payrollYear, payrollMonth]
+      );
+      const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);
+
+      // Calculate digenapkan (round UP to nearest whole ringgit)
+      const jumlah = (net_pay || 0) - midMonthAmount;
+      const setelahDigenapkan = Math.ceil(jumlah);
+      const digenapkan = setelahDigenapkan - jumlah;
+
       // Check if employee payroll exists
       const checkQuery = `
-        SELECT id FROM employee_payrolls 
+        SELECT id FROM employee_payrolls
         WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
       `;
       const checkResult = await pool.query(checkQuery, [
@@ -1372,8 +1417,9 @@ export default function (pool) {
 
         const updateQuery = `
           UPDATE employee_payrolls
-          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5
-          WHERE id = $6
+          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4, status = $5,
+              digenapkan = $6, setelah_digenapkan = $7
+          WHERE id = $8
           RETURNING *
         `;
 
@@ -1383,6 +1429,8 @@ export default function (pool) {
           gross_pay || 0,
           net_pay || 0,
           status,
+          digenapkan.toFixed(2),
+          setelahDigenapkan.toFixed(2),
           employeePayrollId,
         ]);
 
@@ -1396,9 +1444,9 @@ export default function (pool) {
         const insertQuery = `
           INSERT INTO employee_payrolls (
             monthly_payroll_id, employee_id, job_type, section,
-            gross_pay, net_pay, status
+            gross_pay, net_pay, status, digenapkan, setelah_digenapkan
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id
         `;
 
@@ -1410,6 +1458,8 @@ export default function (pool) {
           gross_pay || 0,
           net_pay || 0,
           status,
+          digenapkan.toFixed(2),
+          setelahDigenapkan.toFixed(2),
         ]);
 
         employeePayrollId = insertResult.rows[0].id;
