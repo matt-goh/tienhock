@@ -15,7 +15,11 @@ interface ActivitiesTooltipProps {
   onNavigateAttempt?: (to: string) => void;
   logDate?: string; // Log date for displaying correct OT threshold (5 for Saturday, 8 for others)
   showBelow?: boolean; // Show tooltip below button instead of above (for top rows)
+  isDoubled?: boolean; // Whether x2 doubling is active for SALESMAN_IKUT
 }
+
+// Paycodes that are doubled when x2 is active for SALESMAN_IKUT
+const DOUBLED_PAYCODES = ["BILL", "ELAUN_MT", "ELAUN_MO", "IKUT", "4-COMM_MUAT_MEE", "5-COMM_MUAT_BH"];
 
 const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   activities,
@@ -27,6 +31,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   onNavigateAttempt = () => {},
   logDate,
   showBelow = false,
+  isDoubled = false,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -84,6 +89,17 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
     (sum, activity) => sum + activity.calculatedAmount,
     0
   );
+
+  // Sort activities: doubled paycodes first when x2 is active
+  const sortedActivities = isDoubled
+    ? [...activities].sort((a, b) => {
+        const aIsDoubled = DOUBLED_PAYCODES.includes(a.payCodeId);
+        const bIsDoubled = DOUBLED_PAYCODES.includes(b.payCodeId);
+        if (aIsDoubled && !bIsDoubled) return -1;
+        if (!aIsDoubled && bIsDoubled) return 1;
+        return 0;
+      })
+    : activities;
 
   return (
     <>
@@ -144,27 +160,32 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
 
             {/* --- Scrollable Content --- */}
             <div className="flex-grow overflow-y-auto py-3 space-y-3 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-              {activities.map((activity, index) => (
+              {sortedActivities.map((activity, index) => (
                 <div
                   key={index}
                   className="flex justify-between items-start text-sm"
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <div
-                      className="font-medium text-default-800 dark:text-gray-100 truncate"
+                      className="font-medium text-default-800 dark:text-gray-100 flex items-center"
                       title={`${activity.description} (${activity.payCodeId})`}
                     >
                       <SafeLink
                         to={`/catalogue/pay-codes?desc=${activity.payCodeId}`}
                         hasUnsavedChanges={hasUnsavedChanges}
                         onNavigateAttempt={onNavigateAttempt}
-                        className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
+                        className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline truncate w-full"
                         onClick={(e) => {
                           e.stopPropagation();
                         }}
                       >
                         {activity.description}
                       </SafeLink>
+                      {isDoubled && DOUBLED_PAYCODES.includes(activity.payCodeId) && (
+                        <span className="ml-1 flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                          x2
+                        </span>
+                      )}
                       {activity.payType === "Overtime" && (
                         <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
                           (OT)

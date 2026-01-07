@@ -54,7 +54,30 @@ interface ManageActivitiesModalProps {
   hasUnsavedChanges?: boolean;
   onNavigateAttempt?: (to: string) => void;
   logDate?: string; // Log date for calculating Saturday OT threshold
+  isDoubled?: boolean; // Whether x2 doubling is active for SALESMAN_IKUT
 }
+
+// Paycodes that are doubled when x2 is active for SALESMAN_IKUT (for visual indicator)
+const DOUBLED_PAYCODES = ["BILL", "ELAUN_MT", "ELAUN_MO", "IKUT", "4-COMM_MUAT_MEE", "5-COMM_MUAT_BH"];
+// Fixed paycodes that have their amounts doubled (not units)
+const FIXED_DOUBLED_PAYCODES = ["ELAUN_MT", "ELAUN_MO", "IKUT"];
+
+// Helper function to apply x2 doubling to activities for SALESMAN_IKUT
+const applyDoubling = (activities: ActivityItem[], isDoubled: boolean): ActivityItem[] => {
+  if (!isDoubled) return activities;
+
+  return activities.map(activity => {
+    // For fixed paycodes (ELAUN_MT, ELAUN_MO, IKUT), double the calculated amount
+    if (FIXED_DOUBLED_PAYCODES.includes(activity.payCodeId) && activity.isSelected) {
+      return {
+        ...activity,
+        calculatedAmount: activity.rate * 2,
+      };
+    }
+    // For BILL, the units are already doubled in the parent, so amount is correct
+    return activity;
+  });
+};
 
 const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   isOpen,
@@ -73,6 +96,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   hasUnsavedChanges = false,
   onNavigateAttempt = () => {},
   logDate,
+  isDoubled = false,
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -168,9 +192,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             logDate
           );
 
-          setActivities(calculatedActivities);
+          // Apply x2 doubling for SALESMAN_IKUT fixed paycodes
+          const finalActivities = isSalesmanIkut
+            ? applyDoubling(calculatedActivities, isDoubled)
+            : calculatedActivities;
+
+          setActivities(finalActivities);
           setOriginalActivities(
-            JSON.parse(JSON.stringify(calculatedActivities))
+            JSON.parse(JSON.stringify(finalActivities))
           );
         } else {
           setActivities([]);
@@ -187,6 +216,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     contextData,
     employeeHours,
     isSalesman,
+    isSalesmanIkut,
+    isDoubled,
     locationType,
     jobConfig,
     salesmanProducts,
@@ -219,7 +250,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         logDate
       )
     }));
-    setActivities(recalculatedActivities);
+
+    // Apply x2 doubling for SALESMAN_IKUT fixed paycodes
+    const finalActivities = isSalesmanIkut
+      ? applyDoubling(recalculatedActivities, isDoubled)
+      : recalculatedActivities;
+    setActivities(finalActivities);
   };
 
   // Toggle selection of an activity
@@ -238,7 +274,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         logDate
       )
     }));
-    setActivities(updatedActivities);
+
+    // Apply x2 doubling for SALESMAN_IKUT fixed paycodes
+    const finalActivities = isSalesmanIkut
+      ? applyDoubling(updatedActivities, isDoubled)
+      : updatedActivities;
+    setActivities(finalActivities);
   };
 
   // Update units produced
@@ -257,7 +298,12 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         logDate
       )
     }));
-    setActivities(updatedActivities);
+
+    // Apply x2 doubling for SALESMAN_IKUT fixed paycodes
+    const finalActivities = isSalesmanIkut
+      ? applyDoubling(updatedActivities, isDoubled)
+      : updatedActivities;
+    setActivities(finalActivities);
   };
 
   // Calculate total amount
@@ -515,6 +561,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                   <span className="ml-1.5 text-xs text-default-500 dark:text-gray-400 rounded-full bg-default-100 dark:bg-gray-700 px-2 py-0.5 flex-shrink-0">
                                                     {activity.payCodeId}
                                                   </span>
+                                                  {isDoubled && DOUBLED_PAYCODES.includes(activity.payCodeId) && (
+                                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                                                      x2
+                                                    </span>
+                                                  )}
                                                   {activity.payType ===
                                                     "Overtime" && (
                                                     <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
