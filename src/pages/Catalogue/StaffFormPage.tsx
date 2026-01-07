@@ -26,6 +26,7 @@ import { IconLink, IconChevronDown, IconChevronRight, IconLayoutList, IconLayout
 import EditEmployeePayCodeRatesModal from "../../components/Catalogue/EditEmployeePayCodeRatesModal";
 import EditPayCodeRatesModal from "../../components/Catalogue/EditPayCodeRatesModal";
 import BatchManageJobPayCodesModal from "../../components/Catalogue/BatchManageJobPayCodesModal";
+import RefreshPayCodeCacheButton from "../../components/Catalogue/RefreshPayCodeCacheButton";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { JobPayCodeDetails, PayType, Job } from "../../types/types";
 
@@ -1445,6 +1446,10 @@ const StaffFormPage: React.FC = () => {
                           )}
                         </button>
                       )}
+                      <RefreshPayCodeCacheButton
+                        onRefresh={refreshPayCodeMappings}
+                        size="sm"
+                      />
                       {isEditMode && (
                         <Button
                           type="button"
