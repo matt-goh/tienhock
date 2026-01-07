@@ -1,5 +1,5 @@
 // src/components/Catalogue/AssociatePayCodesWithJobsModal.tsx
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, useMemo, Fragment } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -7,11 +7,17 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
+import {
+  IconX,
+  IconPlus,
+  IconTrash,
+  IconSearch,
+  IconBriefcase,
+  IconCheck,
+} from "@tabler/icons-react";
 import Button from "../Button";
-import Checkbox from "../Checkbox";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
-import LoadingSpinner from "../LoadingSpinner";
 import { PayCode, Job } from "../../types/types";
 
 interface AssociatePayCodesWithJobsModalProps {
@@ -33,61 +39,97 @@ const AssociatePayCodesWithJobsModal: React.FC<
   currentJobIds,
   onAssociationComplete,
 }) => {
-  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string>("");
 
-  // Initialize selections when modal opens
+  // Job selection state
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
+  const [originalJobs, setOriginalJobs] = useState<Set<string>>(new Set());
+
+  // Search state
+  const [assignedSearch, setAssignedSearch] = useState("");
+  const [availableSearch, setAvailableSearch] = useState("");
+
+  // Reset form when modal opens
   useEffect(() => {
     if (isOpen && currentJobIds) {
-      setSelectedJobIds(new Set(currentJobIds));
+      const currentIds = new Set(currentJobIds);
+      setSelectedJobs(currentIds);
+      setOriginalJobs(new Set(currentIds));
+      setError("");
+      setAssignedSearch("");
+      setAvailableSearch("");
     }
   }, [isOpen, currentJobIds]);
 
-  // Filter jobs based on search query
-  const filteredJobs = (searchQuery
-    ? availableJobs.filter(
+  // Assigned jobs (sorted alphabetically)
+  const assignedJobs = useMemo(() => {
+    const assigned = availableJobs.filter((job) => selectedJobs.has(job.id));
+    if (!assignedSearch) return assigned.sort((a, b) => a.name.localeCompare(b.name));
+    const search = assignedSearch.toLowerCase();
+    return assigned
+      .filter(
         (job) =>
-          job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          job.id.toLowerCase().includes(searchQuery.toLowerCase())
+          job.id.toLowerCase().includes(search) ||
+          job.name.toLowerCase().includes(search)
       )
-    : availableJobs)
-    .sort((a, b) => {
-      // Sort associated jobs (current) at the top
-      const aAssociated = currentJobIds.includes(a.id);
-      const bAssociated = currentJobIds.includes(b.id);
-      
-      if (aAssociated && !bAssociated) return -1;
-      if (!aAssociated && bAssociated) return 1;
-      
-      // Within each group, sort alphabetically by name
-      return a.name.localeCompare(b.name);
-    });
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [availableJobs, selectedJobs, assignedSearch]);
 
-  const handleToggleJob = (jobId: string) => {
-    setSelectedJobIds((prev) => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(jobId)) {
-        newSelection.delete(jobId);
-      } else {
-        newSelection.add(jobId);
-      }
-      return newSelection;
+  // Available jobs (not assigned, sorted alphabetically)
+  const unassignedJobs = useMemo(() => {
+    const available = availableJobs.filter((job) => !selectedJobs.has(job.id));
+    if (!availableSearch) return available.sort((a, b) => a.name.localeCompare(b.name));
+    const search = availableSearch.toLowerCase();
+    return available
+      .filter(
+        (job) =>
+          job.id.toLowerCase().includes(search) ||
+          job.name.toLowerCase().includes(search)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [availableJobs, selectedJobs, availableSearch]);
+
+  // Check for changes
+  const hasChanges = useMemo(() => {
+    if (selectedJobs.size !== originalJobs.size) return true;
+    for (const id of selectedJobs) {
+      if (!originalJobs.has(id)) return true;
+    }
+    return false;
+  }, [selectedJobs, originalJobs]);
+
+  // Changes summary
+  const changesSummary = useMemo(() => {
+    const toAdd = Array.from(selectedJobs).filter((id) => !originalJobs.has(id)).length;
+    const toRemove = Array.from(originalJobs).filter((id) => !selectedJobs.has(id)).length;
+    return { toAdd, toRemove };
+  }, [selectedJobs, originalJobs]);
+
+  const handleAddJob = (jobId: string) => {
+    setSelectedJobs((prev) => new Set([...prev, jobId]));
+  };
+
+  const handleRemoveJob = (jobId: string) => {
+    setSelectedJobs((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(jobId);
+      return newSet;
     });
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async () => {
     if (!payCode) return;
-
-    setIsProcessing(true);
+    setError("");
+    setIsSaving(true);
 
     try {
       // Find which jobs to add and which to remove
-      const jobsToAdd = Array.from(selectedJobIds).filter(
-        (id) => !currentJobIds.includes(id)
+      const jobsToAdd = Array.from(selectedJobs).filter(
+        (id) => !originalJobs.has(id)
       );
-      const jobsToRemove = currentJobIds.filter(
-        (id) => !selectedJobIds.has(id)
+      const jobsToRemove = Array.from(originalJobs).filter(
+        (id) => !selectedJobs.has(id)
       );
 
       // Use batch endpoints instead of individual calls
@@ -114,31 +156,61 @@ const AssociatePayCodesWithJobsModal: React.FC<
         promises.push(api.post("/api/job-pay-codes/batch-delete", { items }));
       }
 
-      // Wait for all batch operations to complete
-      const results = await Promise.all(promises);
+      // Wait for all operations using allSettled to handle partial failures gracefully
+      const results = await Promise.allSettled(promises);
 
-      // Check results for any errors
-      const errors = results.filter(
-        (result) => result.errors && result.errors.length > 0
-      );
-      if (errors.length > 0) {
-        console.warn("Some associations had errors:", errors);
+      // Analyze results
+      const failed = results.filter((r) => r.status === "rejected");
+      const succeeded = results.filter((r) => r.status === "fulfilled");
+
+      // Check if all failures are just "not found" errors (stale cache issue)
+      const realFailures = failed.filter((r) => {
+        const errorData = (r as PromiseRejectedResult).reason?.data;
+        // If all errors in the response are "not found", it's not a real failure
+        if (errorData?.errors?.every((e: { message: string }) => e.message === "Association not found")) {
+          console.warn("Some associations were already removed (stale cache):", errorData.errors);
+          return false;
+        }
+        return true;
+      });
+
+      // Check fulfilled results for partial errors
+      const partialErrors = succeeded
+        .map((r) => (r as PromiseFulfilledResult<any>).value)
+        .filter((result) => result.errors && result.errors.length > 0);
+      if (partialErrors.length > 0) {
+        console.warn("Some associations had partial errors:", partialErrors);
+      }
+
+      // If there are real failures, throw an error
+      if (realFailures.length > 0) {
+        const firstError = (realFailures[0] as PromiseRejectedResult).reason;
+        throw firstError;
       }
 
       await onAssociationComplete();
       toast.success(
-        `Pay code "${payCode.description}" updated for ${
-          jobsToAdd.length + jobsToRemove.length
-        } job(s)`
+        `Pay code "${payCode.description}" updated - Added: ${jobsToAdd.length}, Removed: ${jobsToRemove.length} job(s)`
       );
 
-      onClose();
-    } catch (error) {
-      console.error("Error updating job associations:", error);
+      handleClose();
+    } catch (err: any) {
+      console.error("Error updating job associations:", err);
+      setError(err.message || "Failed to update job associations");
       toast.error("Failed to update job associations");
     } finally {
-      setIsProcessing(false);
+      setIsSaving(false);
     }
+  };
+
+  const handleClose = () => {
+    if (isSaving) return;
+    setSelectedJobs(new Set());
+    setOriginalJobs(new Set());
+    setAssignedSearch("");
+    setAvailableSearch("");
+    setError("");
+    onClose();
   };
 
   return (
@@ -146,7 +218,7 @@ const AssociatePayCodesWithJobsModal: React.FC<
       <Dialog
         as="div"
         className="relative z-50"
-        onClose={() => !isProcessing && onClose()}
+        onClose={() => !isSaving && handleClose()}
       >
         <TransitionChild
           as={Fragment}
@@ -157,7 +229,10 @@ const AssociatePayCodesWithJobsModal: React.FC<
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/70" aria-hidden="true" />
+          <div
+            className="fixed inset-0 bg-black/50 dark:bg-black/70"
+            aria-hidden="true"
+          />
         </TransitionChild>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -171,101 +246,216 @@ const AssociatePayCodesWithJobsModal: React.FC<
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
-                <DialogTitle
-                  as="h3"
-                  className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
-                >
-                  Associate Pay Code with Jobs
-                </DialogTitle>
+              <DialogPanel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <DialogTitle
+                    as="h3"
+                    className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
+                  >
+                    Manage Jobs for "{payCode?.description || ""}"
+                  </DialogTitle>
+                  <button
+                    onClick={handleClose}
+                    className="text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
+                    disabled={isSaving}
+                  >
+                    <IconX size={20} />
+                  </button>
+                </div>
 
                 {payCode ? (
                   <>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Select jobs to associate with pay code:{" "}
-                        <span className="font-medium text-default-800 dark:text-gray-200">
-                          {payCode.description}
-                        </span>
-                      </p>
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="mb-4">
-                        <input
-                          type="text"
-                          placeholder="Search jobs..."
-                          className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="max-h-96 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
-                        {isProcessing ? (
-                          <div className="flex justify-center items-center py-10">
-                            <LoadingSpinner size="sm" hideText />
+                    {/* Two Column Layout */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Left Panel - Assigned Jobs */}
+                      <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                        <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                          <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
+                            <IconBriefcase size={16} />
+                            Assigned Jobs ({selectedJobs.size})
                           </div>
-                        ) : filteredJobs.length === 0 ? (
-                          <div className="py-4 px-3 text-center text-sm text-default-500 dark:text-gray-400">
-                            No jobs found
+                          <div className="relative mt-2">
+                            <IconSearch
+                              size={16}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Search assigned..."
+                              className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                              value={assignedSearch}
+                              onChange={(e) => setAssignedSearch(e.target.value)}
+                              disabled={isSaving}
+                            />
                           </div>
-                        ) : (
-                          <ul className="divide-y divide-default-200 dark:divide-gray-700">
-                            {filteredJobs.map((job) => (
-                              <li
-                                key={job.id}
-                                className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
-                                onClick={() => handleToggleJob(job.id)}
-                              >
-                                <Checkbox
-                                  checked={selectedJobIds.has(job.id)}
-                                  onChange={() => handleToggleJob(job.id)}
-                                  label={
-                                    <div>
-                                      <div
-                                        className="font-medium text-default-800 dark:text-gray-100"
-                                        onClick={() => handleToggleJob(job.id)}
-                                      >
+                        </div>
+
+                        <div className="max-h-[400px] overflow-y-auto">
+                          {assignedJobs.length === 0 ? (
+                            <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                              <IconBriefcase
+                                size={32}
+                                className="mx-auto mb-2 text-default-300 dark:text-gray-500"
+                              />
+                              {assignedSearch ? "No jobs found" : "No jobs assigned yet"}
+                            </div>
+                          ) : (
+                            <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                              {assignedJobs.map((job) => {
+                                const isNew = !originalJobs.has(job.id);
+                                return (
+                                  <li
+                                    key={job.id}
+                                    className={`px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between ${
+                                      isNew ? "bg-sky-50/50 dark:bg-sky-900/20" : ""
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-2">
                                         {job.name}
+                                        {isNew && (
+                                          <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
+                                            New
+                                          </span>
+                                        )}
                                       </div>
-                                      <div
-                                        className="text-xs text-default-500 dark:text-gray-400"
-                                        onClick={() => handleToggleJob(job.id)}
-                                      >
+                                      <div className="text-xs text-default-500 dark:text-gray-400">
                                         {job.id}
                                       </div>
                                     </div>
-                                  }
-                                  size={20}
-                                  checkedColor="text-sky-600 dark:text-sky-400"
-                                  uncheckedColor="text-default-400 dark:text-gray-500"
-                                />
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveJob(job.id)}
+                                      disabled={isSaving}
+                                      className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
+                                      title="Remove job"
+                                    >
+                                      <IconTrash size={16} />
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right Panel - Available Jobs */}
+                      <div className="border border-default-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                        <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium text-default-700 dark:text-gray-200">
+                              Add Job
+                            </div>
+                            <span className="text-xs text-default-500 dark:text-gray-400">
+                              {unassignedJobs.length} available
+                            </span>
+                          </div>
+                          <div className="relative mt-2">
+                            <IconSearch
+                              size={16}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Search available..."
+                              className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-600 dark:text-gray-100 dark:placeholder-gray-400"
+                              value={availableSearch}
+                              onChange={(e) => setAvailableSearch(e.target.value)}
+                              disabled={isSaving}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="max-h-[400px] overflow-y-auto">
+                          {unassignedJobs.length === 0 ? (
+                            <div className="py-10 text-center text-sm text-default-500 dark:text-gray-400">
+                              <IconCheck
+                                size={32}
+                                className="mx-auto mb-2 text-emerald-400"
+                              />
+                              {availableSearch ? "No jobs found" : "All jobs assigned"}
+                            </div>
+                          ) : (
+                            <ul className="divide-y divide-default-100 dark:divide-gray-600">
+                              {unassignedJobs.map((job) => (
+                                <li
+                                  key={job.id}
+                                  className="px-3 py-2 hover:bg-default-50 dark:hover:bg-gray-700 flex items-center justify-between"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm text-default-800 dark:text-gray-100">
+                                      {job.name}
+                                    </div>
+                                    <div className="text-xs text-default-500 dark:text-gray-400">
+                                      {job.id}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddJob(job.id)}
+                                    disabled={isSaving}
+                                    className="p-1.5 text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded disabled:opacity-50"
+                                    title="Add job"
+                                  >
+                                    <IconPlus size={18} />
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="mt-6 flex justify-end space-x-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={onClose}
-                        disabled={isProcessing}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        color="sky"
-                        variant="filled"
-                        onClick={handleSave}
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? "Saving..." : "Save"}
-                      </Button>
+                    {/* Error Message */}
+                    {error && (
+                      <div className="mt-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800">
+                        <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="mt-6 flex justify-between items-center">
+                      <div className="text-sm text-default-500 dark:text-gray-400">
+                        {hasChanges ? (
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                              Assigned: {selectedJobs.size}
+                            </span>
+                            <span className="text-amber-600 dark:text-amber-400">
+                              ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
+                              {changesSummary.toAdd > 0 && changesSummary.toRemove > 0 && ", "}
+                              {changesSummary.toRemove > 0 && `-${changesSummary.toRemove}`})
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <IconCheck size={14} /> No changes
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleClose}
+                          disabled={isSaving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          color="sky"
+                          variant="filled"
+                          onClick={handleSubmit}
+                          disabled={isSaving || !hasChanges}
+                        >
+                          {isSaving ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
                     </div>
                   </>
                 ) : (

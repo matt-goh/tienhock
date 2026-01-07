@@ -187,11 +187,15 @@ const PayCodePage: React.FC = () => {
       .map(([jobId]) => jobId);
   };
 
-  const getAssociatedEmployeeIds = (payCodeId: string): string[] => {
-    const associatedEmployees: string[] = [];
+  const getAssociatedEmployeeDetails = (payCodeId: string): { id: string; is_default: boolean }[] => {
+    const associatedEmployees: { id: string; is_default: boolean }[] = [];
     Object.entries(employeeMappings).forEach(([employeeId, payCodeDetails]) => {
-      if (payCodeDetails.some((detail) => detail.id === payCodeId)) {
-        associatedEmployees.push(employeeId);
+      const matchingPayCode = payCodeDetails.find((detail) => detail.id === payCodeId);
+      if (matchingPayCode) {
+        associatedEmployees.push({
+          id: employeeId,
+          is_default: matchingPayCode.is_default_setting || false,
+        });
       }
     });
     return associatedEmployees;
@@ -778,9 +782,9 @@ const PayCodePage: React.FC = () => {
         onClose={() => setShowAssociateEmployeesModal(false)}
         payCode={payCodeToAssociateWithEmployees}
         availableEmployees={allEmployees}
-        currentEmployeeIds={
+        currentEmployeeDetails={
           payCodeToAssociateWithEmployees
-            ? getAssociatedEmployeeIds(payCodeToAssociateWithEmployees.id)
+            ? getAssociatedEmployeeDetails(payCodeToAssociateWithEmployees.id)
             : []
         }
         onAssociationComplete={refreshPayCodeMappings}
