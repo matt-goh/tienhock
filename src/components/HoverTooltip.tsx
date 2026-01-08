@@ -69,7 +69,7 @@ const HoverTooltip: React.FC<HoverTooltipProps> = ({
         content &&
         createPortal(
           <div
-            className="fixed z-[9999] px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg whitespace-pre-line"
+            className="fixed z-[9999] px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg whitespace-pre"
             style={{
               top: `${coords.top}px`,
               left: `${coords.left}px`,
