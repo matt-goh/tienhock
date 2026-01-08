@@ -10,7 +10,7 @@ const SalesSummaryPage: React.FC = () => {
   return (
     <div className="space-y-3">
       <Tab
-        labels={["Salesman", "Products"]}
+        labels={["Products", "Salesman"]}
         defaultActiveTab={0}
         onTabChange={setActiveTab}
         headerLeftContent={
@@ -20,8 +20,8 @@ const SalesSummaryPage: React.FC = () => {
         }
         headerRightContent={<SalesSummarySelectionTooltip activeTab={activeTab} />}
       >
-        <SalesBySalesmanPage />
         <SalesByProductsPage />
+        <SalesBySalesmanPage />
       </Tab>
     </div>
   );

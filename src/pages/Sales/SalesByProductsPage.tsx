@@ -5,7 +5,6 @@ import { FormCombobox } from "../../components/FormComponents";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
-import StyledListbox from "../../components/StyledListbox";
 import MonthNavigator from "../../components/MonthNavigator";
 import DateNavigator from "../../components/DateNavigator";
 import toast from "react-hot-toast";
@@ -23,7 +22,6 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
-import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import Button from "../../components/Button";
 
 interface ProductSalesData {
@@ -34,6 +32,13 @@ interface ProductSalesData {
   totalSales: number;
   foc: number;
   returns: number;
+}
+
+interface SalesmanProductSales {
+  salesmanId: string;
+  totalSales: number;
+  totalQuantity: number;
+  products: ProductSalesData[];
 }
 
 interface CategorySummary {
@@ -80,25 +85,22 @@ const SalesByProductsPage: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [salesData, setSalesData] = useState<ProductSalesData[]>([]);
-  const [selectedSalesman, setSelectedSalesman] =
-    useState<string>("All Salesmen");
-  const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
+  const [salesmanProductsData, setSalesmanProductsData] = useState<SalesmanProductSales[]>([]);
+  const [isLoadingSalesmanData, setIsLoadingSalesmanData] = useState(false);
   const [yearlyTrendData, setYearlyTrendData] = useState<MonthlyTypeData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ProductSalesData;
     direction: "asc" | "desc";
   }>({
-    key: "totalSales",
-    direction: "desc",
+    key: "type",
+    direction: "asc",
   });
   const {
     products,
     isLoading: isProductsLoading,
     error: productsError,
   } = useProductsCache("all");
-  const { salesmen: salesmenData, isLoading: salesmenLoading } =
-    useSalesmanCache();
   const [selectedChartProducts, setSelectedChartProducts] = useState<string[]>(
     []
   );
@@ -204,12 +206,6 @@ const SalesByProductsPage: React.FC = () => {
     }
   }, [selectedChartProducts]);
 
-  useEffect(() => {
-    if (salesmenData.length > 0) {
-      const salesmenIds = salesmenData.map((employee) => employee.id);
-      setSalesmen(["All Salesmen", ...salesmenIds]);
-    }
-  }, [salesmenData]);
 
   // Initialize selected products when product options are available
   useEffect(() => {
@@ -294,35 +290,6 @@ const SalesByProductsPage: React.FC = () => {
       .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   };
 
-  // Get top products for summary cards
-  const topProductSummary = useMemo(() => {
-    // Define product type order for sorting
-    const typeOrder: Record<string, number> = {
-      MEE: 1,
-      BH: 2,
-      JP: 3,
-      OTH: 4,
-      OTHER: 5,
-    };
-
-    // Sort by product type first, then by sales amount within each type
-    const sortedProducts = [...salesData].sort((a, b) => {
-      const typeOrderA = typeOrder[a.type] || 999;
-      const typeOrderB = typeOrder[b.type] || 999;
-
-      // First sort by type order
-      if (typeOrderA !== typeOrderB) {
-        return typeOrderA - typeOrderB;
-      }
-
-      // Then sort by sales amount (descending) within the same type
-      return b.totalSales - a.totalSales;
-    });
-
-    // Return all products (remove the slice limit)
-    return sortedProducts;
-  }, [salesData]);
-
   // Fetch yearly trend data for the product mix chart
   const fetchYearlyTrendData = async () => {
     setIsGeneratingChart(true);
@@ -373,13 +340,8 @@ const SalesByProductsPage: React.FC = () => {
         const startTimestamp = dateRange.start.getTime().toString();
         const endTimestamp = dateRange.end.getTime().toString();
 
-        // Use the new dedicated endpoint
-        let url = `/api/invoices/sales/products?startDate=${startTimestamp}&endDate=${endTimestamp}`;
-
-        // Add salesman filter if not "All Salesmen"
-        if (selectedSalesman !== "All Salesmen") {
-          url += `&salesman=${selectedSalesman}`;
-        }
+        // Use the dedicated endpoint
+        const url = `/api/invoices/sales/products?startDate=${startTimestamp}&endDate=${endTimestamp}`;
 
         const data = await api.get(url);
 
@@ -398,7 +360,35 @@ const SalesByProductsPage: React.FC = () => {
     };
 
     fetchSalesData();
-  }, [dateRange, selectedSalesman]);
+  }, [dateRange]);
+
+  // Fetch products-by-salesman data for individual salesman tables
+  useEffect(() => {
+    const fetchSalesmanProductsData = async () => {
+      setIsLoadingSalesmanData(true);
+
+      try {
+        const startTimestamp = dateRange.start.getTime().toString();
+        const endTimestamp = dateRange.end.getTime().toString();
+
+        const url = `/api/invoices/sales/products-by-salesman?startDate=${startTimestamp}&endDate=${endTimestamp}`;
+
+        const data = await api.get(url);
+
+        if (Array.isArray(data)) {
+          setSalesmanProductsData(data);
+        } else {
+          throw new Error("Invalid response format");
+        }
+      } catch (error) {
+        console.error("Error fetching salesman products data:", error);
+      } finally {
+        setIsLoadingSalesmanData(false);
+      }
+    };
+
+    fetchSalesmanProductsData();
+  }, [dateRange]);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -568,6 +558,7 @@ const SalesByProductsPage: React.FC = () => {
         name: product.id, // Show product code in labels
         description: product.description || product.id, // Keep description for tooltips
         value: product.totalSales,
+        quantity: product.quantity, // Add quantity for inline display
         color: shades[index],
         id: product.id, // Add id to ensure consistency
       }));
@@ -580,6 +571,9 @@ const SalesByProductsPage: React.FC = () => {
           value: products
             .slice(limit)
             .reduce((sum, p) => sum + p.totalSales, 0),
+          quantity: products
+            .slice(limit)
+            .reduce((sum, p) => sum + p.quantity, 0),
           color: "#a0aec0",
           id: "others",
         });
@@ -680,50 +674,45 @@ const SalesByProductsPage: React.FC = () => {
               onChange={handleDateChange}
               showGoToTodayButton={false}
             />
-
-            {/* Salesman Selection */}
-            <div className="w-40">
-              <StyledListbox
-                value={selectedSalesman}
-                onChange={(value) => setSelectedSalesman(String(value))}
-                options={salesmen.map((salesman) => ({
-                  id: salesman,
-                  name: salesman,
-                }))}
-              />
-            </div>
-          </div>
-          <div className="text-lg text-right font-bold text-default-700 dark:text-gray-200">
-            Total Sales: {formatCurrency(summary.totalSales)}
           </div>
         </div>
-        {/* Product cards */}
-        <div className="max-h-96 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-2">
-            {topProductSummary.map((product) => (
-              <div
-                key={product.id}
-                className="bg-default-100 dark:bg-gray-800/75 rounded-lg p-3 border-l-4 overflow-hidden flex-shrink-0"
-                style={{
-                  borderColor: categoryColors[product.type] || "#a0aec0",
-                }}
-              >
-                <div
-                  className="text-base text-default-500 dark:text-gray-400 font-medium truncate"
-                  title={`${
-                    product.description
-                  } • ${product.quantity.toLocaleString()} units`}
-                >
-                  {product.description || product.id}
-                  {" • "}
-                  {product.quantity.toLocaleString()} units
-                </div>
-                <div className="text-lg font-bold mt-1">
-                  {formatCurrency(product.totalSales)}
-                </div>
-                <div className="text-sm text-default-500 dark:text-gray-400 font-medium mt-1"></div>
-              </div>
-            ))}
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-4 gap-3">
+          {/* Total Sales */}
+          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-sky-500 p-3">
+            <div className="text-sm text-default-500 dark:text-gray-400">Total</div>
+            <div className="text-xl font-bold">
+              {formatCurrency(summary.totalSales)}
+              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
+              <span className="text-sky-600 dark:text-sky-400">{salesData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
+            </div>
+          </div>
+          {/* BH Products */}
+          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-blue-500 p-3">
+            <div className="text-sm text-default-500 dark:text-gray-400">BH Products</div>
+            <div className="text-xl font-bold">
+              {formatCurrency(summary.bhTotal)}
+              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
+              <span className="text-blue-600 dark:text-blue-400">{salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
+            </div>
+          </div>
+          {/* MEE Products */}
+          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-green-500 p-3">
+            <div className="text-sm text-default-500 dark:text-gray-400">MEE Products</div>
+            <div className="text-xl font-bold">
+              {formatCurrency(summary.meeTotal)}
+              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
+              <span className="text-green-600 dark:text-green-400">{salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
+            </div>
+          </div>
+          {/* OTH Products */}
+          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-purple-500 p-3">
+            <div className="text-sm text-default-500 dark:text-gray-400">Other Products</div>
+            <div className="text-xl font-bold">
+              {formatCurrency(summary.othTotal)}
+              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
+              <span className="text-purple-600 dark:text-purple-400">{salesData.filter(p => p.type === "OTH" || p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
+            </div>
           </div>
         </div>
       </div>
@@ -737,20 +726,108 @@ const SalesByProductsPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Detailed product sales table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-            <h2 className="text-lg font-semibold mb-4">
-              Product Sales Details
-            </h2>
+          {/* Individual Salesman Tables */}
+          {isLoadingSalesmanData ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : salesmanProductsData.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {salesmanProductsData.map((salesman) => (
+                <div
+                  key={salesman.salesmanId}
+                  className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden"
+                >
+                  {/* Salesman Header */}
+                  <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
+                    <h3 className="text-base font-semibold">{salesman.salesmanId}</h3>
+                    <div className="flex items-center gap-2 text-sm font-bold">
+                      <span>{formatCurrency(salesman.totalSales)}</span>
+                      <span className="text-default-400 dark:text-gray-500">·</span>
+                      <span className="text-sky-600 dark:text-sky-400">
+                        {salesman.totalQuantity.toLocaleString()} units
+                      </span>
+                    </div>
+                  </div>
+                  {/* Products Table */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-default-200 dark:divide-gray-600">
+                      <thead className="bg-default-50 dark:bg-gray-700/30">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
+                            Product ID
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
+                            Description
+                          </th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
+                            Type
+                          </th>
+                          <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
+                            Qty
+                          </th>
+                          <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
+                            Sales
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-default-100 dark:divide-gray-600">
+                        {[...salesman.products].sort((a, b) => a.type.localeCompare(b.type)).map((product) => (
+                          <tr key={product.id} className="hover:bg-default-100 dark:hover:bg-gray-600/50">
+                            <td className="px-4 py-2 text-sm font-medium">{product.id}</td>
+                            <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-300 truncate max-w-[200px]" title={product.description}>
+                              {product.description}
+                            </td>
+                            <td className="px-4 py-2 text-sm">
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                style={{
+                                  backgroundColor: `${categoryColors[product.type] || "#a0aec0"}20`,
+                                  color: categoryColors[product.type] || "#a0aec0",
+                                }}
+                              >
+                                {product.type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-sm text-right">{product.quantity.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(product.totalSales)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border border-dashed border-default-300 dark:border-gray-600 rounded p-4 text-center text-default-500 dark:text-gray-400">
+              No salesman data available for this period.
+            </div>
+          )}
+
+          {/* All Salesmen - Product Sales Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+            <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
+              <h3 className="text-base font-semibold">All Products Summary</h3>
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <span>{formatCurrency(summary.totalSales)}</span>
+                <span className="text-default-400 dark:text-gray-500">·</span>
+                <span className="text-sky-600 dark:text-sky-400">
+                  {filteredAndSortedData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                </span>
+                <span className="text-default-400 dark:text-gray-500 font-normal">
+                  ({filteredAndSortedData.length} products)
+                </span>
+              </div>
+            </div>
             {filteredAndSortedData.length > 0 ? (
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                {/* Added fixed height and vertical scroll */}
+              <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-                  <thead className="bg-default-100 dark:bg-gray-800 sticky top-0">
+                  <thead className="bg-default-100 dark:bg-gray-800">
                     <tr>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
@@ -765,7 +842,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("description")}
                       >
                         <div className="flex items-center">
@@ -780,7 +857,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-left text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("type")}
                       >
                         <div className="flex items-center">
@@ -795,7 +872,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("foc")}
                       >
                         <div className="flex items-center justify-end">
@@ -810,7 +887,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("returns")}
                       >
                         <div className="flex items-center justify-end">
@@ -825,7 +902,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("quantity")}
                       >
                         <div className="flex items-center justify-end">
@@ -840,7 +917,7 @@ const SalesByProductsPage: React.FC = () => {
                       </th>
                       <th
                         scope="col"
-                        className="px-6 py-3 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                        className="px-4 py-2 text-right text-base font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort("totalSales")}
                       >
                         <div className="flex items-center justify-end">
@@ -858,16 +935,16 @@ const SalesByProductsPage: React.FC = () => {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                     {filteredAndSortedData.map((product) => (
                       <tr key={product.id} className="hover:bg-default-100 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900 dark:text-gray-100">
+                        <td className="px-4 py-2 whitespace-nowrap text-base font-medium text-default-900 dark:text-gray-100">
                           {product.id}
                         </td>
                         <td
-                          className="px-6 py-4 whitespace-nowrap text-base text-default-700 dark:text-gray-200 truncate max-w-xs"
+                          className="px-4 py-2 whitespace-nowrap text-base text-default-700 dark:text-gray-200 truncate max-w-xs"
                           title={product.description}
                         >
                           {product.description}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-default-700 dark:text-gray-200">
+                        <td className="px-4 py-2 whitespace-nowrap text-base text-default-700 dark:text-gray-200">
                           <span
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                             style={{
@@ -880,35 +957,35 @@ const SalesByProductsPage: React.FC = () => {
                             {product.type}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
+                        <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
                           {product.foc.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
+                        <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
                           {product.returns.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
+                        <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
                           {product.quantity.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-base text-right font-medium">
+                        <td className="px-4 py-2 whitespace-nowrap text-base text-right font-medium">
                           {formatCurrency(product.totalSales)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-default-100 dark:bg-gray-800 sticky bottom-0">
+                  <tfoot className="bg-default-100 dark:bg-gray-800">
                     <tr>
                       <td
                         colSpan={5}
-                        className="px-6 py-3 text-right text-base font-medium"
+                        className="px-4 py-2 text-right text-base font-medium"
                       >
                         Total:
                       </td>
-                      <td className="px-6 py-3 text-right text-base font-bold">
+                      <td className="px-4 py-2 text-right text-base font-bold">
                         {filteredAndSortedData
                           .reduce((sum, product) => sum + product.quantity, 0)
                           .toLocaleString()}
                       </td>
-                      <td className="px-6 py-3 text-right text-base font-bold">
+                      <td className="px-4 py-2 text-right text-base font-bold">
                         {formatCurrency(
                           filteredAndSortedData.reduce(
                             (sum, product) => sum + product.totalSales,
@@ -945,11 +1022,9 @@ const SalesByProductsPage: React.FC = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) =>
+                          label={({ name, percent, quantity }) =>
                             percent > 0.05
-                              ? `${name.substring(0, 12)}${
-                                  name.length > 12 ? "..." : ""
-                                }: ${(percent * 100).toFixed(1)}%`
+                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
                               : ""
                           }
                           outerRadius={100}
@@ -963,7 +1038,10 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
+                          formatter={(value, _name, props) => [
+                            `${formatCurrency(Number(value))} · ${props.payload.quantity?.toLocaleString() || 0} units`,
+                            props.payload.description
+                          ]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -976,7 +1054,10 @@ const SalesByProductsPage: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Total: {formatCurrency(summary.bhTotal)}
+                    <div>Total: {formatCurrency(summary.bhTotal)}</div>
+                    <div className="text-sm opacity-80">
+                      {salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                    </div>
                   </div>
                 </>
               ) : (
@@ -1001,11 +1082,9 @@ const SalesByProductsPage: React.FC = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) =>
+                          label={({ name, percent, quantity }) =>
                             percent > 0.05
-                              ? `${name.substring(0, 12)}${
-                                  name.length > 12 ? "..." : ""
-                                }: ${(percent * 100).toFixed(1)}%`
+                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
                               : ""
                           }
                           outerRadius={100}
@@ -1019,7 +1098,10 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
+                          formatter={(value, _name, props) => [
+                            `${formatCurrency(Number(value))} · ${props.payload.quantity?.toLocaleString() || 0} units`,
+                            props.payload.description
+                          ]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1032,7 +1114,10 @@ const SalesByProductsPage: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Total: {formatCurrency(summary.meeTotal)}
+                    <div>Total: {formatCurrency(summary.meeTotal)}</div>
+                    <div className="text-sm opacity-80">
+                      {salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                    </div>
                   </div>
                 </>
               ) : (
@@ -1057,11 +1142,9 @@ const SalesByProductsPage: React.FC = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) =>
+                          label={({ name, percent, quantity }) =>
                             percent > 0.05
-                              ? `${name.substring(0, 12)}${
-                                  name.length > 12 ? "..." : ""
-                                }: ${(percent * 100).toFixed(1)}%`
+                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
                               : ""
                           }
                           outerRadius={100}
@@ -1075,7 +1158,10 @@ const SalesByProductsPage: React.FC = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value, name, props) => [formatCurrency(Number(value)), props.payload.description]}
+                          formatter={(value, _name, props) => [
+                            `${formatCurrency(Number(value))} · ${props.payload.quantity?.toLocaleString() || 0} units`,
+                            props.payload.description
+                          ]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1088,7 +1174,10 @@ const SalesByProductsPage: React.FC = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Total: {formatCurrency(summary.othTotal)}
+                    <div>Total: {formatCurrency(summary.othTotal)}</div>
+                    <div className="text-sm opacity-80">
+                      {salesData.filter(p => p.type === "OTH" || p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                    </div>
                   </div>
                 </>
               ) : (
