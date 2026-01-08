@@ -40,11 +40,10 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { IconChevronDown, IconCheck } from "@tabler/icons-react";
+import { IconChevronDown, IconCheck, IconRefresh } from "@tabler/icons-react";
 import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import RefreshPayCodeCacheButton from "../../../components/Catalogue/RefreshPayCodeCacheButton";
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -102,8 +101,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   jobType = "MEE",
 }) => {
   const navigate = useNavigate();
-  const { jobs: allJobs, loading: loadingJobs } = useJobsCache();
-  const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
+  const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
+  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
+  const [isRefreshingCache, setIsRefreshingCache] = useState(false);
   const [employeeSelectionState, setEmployeeSelectionState] = useState<{
     selectedJobs: Record<string, string[]>; // employeeId -> list of selected jobIds
     jobHours: Record<string, Record<string, number>>; // employeeId -> jobId -> hours
@@ -1016,6 +1016,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   const handleBack = () => {
     safeNavigate(`/payroll/${jobType.toLowerCase()}-production`);
+  };
+
+  const handleRefreshCache = async () => {
+    setIsRefreshingCache(true);
+    try {
+      await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
+      toast.success("Data refreshed");
+    } catch (err) {
+      toast.error("Failed to refresh data");
+    } finally {
+      setIsRefreshingCache(false);
+    }
   };
 
   // Toggle employee selection by employee+job combination
@@ -2026,10 +2038,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             </h1>
           </div>
           <div className="flex space-x-2">
-            <RefreshPayCodeCacheButton
-              onRefresh={refreshPayCodeMappings}
-              size="sm"
-            />
+            <button
+              onClick={handleRefreshCache}
+              disabled={isRefreshingCache}
+              className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+              title="Refresh staff, jobs, and pay codes"
+            >
+              <IconRefresh
+                size={16}
+                className={isRefreshingCache ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
             <Button
               variant="outline"
               size="sm"

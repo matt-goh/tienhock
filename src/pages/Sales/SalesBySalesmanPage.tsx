@@ -2,10 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import {
-  IconSortAscending,
-  IconSortDescending,
-} from "@tabler/icons-react";
+import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import DateRangePicker from "../../components/DateRangePicker";
 import MonthNavigator from "../../components/MonthNavigator";
 import DateNavigator from "../../components/DateNavigator";
@@ -25,6 +22,7 @@ import {
 import Button from "../../components/Button";
 import { FormCombobox } from "../../components/FormComponents";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
+import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 
 // Define interfaces
 interface SalesmanData {
@@ -47,7 +45,15 @@ interface SalesTrendData {
   [key: string]: string | number; // For salesmen IDs and their sales values
 }
 
-const SalesBySalesmanPage: React.FC = () => {
+interface SalesBySalesmanPageProps {
+  activeTab: number;
+  onTabChange: (tab: number) => void;
+}
+
+const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
+  activeTab,
+  onTabChange,
+}) => {
   // Initialize dates
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -98,7 +104,10 @@ const SalesBySalesmanPage: React.FC = () => {
     if (selectedMonth) {
       window.dispatchEvent(
         new CustomEvent("monthSelectionChanged", {
-          detail: { month: selectedMonth.getMonth(), year: selectedMonth.getFullYear() },
+          detail: {
+            month: selectedMonth.getMonth(),
+            year: selectedMonth.getFullYear(),
+          },
         })
       );
     }
@@ -347,10 +356,33 @@ const SalesBySalesmanPage: React.FC = () => {
     <div className="space-y-4">
       {/* Summary section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold">Summary</h2>
-
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            {/* Tab Buttons */}
+            <div className="flex rounded-lg bg-default-100 dark:bg-gray-700 p-0.5">
+              <button
+                onClick={() => onTabChange(0)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 0
+                    ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                    : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                }`}
+              >
+                Products
+              </button>
+              <button
+                onClick={() => onTabChange(1)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 1
+                    ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                    : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                }`}
+              >
+                Salesman
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             {/* Date Range Picker */}
             <DateRangePicker
               dateRange={dateRange}
@@ -373,9 +405,12 @@ const SalesBySalesmanPage: React.FC = () => {
               onChange={handleDateChange}
               showGoToTodayButton={false}
             />
-          </div>
-          <div className="text-lg text-right font-bold text-default-700 dark:text-gray-200">
-            Total Sales: {formatCurrency(summary.totalSales)}
+
+            {/* Separator */}
+            <div className="h-5 w-px bg-default-300 dark:bg-gray-600" />
+
+            {/* Generate PDF Summary Button */}
+            <SalesSummarySelectionTooltip activeTab={activeTab} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -430,11 +465,16 @@ const SalesBySalesmanPage: React.FC = () => {
         <>
           {/* Detailed salesman sales table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-            <h2 className="text-lg font-semibold mb-4">
-              Salesman Performance Details
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">
+                Salesman Performance Details
+              </h2>
+              <div className="text-sm text-default-500 dark:text-gray-400">
+                {filteredAndSortedData.length} salesmen
+              </div>
+            </div>
             {filteredAndSortedData.length > 0 ? (
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                 <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                   <thead className="bg-default-100 dark:bg-gray-800 sticky top-0">
                     <tr>
@@ -517,7 +557,10 @@ const SalesBySalesmanPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                     {filteredAndSortedData.map((salesman) => (
-                      <tr key={salesman.id} className="hover:bg-default-100 dark:hover:bg-gray-700">
+                      <tr
+                        key={salesman.id}
+                        className="hover:bg-default-100 dark:hover:bg-gray-700"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-default-900 dark:text-gray-100">
                           {salesman.id}
                         </td>

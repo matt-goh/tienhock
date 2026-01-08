@@ -353,7 +353,7 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Sales Summary",
+        name: "Summary",
         path: "/sales/summary",
         component: SalesSummaryPage,
       },

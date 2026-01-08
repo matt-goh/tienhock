@@ -267,22 +267,22 @@ const JournalDetailsPage: React.FC = () => {
             <table className="min-w-full">
               <thead>
                 <tr className="bg-default-100 dark:bg-gray-900/50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-12">
                     #
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
                     Account
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-28">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-28">
                     Reference
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
                     Particulars
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
                     Debit ($)
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32">
                     Credit ($)
                   </th>
                 </tr>
@@ -294,26 +294,26 @@ const JournalDetailsPage: React.FC = () => {
                       key={line.id || index}
                       className="hover:bg-default-50/50 dark:hover:bg-gray-700/30"
                     >
-                      <td className="px-4 py-3 text-sm text-default-500 dark:text-gray-400 font-mono">
+                      <td className="px-4 py-2.5 text-sm text-default-500 dark:text-gray-400 font-mono">
                         {String(line.line_number).padStart(2, "0")}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <div className="text-sm font-medium text-default-900 dark:text-gray-100">
                           {getAccountDescription(line.account_code)}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-default-600 dark:text-gray-300">
+                      <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
                         {line.reference || "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-default-600 dark:text-gray-300">
+                      <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
                         {line.particulars || "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                      <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
                         {line.debit_amount > 0
                           ? formatAmount(line.debit_amount)
                           : "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                      <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
                         {line.credit_amount > 0
                           ? formatAmount(line.credit_amount)
                           : "-"}
@@ -335,14 +335,14 @@ const JournalDetailsPage: React.FC = () => {
                 <tr className="bg-default-100 dark:bg-gray-900/50 font-semibold">
                   <td
                     colSpan={4}
-                    className="px-4 py-3 text-sm text-right text-default-700 dark:text-gray-300"
+                    className="px-4 py-2.5 text-sm text-right text-default-700 dark:text-gray-300"
                   >
                     Total
                   </td>
-                  <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                  <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
                     {formatAmount(entry.total_debit)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-right font-mono text-default-900 dark:text-gray-100">
+                  <td className="px-4 py-2.5 text-sm text-right font-mono text-default-900 dark:text-gray-100">
                     {formatAmount(entry.total_credit)}
                   </td>
                 </tr>
