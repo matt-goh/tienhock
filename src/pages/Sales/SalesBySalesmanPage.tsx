@@ -430,11 +430,14 @@ const SalesBySalesmanPage: React.FC = () => {
         <>
           {/* Detailed salesman sales table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-            <h2 className="text-lg font-semibold mb-4">
-              Salesman Performance Details
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Salesman Performance Details</h2>
+              <div className="text-sm text-default-500 dark:text-gray-400">
+                {filteredAndSortedData.length} salesmen
+              </div>
+            </div>
             {filteredAndSortedData.length > 0 ? (
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                 <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                   <thead className="bg-default-100 dark:bg-gray-800 sticky top-0">
                     <tr>

@@ -1787,6 +1787,126 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/sales/products-by-salesman - Get product sales data grouped by salesman
+  router.get("/sales/products-by-salesman", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      // Query for main invoices
+      const mainQuery = `
+      SELECT
+        i.salespersonid,
+        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, od.total,
+        p.type
+      FROM invoices i
+      JOIN order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    `;
+
+      // Query for JellyPolly invoices
+      const jellypollyQuery = `
+      SELECT
+        i.salespersonid,
+        od.code, od.description, od.quantity, od.price, od.freeproduct, od.returnproduct, od.total,
+        p.type
+      FROM jellypolly.invoices i
+      JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      WHERE
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    `;
+
+      // Execute both queries in parallel
+      const [mainResult, jellypollyResult] = await Promise.all([
+        pool.query(mainQuery, [startDate, endDate]),
+        pool.query(jellypollyQuery, [startDate, endDate]),
+      ]);
+
+      // Combine results from both schemas
+      const allProducts = [...mainResult.rows, ...jellypollyResult.rows];
+
+      // Process data - group by salesman first, then by product
+      const salesmanMap = new Map();
+
+      allProducts.forEach((product) => {
+        const salesmanId = product.salespersonid;
+        const productId = product.code;
+        if (!salesmanId || !productId) return;
+
+        // Parse values from string to number
+        const quantity = parseInt(product.quantity) || 0;
+        const total = parseFloat(product.total) || 0;
+        const foc = parseInt(product.freeproduct) || 0;
+        const returns = parseInt(product.returnproduct) || 0;
+
+        // Get or create salesman entry
+        if (!salesmanMap.has(salesmanId)) {
+          salesmanMap.set(salesmanId, {
+            salesmanId,
+            totalSales: 0,
+            totalQuantity: 0,
+            products: new Map(),
+          });
+        }
+
+        const salesman = salesmanMap.get(salesmanId);
+        salesman.totalSales = addMoney(salesman.totalSales, total);
+        salesman.totalQuantity += quantity;
+
+        // Get or create product entry within salesman
+        if (!salesman.products.has(productId)) {
+          salesman.products.set(productId, {
+            id: productId,
+            description: product.description || productId,
+            type: product.type || "OTH",
+            quantity: 0,
+            totalSales: 0,
+            foc: 0,
+            returns: 0,
+          });
+        }
+
+        const productEntry = salesman.products.get(productId);
+        productEntry.quantity += quantity;
+        productEntry.totalSales = addMoney(productEntry.totalSales, total);
+        productEntry.foc += foc;
+        productEntry.returns += returns;
+      });
+
+      // Convert to array format for response
+      const result = Array.from(salesmanMap.values())
+        .map((salesman) => ({
+          salesmanId: salesman.salesmanId,
+          totalSales: salesman.totalSales,
+          totalQuantity: salesman.totalQuantity,
+          products: Array.from(salesman.products.values()).sort(
+            (a, b) => b.totalSales - a.totalSales
+          ),
+        }))
+        .sort((a, b) => b.totalSales - a.totalSales);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching products by salesman data:", error);
+      res.status(500).json({
+        message: "Error fetching products by salesman data",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/invoices/sales/trends - Get monthly sales trends for products or salesmen
   router.get("/sales/trends", async (req, res) => {
     try {
