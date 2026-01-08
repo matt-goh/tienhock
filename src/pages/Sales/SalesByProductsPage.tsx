@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import Button from "../../components/Button";
+import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 
 interface ProductSalesData {
   id: string;
@@ -58,6 +59,11 @@ interface DateRange {
   end: Date;
 }
 
+interface SalesByProductsPageProps {
+  activeTab: number;
+  onTabChange: (tab: number) => void;
+}
+
 const today = new Date();
 today.setHours(0, 0, 0, 0);
 const tomorrow = new Date(today);
@@ -66,7 +72,10 @@ const currentDate = new Date();
 const currentMonth = currentDate.getMonth();
 const currentYear = currentDate.getFullYear();
 
-const SalesByProductsPage: React.FC = () => {
+const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
+  activeTab,
+  onTabChange,
+}) => {
   // Month selection - uses Date object for MonthNavigator
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     return new Date(currentYear, currentMonth, 1);
@@ -649,7 +658,31 @@ const SalesByProductsPage: React.FC = () => {
       {/* Summary section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <h2 className="text-lg font-semibold">Summary</h2>
+          <div className="flex items-center gap-3">
+            {/* Tab Buttons */}
+            <div className="flex rounded-lg bg-default-100 dark:bg-gray-700 p-0.5">
+              <button
+                onClick={() => onTabChange(0)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 0
+                    ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                    : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                }`}
+              >
+                Products
+              </button>
+              <button
+                onClick={() => onTabChange(1)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 1
+                    ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                    : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                }`}
+              >
+                Salesman
+              </button>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             {/* Date Range Picker */}
             <DateRangePicker
@@ -673,6 +706,12 @@ const SalesByProductsPage: React.FC = () => {
               onChange={handleDateChange}
               showGoToTodayButton={false}
             />
+
+            {/* Separator */}
+            <div className="h-5 w-px bg-default-300 dark:bg-gray-600" />
+
+            {/* Generate PDF Summary Button */}
+            <SalesSummarySelectionTooltip activeTab={activeTab} />
           </div>
         </div>
         {/* Quick Stats Row */}
