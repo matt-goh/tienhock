@@ -352,6 +352,7 @@ export interface ConsolidatedPayrollItem {
   rate: number;
   rate_unit: string;
   total_quantity: number;
+  total_foc_units: number;
   total_amount: number;
   item_count: number; // How many items were consolidated
   is_manual: boolean;
@@ -375,11 +376,13 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
   items.forEach((item) => {
     // Create unique key from pay_code_id + rate + rate_unit
     const key = `${item.pay_code_id}_${item.rate}_${item.rate_unit}`;
+    const focUnits = (item as any).foc_units ? parseFloat((item as any).foc_units) : 0;
 
     if (groupMap.has(key)) {
       // Add to existing group
       const existing = groupMap.get(key)!;
       existing.total_quantity += item.quantity;
+      existing.total_foc_units += focUnits;
       existing.total_amount += item.amount;
       existing.item_count += 1;
       // Keep is_manual as true if any item is manual
@@ -395,6 +398,7 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
         rate: item.rate,
         rate_unit: item.rate_unit,
         total_quantity: item.quantity,
+        total_foc_units: focUnits,
         total_amount: item.amount,
         item_count: 1,
         is_manual: item.is_manual,
@@ -403,12 +407,13 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
     }
   });
 
-  // Recalculate amounts from rate × quantity for display consistency
-  // This ensures consolidated amounts match rate × total_quantity exactly
+  // Recalculate amounts from rate × (quantity + foc) for display consistency
+  // This ensures consolidated amounts match rate × (total_quantity + total_foc_units) exactly
   groupMap.forEach((item) => {
     // Skip Percent and Fixed rate units - they have special calculation logic
     if (item.rate_unit !== 'Percent' && item.rate_unit !== 'Fixed') {
-      item.total_amount = Math.round(item.rate * item.total_quantity * 100) / 100;
+      const totalUnits = item.total_quantity + (item.total_foc_units || 0);
+      item.total_amount = Math.round(item.rate * totalUnits * 100) / 100;
     }
   });
 

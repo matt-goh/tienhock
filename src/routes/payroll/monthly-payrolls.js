@@ -436,6 +436,7 @@ export default function (pool) {
               'rate_used', dwla.rate_used,
               'hours_applied', dwla.hours_applied,
               'units_produced', dwla.units_produced,
+              'foc_units', dwla.foc_units,
               'calculated_amount', dwla.calculated_amount
             )) as activities
           FROM daily_work_logs dwl
@@ -577,6 +578,7 @@ export default function (pool) {
             rate: parseFloat(activity.rate_used) || 0,
             rate_unit: activity.rate_unit || "Fixed",
             quantity: qty,
+            foc_units: parseFloat(activity.foc_units) || 0,
             amount: parseFloat(activity.calculated_amount) || 0,
             source_date: formatDateToYMD(log.log_date), // Format as YYYY-MM-DD
             work_log_id: log.id,       // daily_work_logs.id
@@ -1209,10 +1211,11 @@ export default function (pool) {
                 ${item.source_employee_id ? `'${item.source_employee_id}'` : 'NULL'},
                 ${item.source_date ? `'${item.source_date}'` : 'NULL'},
                 ${item.work_log_id || 'NULL'},
-                ${item.work_log_type ? `'${item.work_log_type}'` : 'NULL'})`
+                ${item.work_log_type ? `'${item.work_log_type}'` : 'NULL'},
+                ${item.foc_units || 'NULL'})`
             ).join(", ");
             await client.query(`
-              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type, source_employee_id, source_date, work_log_id, work_log_type)
+              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type, source_employee_id, source_date, work_log_id, work_log_type, foc_units)
               VALUES ${itemValues}
             `);
           }

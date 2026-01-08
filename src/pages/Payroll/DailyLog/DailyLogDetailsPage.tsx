@@ -450,7 +450,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                             <th className="text-right py-1.5 font-medium w-20">
                               Rate
                             </th>
-                            <th className="text-right py-1.5 font-medium w-24">
+                            <th className="text-right py-1.5 font-medium w-28">
                               Qty
                             </th>
                             <th className="text-right py-1.5 font-medium w-24">
@@ -501,14 +501,14 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       )}
                                   </div>
                                 </td>
-                                <td className="py-1.5 text-right text-default-600 dark:text-gray-300">
+                                <td className="py-1.5 text-right text-default-600 dark:text-gray-300 whitespace-nowrap w-20">
                                   {activity.rate_unit === "Percent"
                                     ? `${activity.rate_used}%`
                                     : activity.rate_unit === "Fixed"
                                     ? "-"
                                     : `RM${activity.rate_used}`}
                                 </td>
-                                <td className="py-1.5 text-right text-default-600 dark:text-gray-300">
+                                <td className="py-1.5 text-right text-default-600 dark:text-gray-300 whitespace-nowrap w-28">
                                   {activity.rate_unit === "Fixed"
                                     ? "Fixed"
                                     : activity.rate_unit === "Day" &&
@@ -521,14 +521,19 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                     ? `${activity.hours_applied} Hour`
                                     : activity.units_produced !== null &&
                                       activity.rate_unit !== "Bill"
-                                    ? `${activity.units_produced} ${
-                                        activity.rate_unit === "Percent"
-                                          ? ""
-                                          : activity.rate_unit
-                                      }`
+                                    ? (
+                                      <>
+                                        {activity.foc_units > 0 && (
+                                          <span className="text-emerald-600 dark:text-emerald-400 text-xs">
+                                            {Math.round(activity.foc_units)} FOC +{" "}
+                                          </span>
+                                        )}
+                                        {activity.units_produced} {activity.rate_unit === "Percent" ? "" : activity.rate_unit}
+                                      </>
+                                    )
                                     : "-"}
                                 </td>
-                                <td className="py-1.5 text-right font-medium text-default-700 dark:text-gray-200">
+                                <td className="py-1.5 text-right font-medium text-default-700 dark:text-gray-200 whitespace-nowrap w-24">
                                   RM{activity.calculated_amount.toFixed(2)}
                                 </td>
                               </tr>
