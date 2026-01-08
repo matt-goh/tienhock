@@ -14,7 +14,7 @@ export const useStaffsCache = () => {
   const [error, setError] = useState<Error | null>(null);
 
   const CACHE_KEY = "allStaffsData";
-  const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
+  const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
   // Filter active staff members (no resignation date)
   const staffs = useMemo(() => {
