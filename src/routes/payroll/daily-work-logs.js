@@ -191,6 +191,9 @@ export default function (pool) {
               units_produced: activity.units_produced
                 ? parseFloat(activity.units_produced)
                 : null,
+              foc_units: activity.foc_units
+                ? parseFloat(activity.foc_units)
+                : null,
               rate_used: parseFloat(activity.rate_used),
               calculated_amount: parseFloat(activity.calculated_amount),
             })),
@@ -348,8 +351,8 @@ export default function (pool) {
                 INSERT INTO daily_work_log_activities (
                   log_entry_id, pay_code_id, hours_applied,
                   units_produced, rate_used, calculated_amount,
-                  is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                  is_manually_added, foc_units
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               `;
 
                 await pool.query(activityQuery, [
@@ -362,6 +365,7 @@ export default function (pool) {
                   parseFloat(activity.rate),
                   parseFloat(activity.calculatedAmount),
                   false,
+                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
                 ]);
               }
             }
@@ -427,10 +431,10 @@ export default function (pool) {
               if (activity.isSelected) {
                 const activityQuery = `
                   INSERT INTO daily_work_log_activities (
-                    log_entry_id, pay_code_id, hours_applied, 
+                    log_entry_id, pay_code_id, hours_applied,
                     units_produced, rate_used, calculated_amount,
-                    is_manually_added
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    is_manually_added, foc_units
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 `;
 
                 await pool.query(activityQuery, [
@@ -441,6 +445,7 @@ export default function (pool) {
                   parseFloat(activity.rate),
                   parseFloat(activity.calculatedAmount),
                   false,
+                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
                 ]);
               }
             }
@@ -616,8 +621,8 @@ export default function (pool) {
                 INSERT INTO daily_work_log_activities (
                   log_entry_id, pay_code_id, hours_applied,
                   units_produced, rate_used, calculated_amount,
-                  is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                  is_manually_added, foc_units
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               `;
 
                 await pool.query(activityQuery, [
@@ -630,6 +635,7 @@ export default function (pool) {
                   parseFloat(activity.rate),
                   parseFloat(activity.calculatedAmount),
                   false,
+                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
                 ]);
               }
             }
@@ -695,10 +701,10 @@ export default function (pool) {
               if (activity.isSelected) {
                 const activityQuery = `
                   INSERT INTO daily_work_log_activities (
-                    log_entry_id, pay_code_id, hours_applied, 
+                    log_entry_id, pay_code_id, hours_applied,
                     units_produced, rate_used, calculated_amount,
-                    is_manually_added
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    is_manually_added, foc_units
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 `;
 
                 await pool.query(activityQuery, [
@@ -709,6 +715,7 @@ export default function (pool) {
                   parseFloat(activity.rate),
                   parseFloat(activity.calculatedAmount),
                   false,
+                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
                 ]);
               }
             }

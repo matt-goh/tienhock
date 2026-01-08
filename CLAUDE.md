@@ -99,7 +99,7 @@ This is a comprehensive ERP system supporting three companies:
 - `employee_pay_codes` - id, employee_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum
 - `monthly_payrolls` - id, year, month, status, created_at, updated_at, created_by
 - `employee_payrolls` - id, monthly_payroll_id, employee_id, job_type, section, gross_pay, net_pay, status, created_at, employee_job_mapping, digenapkan, setelah_digenapkan
-- `payroll_items` - id, employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, created_at, job_type, source_employee_id, source_date, work_log_id, work_log_type
+- `payroll_items` - id, employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, foc_units, amount, is_manual, created_at, job_type, source_employee_id, source_date, work_log_id, work_log_type
 - `payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `mid_month_payrolls` - id, employee_id, year, month, amount, payment_method, status, created_at, updated_at, created_by, paid_at, notes
 - `pinjam_records` - id, employee_id, year, month, amount, description, pinjam_type, created_by, created_at, updated_at
@@ -114,7 +114,7 @@ This is a comprehensive ERP system supporting three companies:
 **Work Logs (Daily):**
 - `daily_work_logs` - id, log_date, shift, day_type, context_data, status, created_at, updated_at, section
 - `daily_work_log_entries` - id, work_log_id, employee_id, total_hours, job_id, is_on_leave, leave_type, following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled (boolean, for SALESMAN_IKUT x2 doubling feature)
-- `daily_work_log_activities` - id, log_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added
+- `daily_work_log_activities` - id, log_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added, foc_units (FOC quantity from invoices, used for SALESMAN product activities)
 
 **Work Logs (Monthly):**
 - `monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at

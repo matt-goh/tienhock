@@ -24,6 +24,7 @@ import {
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import Button from "../../components/Button";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
+import HoverTooltip from "../../components/HoverTooltip";
 
 interface ProductSalesData {
   id: string;
@@ -771,71 +772,97 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             </div>
           ) : salesmanProductsData.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {salesmanProductsData.map((salesman) => (
-                <div
-                  key={salesman.salesmanId}
-                  className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden"
-                >
-                  {/* Salesman Header */}
-                  <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
-                    <h3 className="text-base font-semibold">{salesman.salesmanId}</h3>
-                    <div className="flex items-center gap-2 text-sm font-bold">
-                      <span>{formatCurrency(salesman.totalSales)}</span>
-                      <span className="text-default-400 dark:text-gray-500">·</span>
-                      <span className="text-sky-600 dark:text-sky-400">
-                        {salesman.totalQuantity.toLocaleString()} units
-                      </span>
+              {salesmanProductsData.map((salesman) => {
+                // Calculate FOC and RTN totals
+                const focProducts = salesman.products.filter(p => p.foc > 0);
+                const rtnProducts = salesman.products.filter(p => p.returns > 0);
+                const totalFoc = focProducts.reduce((sum, p) => sum + p.foc, 0);
+                const totalRtn = rtnProducts.reduce((sum, p) => sum + p.returns, 0);
+
+                // Build tooltip text for FOC/RTN breakdown
+                const focTooltip = focProducts.map(p => `${p.id} · ${p.description}: ${p.foc}`).join('\n');
+                const rtnTooltip = rtnProducts.map(p => `${p.id} · ${p.description}: ${p.returns}`).join('\n');
+
+                return (
+                  <div
+                    key={salesman.salesmanId}
+                    className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden"
+                  >
+                    {/* Salesman Header */}
+                    <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
+                      <h3 className="text-base font-semibold">{salesman.salesmanId}</h3>
+                      <div className="flex items-center gap-2 text-sm">
+                        {totalFoc > 0 && (
+                          <HoverTooltip content={focTooltip}>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 cursor-default">
+                              FOC {totalFoc}
+                            </span>
+                          </HoverTooltip>
+                        )}
+                        {totalRtn > 0 && (
+                          <HoverTooltip content={rtnTooltip}>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 cursor-default">
+                              RTN {totalRtn}
+                            </span>
+                          </HoverTooltip>
+                        )}
+                        <span className="font-bold">{formatCurrency(salesman.totalSales)}</span>
+                        <span className="text-default-400 dark:text-gray-500">·</span>
+                        <span className="text-sky-600 dark:text-sky-400 font-bold">
+                          {salesman.totalQuantity.toLocaleString()} units
+                        </span>
+                      </div>
+                    </div>
+                    {/* Products Table */}
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-default-200 dark:divide-gray-600">
+                        <thead className="bg-default-50 dark:bg-gray-700/30">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
+                              Product ID
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
+                              Description
+                            </th>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
+                              Type
+                            </th>
+                            <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
+                              Qty
+                            </th>
+                            <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
+                              Sales
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-default-100 dark:divide-gray-600">
+                          {[...salesman.products].sort((a, b) => a.type.localeCompare(b.type)).map((product) => (
+                            <tr key={product.id} className="hover:bg-default-100 dark:hover:bg-gray-600/50">
+                              <td className="px-4 py-2 text-sm font-medium">{product.id}</td>
+                              <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-300 truncate max-w-[200px]" title={product.description}>
+                                {product.description}
+                              </td>
+                              <td className="px-4 py-2 text-sm">
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{
+                                    backgroundColor: `${categoryColors[product.type] || "#a0aec0"}20`,
+                                    color: categoryColors[product.type] || "#a0aec0",
+                                  }}
+                                >
+                                  {product.type}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-sm text-right">{product.quantity.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(product.totalSales)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                  {/* Products Table */}
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-default-200 dark:divide-gray-600">
-                      <thead className="bg-default-50 dark:bg-gray-700/30">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
-                            Product ID
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
-                            Description
-                          </th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
-                            Type
-                          </th>
-                          <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
-                            Qty
-                          </th>
-                          <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
-                            Sales
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-default-100 dark:divide-gray-600">
-                        {[...salesman.products].sort((a, b) => a.type.localeCompare(b.type)).map((product) => (
-                          <tr key={product.id} className="hover:bg-default-100 dark:hover:bg-gray-600/50">
-                            <td className="px-4 py-2 text-sm font-medium">{product.id}</td>
-                            <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-300 truncate max-w-[200px]" title={product.description}>
-                              {product.description}
-                            </td>
-                            <td className="px-4 py-2 text-sm">
-                              <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                style={{
-                                  backgroundColor: `${categoryColors[product.type] || "#a0aec0"}20`,
-                                  color: categoryColors[product.type] || "#a0aec0",
-                                }}
-                              >
-                                {product.type}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 text-sm text-right">{product.quantity.toLocaleString()}</td>
-                            <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(product.totalSales)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="border border-dashed border-default-300 dark:border-gray-600 rounded p-4 text-center text-default-500 dark:text-gray-400">
