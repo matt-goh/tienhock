@@ -31,6 +31,7 @@ import {
   generateBankReportPDF,
   BankReportPDFData,
 } from "../../utils/payroll/BankReportPDF";
+import { generateSalaryReportPDF } from "../../utils/payroll/SalaryReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import toast from "react-hot-toast";
@@ -190,6 +191,8 @@ const SalaryReportPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState<boolean>(false);
+  const printDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [exportYear, setExportYear] = useState<number>(
     new Date().getFullYear()
   );
@@ -254,6 +257,15 @@ const SalaryReportPage: React.FC = () => {
     }
     setSearchParams(params, { replace: true });
   }, [activeTab, currentYear, currentMonth, periodType, setSearchParams]);
+
+  // Cleanup print dropdown timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (printDropdownTimeoutRef.current) {
+        clearTimeout(printDropdownTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Staff data
   const { staffs } = useStaffsCache();
@@ -413,9 +425,29 @@ const SalaryReportPage: React.FC = () => {
     }).format(amount);
   };
 
+  // Print dropdown handlers
+  const handlePrintDropdownMouseEnter = () => {
+    // Clear any existing timeout
+    if (printDropdownTimeoutRef.current) {
+      clearTimeout(printDropdownTimeoutRef.current);
+      printDropdownTimeoutRef.current = null;
+    }
+    setIsPrintDropdownOpen(true);
+  };
+
+  const handlePrintDropdownMouseLeave = () => {
+    // Set timeout to close dropdown after 300ms
+    printDropdownTimeoutRef.current = setTimeout(() => {
+      setIsPrintDropdownOpen(false);
+    }, 300);
+  };
+
   // PDF Generation
   const generatePDF = async (action: "download" | "print") => {
-    if (!reportData || reportData.data.length === 0) {
+    // For Employee (tab 0) and Salary (tab 1) tabs, use activeReportData which respects periodType
+    // For Bank (tab 2) and Pinjam (tab 3) tabs, use monthly reportData
+    const dataToCheck = (activeTab === 0 || activeTab === 1) ? activeReportData : reportData;
+    if (!dataToCheck || dataToCheck.data.length === 0) {
       toast.error("No data available to generate PDF");
       return;
     }
@@ -423,13 +455,44 @@ const SalaryReportPage: React.FC = () => {
     setIsGeneratingPDF(true);
     try {
       if (activeTab === 0) {
-        // Employee tab - individual employee report (will need new PDF generator)
-        toast("Employee salary report PDF will be implemented soon");
+        // Employee tab - individual or grouped by location report
+        const reportTypeValue = employeeViewMode === 'individual'
+          ? 'employee-individual' as const
+          : 'employee-grouped' as const;
+
+        await generateSalaryReportPDF({
+          reportType: reportTypeValue,
+          periodType,
+          year: currentYear,
+          month: periodType === 'monthly' ? currentMonth : undefined,
+          employees: activeReportData?.employees,
+          comprehensiveData: activeComprehensiveData,
+          grandTotals: activeReportData?.employees_grand_totals,
+          locationMap: LOCATION_MAP,
+          locationOrder: LOCATION_ORDER,
+        }, action);
+
+        const viewName = employeeViewMode === 'individual' ? 'Employee' : 'Employee (By Location)';
+        const actionText = action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`${viewName} salary report ${actionText} successfully`);
       } else if (activeTab === 1) {
-        // Salary tab - location-based report (will need new PDF generator)
-        toast("Location salary report PDF will be implemented soon");
+        // Salary tab - location totals report
+        await generateSalaryReportPDF({
+          reportType: 'location',
+          periodType,
+          year: currentYear,
+          month: periodType === 'monthly' ? currentMonth : undefined,
+          comprehensiveData: activeComprehensiveData,
+          grandTotals: activeComprehensiveData?.grand_totals,
+          locationMap: LOCATION_MAP,
+          locationOrder: LOCATION_ORDER,
+        }, action);
+
+        const actionText = action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`Location salary report ${actionText} successfully`);
       } else if (activeTab === 2) {
         // Generate Bank Report PDF
+        if (!reportData) return; // Guard for TypeScript
         const bankPdfData: BankReportPDFData = {
           year: reportData.year,
           month: reportData.month,
@@ -446,6 +509,7 @@ const SalaryReportPage: React.FC = () => {
         toast.success(`Bank report ${actionText} successfully`);
       } else {
         // Generate Pinjam (Salary) Report PDF
+        if (!reportData) return; // Guard for TypeScript
         const pdfData: PinjamReportPDFData = {
           year: reportData.year,
           month: reportData.month,
@@ -2153,20 +2217,52 @@ const SalaryReportPage: React.FC = () => {
               >
                 Refresh
               </Button>
-              <Button
-                onClick={() => generatePDF("print")}
-                icon={IconPrinter}
-                color="green"
-                variant="outline"
-                disabled={
-                  !activeReportData ||
-                  activeReportData.data.length === 0 ||
-                  isGeneratingPDF
-                }
-                size="sm"
+              <div
+                className="relative"
+                onMouseEnter={handlePrintDropdownMouseEnter}
+                onMouseLeave={handlePrintDropdownMouseLeave}
               >
-                Print
-              </Button>
+                <Button
+                  onClick={() => generatePDF("print")}
+                  icon={IconPrinter}
+                  color="green"
+                  variant="outline"
+                  disabled={
+                    !activeReportData ||
+                    activeReportData.data.length === 0 ||
+                    isGeneratingPDF
+                  }
+                  size="sm"
+                >
+                  Print
+                </Button>
+                {isPrintDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[140px]">
+                      <button
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          generatePDF("print");
+                        }}
+                        disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                        className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Print
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          generatePDF("download");
+                        }}
+                        disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                        className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Download PDF
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               {activeTab === 2 && (
                 <>
                   <Button
@@ -2262,20 +2358,52 @@ const SalaryReportPage: React.FC = () => {
                 >
                   Refresh
                 </Button>
-                <Button
-                  onClick={() => generatePDF("print")}
-                  icon={IconPrinter}
-                  color="green"
-                  variant="outline"
-                  disabled={
-                    !activeReportData ||
-                    activeReportData.data.length === 0 ||
-                    isGeneratingPDF
-                  }
-                  size="sm"
+                <div
+                  className="relative"
+                  onMouseEnter={handlePrintDropdownMouseEnter}
+                  onMouseLeave={handlePrintDropdownMouseLeave}
                 >
-                  Print
-                </Button>
+                  <Button
+                    onClick={() => generatePDF("print")}
+                    icon={IconPrinter}
+                    color="green"
+                    variant="outline"
+                    disabled={
+                      !activeReportData ||
+                      activeReportData.data.length === 0 ||
+                      isGeneratingPDF
+                    }
+                    size="sm"
+                  >
+                    Print
+                  </Button>
+                  {isPrintDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[140px]">
+                        <button
+                          onClick={() => {
+                            setIsPrintDropdownOpen(false);
+                            generatePDF("print");
+                          }}
+                          disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                          className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Print
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsPrintDropdownOpen(false);
+                            generatePDF("download");
+                          }}
+                          disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                          className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Download PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {activeTab === 2 && (
                   <>
                     <Button
