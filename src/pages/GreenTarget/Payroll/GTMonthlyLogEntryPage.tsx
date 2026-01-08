@@ -8,7 +8,9 @@ import MonthNavigator from "../../../components/MonthNavigator";
 import toast from "react-hot-toast";
 import { api } from "../../../routes/utils/api";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
-import { IconCheck, IconX, IconClock } from "@tabler/icons-react";
+import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
+import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { IconCheck, IconX, IconClock, IconRefresh } from "@tabler/icons-react";
 
 interface GTPayrollEmployee {
   id: number;
@@ -65,8 +67,10 @@ const GTMonthlyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { detailedMappings: jobPayCodeDetails, loading: loadingPayCodes } =
+  const { detailedMappings: jobPayCodeDetails, loading: loadingPayCodes, refreshData: refreshPayCodeMappings } =
     useJobPayCodeMappings();
+  const { refreshJobs } = useJobsCache();
+  const { refreshStaffs } = useStaffsCache();
 
   // Form state
   const currentDate = new Date();
@@ -80,6 +84,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
   const [existingWorkLog, setExistingWorkLog] = useState<ExistingWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
   const DEFAULT_HOURS = 176; // 22 days × 8 hours
   const DEFAULT_OVERTIME = 0;
@@ -255,6 +260,18 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         selected: !prev[employeeId].selected,
       },
     }));
+  };
+
+  const handleRefreshCache = async () => {
+    setIsRefreshingCache(true);
+    try {
+      await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
+      toast.success("Data refreshed");
+    } catch (err) {
+      toast.error("Failed to refresh data");
+    } finally {
+      setIsRefreshingCache(false);
+    }
   };
 
   const handleSave = async () => {
@@ -524,6 +541,18 @@ const GTMonthlyLogEntryPage: React.FC = () => {
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
+            <button
+              onClick={handleRefreshCache}
+              disabled={isRefreshingCache}
+              className="px-3 py-1.5 flex items-center gap-1.5 rounded-lg border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+              title="Refresh staff, jobs, and pay codes"
+            >
+              <IconRefresh
+                size={16}
+                className={isRefreshingCache ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
             <Button variant="outline" onClick={() => navigate("/greentarget/payroll")}>
               Cancel
             </Button>

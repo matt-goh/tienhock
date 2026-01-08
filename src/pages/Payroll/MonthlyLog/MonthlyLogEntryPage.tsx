@@ -9,6 +9,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import Checkbox from "../../../components/Checkbox";
 import toast from "react-hot-toast";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
@@ -34,6 +35,7 @@ import {
   IconTrash,
   IconCalendar,
   IconAlertCircle,
+  IconRefresh,
 } from "@tabler/icons-react";
 
 interface MonthlyLogEntryPageProps {
@@ -69,12 +71,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   jobType = "MAINTENANCE",
 }) => {
   const navigate = useNavigate();
-  const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
+  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
+  const { refreshJobs } = useJobsCache();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
   const {
     detailedMappings: jobPayCodeDetails,
     employeeMappings,
     loading: loadingPayCodeMappings,
+    refreshData: refreshPayCodeMappings,
   } = useJobPayCodeMappings();
   const jobConfig = getJobConfig(jobType);
   const JOB_IDS = getJobIds(jobType);
@@ -92,6 +96,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   // Employee state
   const [employeeEntries, setEmployeeEntries] = useState<Record<string, EmployeeEntry>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
   // Activities state
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
@@ -767,6 +772,18 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     }
   };
 
+  const handleRefreshCache = async () => {
+    setIsRefreshingCache(true);
+    try {
+      await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
+      toast.success("Data refreshed");
+    } catch (err) {
+      toast.error("Failed to refresh data");
+    } finally {
+      setIsRefreshingCache(false);
+    }
+  };
+
   // Get days in selected month for date picker constraint
   const getDaysInMonth = () => {
     return new Date(formData.logYear, formData.logMonth, 0).getDate();
@@ -852,6 +869,18 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             )}
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={handleRefreshCache}
+              disabled={isRefreshingCache}
+              className="px-3 py-1.5 flex items-center gap-1.5 rounded-lg border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+              title="Refresh staff, jobs, and pay codes"
+            >
+              <IconRefresh
+                size={16}
+                className={isRefreshingCache ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
             <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving}>
               Cancel
             </Button>
