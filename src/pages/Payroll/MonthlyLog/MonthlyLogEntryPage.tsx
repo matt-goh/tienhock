@@ -872,7 +872,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             <button
               onClick={handleRefreshCache}
               disabled={isRefreshingCache}
-              className="px-3 py-1.5 flex items-center gap-1.5 rounded-lg border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
               title="Refresh staff, jobs, and pay codes"
             >
               <IconRefresh
