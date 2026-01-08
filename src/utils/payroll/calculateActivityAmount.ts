@@ -61,12 +61,16 @@ export function calculateActivityAmount(
     case "Day":
     case "Bag":
     case "Trip":
-      // Calculate based on units produced
+      // Calculate based on units produced + FOC
       if (
         activity.unitsProduced !== null &&
         activity.unitsProduced !== undefined
       ) {
-        calculatedAmount = multiplyMoney(activity.rate, activity.unitsProduced);
+        const totalUnits = activity.unitsProduced + (activity.unitsFOC || 0);
+        calculatedAmount = multiplyMoney(activity.rate, totalUnits);
+      } else if (activity.unitsFOC && activity.unitsFOC > 0) {
+        // Only FOC, no regular units
+        calculatedAmount = multiplyMoney(activity.rate, activity.unitsFOC);
       } else {
         calculatedAmount = 0;
       }

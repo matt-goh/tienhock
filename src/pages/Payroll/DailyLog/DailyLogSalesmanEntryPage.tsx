@@ -1427,13 +1427,13 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         // Ensure products is always an array and has required fields
         const productArray = Array.isArray(products) ? products : [];
 
-        // Filter to only include products with valid data
+        // Filter to only include products with valid data (quantity > 0 or foc_quantity > 0)
         rowKeyProducts[rowKey] = productArray.filter(
           (p) =>
             p &&
             p.product_id &&
-            typeof p.quantity === "number" &&
-            p.quantity > 0
+            ((typeof p.quantity === "number" && p.quantity > 0) ||
+             (typeof p.foc_quantity === "number" && p.foc_quantity > 0))
         );
       });
 
@@ -1495,7 +1495,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
       // Create hash for current products (empty array = empty hash)
       const productsHash = JSON.stringify(
-        products.map((p) => ({ id: p.product_id, qty: p.quantity }))
+        products.map((p) => ({ id: p.product_id, qty: p.quantity, foc: p.foc_quantity }))
       );
 
       // Skip if we've already processed this exact state
@@ -1520,10 +1520,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             const payCodeId = String(activity.payCodeId);
             const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
 
-            if (isProductPaycode && activity.unitsProduced > 0) {
+            if (isProductPaycode && (activity.unitsProduced > 0 || activity.unitsFOC > 0)) {
               updatedActivities[index] = {
                 ...activity,
                 unitsProduced: 0,
+                unitsFOC: 0,
                 isSelected: false,
                 calculatedAmount: 0,
               };
@@ -1540,20 +1541,24 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
               const product = products.find((p) => String(p.product_id) === payCodeId);
               if (product) {
                 const quantity = parseFloat(product.quantity) || 0;
-                if (quantity > 0) {
-                  const newAmount = quantity * (activity.rate || 0);
+                const focQuantity = parseFloat(product.foc_quantity) || 0;
+                if (quantity > 0 || focQuantity > 0) {
+                  const totalUnits = quantity + focQuantity;
+                  const newAmount = totalUnits * (activity.rate || 0);
                   updatedActivities[index] = {
                     ...activity,
                     unitsProduced: quantity,
+                    unitsFOC: focQuantity,
                     isSelected: true,
                     calculatedAmount: newAmount,
                   };
                 }
-              } else if (activity.unitsProduced > 0) {
+              } else if (activity.unitsProduced > 0 || activity.unitsFOC > 0) {
                 // This product no longer has data - clear it
                 updatedActivities[index] = {
                   ...activity,
                   unitsProduced: 0,
+                  unitsFOC: 0,
                   isSelected: false,
                   calculatedAmount: 0,
                 };
@@ -1588,7 +1593,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         };
       });
     });
-  }, [salesmanProducts, employeeActivities, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs]);
+  // Note: We intentionally exclude employeeActivities from deps to avoid cascading updates
+  // when SALESMAN_IKUT activities change. The ref tracking ensures we process when products change.
+  }, [salesmanProducts, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs]);
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
@@ -2195,6 +2202,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         products: salesmanProductList.map((p) => ({
           id: p.product_id,
           qty: p.quantity,
+          foc: p.foc_quantity,
         })),
         isDoubled,
         salesmanId,
@@ -2205,11 +2213,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         return;
       }
 
-      // Build a map of DME/DWE paycode -> total quantity
+      // Build a map of DME/DWE paycode -> { quantity, foc }
       // Initialize all DME paycodes to 0 first (to clear old values when switching salesmen)
-      const paycodeQuantities: Record<string, number> = {};
+      const paycodeData: Record<string, { qty: number; foc: number }> = {};
       allDmePaycodes.forEach((paycode) => {
-        paycodeQuantities[paycode] = 0;
+        paycodeData[paycode] = { qty: 0, foc: 0 };
       });
 
       // Then apply the new salesman's products
@@ -2218,9 +2226,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
         if (dmePaycode) {
           const qty = parseFloat(product.quantity) || 0;
-          // Apply x2 multiplier if active
-          const finalQty = isDoubled ? qty * 2 : qty;
-          paycodeQuantities[dmePaycode] = (paycodeQuantities[dmePaycode] || 0) + finalQty;
+          const foc = parseFloat(product.foc_quantity) || 0;
+          paycodeData[dmePaycode].qty += qty;
+          paycodeData[dmePaycode].foc += foc;
         }
       });
 
@@ -2233,19 +2241,25 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         let hasChanges = false;
 
         const updatedActivities = activities.map((activity) => {
-          const mappedQty = paycodeQuantities[activity.payCodeId];
-          if (mappedQty !== undefined) {
-            const newAmount = mappedQty * (activity.rate || 0);
+          const mappedData = paycodeData[activity.payCodeId];
+          if (mappedData !== undefined) {
+            // Apply x2 multiplier if active
+            const finalQty = isDoubled ? mappedData.qty * 2 : mappedData.qty;
+            const finalFoc = isDoubled ? mappedData.foc * 2 : mappedData.foc;
+            const totalUnits = finalQty + finalFoc;
+            const newAmount = totalUnits * (activity.rate || 0);
             if (
-              activity.unitsProduced !== mappedQty ||
+              activity.unitsProduced !== finalQty ||
+              activity.unitsFOC !== finalFoc ||
               activity.calculatedAmount !== newAmount ||
-              activity.isSelected !== (mappedQty > 0)
+              activity.isSelected !== (totalUnits > 0)
             ) {
               hasChanges = true;
               return {
                 ...activity,
-                unitsProduced: mappedQty,
-                isSelected: mappedQty > 0,
+                unitsProduced: finalQty,
+                unitsFOC: finalFoc,
+                isSelected: totalUnits > 0,
                 calculatedAmount: newAmount,
               };
             }
@@ -2563,6 +2577,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                 ? 0
                 : null;
 
+            // Preserve FOC units from existing activity
+            const unitsFOC = existingActivity?.unitsFOC || 0;
+
             return {
               payCodeId: payCode.id,
               description: payCode.description,
@@ -2572,6 +2589,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
               isDefault: payCode.is_default_setting,
               isSelected: isSelected,
               unitsProduced: unitsProduced,
+              unitsFOC: unitsFOC,
               isContextLinked: isContextLinked,
               source: payCode.source,
               calculatedAmount: calculateActivityAmount(
@@ -2581,6 +2599,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                   rateUnit: payCode.rate_unit,
                   rate,
                   unitsProduced,
+                  unitsFOC,
                 },
                 0, // Salesmen don't track hours
                 formData.contextData,
@@ -2684,10 +2703,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         const salesmanProductList = salesmanProducts[salesmanRowKey] || [];
         const isDoubled = ikutDoubled[ikutRowKey] || false;
 
-        // Build paycode quantities map (initialize all to 0 first)
-        const paycodeQuantities: Record<string, number> = {};
+        // Build paycode data map (initialize all to 0 first)
+        const paycodeData: Record<string, { qty: number; foc: number }> = {};
         allDmePaycodes.forEach((paycode) => {
-          paycodeQuantities[paycode] = 0;
+          paycodeData[paycode] = { qty: 0, foc: 0 };
         });
 
         // Apply products from followed salesman
@@ -2696,21 +2715,27 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
           if (dmePaycode) {
             const qty = parseFloat(product.quantity) || 0;
-            const finalQty = isDoubled ? qty * 2 : qty;
-            paycodeQuantities[dmePaycode] = (paycodeQuantities[dmePaycode] || 0) + finalQty;
+            const foc = parseFloat(product.foc_quantity) || 0;
+            paycodeData[dmePaycode].qty += qty;
+            paycodeData[dmePaycode].foc += foc;
           }
         });
 
         // Update SALESMAN_IKUT activities
         const ikutActivities = newEmployeeActivities[ikutRowKey];
         const updatedActivities = ikutActivities.map((activity: any) => {
-          const mappedQty = paycodeQuantities[activity.payCodeId];
-          if (mappedQty !== undefined) {
-            const newAmount = mappedQty * (activity.rate || 0);
+          const mappedData = paycodeData[activity.payCodeId];
+          if (mappedData !== undefined) {
+            // Apply x2 multiplier if active
+            const finalQty = isDoubled ? mappedData.qty * 2 : mappedData.qty;
+            const finalFoc = isDoubled ? mappedData.foc * 2 : mappedData.foc;
+            const totalUnits = finalQty + finalFoc;
+            const newAmount = totalUnits * (activity.rate || 0);
             return {
               ...activity,
-              unitsProduced: mappedQty,
-              isSelected: mappedQty > 0,
+              unitsProduced: finalQty,
+              unitsFOC: finalFoc,
+              isSelected: totalUnits > 0,
               calculatedAmount: newAmount,
             };
           }
@@ -2724,6 +2749,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           products: salesmanProductList.map((p: any) => ({
             id: p.product_id,
             qty: p.quantity,
+            foc: p.foc_quantity,
           })),
           isDoubled,
           salesmanId,
@@ -3049,6 +3075,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
               unitsProduced: activity.units_produced
                 ? parseFloat(activity.units_produced)
                 : 0,
+              unitsFOC: activity.foc_units
+                ? parseFloat(activity.foc_units)
+                : 0,
               hoursApplied: activity.hours_applied
                 ? parseFloat(activity.hours_applied)
                 : null,
@@ -3138,6 +3167,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                 unitsProduced: activity.units_produced
                   ? parseFloat(activity.units_produced)
                   : 0,
+                unitsFOC: activity.foc_units
+                  ? parseFloat(activity.foc_units)
+                  : 0,
                 hoursApplied: activity.hours_applied
                   ? parseFloat(activity.hours_applied)
                   : null,
@@ -3193,6 +3225,9 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                 rate: parseFloat(activity.rate_used),
                 unitsProduced: activity.units_produced
                   ? parseFloat(activity.units_produced)
+                  : 0,
+                unitsFOC: activity.foc_units
+                  ? parseFloat(activity.foc_units)
                   : 0,
                 hoursApplied: activity.hours_applied
                   ? parseFloat(activity.hours_applied)

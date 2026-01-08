@@ -49,6 +49,7 @@ interface PayrollItem {
   rate: number;
   rate_unit: string;
   quantity: number;
+  foc_units?: number | null;
   amount: number;
   is_manual: boolean;
   pay_type?: string;
@@ -353,9 +354,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Fixed" && item.total_quantity > 1
-            ? formatCurrency(item.total_quantity)
-            : item.total_quantity}
+          {item.rate_unit === "Fixed" && item.total_quantity > 1 ? (
+            formatCurrency(item.total_quantity)
+          ) : (
+            <>
+              {item.total_quantity}
+              {item.total_foc_units > 0 && (
+                <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
+                  (+{Math.round(item.total_foc_units)})
+                </span>
+              )}
+            </>
+          )}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
           {formatCurrency(item.total_amount)}
@@ -436,9 +446,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Fixed" && item.quantity > 1
-            ? formatCurrency(item.quantity)
-            : item.quantity}
+          {item.rate_unit === "Fixed" && item.quantity > 1 ? (
+            formatCurrency(item.quantity)
+          ) : (
+            <>
+              {item.quantity}
+              {item.foc_units && item.foc_units > 0 && (
+                <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
+                  (+{Math.round(item.foc_units)})
+                </span>
+              )}
+            </>
+          )}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
           {formatCurrency(item.amount)}

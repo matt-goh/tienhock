@@ -255,6 +255,14 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                               : `${activity.unitsProduced} ${activity.rateUnit === "Percent" ? "Units" : activity.rateUnit}`}
                           </span>
                         )}
+                      {/* Show FOC units when available */}
+                      {activity.unitsFOC !== null &&
+                        activity.unitsFOC !== undefined &&
+                        activity.unitsFOC > 0 && (
+                          <span className="text-amber-600 dark:text-amber-400">
+                            • {activity.unitsFOC} FOC
+                          </span>
+                        )}
                       {activity.payType === "Overtime" &&
                         (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") && (
                           <span

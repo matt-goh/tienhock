@@ -1405,11 +1405,12 @@ export default function (pool, config) {
 
       // Query for main invoices products - now includes salespersonid in results and uses ANY for multiple salesmen
       const mainInvoicesQuery = `
-      SELECT 
+      SELECT
         i.salespersonid,
         od.code as product_id,
         p.description as product_name,
-        SUM(od.quantity) as quantity
+        SUM(od.quantity) as quantity,
+        SUM(COALESCE(od.freeproduct, 0)) as foc_quantity
       FROM invoices i
       JOIN order_details od ON i.id = od.invoiceid
       LEFT JOIN products p ON od.code = p.id
@@ -1422,11 +1423,12 @@ export default function (pool, config) {
 
       // Query for jellypolly invoices products
       const jellypollyInvoicesQuery = `
-      SELECT 
+      SELECT
         i.salespersonid,
         od.code as product_id,
         p.description as product_name,
-        SUM(od.quantity) as quantity
+        SUM(od.quantity) as quantity,
+        SUM(COALESCE(od.freeproduct, 0)) as foc_quantity
       FROM jellypolly.invoices i
       JOIN jellypolly.order_details od ON i.id = od.invoiceid
       LEFT JOIN products p ON od.code = p.id
@@ -1461,7 +1463,7 @@ export default function (pool, config) {
 
       // Process main invoices
       mainResult.rows.forEach((row) => {
-        const { salespersonid, product_id, product_name, quantity } = row;
+        const { salespersonid, product_id, product_name, quantity, foc_quantity } = row;
 
         if (!productsBySalesman[salespersonid]) {
           productsBySalesman[salespersonid] = {};
@@ -1471,13 +1473,15 @@ export default function (pool, config) {
           product_id,
           product_name: product_name || product_id,
           quantity: parseInt(quantity) || 0,
+          foc_quantity: parseInt(foc_quantity) || 0,
         };
       });
 
       // Process jellypolly invoices
       jellypollyResult.rows.forEach((row) => {
-        const { salespersonid, product_id, product_name, quantity } = row;
+        const { salespersonid, product_id, product_name, quantity, foc_quantity } = row;
         const parsedQuantity = parseInt(quantity) || 0;
+        const parsedFocQuantity = parseInt(foc_quantity) || 0;
 
         if (!productsBySalesman[salespersonid]) {
           productsBySalesman[salespersonid] = {};
@@ -1487,12 +1491,15 @@ export default function (pool, config) {
           // Add to existing product quantity
           productsBySalesman[salespersonid][product_id].quantity +=
             parsedQuantity;
+          productsBySalesman[salespersonid][product_id].foc_quantity +=
+            parsedFocQuantity;
         } else {
           // Create new product entry
           productsBySalesman[salespersonid][product_id] = {
             product_id,
             product_name: product_name || product_id,
             quantity: parsedQuantity,
+            foc_quantity: parsedFocQuantity,
           };
         }
       });
