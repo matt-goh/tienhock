@@ -33,6 +33,7 @@ export interface ActivityItem {
   isDefault: boolean;
   isSelected: boolean;
   unitsProduced?: number;
+  unitsFOC?: number;
   hoursApplied?: number;
   calculatedAmount: number;
   isContextLinked?: boolean;
@@ -166,8 +167,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
               );
               if (matchingProduct) {
                 const quantity = parseFloat(matchingProduct.quantity) || 0;
-                if (quantity > 0) {
+                const focQuantity = parseFloat(matchingProduct.foc_quantity) || 0;
+                if (quantity > 0 || focQuantity > 0) {
                   activity.unitsProduced = quantity;
+                  activity.unitsFOC = focQuantity;
                   activity.isSelected = true;
                 }
               }
@@ -243,6 +246,28 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   const handleUnitsChange = (index: number, value: string) => {
     const newActivities = [...activities];
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
+
+    const updatedActivities = newActivities.map(activity => ({
+      ...activity,
+      calculatedAmount: calculateActivityAmount(
+        activity,
+        activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
+        contextData,
+        locationType,
+        logDate
+      )
+    }));
+
+    const finalActivities = isSalesmanIkut
+      ? applyDoubling(updatedActivities, isDoubled)
+      : updatedActivities;
+    setActivities(finalActivities);
+  };
+
+  // Update FOC units
+  const handleFOCChange = (index: number, value: string) => {
+    const newActivities = [...activities];
+    newActivities[index].unitsFOC = value === "" ? 0 : Number(value);
 
     const updatedActivities = newActivities.map(activity => ({
       ...activity,
@@ -544,6 +569,22 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                               )}
                                             </div>
                                           </div>
+                                          {/* FOC input for salesman product activities and SALESMAN_IKUT DME/DWE paycodes */}
+                                          {((isSalesman && salesmanProducts.find((p) => String(p.product_id) === String(activity.payCodeId))) ||
+                                            (isSalesmanIkut && (activity.payCodeId.startsWith("DME-") || activity.payCodeId.startsWith("DWE-")))) && (
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-amber-600 dark:text-amber-400">FOC:</span>
+                                              <input
+                                                type="number"
+                                                className="w-16 text-center border border-amber-300 dark:border-amber-600 rounded py-0.5 pl-2 text-sm bg-amber-50 dark:bg-amber-900/30 text-default-900 dark:text-gray-100"
+                                                value={activity.unitsFOC?.toString() || "0"}
+                                                onChange={(e) => handleFOCChange(originalIndex, e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                min="0"
+                                                step="1"
+                                              />
+                                            </div>
+                                          )}
                                         </>
                                       )}
                                     </div>
