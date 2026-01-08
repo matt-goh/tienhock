@@ -9,6 +9,7 @@ import {
   IconPhone,
   IconId,
   IconUsers,
+  IconRefresh,
 } from "@tabler/icons-react";
 import { Employee, FilterOptions } from "../../types/types";
 import { useNavigate } from "react-router-dom";
@@ -175,7 +176,20 @@ const StaffPage = () => {
     jobFilter: null,
     applyJobFilter: true,
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshStaffs();
+      toast.success("Staff list refreshed");
+    } catch (err) {
+      toast.error("Failed to refresh staff list");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const ITEMS_PER_PAGE = 12;
 
@@ -365,6 +379,18 @@ const StaffPage = () => {
           Staff Directory ({filteredEmployees.length})
         </h1>
         <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-3 py-2 flex items-center gap-2 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+            title="Refresh staff list"
+          >
+            <IconRefresh
+              size={18}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+            Refresh
+          </button>
           <Button
             onClick={() => navigate("/catalogue/staff/records")}
             icon={IconUsers}

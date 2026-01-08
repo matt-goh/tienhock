@@ -5,7 +5,6 @@ import {
   IconRefresh,
   IconFileText,
   IconPrinter,
-  IconDownload,
   IconFileExport,
   IconLink,
 } from "@tabler/icons-react";
@@ -32,6 +31,7 @@ import {
   generateBankReportPDF,
   BankReportPDFData,
 } from "../../utils/payroll/BankReportPDF";
+import { generateSalaryReportPDF } from "../../utils/payroll/SalaryReportPDF";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
 import toast from "react-hot-toast";
@@ -191,12 +191,28 @@ const SalaryReportPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState<boolean>(false);
+  const printDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [exportYear, setExportYear] = useState<number>(
     new Date().getFullYear()
   );
   const [exportMonth, setExportMonth] = useState<number>(
     new Date().getMonth() + 1
   );
+
+  // Sub-view mode for Employee tab
+  const [employeeViewMode, setEmployeeViewMode] = useState<'individual' | 'location'>('individual');
+
+  // Period type toggle (monthly/yearly) - initialize from URL params
+  const [periodType, setPeriodType] = useState<'monthly' | 'yearly'>(() => {
+    const periodParam = searchParams.get("period");
+    return periodParam === 'yearly' ? 'yearly' : 'monthly';
+  });
+
+  // Yearly data states
+  const [yearlyReportData, setYearlyReportData] = useState<SalaryReportResponse | null>(null);
+  const [yearlyComprehensiveSalaryData, setYearlyComprehensiveSalaryData] = useState<ComprehensiveSalaryData | null>(null);
+  const [isLoadingYearly, setIsLoadingYearly] = useState<boolean>(false);
 
   // Filters - use Date for month navigation, initialize from URL params
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
@@ -228,17 +244,28 @@ const SalaryReportPage: React.FC = () => {
     return tabIndex >= 0 && tabIndex <= 3 ? tabIndex : 0;
   }); // 0 = Employee, 1 = Salary, 2 = Bank, 3 = Pinjam
 
-  // Update URL params when tab, year, or month changes
+  // Update URL params when tab, year, month, or period changes
   useEffect(() => {
-    setSearchParams(
-      {
-        tab: activeTab.toString(),
-        year: currentYear.toString(),
-        month: currentMonth.toString(),
-      },
-      { replace: true }
-    );
-  }, [activeTab, currentYear, currentMonth, setSearchParams]);
+    const params: Record<string, string> = {
+      tab: activeTab.toString(),
+      year: currentYear.toString(),
+      period: periodType,
+    };
+    // Only include month in URL when in monthly mode
+    if (periodType === 'monthly') {
+      params.month = currentMonth.toString();
+    }
+    setSearchParams(params, { replace: true });
+  }, [activeTab, currentYear, currentMonth, periodType, setSearchParams]);
+
+  // Cleanup print dropdown timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (printDropdownTimeoutRef.current) {
+        clearTimeout(printDropdownTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Staff data
   const { staffs } = useStaffsCache();
@@ -341,10 +368,18 @@ const SalaryReportPage: React.FC = () => {
     setSelectedMonth(new Date(newYear, selectedMonth.getMonth(), 1));
   };
 
-  // Load salary report on mount and filter changes
+  // Load monthly salary report - always on mount and when month changes
+  // Bank and Pinjam tabs always need monthly data
   useEffect(() => {
     fetchSalaryReport();
   }, [selectedMonth]);
+
+  // Load yearly salary report when year or period changes
+  useEffect(() => {
+    if (periodType === 'yearly') {
+      fetchYearlySalaryReport();
+    }
+  }, [currentYear, periodType]);
 
   const fetchSalaryReport = async () => {
     setIsLoading(true);
@@ -363,6 +398,26 @@ const SalaryReportPage: React.FC = () => {
     }
   };
 
+  const fetchYearlySalaryReport = async () => {
+    setIsLoadingYearly(true);
+    try {
+      const response = await api.get(`/api/salary-report/yearly?year=${currentYear}`);
+      setYearlyReportData(response);
+      setYearlyComprehensiveSalaryData(response.comprehensive);
+    } catch (error) {
+      console.error("Error fetching yearly salary report:", error);
+      setYearlyReportData(null);
+      setYearlyComprehensiveSalaryData(null);
+    } finally {
+      setIsLoadingYearly(false);
+    }
+  };
+
+  // Active data based on period type
+  const activeReportData = periodType === 'yearly' ? yearlyReportData : reportData;
+  const activeComprehensiveData = periodType === 'yearly' ? yearlyComprehensiveSalaryData : comprehensiveSalaryData;
+  const activeLoading = periodType === 'yearly' ? isLoadingYearly : isLoading;
+
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
       style: "currency",
@@ -370,9 +425,29 @@ const SalaryReportPage: React.FC = () => {
     }).format(amount);
   };
 
+  // Print dropdown handlers
+  const handlePrintDropdownMouseEnter = () => {
+    // Clear any existing timeout
+    if (printDropdownTimeoutRef.current) {
+      clearTimeout(printDropdownTimeoutRef.current);
+      printDropdownTimeoutRef.current = null;
+    }
+    setIsPrintDropdownOpen(true);
+  };
+
+  const handlePrintDropdownMouseLeave = () => {
+    // Set timeout to close dropdown after 300ms
+    printDropdownTimeoutRef.current = setTimeout(() => {
+      setIsPrintDropdownOpen(false);
+    }, 300);
+  };
+
   // PDF Generation
   const generatePDF = async (action: "download" | "print") => {
-    if (!reportData || reportData.data.length === 0) {
+    // For Employee (tab 0) and Salary (tab 1) tabs, use activeReportData which respects periodType
+    // For Bank (tab 2) and Pinjam (tab 3) tabs, use monthly reportData
+    const dataToCheck = (activeTab === 0 || activeTab === 1) ? activeReportData : reportData;
+    if (!dataToCheck || dataToCheck.data.length === 0) {
       toast.error("No data available to generate PDF");
       return;
     }
@@ -380,13 +455,44 @@ const SalaryReportPage: React.FC = () => {
     setIsGeneratingPDF(true);
     try {
       if (activeTab === 0) {
-        // Employee tab - individual employee report (will need new PDF generator)
-        toast("Employee salary report PDF will be implemented soon");
+        // Employee tab - individual or grouped by location report
+        const reportTypeValue = employeeViewMode === 'individual'
+          ? 'employee-individual' as const
+          : 'employee-grouped' as const;
+
+        await generateSalaryReportPDF({
+          reportType: reportTypeValue,
+          periodType,
+          year: currentYear,
+          month: periodType === 'monthly' ? currentMonth : undefined,
+          employees: activeReportData?.employees,
+          comprehensiveData: activeComprehensiveData,
+          grandTotals: activeReportData?.employees_grand_totals,
+          locationMap: LOCATION_MAP,
+          locationOrder: LOCATION_ORDER,
+        }, action);
+
+        const viewName = employeeViewMode === 'individual' ? 'Employee' : 'Employee (By Location)';
+        const actionText = action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`${viewName} salary report ${actionText} successfully`);
       } else if (activeTab === 1) {
-        // Salary tab - location-based report (will need new PDF generator)
-        toast("Location salary report PDF will be implemented soon");
+        // Salary tab - location totals report
+        await generateSalaryReportPDF({
+          reportType: 'location',
+          periodType,
+          year: currentYear,
+          month: periodType === 'monthly' ? currentMonth : undefined,
+          comprehensiveData: activeComprehensiveData,
+          grandTotals: activeComprehensiveData?.grand_totals,
+          locationMap: LOCATION_MAP,
+          locationOrder: LOCATION_ORDER,
+        }, action);
+
+        const actionText = action === "download" ? "downloaded" : "generated for printing";
+        toast.success(`Location salary report ${actionText} successfully`);
       } else if (activeTab === 2) {
         // Generate Bank Report PDF
+        if (!reportData) return; // Guard for TypeScript
         const bankPdfData: BankReportPDFData = {
           year: reportData.year,
           month: reportData.month,
@@ -403,6 +509,7 @@ const SalaryReportPage: React.FC = () => {
         toast.success(`Bank report ${actionText} successfully`);
       } else {
         // Generate Pinjam (Salary) Report PDF
+        if (!reportData) return; // Guard for TypeScript
         const pdfData: PinjamReportPDFData = {
           year: reportData.year,
           month: reportData.month,
@@ -638,71 +745,74 @@ const SalaryReportPage: React.FC = () => {
 
   // Employee Salary Table Component (individual employees)
   const EmployeeSalaryTable = () => {
-    const employees = reportData?.employees || [];
-    const grandTotals = reportData?.employees_grand_totals;
+    const employees = activeReportData?.employees || [];
+    const grandTotals = activeReportData?.employees_grand_totals;
 
     if (employees.length === 0) return null;
 
     return (
-      <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+      <div className="overflow-auto mb-2 max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="w-full">
           <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700" title="Bilangan">
                 BIL
               </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[120px] truncate" title="Nama Pekerja">
                 NAMA PEKERJA
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[80px] truncate" title="Gaji">
                 GAJI
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[60px] truncate" title="Overtime">
                 OT
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Bonus">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission">
                 COMM
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Kasar">
                 GAJI KASAR
               </th>
               <th
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
+                title="EPF"
               >
                 EPF
               </th>
               <th
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
+                title="SOCSO"
               >
                 SOCSO
               </th>
               <th
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
+                title="SIP"
               >
                 SIP
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900 max-w-[60px] truncate" title="PCB">
                 PCB
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Bersih">
                 GAJI BERSIH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[90px] truncate" title="Setengah Bulan">
                 1/2 BULAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[80px] truncate" title="Jumlah">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Digenapkan">
                 DIGENAPKAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[150px] truncate" title="Setelah Digenapkan">
                 SETELAH DIGENAPKAN
               </th>
             </tr>
@@ -877,70 +987,523 @@ const SalaryReportPage: React.FC = () => {
     );
   };
 
-  // Comprehensive Salary Table Component
-  const ComprehensiveSalaryTable = () => {
-    if (!comprehensiveSalaryData) return null;
+  // Location Grouped Table Component - shows employees grouped by location
+  const LocationGroupedTable = () => {
+    if (!activeComprehensiveData) return null;
+
+    // Process locations: merge 16-24 into 14
+    const processedLocations = useMemo(() => {
+      const locationsCopy = JSON.parse(JSON.stringify(activeComprehensiveData.locations)) as LocationSalaryData[];
+
+      // Find location 14 or create it
+      let location14 = locationsCopy.find(loc => loc.location === '14');
+      if (!location14) {
+        location14 = {
+          location: '14',
+          employees: [],
+          totals: {
+            gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
+            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
+            sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
+            setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
+          }
+        };
+        locationsCopy.push(location14);
+      }
+
+      // Merge employees from locations 16-24 into location 14
+      // Use a Map to deduplicate employees by staff_id (aggregate their values)
+      const commissionLocations = ['16', '17', '18', '19', '20', '21', '22', '23', '24'];
+      type LocationEmployee = LocationSalaryData['employees'][0];
+      const mergedEmployeesMap = new Map<string, LocationEmployee>();
+
+      // First, add existing location 14 employees to the map
+      location14.employees.forEach(emp => {
+        mergedEmployeesMap.set(emp.staff_id, { ...emp });
+      });
+
+      // Merge commission location employees
+      commissionLocations.forEach(locId => {
+        const commissionLoc = locationsCopy.find(loc => loc.location === locId);
+        if (commissionLoc && commissionLoc.employees.length > 0) {
+          commissionLoc.employees.forEach(emp => {
+            const existing = mergedEmployeesMap.get(emp.staff_id);
+            if (existing) {
+              // Aggregate values for the same employee
+              existing.gaji += emp.gaji;
+              existing.ot += emp.ot;
+              existing.bonus += emp.bonus;
+              existing.comm += emp.comm;
+              existing.gaji_kasar += emp.gaji_kasar;
+              existing.epf_majikan += emp.epf_majikan;
+              existing.epf_pekerja += emp.epf_pekerja;
+              existing.socso_majikan += emp.socso_majikan;
+              existing.socso_pekerja += emp.socso_pekerja;
+              existing.sip_majikan += emp.sip_majikan;
+              existing.sip_pekerja += emp.sip_pekerja;
+              existing.pcb += emp.pcb;
+              existing.gaji_bersih += emp.gaji_bersih;
+              existing.setengah_bulan += emp.setengah_bulan;
+              existing.jumlah += emp.jumlah;
+              existing.digenapkan += emp.digenapkan;
+              existing.setelah_digenapkan += emp.setelah_digenapkan;
+            } else {
+              mergedEmployeesMap.set(emp.staff_id, { ...emp });
+            }
+          });
+          // Add totals to location 14
+          Object.keys(location14!.totals).forEach(key => {
+            const k = key as keyof typeof location14.totals;
+            location14!.totals[k] += commissionLoc.totals[k];
+          });
+        }
+      });
+
+      // Replace location 14 employees with deduplicated merged employees
+      location14.employees = Array.from(mergedEmployeesMap.values());
+
+      // Filter out commission locations (16-24) and empty locations
+      // Sort numerically by location code
+      const filteredLocations = locationsCopy
+        .filter(loc => !commissionLocations.includes(loc.location))
+        .filter(loc => loc.employees.length > 0)
+        .sort((a, b) => parseInt(a.location, 10) - parseInt(b.location, 10));
+
+      return filteredLocations;
+    }, [activeComprehensiveData]);
+
+    // Use the same deduplicated employees_grand_totals from activeReportData as the Individual view
+    // This ensures both views show identical grand totals
+    const grandTotals = activeReportData?.employees_grand_totals;
+
+    if (processedLocations.length === 0 || !grandTotals) return null;
 
     return (
-      <div className="overflow-auto max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
+      <div className="space-y-3">
+        {processedLocations.map((locationData) => {
+          const locationName = LOCATION_MAP[locationData.location] || `Location ${locationData.location}`;
+
+          return (
+            <div key={locationData.location} className="overflow-auto border border-default-200 dark:border-gray-700 rounded-lg">
+              {/* Location Header */}
+              <div className="bg-sky-50 dark:bg-sky-900/20 px-4 py-2 border-b border-default-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300">
+                  {locationData.location} - {locationName.toUpperCase()}
+                </h3>
+              </div>
+
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[40px]" />
+                  <col className="w-[140px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[70px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[110px]" />
+                </colgroup>
+                <thead className="bg-default-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700" title="Bilangan">
+                      BIL
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[120px] truncate" title="Nama Pekerja">
+                      NAMA PEKERJA
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[80px] truncate" title="Gaji">
+                      GAJI
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[60px] truncate" title="Overtime">
+                      OT
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Bonus">
+                      BONUS
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission">
+                      COMM
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Kasar">
+                      GAJI KASAR
+                    </th>
+                    <th
+                      className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                      colSpan={2}
+                      title="EPF"
+                    >
+                      EPF
+                    </th>
+                    <th
+                      className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                      colSpan={2}
+                      title="SOCSO"
+                    >
+                      SOCSO
+                    </th>
+                    <th
+                      className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
+                      colSpan={2}
+                      title="SIP"
+                    >
+                      SIP
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900 max-w-[60px] truncate" title="PCB">
+                      PCB
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Bersih">
+                      GAJI BERSIH
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[90px] truncate" title="Setengah Bulan">
+                      1/2 BULAN
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[80px] truncate" title="Jumlah">
+                      JUMLAH
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Digenapkan">
+                      DIGENAPKAN
+                    </th>
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[150px] truncate" title="Setelah Digenapkan">
+                      SETELAH DIGENAPKAN
+                    </th>
+                  </tr>
+                  <tr>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      MAJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      PKJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      MAJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      PKJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      MAJ
+                    </th>
+                    <th className="px-1 py-1 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+                      PKJ
+                    </th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                    <th className="bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700"></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                  {locationData.employees.map((emp, index) => (
+                    <tr
+                      key={`${emp.staff_id}-${index}`}
+                      className={`${index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"} ${emp.employee_payroll_id ? "cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700" : ""}`}
+                      onClick={() => emp.employee_payroll_id && window.open(`/payroll/employee-payroll/${emp.employee_payroll_id}`, '_blank')}
+                    >
+                      <td className="px-2 py-2 text-xs text-default-900 dark:text-gray-100 text-center">
+                        {index + 1}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-left max-w-[100px]">
+                        <span className="block truncate" title={`${emp.staff_id.toUpperCase()} - ${emp.staff_name.toUpperCase()}`}>
+                          {emp.staff_id.toUpperCase()} - {emp.staff_name.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.gaji)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.ot)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.bonus)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.comm)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.gaji_kasar)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.epf_majikan)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.epf_pekerja)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.socso_majikan)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.socso_pekerja)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.sip_majikan)}
+                      </td>
+                      <td className="px-1 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.sip_pekerja)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center border-l border-default-300 dark:border-gray-600">
+                        {formatCurrency(emp.pcb)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.gaji_bersih)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.setengah_bulan)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.jumlah)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.digenapkan)}
+                      </td>
+                      <td className="px-2 py-2 text-xs text-default-600 dark:text-gray-300 text-center">
+                        {formatCurrency(emp.setelah_digenapkan)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
+                    >
+                      SUBTOTAL
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.gaji)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.ot)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.bonus)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.comm)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.gaji_kasar)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.epf_majikan)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.epf_pekerja)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.socso_majikan)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.socso_pekerja)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.sip_majikan)}
+                    </td>
+                    <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.sip_pekerja)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
+                      {formatCurrency(locationData.totals.pcb)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.gaji_bersih)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.setengah_bulan)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.jumlah)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.digenapkan)}
+                    </td>
+                    <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600">
+                      {formatCurrency(locationData.totals.setelah_digenapkan)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          );
+        })}
+
+        {/* Grand Total Section */}
+        <div className="overflow-auto border-2 border-sky-500 dark:border-sky-600 rounded-lg">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-[40px]" />
+              <col className="w-[140px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[90px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[90px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[110px]" />
+            </colgroup>
+            <tbody>
+              <tr>
+                <td
+                  colSpan={2}
+                  className="px-2 py-3 text-sm font-bold text-white text-center bg-sky-600 dark:bg-sky-700"
+                >
+                  GRAND TOTAL
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.gaji)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.ot)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.bonus)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.comm)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.gaji_kasar)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.epf_majikan)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.epf_pekerja)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.socso_majikan)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.socso_pekerja)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.sip_majikan)}
+                </td>
+                <td className="px-1 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.sip_pekerja)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center border-l border-sky-300 dark:border-sky-700 bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.pcb)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.gaji_bersih)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.setengah_bulan)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.jumlah)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.digenapkan)}
+                </td>
+                <td className="px-2 py-3 text-xs font-bold text-sky-900 dark:text-sky-100 text-center bg-sky-100 dark:bg-sky-900/40">
+                  {formatCurrency(grandTotals.setelah_digenapkan)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // Comprehensive Salary Table Component
+  const ComprehensiveSalaryTable = () => {
+    if (!activeComprehensiveData) return null;
+
+    return (
+      <div className="overflow-auto mb-2 max-h-[75vh] border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="w-full">
           <thead className="sticky top-0 z-20 bg-default-50 dark:bg-gray-900">
             <tr>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700" title="Bilangan">
                 BIL
               </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[130px] truncate" title="Bahagian Kerja">
                 BAHAGIAN KERJA
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[80px] truncate" title="Gaji">
                 GAJI
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[60px] truncate" title="Overtime">
                 OT
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Bonus">
                 BONUS
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[70px] truncate" title="Commission">
                 COMM
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Kasar">
                 GAJI KASAR
               </th>
               <th
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
+                title="EPF"
               >
                 EPF
               </th>
               <th
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
+                title="SOCSO"
               >
                 SOCSO
               </th>
               <th
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
                 colSpan={2}
+                title="SIP"
               >
                 SIP
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900 max-w-[60px] truncate" title="PCB">
                 PCB
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Gaji Bersih">
                 GAJI BERSIH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[90px] truncate" title="Setengah Bulan">
                 1/2 BULAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[80px] truncate" title="Jumlah">
                 JUMLAH
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[100px] truncate" title="Digenapkan">
                 DIGENAPKAN
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
+              <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 max-w-[150px] truncate" title="Setelah Digenapkan">
                 SETELAH DIGENAPKAN
               </th>
             </tr>
@@ -993,7 +1556,7 @@ const SalaryReportPage: React.FC = () => {
                 );
               }
 
-              const locationData = comprehensiveSalaryData.locations.find(
+              const locationData = activeComprehensiveData.locations.find(
                 (loc) => loc.location === item.id
               );
               const locationNumber = item.id!;
@@ -1254,73 +1817,73 @@ const SalaryReportPage: React.FC = () => {
                 GRAND TOTAL
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.gaji)}
+                {formatCurrency(activeComprehensiveData.grand_totals.gaji)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.ot)}
+                {formatCurrency(activeComprehensiveData.grand_totals.ot)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.bonus)}
+                {formatCurrency(activeComprehensiveData.grand_totals.bonus)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.comm)}
+                {formatCurrency(activeComprehensiveData.grand_totals.comm)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.gaji_kasar
+                  activeComprehensiveData.grand_totals.gaji_kasar
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.epf_majikan
+                  activeComprehensiveData.grand_totals.epf_majikan
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.epf_pekerja
+                  activeComprehensiveData.grand_totals.epf_pekerja
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.socso_majikan
+                  activeComprehensiveData.grand_totals.socso_majikan
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.socso_pekerja
+                  activeComprehensiveData.grand_totals.socso_pekerja
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.sip_majikan
+                  activeComprehensiveData.grand_totals.sip_majikan
                 )}
               </td>
               <td className="px-1 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.sip_pekerja
+                  activeComprehensiveData.grand_totals.sip_pekerja
                 )}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center border-l border-t-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.pcb)}
+                {formatCurrency(activeComprehensiveData.grand_totals.pcb)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.gaji_bersih
+                  activeComprehensiveData.grand_totals.gaji_bersih
                 )}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
                 {formatCurrency(
-                  comprehensiveSalaryData.grand_totals.setengah_bulan
+                  activeComprehensiveData.grand_totals.setengah_bulan
                 )}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.jumlah)}
+                {formatCurrency(activeComprehensiveData.grand_totals.jumlah)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.digenapkan)}
+                {formatCurrency(activeComprehensiveData.grand_totals.digenapkan)}
               </td>
               <td className="px-2 py-2 text-xs font-bold text-default-900 dark:text-gray-100 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
-                {formatCurrency(comprehensiveSalaryData.grand_totals.setelah_digenapkan)}
+                {formatCurrency(activeComprehensiveData.grand_totals.setelah_digenapkan)}
               </td>
             </tr>
           </tfoot>
@@ -1420,19 +1983,19 @@ const SalaryReportPage: React.FC = () => {
       <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
           <tr>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[60px] truncate" title="Number">
               NO.
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[150px] truncate" title="Staff Name">
               STAFF NAME
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[120px] truncate" title="IC Number">
               IC NO.
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[200px] truncate" title="Bank Account Number">
               BANK ACCOUNT NUMBER
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[100px] truncate" title="Total">
               TOTAL
             </th>
           </tr>
@@ -1468,22 +2031,22 @@ const SalaryReportPage: React.FC = () => {
       <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
           <tr>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[60px] truncate" title="Number">
               NO.
             </th>
-            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-left text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[150px] truncate" title="Staff ID and Name">
               STAFF/ID
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[120px] truncate" title="Gaji Digenapkan">
               GAJI/GENAP
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[120px] truncate" title="Total Pinjam">
               TOTAL PINJAM
             </th>
-            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-right text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[100px] truncate" title="Total">
               TOTAL
             </th>
-            <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-2 py-2 text-center text-sm font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider max-w-[100px] truncate" title="Payment Method">
               PAYMENT
             </th>
           </tr>
@@ -1491,24 +2054,24 @@ const SalaryReportPage: React.FC = () => {
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
           {reportData?.data.map((item, index) => (
             <tr key={item.staff_id} className={index % 2 === 0 ? "bg-white dark:bg-gray-800" : "bg-default-25 dark:bg-gray-750"}>
-              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100">
+              <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100">
                 {item.no}
               </td>
-              <td className="px-2 py-2">
+              <td className="px-2 py-1">
                 <div className="text-sm text-default-900 dark:text-gray-100 font-medium">
                   {item.staff_id} - {item.staff_name}
                 </div>
               </td>
-              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-right">
+              <td className="px-2 py-1 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.gaji_genap)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-600 dark:text-gray-300 text-right">
+              <td className="px-2 py-1 text-sm text-default-600 dark:text-gray-300 text-right">
                 {formatCurrency(item.total_pinjam)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 font-medium text-right">
+              <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100 font-medium text-right">
                 {formatCurrency(item.final_total)}
               </td>
-              <td className="px-2 py-2 text-sm text-default-900 dark:text-gray-100 text-center">
+              <td className="px-2 py-1 text-sm text-default-900 dark:text-gray-100 text-center">
                 <span
                   className={`inline-flex px-2 py-1 text-sm font-semibold rounded-full ${
                     item.payment_preference === "Bank"
@@ -1526,19 +2089,20 @@ const SalaryReportPage: React.FC = () => {
     </div>
   );
 
-  const tabLabels = ["Employee", "Salary", "Bank", "Pinjam"];
+  const tabLabels = ["Employee", "Location", "Bank", "Pinjam"];
 
   return (
     <div className="space-y-3">
       {/* Salary Report Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
-            <div className="flex flex-wrap items-center gap-3">
+          {/* Large screens (2xl/1536px+): Single row layout */}
+          <div className="hidden 2xl:flex 2xl:justify-between 2xl:items-center gap-3">
+            <div className="flex items-center gap-3">
               <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
                 Salary Report
               </h2>
-              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              <span className="text-default-300 dark:text-gray-600">|</span>
               {/* Tab buttons */}
               <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
                 {tabLabels.map((label, index) => (
@@ -1555,74 +2119,150 @@ const SalaryReportPage: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+              {/* Sub-view toggle for Employee tab - right after tabs */}
+              {activeTab === 0 && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      onClick={() => setEmployeeViewMode('individual')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        employeeViewMode === 'individual'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Individual
+                    </button>
+                    <button
+                      onClick={() => setEmployeeViewMode('location')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        employeeViewMode === 'location'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Location
+                    </button>
+                  </div>
+                </>
+              )}
+              {/* Period Toggle - only for tabs 0 (Employee) and 1 (Location) */}
+              {(activeTab === 0 || activeTab === 1) && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      onClick={() => setPeriodType('monthly')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        periodType === 'monthly'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setPeriodType('yearly')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                        periodType === 'yearly'
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      Yearly
+                    </button>
+                  </div>
+                </>
+              )}
+              <span className="text-default-300 dark:text-gray-600">|</span>
               <div className="flex items-center gap-2">
                 <YearNavigator
                   selectedYear={currentYear}
                   onChange={handleYearChange}
                   showGoToCurrentButton={false}
                 />
-                <MonthNavigator
-                  selectedMonth={selectedMonth}
-                  onChange={setSelectedMonth}
-                  showGoToCurrentButton={false}
-                  formatDisplay={(date) =>
-                    date.toLocaleDateString("en-MY", { month: "long" })
-                  }
-                />
+                {periodType === 'monthly' && (
+                  <MonthNavigator
+                    selectedMonth={selectedMonth}
+                    onChange={setSelectedMonth}
+                    showGoToCurrentButton={false}
+                    formatDisplay={(date) =>
+                      date.toLocaleDateString("en-MY", { month: "long" })
+                    }
+                  />
+                )}
               </div>
-              {reportData && (
+              {activeReportData && (
                 <>
-                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
                     <span className="font-medium">
-                      {reportData.total_records} employees
+                      {activeReportData.total_records} employees
                     </span>
                     <span className="font-medium">
-                      Total: {formatCurrency(reportData.summary.total_final)}
+                      Total: {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                 </>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <Button
-                onClick={fetchSalaryReport}
+                onClick={periodType === 'yearly' ? fetchYearlySalaryReport : fetchSalaryReport}
                 icon={IconRefresh}
                 variant="outline"
-                disabled={isLoading}
+                disabled={activeLoading}
                 size="sm"
               >
                 Refresh
               </Button>
-              <Button
-                onClick={() => generatePDF("print")}
-                icon={IconPrinter}
-                color="green"
-                variant="outline"
-                disabled={
-                  !reportData ||
-                  reportData.data.length === 0 ||
-                  isGeneratingPDF
-                }
-                size="sm"
+              <div
+                className="relative"
+                onMouseEnter={handlePrintDropdownMouseEnter}
+                onMouseLeave={handlePrintDropdownMouseLeave}
               >
-                Print
-              </Button>
-              <Button
-                onClick={() => generatePDF("download")}
-                icon={IconDownload}
-                color="blue"
-                variant="outline"
-                disabled={
-                  !reportData ||
-                  reportData.data.length === 0 ||
-                  isGeneratingPDF
-                }
-                size="sm"
-              >
-                Download
-              </Button>
+                <Button
+                  onClick={() => generatePDF("print")}
+                  icon={IconPrinter}
+                  color="green"
+                  variant="outline"
+                  disabled={
+                    !activeReportData ||
+                    activeReportData.data.length === 0 ||
+                    isGeneratingPDF
+                  }
+                  size="sm"
+                >
+                  Print
+                </Button>
+                {isPrintDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[140px]">
+                      <button
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          generatePDF("print");
+                        }}
+                        disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                        className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Print
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsPrintDropdownOpen(false);
+                          generatePDF("download");
+                        }}
+                        disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                        className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Download PDF
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               {activeTab === 2 && (
                 <>
                   <Button
@@ -1631,8 +2271,8 @@ const SalaryReportPage: React.FC = () => {
                     color="purple"
                     variant="outline"
                     disabled={
-                      !reportData ||
-                      reportData.data.length === 0 ||
+                      !activeReportData ||
+                      activeReportData.data.length === 0 ||
                       isGeneratingExport
                     }
                     size="sm"
@@ -1652,25 +2292,229 @@ const SalaryReportPage: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Smaller screens (<2xl/1536px): Multi-row layout */}
+          <div className="2xl:hidden space-y-3">
+            {/* Row 1: Title + Tabs + Action buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
+                  Salary Report
+                </h2>
+                <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                {/* Tab buttons */}
+                <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                  {tabLabels.map((label, index) => (
+                    <button
+                      key={label}
+                      onClick={() => setActiveTab(index)}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        activeTab === index
+                          ? "bg-sky-500 text-white"
+                          : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                      } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {/* Sub-view toggle for Employee tab - right after tabs */}
+                {activeTab === 0 && (
+                  <>
+                    <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                    <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                      <button
+                        onClick={() => setEmployeeViewMode('individual')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          employeeViewMode === 'individual'
+                            ? "bg-sky-500 text-white"
+                            : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        Individual
+                      </button>
+                      <button
+                        onClick={() => setEmployeeViewMode('location')}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                          employeeViewMode === 'location'
+                            ? "bg-sky-500 text-white"
+                            : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        Location
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Action buttons on the right */}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={periodType === 'yearly' ? fetchYearlySalaryReport : fetchSalaryReport}
+                  icon={IconRefresh}
+                  variant="outline"
+                  disabled={activeLoading}
+                  size="sm"
+                >
+                  Refresh
+                </Button>
+                <div
+                  className="relative"
+                  onMouseEnter={handlePrintDropdownMouseEnter}
+                  onMouseLeave={handlePrintDropdownMouseLeave}
+                >
+                  <Button
+                    onClick={() => generatePDF("print")}
+                    icon={IconPrinter}
+                    color="green"
+                    variant="outline"
+                    disabled={
+                      !activeReportData ||
+                      activeReportData.data.length === 0 ||
+                      isGeneratingPDF
+                    }
+                    size="sm"
+                  >
+                    Print
+                  </Button>
+                  {isPrintDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[140px]">
+                        <button
+                          onClick={() => {
+                            setIsPrintDropdownOpen(false);
+                            generatePDF("print");
+                          }}
+                          disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                          className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Print
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsPrintDropdownOpen(false);
+                            generatePDF("download");
+                          }}
+                          disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                          className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Download PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {activeTab === 2 && (
+                  <>
+                    <Button
+                      onClick={generateTextExport}
+                      icon={IconFileExport}
+                      color="purple"
+                      variant="outline"
+                      disabled={
+                        !activeReportData ||
+                        activeReportData.data.length === 0 ||
+                        isGeneratingExport
+                      }
+                      size="sm"
+                    >
+                      Export
+                    </Button>
+                    <Button
+                      onClick={() => setShowExportDialog(true)}
+                      icon={IconLink}
+                      color="orange"
+                      variant="outline"
+                      size="sm"
+                    >
+                      Export Link
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Period toggle + Navigators + Stats + View toggle */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Period Toggle - only for tabs 0 (Employee) and 1 (Location) */}
+              {(activeTab === 0 || activeTab === 1) && (
+                <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
+                  <button
+                    onClick={() => setPeriodType('monthly')}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                      periodType === 'monthly'
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setPeriodType('yearly')}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-default-200 dark:border-gray-600 ${
+                      periodType === 'yearly'
+                        ? "bg-sky-500 text-white"
+                        : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Yearly
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <YearNavigator
+                  selectedYear={currentYear}
+                  onChange={handleYearChange}
+                  showGoToCurrentButton={false}
+                />
+                {periodType === 'monthly' && (
+                  <MonthNavigator
+                    selectedMonth={selectedMonth}
+                    onChange={setSelectedMonth}
+                    showGoToCurrentButton={false}
+                    formatDisplay={(date) =>
+                      date.toLocaleDateString("en-MY", { month: "long" })
+                    }
+                  />
+                )}
+              </div>
+              {activeReportData && (
+                <>
+                  <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+                  <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
+                    <span className="font-medium">
+                      {activeReportData.total_records} employees
+                    </span>
+                    <span className="font-medium">
+                      Total: {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        {isLoading ? (
+        {activeLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : !reportData || reportData.data.length === 0 ? (
+        ) : !activeReportData || activeReportData.data.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No salary data found</p>
             <p>
-              No salary data available for {getMonthName(currentMonth)}{" "}
-              {currentYear}
+              No salary data available for {periodType === 'yearly' ? currentYear : `${getMonthName(currentMonth)} ${currentYear}`}
             </p>
           </div>
         ) : (
           <>
-            <div className="px-6 py-4">
-              {activeTab === 0 && <EmployeeSalaryTable />}
+            <div className="px-6 pt-2">
+              {activeTab === 0 && (
+                employeeViewMode === 'individual'
+                  ? <EmployeeSalaryTable />
+                  : <LocationGroupedTable />
+              )}
               {activeTab === 1 && <ComprehensiveSalaryTable />}
               {activeTab === 2 && <BankTable />}
               {activeTab === 3 && <PinjamTable />}
@@ -1681,25 +2525,25 @@ const SalaryReportPage: React.FC = () => {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
                 <div className="text-sm text-default-600 dark:text-gray-300">
                   <span className="font-medium">Total Records:</span>{" "}
-                  {reportData.total_records}
+                  {activeReportData.total_records}
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Gaji/Genap:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(reportData.summary.total_gaji_genap)}
+                      {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Pinjam:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(reportData.summary.total_pinjam)}
+                      {formatCurrency(activeReportData.summary.total_pinjam)}
                     </span>
                   </div>
                   <div className="text-sky-700 dark:text-sky-400">
                     <span className="font-semibold">Grand Total:</span>{" "}
                     <span className="font-bold text-sky-800 dark:text-sky-300">
-                      {formatCurrency(reportData.summary.total_final)}
+                      {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
                     </span>
                   </div>
                 </div>
