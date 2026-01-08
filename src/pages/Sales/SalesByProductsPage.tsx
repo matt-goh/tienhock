@@ -648,10 +648,9 @@ const SalesByProductsPage: React.FC = () => {
     <div className="space-y-4">
       {/* Summary section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold">Summary</h2>
-
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold">Summary</h2>
+          <div className="flex flex-wrap items-center gap-3">
             {/* Date Range Picker */}
             <DateRangePicker
               dateRange={dateRange}
@@ -677,7 +676,7 @@ const SalesByProductsPage: React.FC = () => {
           </div>
         </div>
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Total Sales */}
           <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-sky-500 p-3">
             <div className="text-sm text-default-500 dark:text-gray-400">Total</div>
@@ -1190,10 +1189,10 @@ const SalesByProductsPage: React.FC = () => {
 
           {/* Product Mix Analysis Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
               <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
-              <div className="flex items-center gap-3">
-                <div className="w-96">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="w-full sm:w-96">
                   <FormCombobox
                     name="chartProducts"
                     label=""
