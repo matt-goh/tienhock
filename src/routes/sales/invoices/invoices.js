@@ -178,6 +178,57 @@ const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
   }
 };
 
+/**
+ * Clear e-invoice status for invoices where customer lacks e-invoice info.
+ * Targets 'invalid' status invoices where customer has neither tin_number nor id_number.
+ * @param {object} pool - Database connection pool
+ * @returns {Promise<number>} Number of invoices cleared
+ */
+const clearInvalidEInvoicesForNonEligibleCustomers = async (pool) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const clearQuery = `
+      UPDATE invoices i
+      SET einvoice_status = NULL,
+          uuid = NULL,
+          submission_uid = NULL,
+          long_id = NULL,
+          datetime_validated = NULL
+      FROM customers c
+      WHERE i.customerid = c.id
+        AND i.einvoice_status = 'invalid'
+        AND i.invoice_status != 'cancelled'
+        AND (c.tin_number IS NULL OR c.tin_number = '')
+        AND (c.id_number IS NULL OR c.id_number = '')
+      RETURNING i.id, c.name as customer_name
+    `;
+
+    const result = await client.query(clearQuery);
+    await client.query("COMMIT");
+
+    if (result.rows.length > 0) {
+      console.log(
+        `[E-Invoice Clearing] Cleared ${result.rows.length} invalid invoices for non-eligible customers:`,
+        result.rows.map((r) => `${r.id} (${r.customer_name})`).join(", ")
+      );
+    } else {
+      console.log(
+        `[E-Invoice Clearing] No invalid invoices found for non-eligible customers`
+      );
+    }
+
+    return result.rows.length;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`[E-Invoice Clearing] Error:`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 const fetchCustomerData = async (pool, customerId) => {
   try {
     const query = `
@@ -231,6 +282,9 @@ const updateCustomerCredit = async (client, customerId, amount) => {
   }
 };
 
+// Export for use in server.js cron job
+export { clearInvalidEInvoicesForNonEligibleCustomers };
+
 export default function (pool, config) {
   const router = Router();
 
@@ -280,7 +334,14 @@ export default function (pool, config) {
   };
 
   // Initialize on server start (delayed to allow DB to fully start)
-  setTimeout(() => initializePendingInvoiceChecks(), 15000);
+  setTimeout(() => {
+    initializePendingInvoiceChecks();
+
+    // Clear invalid e-invoices for non-eligible customers
+    clearInvalidEInvoicesForNonEligibleCustomers(pool).catch((error) =>
+      console.error("[E-Invoice Clearing] Error in initial clearing:", error)
+    );
+  }, 15000);
 
   // Customer data cache
   const customerCache = new Map();
