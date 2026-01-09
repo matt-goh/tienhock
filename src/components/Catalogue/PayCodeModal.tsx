@@ -62,6 +62,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
     { id: "Trip", name: "Trip" },
+    { id: "Tray", name: "Tray" },
     { id: "Percent", name: "Percent" },
     { id: "Fixed", name: "Fixed" },
   ];
@@ -134,7 +135,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     (name: keyof Omit<PayCode, "code">) => (value: string) => {
       if (
         name === "rate_unit" &&
-        ["Percent", "Trip", "Day", "Bag", "Fixed"].includes(value)
+        ["Percent", "Trip", "Day", "Bag", "Fixed", "Tray"].includes(value)
       ) {
         // When rate unit is Percent, Trip, Day, Bag, or Fixed, automatically set requires_units_input to true
         setFormData((prev) => ({
