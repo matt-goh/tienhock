@@ -143,6 +143,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     >
   >({});
+  // State for BH_SANGKUT tray counts (only used for BIHUN jobType)
+  const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
+
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
   // Get job configuration
@@ -150,6 +153,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const contextLinkedPayCodes = jobConfig
     ? getContextLinkedPayCodes(jobConfig)
     : {};
+
+  // Constant for the BHANGKUT paycode ID (for BH_SANGKUT tray linking)
+  const BHANGKUT_PAYCODE = "BHANGKUT";
+
+  // Check if current page is BIHUN production (for conditionally showing Tray column)
+  const isBihunPage = jobType === "BIHUN";
 
   // Helper function to determine day type based on date
   const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
@@ -218,6 +227,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployees: Record<string, LeaveEntry>;
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
     leaveBalances: Record<string, any>;
+    trayCounts: Record<string, number>;
   } | null>(null);
 
   // Ref to track which work log's formData has been initialized
@@ -298,7 +308,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         normalizeForComparison(leaveEmployeeActivities) !==
           normalizeForComparison(initialState.leaveEmployeeActivities) ||
         normalizeForComparison(leaveBalances) !==
-          normalizeForComparison(initialState.leaveBalances)
+          normalizeForComparison(initialState.leaveBalances) ||
+        normalizeForComparison(trayCounts) !==
+          normalizeForComparison(initialState.trayCounts)
       );
     } catch (error) {
       console.warn("Error comparing states, defaulting to no changes:", error);
@@ -311,6 +323,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployees,
     leaveEmployeeActivities,
     leaveBalances,
+    trayCounts,
     initialState,
     isInitializationComplete,
     mode,
@@ -393,6 +406,47 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
     }
   }, [formData.dayType]);
+
+  // Update BHANGKUT activities when trayCounts changes (BIHUN jobType only)
+  useEffect(() => {
+    if (!isInitializationComplete || !isBihunPage) return;
+
+    Object.entries(trayCounts).forEach(([rowKey, trayCount]) => {
+      // Only process if activities exist for this row
+      if (employeeActivities[rowKey] && employeeActivities[rowKey].length > 0) {
+        setEmployeeActivities((prev) => {
+          const activities = prev[rowKey] || [];
+          let hasChanges = false;
+
+          const updatedActivities = activities.map((activity) => {
+            if (activity.payCodeId === BHANGKUT_PAYCODE) {
+              const newAmount = trayCount * (activity.rate || 0);
+              if (
+                activity.unitsProduced !== trayCount ||
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== (trayCount > 0)
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  unitsProduced: trayCount,
+                  isSelected: trayCount > 0,
+                  calculatedAmount: newAmount,
+                };
+              }
+            }
+            return activity;
+          });
+
+          if (hasChanges) {
+            return { ...prev, [rowKey]: updatedActivities };
+          }
+          return prev;
+        });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trayCounts, isInitializationComplete, isBihunPage]);
 
   // Update the jobs filter based on dynamic configuration
   const jobs = useMemo(() => {
@@ -631,6 +685,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             JSON.stringify(leaveEmployeeActivities)
           ),
           leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
+          trayCounts: JSON.parse(JSON.stringify(trayCounts)),
         });
       }, 300); // Longer delay to ensure stability
 
@@ -1090,6 +1145,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
+  // Handle tray count changes for BH_SANGKUT employees (BIHUN only)
+  const handleTrayCountChange = (rowKey: string, value: string) => {
+    const numValue = value === "" ? 0 : parseInt(value) || 0;
+    setTrayCounts((prev) => ({
+      ...prev,
+      [rowKey]: numValue,
+    }));
+  };
+
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
     if (!employee.rowKey) {
@@ -1208,6 +1272,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           JSON.stringify(leaveEmployeeActivities)
         ),
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
+        trayCounts: JSON.parse(JSON.stringify(trayCounts)),
       });
       // Navigate to details page after edit, list page after create
       if (mode === "edit" && existingWorkLog) {
@@ -1833,6 +1898,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
       const newEmployeeActivities: Record<string, any[]> = {};
+      const newTrayCounts: Record<string, number> = {};
 
       // Clear and populate the saved employee row keys ref
       // This tracks which employees were originally in the work log
@@ -1883,6 +1949,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           newEmployeeActivities[rowKey] = restoredActivities;
           // Also store in ref to preserve original state for deselect/re-select cycles
           savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
+
+          // Extract tray count from BHANGKUT activity for BH_SANGKUT entries (BIHUN only)
+          if (entry.job_id === "BH_SANGKUT") {
+            const bhangkutActivity = entry.activities.find(
+              (a: any) => a.pay_code_id === "BHANGKUT"
+            );
+            if (bhangkutActivity && bhangkutActivity.units_produced > 0) {
+              newTrayCounts[rowKey] = parseFloat(bhangkutActivity.units_produced);
+            }
+          }
         }
       });
 
@@ -1892,6 +1968,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         jobHours: newJobHours,
       });
       setEmployeeActivities(newEmployeeActivities);
+
+      // Apply tray counts if any were restored (BIHUN only)
+      if (Object.keys(newTrayCounts).length > 0) {
+        setTrayCounts(newTrayCounts);
+      }
 
       // Restore leave records if they exist
       if (
@@ -2020,6 +2101,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       ...prev,
       [rowKey]: activities,
     }));
+
+    // Sync tray count if BHANGKUT activity was modified (BIHUN BH_SANGKUT only)
+    if (isBihunPage && selectedEmployee.jobType === "BH_SANGKUT") {
+      const bhangkutActivity = activities.find(
+        (a) => a.payCodeId === BHANGKUT_PAYCODE && a.isSelected
+      );
+      const newTrayCount = bhangkutActivity?.unitsProduced || 0;
+      setTrayCounts((prev) => ({
+        ...prev,
+        [rowKey]: newTrayCount,
+      }));
+    }
 
     toast.success(`Activities updated for ${selectedEmployee.name}`);
   };
@@ -2201,6 +2294,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         >
                           Hours
                         </th>
+                        {isBihunPage && (
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Tray
+                          </th>
+                        )}
                         <th
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
@@ -2320,6 +2421,25 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 />
                               </div>
                             </td>
+                            {isBihunPage && (
+                              <td className="px-4 py-2 whitespace-nowrap text-center">
+                                {row.jobType === "BH_SANGKUT" ? (
+                                  <input
+                                    type="number"
+                                    value={isSelected ? (trayCounts[row.rowKey || ""] || 0).toString() : ""}
+                                    onChange={(e) => handleTrayCountChange(row.rowKey || "", e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-16 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
+                                    min="0"
+                                    step="1"
+                                    disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
+                                ) : (
+                                  <span className="text-xs text-default-400 dark:text-gray-500">-</span>
+                                )}
+                              </td>
+                            )}
                             <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(

@@ -61,6 +61,7 @@ export function calculateActivityAmount(
     case "Day":
     case "Bag":
     case "Trip":
+    case "Tray":
       // Calculate based on units produced + FOC
       if (
         activity.unitsProduced !== null &&
@@ -129,7 +130,8 @@ export function calculateActivitiesAmounts(
       !activity.isSelected &&
       activity.rateUnit !== "Bag" &&
       activity.rateUnit !== "Trip" &&
-      activity.rateUnit !== "Day";
+      activity.rateUnit !== "Day" &&
+      activity.rateUnit !== "Tray";
 
     return {
       ...activity,
