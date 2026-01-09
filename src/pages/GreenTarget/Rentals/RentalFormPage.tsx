@@ -208,7 +208,8 @@ const RentalFormPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [formData.date_placed, dumpsterAvailability]); // Re-run if date changes OR availability needs refresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.date_placed]); // Only re-run when date changes - previousDateRef handles deduplication
 
   // Fetch Rental Details in Edit Mode
   useEffect(() => {

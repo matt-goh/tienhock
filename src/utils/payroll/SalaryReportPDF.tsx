@@ -156,22 +156,22 @@ const styles = StyleSheet.create({
   // Regular columns: padding 2 horizontal, 1 vertical (matching px-2 py-2 scaled down)
   // EPF/SOCSO/SIP columns: padding 1 horizontal (matching px-1 py-2 scaled down)
   colBil: { width: "2.5%", textAlign: "center", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
-  colName: { width: "14%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colName: { width: "18%", textAlign: "left", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colGaji: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colOt: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colBonus: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colComm: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
-  colGajiKasar: { width: "5.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colGajiKasar: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   // EPF group - left border on MAJ to separate from previous section
-  colEpfMaj: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  colEpfPkj: { width: "5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colEpfMaj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
+  colEpfPkj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
   // SOCSO group - left border on MAJ to separate from EPF
-  colSocsoMaj: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
-  colSocsoPkj: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colSocsoMaj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
+  colSocsoPkj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
   // SIP group - left border on MAJ to separate from SOCSO
   colSipMaj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.borderLight },
   colSipPkj: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 1, borderRightWidth: 0.5, borderRightColor: colors.border },
-  colPcb: { width: "4.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.border },
+  colPcb: { width: "4%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderLeftWidth: 0.5, borderLeftColor: colors.border, borderRightWidth: 0.5, borderRightColor: colors.border },
   colGajiBersih: { width: "5.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colSetengah: { width: "5.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
   colJumlah: { width: "5.5%", textAlign: "right", paddingVertical: 1, paddingHorizontal: 2, borderRightWidth: 0.5, borderRightColor: colors.border },
@@ -384,8 +384,8 @@ const TableHeader: React.FC<{ isLocationReport: boolean }> = ({
   const nameHeader = isLocationReport ? "BAHAGIAN KERJA" : "NAMA PEKERJA";
 
   // Combined widths for spanning headers
-  const epfWidth = "10%"; // 5% + 5%
-  const socsoWidth = "9%"; // 4.5% + 4.5%
+  const epfWidth = "8%"; // 4% + 4%
+  const socsoWidth = "8%"; // 4% + 4%
   const sipWidth = "8%"; // 4% + 4%
 
   return (
