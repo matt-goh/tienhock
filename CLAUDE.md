@@ -48,11 +48,12 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (69 tables)
+#### Database Schema (70 tables)
 
 **Accounting & Finance:**
-- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by
+- `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
 - `account_codes_hierarchy` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, path, path_array, depth
+- `financial_statement_notes` - code (PK), name, description, category (asset/liability/equity/revenue/expense/cogs), report_section (balance_sheet/income_statement/cogm), normal_balance (debit/credit), sort_order, parent_note, is_active, created_at, updated_at
 - `journal_entries` - id, reference_no, entry_type, entry_date, description, total_debit, total_credit, status, created_at, updated_at, created_by, updated_by, posted_at, posted_by
 - `journal_entry_lines` - id, journal_entry_id, line_number, account_code, debit_amount, credit_amount, reference, particulars, created_at
 - `journal_entry_types` - code, name, description, is_active

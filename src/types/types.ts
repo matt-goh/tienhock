@@ -856,6 +856,7 @@ export interface AccountCode {
   is_active: boolean;
   is_system: boolean; // System accounts cannot be deleted
   notes?: string;
+  fs_note?: string | null; // Financial statement note reference (e.g., "1", "3-1", "14-2")
   created_at?: string;
   updated_at?: string;
   created_by?: string;

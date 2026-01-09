@@ -14,7 +14,7 @@ export default function (pool) {
       let query = `
         SELECT
           id, code, description, ledger_type, parent_code,
-          level, sort_order, is_active, is_system, notes,
+          level, sort_order, is_active, is_system, notes, fs_note,
           created_at, updated_at
         FROM account_codes
         WHERE 1=1
@@ -101,7 +101,7 @@ export default function (pool) {
       }
 
       const query = `
-        SELECT code, description, ledger_type, parent_code, is_active
+        SELECT code, description, ledger_type, parent_code, is_active, fs_note
         FROM account_codes
         WHERE is_active = true
           AND (code ILIKE $1 OR description ILIKE $1)
@@ -133,7 +133,7 @@ export default function (pool) {
 
       const query = `
         SELECT id, code, description, ledger_type, parent_code,
-               level, sort_order, is_active, is_system
+               level, sort_order, is_active, is_system, fs_note
         FROM account_codes
         WHERE parent_code = $1
         ORDER BY sort_order, code
@@ -158,7 +158,7 @@ export default function (pool) {
       const query = `
         SELECT
           id, code, description, ledger_type, parent_code,
-          level, sort_order, is_active, is_system, notes,
+          level, sort_order, is_active, is_system, notes, fs_note,
           created_at, updated_at, created_by, updated_by
         FROM account_codes
         WHERE code = $1
@@ -407,6 +407,57 @@ export default function (pool) {
       });
     } finally {
       client.release();
+    }
+  });
+
+  // PATCH /:code/fs-note - Update only the financial statement note
+  router.patch("/:code/fs-note", async (req, res) => {
+    const { code } = req.params;
+    const { fs_note } = req.body;
+
+    try {
+      // Validate fs_note if provided (must be null or exist in financial_statement_notes)
+      if (fs_note !== null && fs_note !== undefined && fs_note !== "") {
+        const noteCheck = await pool.query(
+          "SELECT 1 FROM financial_statement_notes WHERE code = $1",
+          [fs_note]
+        );
+        if (noteCheck.rows.length === 0) {
+          return res.status(400).json({
+            message: `Financial statement note '${fs_note}' does not exist`,
+          });
+        }
+      }
+
+      const updateQuery = `
+        UPDATE account_codes
+        SET fs_note = $1, updated_at = CURRENT_TIMESTAMP, updated_by = $2
+        WHERE code = $3
+        RETURNING code, description, fs_note
+      `;
+
+      const result = await pool.query(updateQuery, [
+        fs_note || null,
+        req.staffId || null,
+        code,
+      ]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: `Account code '${code}' not found`,
+        });
+      }
+
+      res.json({
+        message: "Financial statement note updated",
+        accountCode: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error updating fs_note:", error);
+      res.status(500).json({
+        message: "Error updating financial statement note",
+        error: error.message,
+      });
     }
   });
 

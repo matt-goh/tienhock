@@ -77,6 +77,24 @@ export const api = {
     }
   },
 
+  patch: async (endpoint, data) => {
+    const sessionId = sessionService.getSessionId();
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId,
+        },
+        body: JSON.stringify(data),
+      });
+
+      return handleResponse(response);
+    } catch (error) {
+      throw error;
+    }
+  },
+
   delete: async (endpoint, payload) => {
     const sessionId = sessionService.getSessionId();
     try {
