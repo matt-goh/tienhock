@@ -143,7 +143,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }
     >
   >({});
-  // State for BH_SANGKUT tray counts (only used for BIHUN jobType)
+  // State for BIHUN_SANGKUT tray counts (only used for BIHUN jobType)
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
@@ -154,7 +154,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     ? getContextLinkedPayCodes(jobConfig)
     : {};
 
-  // Constant for the BHANGKUT paycode ID (for BH_SANGKUT tray linking)
+  // Constant for the BHANGKUT paycode ID (for BIHUN_SANGKUT tray linking)
   const BHANGKUT_PAYCODE = "BHANGKUT";
 
   // Check if current page is BIHUN production (for conditionally showing Tray column)
@@ -1145,7 +1145,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   };
 
-  // Handle tray count changes for BH_SANGKUT employees (BIHUN only)
+  // Handle tray count changes for BIHUN_SANGKUT employees (BIHUN only)
   const handleTrayCountChange = (rowKey: string, value: string) => {
     const numValue = value === "" ? 0 : parseInt(value) || 0;
     setTrayCounts((prev) => ({
@@ -1950,8 +1950,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Also store in ref to preserve original state for deselect/re-select cycles
           savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
 
-          // Extract tray count from BHANGKUT activity for BH_SANGKUT entries (BIHUN only)
-          if (entry.job_id === "BH_SANGKUT") {
+          // Extract tray count from BHANGKUT activity for BIHUN_SANGKUT entries (BIHUN only)
+          if (entry.job_id === "BIHUN_SANGKUT") {
             const bhangkutActivity = entry.activities.find(
               (a: any) => a.pay_code_id === "BHANGKUT"
             );
@@ -2102,8 +2102,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       [rowKey]: activities,
     }));
 
-    // Sync tray count if BHANGKUT activity was modified (BIHUN BH_SANGKUT only)
-    if (isBihunPage && selectedEmployee.jobType === "BH_SANGKUT") {
+    // Sync tray count if BHANGKUT activity was modified (BIHUN BIHUN_SANGKUT only)
+    if (isBihunPage && selectedEmployee.jobType === "BIHUN_SANGKUT") {
       const bhangkutActivity = activities.find(
         (a) => a.payCodeId === BHANGKUT_PAYCODE && a.isSelected
       );
@@ -2423,7 +2423,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             {isBihunPage && (
                               <td className="px-4 py-2 whitespace-nowrap text-center">
-                                {row.jobType === "BH_SANGKUT" ? (
+                                {row.jobType === "BIHUN_SANGKUT" ? (
                                   <input
                                     type="number"
                                     value={isSelected ? (trayCounts[row.rowKey || ""] || 0).toString() : ""}
