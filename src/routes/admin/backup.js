@@ -19,26 +19,23 @@ export default function backupRouter(pool) {
     return 'tienhock_dev_db';
   };
 
-  // When running inside docker container, use localhost since we're in the db container
-  const getDbHost = () => 'localhost';
-
-  // Check if running in Docker or on host
-  const isRunningInDocker = () => {
-    // On Windows/Mac development, we run on host and use docker exec
-    // On production Linux server, we might run directly in container
-    return process.platform !== 'win32' && process.platform !== 'darwin';
+  // Check if we should use docker exec (only for Windows/Mac development)
+  const shouldUseDockerExec = () => {
+    // On Windows/Mac, we use docker exec to run commands in the DB container
+    // On production Linux (Hetzner), we run commands directly (no Docker)
+    return (process.platform === 'win32' || process.platform === 'darwin');
   };
 
   // Execute a command - either directly or via docker exec
   const executeCommand = async (command, options = {}) => {
-    if (isRunningInDocker()) {
-      // Running inside Docker, execute directly
-      return execAsync(command, options);
-    } else {
-      // Running on host (Windows/Mac), use docker exec
+    if (shouldUseDockerExec()) {
+      // Running on Windows/Mac dev, use docker exec
       const containerName = getContainerName();
       const dockerCommand = `docker exec ${containerName} bash -c "${command.replace(/"/g, '\\"')}"`;
       return execAsync(dockerCommand, options);
+    } else {
+      // Running on Linux (production Hetzner or Docker container), execute directly
+      return execAsync(command, options);
     }
   };
 
@@ -51,8 +48,8 @@ export default function backupRouter(pool) {
 
   async function restoreDatabase(backupPath) {
     let cachedSessions = [];
-    const dbHost = isRunningInDocker() ? DB_HOST : getDbHost();
-    const dbPort = isRunningInDocker() ? DB_PORT : '5432';
+    const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
+    const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
 
     try {
       restoreState = {
@@ -179,8 +176,8 @@ export default function backupRouter(pool) {
         customName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
       }
 
-      const dbHost = isRunningInDocker() ? DB_HOST : getDbHost();
-      const dbPort = isRunningInDocker() ? DB_PORT : '5432';
+      const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
+      const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
       const envBackupDir = `${backupDir}/${env}`;
 
       // Generate timestamp
@@ -334,8 +331,8 @@ export default function backupRouter(pool) {
 
       // Create a temporary database name
       const tempDbName = `temp_restore_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      const dbHost = isRunningInDocker() ? DB_HOST : getDbHost();
-      const dbPort = isRunningInDocker() ? DB_PORT : '5432';
+      const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
+      const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
 
       try {
         console.log(`Creating temporary database: ${tempDbName}`);
@@ -351,7 +348,7 @@ export default function backupRouter(pool) {
         console.log(`Dumping temporary database with INSERT statements`);
 
         // Step 3: Stream pg_dump output from container to response
-        if (isRunningInDocker()) {
+        if (shouldUseDockerExec()) {
           // Running in Docker, spawn pg_dump directly
           const pgDumpArgs = [
             '-h', dbHost,
@@ -418,7 +415,7 @@ export default function backupRouter(pool) {
 
       } catch (error) {
         console.error('Error during backup conversion:', error);
-        await cleanupTempDb(tempDbName, isRunningInDocker() ? DB_HOST : getDbHost(), isRunningInDocker() ? DB_PORT : '5432');
+        await cleanupTempDb(tempDbName, shouldUseDockerExec() ? 'localhost' : DB_HOST, shouldUseDockerExec() ? '5432' : DB_PORT);
         throw error;
       }
 
