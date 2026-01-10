@@ -151,6 +151,34 @@ export async function listS3Backups(env) {
 }
 
 /**
+ * Delete a specific backup from S3
+ * @param {string} filename - Filename to delete
+ * @param {string} env - Environment (development/production)
+ * @returns {Promise<boolean>} - True if deleted successfully
+ */
+export async function deleteS3Backup(filename, env) {
+  if (!isS3BackupEnabled()) {
+    return false;
+  }
+
+  try {
+    const client = getS3Client();
+    const s3Key = `${env}/${filename}`;
+
+    await client.send(new DeleteObjectCommand({
+      Bucket: S3_BUCKET_NAME,
+      Key: s3Key,
+    }));
+
+    console.log(`[S3 Backup] Deleted: ${s3Key}`);
+    return true;
+  } catch (error) {
+    console.warn(`[S3 Backup] Failed to delete ${filename}: ${error.message}`);
+    return false;
+  }
+}
+
+/**
  * Delete old S3 backups beyond retention period
  * @param {string} env - Environment (development/production)
  * @param {number} retentionDays - Number of days to retain backups (default: 1095 = 3 years)
