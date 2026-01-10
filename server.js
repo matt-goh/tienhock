@@ -57,7 +57,7 @@ const corsConfig =
     : {
         // In development, Express handles CORS
         origin: ["http://localhost:3000", "http://localhost:5000"], // Allow frontend and potentially backend itself
-        methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+        methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"],
         allowedHeaders: [
           "Content-Type",
           "Authorization",
