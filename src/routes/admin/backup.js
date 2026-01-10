@@ -3,7 +3,7 @@ import express from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
-import { uploadBackupToS3, listS3Backups } from '../../utils/s3-backup.js';
+import { uploadBackupToS3, listS3Backups, deleteS3Backup } from '../../utils/s3-backup.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -231,9 +231,12 @@ export default function backupRouter(pool) {
       const envBackupDir = `${backupDir}/${env}`;
       const filePath = `${envBackupDir}/${filename}`;
 
-      // Delete the backup file
+      // Delete the local backup file
       const deleteCommand = `rm -f "${filePath}"`;
       await executeCommand(deleteCommand);
+
+      // Delete from S3
+      await deleteS3Backup(filename, env);
 
       // Log deletion
       const logCommand = `echo "[${env}] Backup deleted: ${filename} at $(date -Iseconds)" >> "${envBackupDir}/backup.log"`;
