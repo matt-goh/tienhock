@@ -247,8 +247,8 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
   const buttonClasses =
     size === "sm"
-      ? "flex items-center px-3 h-8 text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors"
-      : "flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-default-300 rounded-full transition-colors";
+      ? "flex items-center px-3 h-8 text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-800 border border-default-300 dark:border-gray-600 rounded-full transition-colors"
+      : "flex items-center px-4 h-[42px] text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/50 hover:bg-sky-100 dark:hover:bg-sky-800 border border-default-300 dark:border-gray-600 rounded-full transition-colors";
 
   const iconSize = size === "sm" ? 16 : 18;
 
@@ -392,7 +392,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
                   {/* Loading Steps */}
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-sky-700 min-h-[20px]">
+                    <p className="text-sm font-medium text-sky-700 dark:text-sky-300 min-h-[20px]">
                       {loadingStep || "Initializing..."}
                     </p>
 

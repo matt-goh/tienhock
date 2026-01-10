@@ -20,11 +20,13 @@ Last bulk mapping performed: **January 2026**
 2. **Account Codes** → `account_codes.fs_note` column maps each account to a financial statement note
 3. **Financial Statement Notes** → `financial_statement_notes` table defines report line items
 4. **Reports** → Backend aggregates journal entries by `fs_note` to generate reports
+5. **Invoice-Based Overrides** → Note 22 & Note 7 are calculated directly from `invoices` table
 
 ### Key Tables
 - `account_codes` - Contains `fs_note` column linking to financial statement notes
 - `financial_statement_notes` - Defines 33 report line items with category/section
 - `journal_entry_lines` - Transaction data with debit/credit amounts
+- `invoices` - Source for Trade Receivables (Note 22) and Revenue (Note 7)
 
 ---
 
@@ -291,18 +293,22 @@ This section documents where each financial statement note gets its data from.
 - Same vouchers as above
 - Account codes: BS_*, MS_*, MB* (factory labor by section)
 
+**Note 22 - Trade Receivables** ✅ IMPLEMENTED
+- Source: `invoices` table (direct calculation, bypasses journal entries)
+- Calculation: `SUM(balance_due)` from unpaid/overdue invoices
+- Filter: `invoice_status IN ('Unpaid', 'Overdue') AND balance_due > 0.01`
+- Date logic: Cumulative - all outstanding invoices up to period end date
+- Implementation: `getTradeReceivables()` in `financial-reports.js`
+
+**Note 7 - Revenue/Sales** ✅ IMPLEMENTED
+- Source: `invoices` table (direct calculation, bypasses journal entries)
+- Calculation: `SUM(total_excluding_tax)` from all invoices (accrual basis)
+- Date logic: YTD - from January 1 to end of selected month
+- Implementation: `getRevenue()` in `financial-reports.js`
+
 ---
 
 ### SHOULD BE AUTOMATED (Data Exists, Needs Implementation)
-
-**Note 22 - Trade Receivables** ⭐ HIGH PRIORITY
-- Expected source: `invoices` table
-- Current data: 2,736 invoices (RM 5.7M total), RM 540K in customer balances
-- Needs: Invoice → Journal Entry generation system
-
-**Note 7 - Revenue/Sales** ⭐ HIGH PRIORITY
-- Expected source: `invoices` table
-- Same as Note 22 - invoices should generate DR: Receivables, CR: Revenue
 
 **Note 19 - Cash at Bank**
 - Expected source: `payments` table
@@ -357,9 +363,11 @@ This section documents where each financial statement note gets its data from.
 
 ### Implementation Priority
 
+**Completed** ✅:
+1. ~~Invoices → Trade Receivables + Revenue~~ - **DONE** (Note 22 & Note 7 now pull directly from invoices)
+
 **High Priority** (data waiting to be converted):
-1. Invoices → Trade Receivables + Revenue (2,736 invoices, RM 5.7M)
-2. Payments → Cash/Bank
+2. Payments → Cash/Bank (Note 19)
 
 **Medium Priority** (needs stock system first):
 3. Stock entries → Closing/Opening Stock
@@ -386,6 +394,22 @@ Backend API: `src/routes/accounting/financial-reports.js`
 
 ---
 
+## Date Range Logic
+
+All financial reports now use **Year-to-Date (YTD)** date ranges:
+
+| Selected Month | Data Range |
+|----------------|------------|
+| August 2025 | January 1, 2025 → August 31, 2025 |
+| December 2025 | January 1, 2025 → December 31, 2025 |
+
+- **Trial Balance**: YTD journal entries + invoice-based Note 22 & Note 7
+- **Income Statement**: YTD revenue/expenses, Note 7 from invoices
+- **Balance Sheet**: YTD balances, Note 22 from invoices (cumulative outstanding)
+- **COGM**: YTD cost of goods manufactured
+
+---
+
 *Last Updated: January 2026*
 *All 2,754 account codes mapped*
-*Data sources documented - see "Data Sources by Note" section*
+*Note 22 (Trade Receivables) and Note 7 (Revenue) now automated from invoices*
