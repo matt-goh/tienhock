@@ -231,7 +231,7 @@ export default function backupRouter(pool) {
       const envBackupDir = `${backupDir}/${env}`;
       const filePath = `${envBackupDir}/${filename}`;
 
-      // Delete the backup file via docker exec
+      // Delete the backup file
       const deleteCommand = `rm -f "${filePath}"`;
       await executeCommand(deleteCommand);
 
@@ -434,7 +434,7 @@ export default function backupRouter(pool) {
       return res.status(400).json({ error: 'Filename is required' });
     }
 
-    if (restoreState.isRestoring) {
+    if (restoreState.status === 'RESTORING') {
       return res.status(503).json({
         error: 'Service unavailable',
         message: 'A restore operation is already in progress'
