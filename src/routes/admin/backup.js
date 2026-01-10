@@ -3,7 +3,7 @@ import express from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
-import { uploadBackupToS3 } from '../../utils/s3-backup.js';
+import { uploadBackupToS3, listBackupsFromS3 } from '../../utils/s3-backup.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -248,28 +248,18 @@ export default function backupRouter(pool) {
 
   router.get('/list', async (req, res) => {
     try {
-      const envBackupDir = `${backupDir}/${env}`;
+      // List backups from S3 (primary source)
+      const s3Backups = await listBackupsFromS3();
 
-      // Ensure directory exists
-      await executeCommand(`mkdir -p "${envBackupDir}"`);
+      const backups = s3Backups.map(backup => ({
+        filename: backup.filename,
+        size: backup.size,
+        created: backup.lastModified.toISOString(),
+        environment: env
+      }));
 
-      // List files with their stats using a single command
-      const listCommand = `find "${envBackupDir}" -maxdepth 1 -name "*.gz" -printf "%f\\t%s\\t%T@\\n" 2>/dev/null || true`;
-      const { stdout } = await executeCommand(listCommand);
-
-      const backups = stdout
-        .trim()
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          const [filename, size, mtime] = line.split('\t');
-          return {
-            filename,
-            size: parseInt(size, 10),
-            created: new Date(parseFloat(mtime) * 1000).toISOString(),
-            environment: env
-          };
-        });
+      // Sort by created date descending (newest first)
+      backups.sort((a, b) => new Date(b.created) - new Date(a.created));
 
       res.json(backups);
     } catch (error) {
