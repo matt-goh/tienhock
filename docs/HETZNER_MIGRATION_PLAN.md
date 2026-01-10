@@ -1,7 +1,7 @@
 # Migration Plan: AWS to Hetzner CPX12 (Without Docker)
 
 **Created:** January 9, 2026
-**Status:** In Progress - Server ready, awaiting database migration
+**Status:** In Progress - Database migrated, deploying application
 
 ## Server Details
 - **Name:** tienhock-erp
@@ -44,7 +44,7 @@ Installed on server:
 
 ---
 
-## Phase 3: Database Migration (NEXT)
+## ✅ Phase 3: Database Migration (COMPLETED)
 
 ### 3.1 Create Database User (on Hetzner server)
 ```bash
@@ -73,12 +73,12 @@ sudo -u postgres psql -d tienhock_prod -c "\dt"
 
 ---
 
-## Phase 4: Application Deployment
+## Phase 4: Application Deployment (NEXT)
 
 ### 4.1 Clone Application from Git
 ```bash
 cd /home/tienhock
-git clone <your-repo-url> tienhock-app
+git clone https://github.com/matt-goh/tienhock.git tienhock-app
 cd tienhock-app
 ```
 
