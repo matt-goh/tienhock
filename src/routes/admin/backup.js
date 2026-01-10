@@ -3,7 +3,7 @@ import express from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
-import { uploadBackupToS3, listBackupsFromS3 } from '../../utils/s3-backup.js';
+import { uploadBackupToS3, listS3Backups } from '../../utils/s3-backup.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -249,7 +249,7 @@ export default function backupRouter(pool) {
   router.get('/list', async (req, res) => {
     try {
       // List backups from S3 (primary source)
-      const s3Backups = await listBackupsFromS3();
+      const s3Backups = await listS3Backups(env);
 
       const backups = s3Backups.map(backup => ({
         filename: backup.filename,
