@@ -38,9 +38,11 @@ const getS3Client = () => {
   return s3Client;
 };
 
-// Check if running in Docker or on host
-const isRunningInDocker = () => {
-  return process.platform !== 'win32' && process.platform !== 'darwin';
+// Check if we should use docker exec (only for Windows/Mac development)
+const shouldUseDockerExec = () => {
+  // On Windows/Mac, we use docker exec to run commands in the DB container
+  // On production Linux (Hetzner), we run commands directly (no Docker)
+  return (process.platform === 'win32' || process.platform === 'darwin');
 };
 
 // Get Docker container name based on environment
@@ -53,12 +55,14 @@ const getContainerName = () => {
 
 // Execute a command - either directly or via docker exec
 const executeCommand = async (command, options = {}) => {
-  if (isRunningInDocker()) {
-    return execAsync(command, options);
-  } else {
+  if (shouldUseDockerExec()) {
+    // Running on Windows/Mac dev, use docker exec
     const containerName = getContainerName();
     const dockerCommand = `docker exec ${containerName} bash -c "${command.replace(/"/g, '\\"')}"`;
     return execAsync(dockerCommand, options);
+  } else {
+    // Running on Linux (production Hetzner or Docker container), execute directly
+    return execAsync(command, options);
   }
 };
 
@@ -86,16 +90,16 @@ export async function uploadBackupToS3(localFilePath, filename, env) {
     // Read file from Docker container or local filesystem
     let fileBuffer;
 
-    if (isRunningInDocker()) {
-      // Running in container, read directly
-      fileBuffer = fs.readFileSync(localFilePath);
-    } else {
-      // Running on host, read via docker exec and pipe
+    if (shouldUseDockerExec()) {
+      // Running on Windows/Mac host, read via docker exec and pipe
       const { stdout } = await execAsync(
         `docker exec ${getContainerName()} cat "${localFilePath}"`,
         { encoding: 'buffer', maxBuffer: 50 * 1024 * 1024 } // 50MB buffer
       );
       fileBuffer = stdout;
+    } else {
+      // Running on Linux (production Hetzner), read directly from filesystem
+      fileBuffer = fs.readFileSync(localFilePath);
     }
 
     await client.send(new PutObjectCommand({
@@ -247,8 +251,8 @@ export async function syncLocalToS3(localBackupDir, env) {
 export async function createAutoBackup() {
   const env = NODE_ENV || 'development';
   const backupDir = `/var/backups/postgres/${env}`;
-  const dbHost = isRunningInDocker() ? DB_HOST : 'localhost';
-  const dbPort = isRunningInDocker() ? DB_PORT : '5432';
+  const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
+  const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
 
   try {
     // Generate timestamp
