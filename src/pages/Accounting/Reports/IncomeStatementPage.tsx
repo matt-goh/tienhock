@@ -135,7 +135,8 @@ const IncomeStatementPage: React.FC = () => {
 
             <Button
               onClick={handleExportPDF}
-              variant="primary"
+              variant="filled"
+              color="sky"
               disabled={exporting || !data}
             >
               <IconDownload className="h-4 w-4 mr-2" />

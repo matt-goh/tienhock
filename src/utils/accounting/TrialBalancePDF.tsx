@@ -304,7 +304,7 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
           {accounts.map((account, index) => (
             <View
               key={account.code}
-              style={[styles.tableRow, index % 2 === 1 && styles.tableRowAlt]}
+              style={[styles.tableRow, index % 2 === 1 ? styles.tableRowAlt : {}]}
             >
               <Text style={styles.cellCode}>{account.code}</Text>
               <Text style={styles.cellDescription}>{account.description}</Text>
