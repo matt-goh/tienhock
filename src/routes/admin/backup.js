@@ -202,9 +202,20 @@ export default function backupRouter(pool) {
       const { stdout, stderr } = await executeCommand(command);
       if (stderr) console.error('Backup stderr:', stderr);
 
-      // Upload to S3 (fire-and-forget, doesn't block response)
+      // Upload to S3 and delete local file after success
       uploadBackupToS3(backupPath, backupFilename, env)
-        .then(() => console.log(`[S3 Backup] Synced: ${backupFilename}`))
+        .then(async (uploaded) => {
+          if (uploaded) {
+            console.log(`[S3 Backup] Synced: ${backupFilename}`);
+            // Delete local file after successful S3 upload
+            try {
+              await executeCommand(`rm -f "${backupPath}"`);
+              console.log(`[Backup] Deleted local file: ${backupFilename}`);
+            } catch (err) {
+              console.warn(`[Backup] Failed to delete local file: ${err.message}`);
+            }
+          }
+        })
         .catch(err => console.warn(`[S3 Backup] Skipped or failed: ${err.message}`));
 
       res.json({ message: 'Backup created successfully' });
@@ -467,6 +478,14 @@ export default function backupRouter(pool) {
       }
 
       await restoreDatabase(backupPath);
+
+      // Clean up downloaded file after restore
+      try {
+        await executeCommand(`rm -f "${backupPath}"`);
+        console.log(`[Restore] Cleaned up local file: ${filename}`);
+      } catch (err) {
+        console.warn(`[Restore] Failed to cleanup local file: ${err.message}`);
+      }
 
     } catch (error) {
       console.error('Restore failed:', error);
