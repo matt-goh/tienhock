@@ -231,7 +231,7 @@ export default function backupRouter(pool) {
       const envBackupDir = `${backupDir}/${env}`;
       const filePath = `${envBackupDir}/${filename}`;
 
-      // Delete the backup file via docker exec
+      // Delete the backup file
       const deleteCommand = `rm -f "${filePath}"`;
       await executeCommand(deleteCommand);
 
@@ -337,9 +337,36 @@ export default function backupRouter(pool) {
 
         console.log(`Dumping temporary database with INSERT statements`);
 
-        // Step 3: Stream pg_dump output from container to response
+        // Step 3: Stream pg_dump output to response
         if (shouldUseDockerExec()) {
-          // Running in Docker, spawn pg_dump directly
+          // Running on Windows/Mac dev, use docker exec with streaming
+          const dockerArgs = [
+            'exec', containerName,
+            'bash', '-c',
+            `PGPASSWORD=${DB_PASSWORD} pg_dump -h localhost -p 5432 -U ${DB_USER} -d "${tempDbName}" --clean --if-exists --no-owner --no-privileges --inserts --disable-triggers`
+          ];
+
+          const dockerProcess = spawn('docker', dockerArgs, {
+            stdio: ['ignore', 'pipe', 'pipe']
+          });
+
+          dockerProcess.stdout.pipe(res);
+
+          dockerProcess.stderr.on('data', (data) => {
+            console.error('docker exec stderr:', data.toString());
+          });
+
+          dockerProcess.on('close', async (code) => {
+            console.log(`docker exec process exited with code ${code}`);
+            await cleanupTempDb(tempDbName, 'localhost', '5432');
+          });
+
+          req.on('close', async () => {
+            if (!dockerProcess.killed) dockerProcess.kill();
+            await cleanupTempDb(tempDbName, 'localhost', '5432');
+          });
+        } else {
+          // Running on Linux (Hetzner production), spawn pg_dump directly
           const pgDumpArgs = [
             '-h', dbHost,
             '-p', dbPort,
@@ -372,33 +399,6 @@ export default function backupRouter(pool) {
 
           req.on('close', async () => {
             if (!pgDump.killed) pgDump.kill();
-            await cleanupTempDb(tempDbName, dbHost, dbPort);
-          });
-        } else {
-          // Running on host, use docker exec with streaming
-          const dockerArgs = [
-            'exec', containerName,
-            'bash', '-c',
-            `PGPASSWORD=${DB_PASSWORD} pg_dump -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d "${tempDbName}" --clean --if-exists --no-owner --no-privileges --inserts --disable-triggers`
-          ];
-
-          const dockerProcess = spawn('docker', dockerArgs, {
-            stdio: ['ignore', 'pipe', 'pipe']
-          });
-
-          dockerProcess.stdout.pipe(res);
-
-          dockerProcess.stderr.on('data', (data) => {
-            console.error('docker exec stderr:', data.toString());
-          });
-
-          dockerProcess.on('close', async (code) => {
-            console.log(`docker exec process exited with code ${code}`);
-            await cleanupTempDb(tempDbName, dbHost, dbPort);
-          });
-
-          req.on('close', async () => {
-            if (!dockerProcess.killed) dockerProcess.kill();
             await cleanupTempDb(tempDbName, dbHost, dbPort);
           });
         }
@@ -434,7 +434,7 @@ export default function backupRouter(pool) {
       return res.status(400).json({ error: 'Filename is required' });
     }
 
-    if (restoreState.isRestoring) {
+    if (restoreState.status === 'RESTORING') {
       return res.status(503).json({
         error: 'Service unavailable',
         message: 'A restore operation is already in progress'
