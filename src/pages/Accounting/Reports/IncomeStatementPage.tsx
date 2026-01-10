@@ -280,7 +280,7 @@ const IncomeStatementPage: React.FC = () => {
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: {getMonthName(selectedMonth)}
+              Period: January - {getMonthName(selectedMonth)}
             </p>
           </div>
         </div>

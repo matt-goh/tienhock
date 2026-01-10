@@ -1717,8 +1717,8 @@ const InvoiceListPage: React.FC = () => {
         <div
           className={`p-3 ${
             selectedInvoiceIds.size > 0
-              ? "bg-sky-50/95 border border-sky-200"
-              : "bg-white/95 border border-default-200"
+              ? "bg-sky-50/95 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-700"
+              : "bg-white/95 dark:bg-gray-800/95 border border-default-200 dark:border-gray-700"
           } rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap sticky top-2 z-20 shadow backdrop-blur-sm`}
           onClick={handleToggleSelectAll}
           title={
@@ -1754,9 +1754,9 @@ const InvoiceListPage: React.FC = () => {
             <div className="flex-grow pb-0.5">
               {/* Selection info text */}
               {selectedInvoiceIds.size > 0 ? (
-                <span className="font-medium text-sky-800 text-sm flex items-center flex-wrap gap-x-2">
+                <span className="font-medium text-sky-800 dark:text-sky-300 text-sm flex items-center flex-wrap gap-x-2">
                   <span>{selectedInvoiceIds.size} selected</span>
-                  <span className="hidden sm:inline mx-1 border-r border-sky-300 h-4"></span>
+                  <span className="hidden sm:inline mx-1 border-r border-sky-300 dark:border-sky-600 h-4"></span>
                   <span className="whitespace-nowrap">
                     {/* Use the total state instead of calculating from visible invoices */}
                     Total:{" "}

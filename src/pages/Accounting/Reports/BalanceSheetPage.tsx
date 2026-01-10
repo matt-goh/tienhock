@@ -18,6 +18,7 @@ interface BalanceSheetData {
   period: {
     year: number;
     month: number;
+    start_date: string;
     as_of_date: string;
   };
   assets: {
@@ -207,7 +208,7 @@ const BalanceSheetPage: React.FC = () => {
               STATEMENT OF FINANCIAL POSITION
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
-              As at {data.period.as_of_date}
+              For the period {data.period.start_date} to {data.period.as_of_date}
             </p>
           </div>
 
@@ -381,7 +382,7 @@ const BalanceSheetPage: React.FC = () => {
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: {getMonthName(selectedMonth)}
+              Period: January - {getMonthName(selectedMonth)}
             </p>
           </div>
         </div>

@@ -37,10 +37,15 @@ interface TrialBalanceData {
   period: {
     year: number;
     month: number;
+    start_date: string;
     end_date: string;
   };
   accounts: TrialBalanceAccount[];
   totals: TrialBalanceTotals;
+  invoice_based?: {
+    note_22_trade_receivables: number;
+    note_7_revenue: number;
+  };
 }
 
 const LEDGER_TYPE_LABELS: Record<string, string> = {
@@ -269,7 +274,7 @@ const TrialBalancePage: React.FC = () => {
               )}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              As of {trialBalance.period.end_date}
+              For period {trialBalance.period.start_date} to {trialBalance.period.end_date}
             </div>
           </div>
         </div>
@@ -363,7 +368,7 @@ const TrialBalancePage: React.FC = () => {
                 Showing {filteredAccounts.length} of {trialBalance.accounts.length} accounts
               </span>
               <span>
-                Period: {getMonthName(selectedMonth)}
+                Period: January - {getMonthName(selectedMonth)}
               </span>
             </div>
           </div>
