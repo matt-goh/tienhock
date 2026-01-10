@@ -318,7 +318,7 @@ const StockMovementPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3">
               {/* B/F (Brought Forward) */}
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900/50">
                   <IconPackage className="text-sky-600 dark:text-sky-400" size={20} />
                 </div>
                 <div>
@@ -339,63 +339,63 @@ const StockMovementPage: React.FC = () => {
                 </div>
               </div>
 
-              <span className="text-default-200 text-xl">|</span>
+              <span className="text-default-200 dark:text-gray-600 text-xl">|</span>
 
               {/* Stock In Group */}
-              <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5">
+              <div className="flex items-center gap-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 px-3 py-1.5">
                 <div className="flex items-center gap-3">
                   <div>
-                    <p className="text-xs text-green-500">Production</p>
-                    <p className="text-lg font-bold tabular-nums text-green-700">
+                    <p className="text-xs text-green-500 dark:text-green-400">Production</p>
+                    <p className="text-lg font-bold tabular-nums text-green-700 dark:text-green-300">
                       {monthlyTotals.production.toLocaleString()}
                     </p>
                   </div>
-                  <div className="h-6 w-px bg-green-200" />
+                  <div className="h-6 w-px bg-green-200 dark:bg-green-700" />
                   <div>
-                    <p className="text-xs text-green-500">Returns</p>
-                    <p className="text-lg font-bold tabular-nums text-green-700">
+                    <p className="text-xs text-green-500 dark:text-green-400">Returns</p>
+                    <p className="text-lg font-bold tabular-nums text-green-700 dark:text-green-300">
                       {monthlyTotals.returns.toLocaleString()}
                     </p>
                   </div>
-                  <div className="h-6 w-px bg-green-200" />
+                  <div className="h-6 w-px bg-green-200 dark:bg-green-700" />
                   <div>
-                    <p className="text-xs text-green-500">Adj+</p>
-                    <p className="text-lg font-bold tabular-nums text-green-700">
+                    <p className="text-xs text-green-500 dark:text-green-400">Adj+</p>
+                    <p className="text-lg font-bold tabular-nums text-green-700 dark:text-green-300">
                       {monthlyTotals.adj_in.toLocaleString()}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <span className="text-default-200 text-xl">|</span>
+              <span className="text-default-200 dark:text-gray-600 text-xl">|</span>
 
               {/* Stock Out Group */}
-              <div className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5">
+              <div className="flex items-center gap-3 rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 px-3 py-1.5">
                 <div className="flex items-center gap-3">
                   <div>
-                    <p className="text-xs text-rose-500">Sold</p>
-                    <p className="text-lg font-bold tabular-nums text-rose-700">
+                    <p className="text-xs text-rose-500 dark:text-rose-400">Sold</p>
+                    <p className="text-lg font-bold tabular-nums text-rose-700 dark:text-rose-300">
                       {monthlyTotals.sold_out.toLocaleString()}
                     </p>
                   </div>
-                  <div className="h-6 w-px bg-rose-200" />
+                  <div className="h-6 w-px bg-rose-200 dark:bg-rose-700" />
                   <div>
-                    <p className="text-xs text-rose-500">FOC</p>
-                    <p className="text-lg font-bold tabular-nums text-rose-700">
+                    <p className="text-xs text-rose-500 dark:text-rose-400">FOC</p>
+                    <p className="text-lg font-bold tabular-nums text-rose-700 dark:text-rose-300">
                       {monthlyTotals.foc.toLocaleString()}
                     </p>
                   </div>
-                  <div className="h-6 w-px bg-rose-200" />
+                  <div className="h-6 w-px bg-rose-200 dark:bg-rose-700" />
                   <div>
-                    <p className="text-xs text-rose-500">Adj-</p>
-                    <p className="text-lg font-bold tabular-nums text-rose-700">
+                    <p className="text-xs text-rose-500 dark:text-rose-400">Adj-</p>
+                    <p className="text-lg font-bold tabular-nums text-rose-700 dark:text-rose-300">
                       {monthlyTotals.adj_out.toLocaleString()}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <span className="text-default-200 text-xl">|</span>
+              <span className="text-default-200 dark:text-gray-600 text-xl">|</span>
 
               {/* Net Change */}
               <div
@@ -408,8 +408,8 @@ const StockMovementPage: React.FC = () => {
                     monthlyTotals.foc -
                     monthlyTotals.adj_out >=
                     0
-                    ? "border-green-200 bg-green-50"
-                    : "border-rose-200 bg-rose-50"
+                    ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30"
+                    : "border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30"
                 )}
               >
                 <p
@@ -422,8 +422,8 @@ const StockMovementPage: React.FC = () => {
                       monthlyTotals.foc -
                       monthlyTotals.adj_out >=
                       0
-                      ? "text-green-500"
-                      : "text-rose-500"
+                      ? "text-green-500 dark:text-green-400"
+                      : "text-rose-500 dark:text-rose-400"
                   )}
                 >
                   Net Change
@@ -438,8 +438,8 @@ const StockMovementPage: React.FC = () => {
                       monthlyTotals.foc -
                       monthlyTotals.adj_out >=
                       0
-                      ? "text-green-700"
-                      : "text-rose-700"
+                      ? "text-green-700 dark:text-green-300"
+                      : "text-rose-700 dark:text-rose-300"
                   )}
                 >
                   {monthlyTotals.production +
@@ -462,11 +462,11 @@ const StockMovementPage: React.FC = () => {
                 </p>
               </div>
 
-              <span className="text-default-200 text-xl">|</span>
+              <span className="text-default-200 dark:text-gray-600 text-xl">|</span>
 
               {/* Closing Balance */}
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900/50">
                   <IconPackage className="text-sky-600 dark:text-sky-400" size={20} />
                 </div>
                 <div>
@@ -489,13 +489,13 @@ const StockMovementPage: React.FC = () => {
             </div>
 
             {/* Divider - only visible on hover */}
-            <div className="h-12 w-px bg-default-200 opacity-0 group-hover:opacity-100 transition-opacity ml-3" />
+            <div className="h-12 w-px bg-default-200 dark:bg-gray-600 opacity-0 group-hover:opacity-100 transition-opacity ml-3" />
 
             {/* Right side - Initial Balance (editable for migration) - only visible on hover */}
             {viewType === "month" && (
               <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 <div>
-                  <p className="text-xs text-default-400 text-right">
+                  <p className="text-xs text-default-400 dark:text-gray-500 text-right">
                     Initial Balance
                   </p>
                   <div className="flex justify-end items-center gap-2">
@@ -506,7 +506,7 @@ const StockMovementPage: React.FC = () => {
                           value={editBalanceValue}
                           onChange={(e) => setEditBalanceValue(e.target.value)}
                           min="0"
-                          className="w-24 rounded-lg border border-default-300 dark:border-gray-600 px-2 py-1 text-sm font-bold text-right focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          className="w-24 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-2 py-1 text-sm font-bold text-right focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                           autoFocus
                         />
                         <button
@@ -519,7 +519,7 @@ const StockMovementPage: React.FC = () => {
                         <button
                           onClick={handleCancelEditBalance}
                           disabled={isSavingBalance}
-                          className="rounded-lg bg-default-200 p-1 text-default-600 dark:text-gray-300 hover:bg-default-300 transition-colors disabled:opacity-50"
+                          className="rounded-lg bg-default-200 dark:bg-gray-700 p-1 text-default-600 dark:text-gray-300 hover:bg-default-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
                         >
                           <IconX size={16} />
                         </button>
@@ -548,14 +548,14 @@ const StockMovementPage: React.FC = () => {
       {/* Stock Movement Table */}
       {!selectedProductId ? (
         <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">
-          <IconPackage className="mx-auto h-12 w-12 text-default-300" />
+          <IconPackage className="mx-auto h-12 w-12 text-default-300 dark:text-gray-600" />
           <p className="mt-4 text-default-500 dark:text-gray-400">
             Please select a product to view stock movements
           </p>
         </div>
       ) : viewType === "custom" && (!customStartDate || !customEndDate) ? (
         <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">
-          <IconCalendar className="mx-auto h-12 w-12 text-default-300" />
+          <IconCalendar className="mx-auto h-12 w-12 text-default-300 dark:text-gray-600" />
           <p className="mt-4 text-default-500 dark:text-gray-400">
             Please select a date range to view stock movements
           </p>
