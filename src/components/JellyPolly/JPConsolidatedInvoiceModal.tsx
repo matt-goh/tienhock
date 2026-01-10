@@ -477,9 +477,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex justify-center items-center p-4 backdrop-blur-sm">
       {/* Modal Container */}
-      <div className="bg-white w-full max-w-7xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale">
+      <div className="bg-white dark:bg-gray-800 w-full max-w-7xl rounded-xl shadow-xl flex flex-col max-h-[calc(100vh-40px)] animate-fade-in-scale">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-default-200 flex-shrink-0">
+        <div className="flex items-center justify-between p-5 border-b border-default-200 dark:border-gray-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100 flex items-center">
             <IconFileSettings size={22} className="mr-2.5 text-sky-600 dark:text-sky-400" />
             Consolidated e-Invoice Management
@@ -487,7 +487,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           <button
             onClick={onClose}
             disabled={isSubmitting || !!processingHistoryId}
-            className="p-1.5 rounded-full text-default-500 hover:text-default-800 hover:bg-default-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500 disabled:opacity-50"
+            className="p-1.5 rounded-full text-default-500 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500 disabled:opacity-50"
             aria-label="Close modal"
           >
             <IconX size={20} />
@@ -495,14 +495,14 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="px-5 py-3 border-b border-default-200 flex-shrink-0">
+        <div className="px-5 py-3 border-b border-default-200 dark:border-gray-700 flex-shrink-0">
           {/* Tabs structure remains the same */}
-          <div className="flex space-x-1 w-fit bg-default-100 rounded-lg p-1">
+          <div className="flex space-x-1 w-fit bg-default-100 dark:bg-gray-700 rounded-lg p-1">
             <button
               className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
                 activeTab === "history"
-                  ? "bg-white shadow-sm text-sky-700 font-semibold"
-                  : "text-default-600 hover:text-default-900 hover:bg-default-50"
+                  ? "bg-white dark:bg-gray-600 shadow-sm text-sky-700 dark:text-sky-300 font-semibold"
+                  : "text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-50 dark:hover:bg-gray-600"
               }`}
               onClick={() => setActiveTab("history")}
             >
@@ -511,8 +511,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
             <button
               className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
                 activeTab === "eligible"
-                  ? "bg-white shadow-sm text-sky-700 font-semibold"
-                  : "text-default-600 hover:text-default-900 hover:bg-default-50"
+                  ? "bg-white dark:bg-gray-600 shadow-sm text-sky-700 dark:text-sky-300 font-semibold"
+                  : "text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-50 dark:hover:bg-gray-600"
               }`}
               onClick={() => setActiveTab("eligible")}
             >
@@ -522,14 +522,14 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
 
         {/* Auto-consolidation toggle - simplified version */}
-        <div className="px-5 py-4 border-b border-default-200 flex flex-col bg-default-50/60 flex-shrink-0">
+        <div className="px-5 py-4 border-b border-default-200 dark:border-gray-700 flex flex-col bg-default-50/60 dark:bg-gray-900/40 flex-shrink-0">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <div className="mr-3">
-                <div className="text-sm font-medium text-default-800">
+                <div className="text-sm font-medium text-default-800 dark:text-gray-100">
                   Auto Consolidation (Monthly)
                 </div>
-                <p className="text-xs text-default-500 mt-0.5">
+                <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5">
                   Automatically consolidate eligible invoices during the first 7
                   days of each month for the previous month's invoices.
                 </p>
@@ -540,10 +540,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                 type="button"
                 role="switch"
                 aria-checked={isAutoConsolidationEnabled}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
                   isLoadingSettings ? "opacity-50 cursor-not-allowed" : ""
                 } ${
-                  isAutoConsolidationEnabled ? "bg-sky-600" : "bg-default-200"
+                  isAutoConsolidationEnabled ? "bg-sky-600" : "bg-default-200 dark:bg-gray-600"
                 }`}
                 onClick={toggleAutoConsolidation}
                 disabled={isLoadingSettings}
@@ -627,14 +627,14 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-grow p-5 bg-gray-50/30 rounded-b-xl">
+        <div className="flex-grow p-5 bg-gray-50/30 dark:bg-gray-900/30 rounded-b-xl">
           {activeTab === "eligible" ? (
             // Eligible invoices tab content (remains largely the same)
             <div className="space-y-4">
               {/* Header and buttons */}
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold text-default-800 mr-2">
+                  <h3 className="text-base font-semibold text-default-800 dark:text-gray-100 mr-2">
                     Eligible for
                   </h3>
 
@@ -647,12 +647,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     }
                   >
                     <div className="relative">
-                      <ListboxButton className="rounded-lg border border-default-300 py-1 px-2 text-sm bg-white w-32 text-left flex items-center justify-between">
+                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 w-32 text-left flex items-center justify-between">
                         <span className="block truncate">
                           {monthOptions[selectedMonth].name}
                         </span>
                         <IconChevronDown
-                          className="h-4 w-4 text-default-400"
+                          className="h-4 w-4 text-default-400 dark:text-gray-400"
                           aria-hidden="true"
                         />
                       </ListboxButton>
@@ -661,7 +661,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         leaveFrom="opacity-100"
                         leaveTo="opacity-0"
                       >
-                        <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-600 focus:outline-none">
                           {monthOptions.map((month) => (
                             <ListboxOption
                               key={month.id}
@@ -669,8 +669,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               className={({ active }) =>
                                 `relative cursor-default select-none py-2 pl-3 pr-9 ${
                                   active
-                                    ? "bg-sky-100 text-sky-900"
-                                    : "text-default-900"
+                                    ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                    : "text-default-900 dark:text-gray-100"
                                 }`
                               }
                             >
@@ -704,7 +704,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     </div>
                   </Listbox>
 
-                  <span className="text-base font-semibold text-default-800 mx-1">
+                  <span className="text-base font-semibold text-default-800 dark:text-gray-100 mx-1">
                     {selectedYear}
                   </span>
                 </div>
@@ -764,25 +764,25 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               {!isLoadingEligible &&
                 !error &&
                 eligibleInvoices.length === 0 && (
-                  <div className="bg-white rounded-lg border border-default-200 p-8 text-center mt-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-8 text-center mt-4">
                     <IconFileInvoice
                       size={36}
-                      className="text-default-300 mx-auto mb-3"
+                      className="text-default-300 dark:text-gray-500 mx-auto mb-3"
                     />
-                    <p className="text-sm font-medium text-default-700 mb-1">
+                    <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       No Eligible Invoices Found
                     </p>
-                    <p className="text-xs text-default-500">...</p>
+                    <p className="text-xs text-default-500 dark:text-gray-400">...</p>
                   </div>
                 )}
 
               {/* Eligible Invoices Table structure remains the same */}
               {!isLoadingEligible && !error && eligibleInvoices.length > 0 && (
-                <div className="border border-default-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
                   {/* Selection Summary Header remains the same */}
-                  <div className="bg-default-50/70 p-3 border-b border-default-200 flex flex-wrap items-center gap-x-4 gap-y-2 group">
+                  <div className="bg-default-50/70 dark:bg-gray-700/50 p-3 border-b border-default-200 dark:border-gray-700 flex flex-wrap items-center gap-x-4 gap-y-2 group">
                     <div
-                      className="flex items-center cursor-pointer rounded hover:bg-default-100 p-1 -m-1"
+                      className="flex items-center cursor-pointer rounded hover:bg-default-100 dark:hover:bg-gray-600 p-1 -m-1"
                       onClick={handleSelectAllInvoices}
                       role="checkbox"
                       aria-checked={
@@ -826,27 +826,27 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                   </div>
                   {/* Table Container */}
                   <div className="max-h-[400px] overflow-auto">
-                    <table className="min-w-full divide-y divide-default-200">
+                    <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                       {/* thead remains the same */}
-                      <thead className="bg-default-50 sticky top-0 z-10">
+                      <thead className="bg-default-50 dark:bg-gray-700 sticky top-0 z-10">
                         <tr>
                           <th className="w-12 px-4 py-2.5 text-center"></th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Invoice #
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Customer ID
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Date
                           </th>
-                          <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Amount (MYR)
                           </th>
                         </tr>
                       </thead>
                       {/* tbody structure remains the same */}
-                      <tbody className="bg-white divide-y divide-default-100">
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-100 dark:divide-gray-700">
                         {eligibleInvoices.map((invoice) => {
                           const { date } = parseDatabaseTimestamp(
                             invoice.createddate
@@ -857,8 +857,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               key={invoice.id}
                               className={`transition-colors duration-150 cursor-pointer group ${
                                 isSelected
-                                  ? "bg-blue-50 hover:bg-blue-100/70"
-                                  : "hover:bg-default-50"
+                                  ? "bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/50"
+                                  : "hover:bg-default-50 dark:hover:bg-gray-700"
                               }`}
                               onClick={() => handleSelectInvoice(invoice.id)}
                               aria-selected={isSelected}
@@ -867,29 +867,29 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 <div className="flex items-center justify-center h-full">
                                   {isSelected ? (
                                     <IconSquareCheckFilled
-                                      className="text-blue-600"
+                                      className="text-blue-600 dark:text-blue-400"
                                       size={18}
                                     />
                                   ) : (
                                     <IconSquare
-                                      className="text-default-400 group-hover:text-blue-500 transition-colors"
+                                      className="text-default-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors"
                                       size={18}
                                     />
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                                 {invoice.id}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                                 {invoice.customerid}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                                 {date
                                   ? formatDisplayDate(date)
                                   : "Invalid Date"}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 text-right font-medium">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200 text-right font-medium">
                                 {formatCurrency(invoice.totalamountpayable)}
                               </td>
                             </tr>
@@ -906,7 +906,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
             <div className="space-y-4">
               {/* Tab Header Section */}
               <div className="flex justify-between items-center">
-                <h3 className="text-base font-semibold text-default-800">
+                <h3 className="text-base font-semibold text-default-800 dark:text-gray-100">
                   Consolidation History
                 </h3>
                 <div className="flex items-center gap-2">
@@ -917,10 +917,10 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     disabled={isLoadingHistory || !!processingHistoryId}
                   >
                     <div className="relative">
-                      <ListboxButton className="rounded-lg border border-default-300 py-1 px-2 text-sm bg-white w-28 text-left flex items-center justify-between">
+                      <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 w-28 text-left flex items-center justify-between">
                         <span className="block truncate">{historyYear}</span>
                         <IconChevronDown
-                          className="h-4 w-4 text-default-400"
+                          className="h-4 w-4 text-default-400 dark:text-gray-400"
                           aria-hidden="true"
                         />
                       </ListboxButton>
@@ -929,7 +929,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         leaveFrom="opacity-100"
                         leaveTo="opacity-0"
                       >
-                        <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <ListboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-600 focus:outline-none">
                           {Array.from({ length: 10 }, (_, i) => {
                             const year = new Date().getFullYear() - i;
                             return (
@@ -939,8 +939,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 className={({ active }) =>
                                   `relative cursor-default select-none py-2 pl-3 pr-9 ${
                                     active
-                                      ? "bg-sky-100 text-sky-900"
-                                      : "text-default-900"
+                                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                      : "text-default-900 dark:text-gray-100"
                                   }`
                                 }
                               >
@@ -1003,15 +1003,15 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
               {/* Empty State */}
               {!isLoadingHistory && consolidationHistory.length === 0 && (
-                <div className="bg-white rounded-lg border border-default-200 p-8 text-center mt-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-8 text-center mt-4">
                   <IconFileInvoice
                     size={36}
-                    className="text-default-300 mx-auto mb-3"
+                    className="text-default-300 dark:text-gray-500 mx-auto mb-3"
                   />
-                  <p className="text-sm font-medium text-default-700 mb-1">
+                  <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                     No Consolidation History Found
                   </p>
-                  <p className="text-xs text-default-500">
+                  <p className="text-xs text-default-500 dark:text-gray-400">
                     There are no records of past consolidated e-invoice
                     submissions.
                   </p>
@@ -1020,43 +1020,43 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
               {/* History Table */}
               {consolidationHistory.length > 0 && (
-                <div className="border border-default-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
                   <div className="max-h-[400px] overflow-auto">
-                    <table className="min-w-full divide-y divide-default-200">
-                      <thead className="bg-default-50 sticky top-0 z-10">
+                    <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                      <thead className="bg-default-50 dark:bg-gray-700 sticky top-0 z-10">
                         <tr>
                           {/* Headers remain the same */}
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Consolidated ID
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Date Created
                           </th>
-                          <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Status
                           </th>
-                          <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Invoices
                           </th>
-                          <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Total Amount
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             UUID
                           </th>
-                          <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                             Actions
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-default-100">
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-100 dark:divide-gray-700">
                         {consolidationHistory.map((item) => {
                           const currentStatus =
                             item.einvoice_status?.toLowerCase();
                           const isProcessing = processingHistoryId === item.id;
 
                           // --- Status Badge Logic ---
-                          let statusColor = "bg-gray-100 text-gray-800"; // Default/Unknown
+                          let statusColor = "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"; // Default/Unknown
                           let statusIcon = (
                             <IconAlertTriangle size={14} className="mr-1.5" />
                           );
@@ -1069,7 +1069,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
                           switch (currentStatus) {
                             case "valid":
-                              statusColor = "bg-green-100 text-green-800";
+                              statusColor = "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300";
                               statusIcon = (
                                 <IconCircleCheck size={14} className="mr-1.5" />
                               );
@@ -1077,7 +1077,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               break;
                             case "pending":
                             case "inprogress":
-                              statusColor = "bg-amber-100 text-amber-800";
+                              statusColor = "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300";
                               statusIcon = (
                                 <IconClockHour4 size={14} className="mr-1.5" />
                               );
@@ -1085,7 +1085,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               break;
                             case "invalid":
                             case "rejected":
-                              statusColor = "bg-rose-100 text-rose-800";
+                              statusColor = "bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300";
                               statusIcon = (
                                 <IconAlertTriangle
                                   size={14}
@@ -1095,7 +1095,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               statusText = "Invalid";
                               break;
                             case "cancelled": // Handle cancelled status visually
-                              statusColor = "bg-gray-200 text-gray-600";
+                              statusColor = "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400";
                               statusIcon = (
                                 <IconBan size={14} className="mr-1.5" />
                               );
@@ -1109,12 +1109,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               key={item.id}
                               className={`transition-colors duration-150 ${
                                 isProcessing
-                                  ? "opacity-60 bg-gray-50"
-                                  : "hover:bg-default-50"
+                                  ? "opacity-60 bg-gray-50 dark:bg-gray-900"
+                                  : "hover:bg-default-50 dark:hover:bg-gray-700"
                               }`}
                             >
                               {/* Other cells remain the same */}
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                                 <div className="flex items-center">
                                   <span>{item.id}</span>
                                   {item.consolidated_invoices &&
@@ -1127,17 +1127,17 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 </div>
                                 {item.long_id && (
                                   <span
-                                    className="block text-xs text-default-400 truncate"
+                                    className="block text-xs text-default-400 dark:text-gray-500 truncate"
                                     title="MyInvois Long ID"
                                   >
                                     {item.long_id}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
                                 {item.datetime_validated && (
                                   <span
-                                    className="block text-xs text-green-600"
+                                    className="block text-xs text-green-600 dark:text-green-400"
                                     title="Validation Date/Time"
                                   >
                                     Validated:{" "}
@@ -1155,14 +1155,14 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                   {statusText}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 text-right">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300 text-right">
                                 {item.consolidated_invoices?.length || 0}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 text-right font-medium">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-200 text-right font-medium">
                                 {formatCurrency(item.totalamountpayable)}
                               </td>
                               <td
-                                className="px-4 py-3 whitespace-nowrap text-sm text-default-500 font-mono max-w-[150px] truncate"
+                                className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400 font-mono max-w-[150px] truncate"
                                 title={item.uuid || "MyInvois Document UUID"}
                               >
                                 {item.uuid || "-"}
@@ -1241,7 +1241,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                   </div>
                                 ) : (
                                   // Show placeholder for other statuses (e.g., cancelled, unknown)
-                                  <span className="text-default-400 text-xs">
+                                  <span className="text-default-400 dark:text-gray-500 text-xs">
                                     —
                                   </span>
                                 )}

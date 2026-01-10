@@ -153,7 +153,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
       className={`relative border rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-shadow duration-200 group
         ${
           isSelected
-            ? "shadow-md ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1"
+            ? "shadow-md ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-1 dark:ring-offset-gray-900"
             : "shadow-sm hover:shadow-md"
         }
         ${invoiceStatusStyle.border}
@@ -190,7 +190,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
           >
             {isSelected ? (
               <IconSquareCheckFilled
-                className="text-blue-600 cursor-pointer"
+                className="text-blue-600 dark:text-blue-400 cursor-pointer"
                 size={22}
               />
             ) : (
