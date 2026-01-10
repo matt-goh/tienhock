@@ -228,13 +228,13 @@ const StaffAddPage: React.FC = () => {
     []
   );
 
-  const checkDuplicateId = async (id: string): Promise<boolean> => {
+  const checkDuplicateId = async (id: string): Promise<Employee | null> => {
     try {
       const existingStaff = allStaffs.find((staff) => staff.id === id);
-      return !!existingStaff;
+      return existingStaff || null;
     } catch (error) {
       console.error("Error checking ID:", error);
-      return false; // Continue with submission on check error
+      return null; // Continue with submission on check error
     }
   };
 
@@ -251,9 +251,15 @@ const StaffAddPage: React.FC = () => {
     }
 
     // Check for duplicate ID before submission
-    const isDuplicate = await checkDuplicateId(formData.id);
-    if (isDuplicate) {
-      toast.error("A staff member with this ID already exists");
+    const existingStaff = await checkDuplicateId(formData.id);
+    if (existingStaff) {
+      if (existingStaff.dateResigned) {
+        toast.error(
+          `A staff member with this ID already exists (Resigned: ${existingStaff.dateResigned})`
+        );
+      } else {
+        toast.error("A staff member with this ID already exists");
+      }
 
       // Focus on the ID field
       const idField = document.getElementById("id");
