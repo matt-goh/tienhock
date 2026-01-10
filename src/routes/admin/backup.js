@@ -3,7 +3,7 @@ import express from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
-import { uploadBackupToS3, listS3Backups, deleteS3Backup } from '../../utils/s3-backup.js';
+import { uploadBackupToS3, listS3Backups, deleteS3Backup, downloadS3Backup } from '../../utils/s3-backup.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -450,7 +450,22 @@ export default function backupRouter(pool) {
         status: 'RESTORING'
       });
 
-      const backupPath = `${backupDir}/${env}/${filename}`;
+      const envBackupDir = `${backupDir}/${env}`;
+      let backupPath = `${envBackupDir}/${filename}`;
+
+      // Check if file exists locally, if not download from S3
+      try {
+        await executeCommand(`test -f "${backupPath}"`);
+        console.log(`[Restore] Using local file: ${backupPath}`);
+      } catch {
+        console.log(`[Restore] File not found locally, downloading from S3...`);
+        const downloadedPath = await downloadS3Backup(filename, env, envBackupDir);
+        if (!downloadedPath) {
+          throw new Error('Failed to download backup from S3');
+        }
+        backupPath = downloadedPath;
+      }
+
       await restoreDatabase(backupPath);
 
     } catch (error) {

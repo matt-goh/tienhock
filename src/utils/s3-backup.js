@@ -1,7 +1,7 @@
 // src/utils/s3-backup.js
 // S3 backup utilities for syncing PostgreSQL backups to AWS S3
 
-import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -175,6 +175,49 @@ export async function deleteS3Backup(filename, env) {
   } catch (error) {
     console.warn(`[S3 Backup] Failed to delete ${filename}: ${error.message}`);
     return false;
+  }
+}
+
+/**
+ * Download a backup from S3 to local filesystem
+ * @param {string} filename - Filename to download
+ * @param {string} env - Environment (development/production)
+ * @param {string} localDir - Local directory to save to
+ * @returns {Promise<string|null>} - Local file path if successful, null otherwise
+ */
+export async function downloadS3Backup(filename, env, localDir) {
+  if (!isS3BackupEnabled()) {
+    return null;
+  }
+
+  try {
+    const client = getS3Client();
+    const s3Key = `${env}/${filename}`;
+    const localPath = `${localDir}/${filename}`;
+
+    // Ensure local directory exists
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+
+    const response = await client.send(new GetObjectCommand({
+      Bucket: S3_BUCKET_NAME,
+      Key: s3Key,
+    }));
+
+    // Convert stream to buffer and write to file
+    const chunks = [];
+    for await (const chunk of response.Body) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    fs.writeFileSync(localPath, buffer);
+
+    console.log(`[S3 Backup] Downloaded: ${s3Key} -> ${localPath}`);
+    return localPath;
+  } catch (error) {
+    console.warn(`[S3 Backup] Failed to download ${filename}: ${error.message}`);
+    return null;
   }
 }
 
