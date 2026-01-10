@@ -18,6 +18,43 @@ export default function (pool) {
     return { valid: true, year: yearNum, month: monthNum };
   };
 
+  // ==================== INVOICE-BASED CALCULATIONS ====================
+
+  /**
+   * Calculate Trade Receivables (Note 22) - cumulative outstanding as of period end
+   * Returns the sum of balance_due from all unpaid/overdue invoices created up to the end date
+   * @param {number} endDateTs - End date as milliseconds timestamp
+   */
+  const getTradeReceivables = async (endDateTs) => {
+    const query = `
+      SELECT COALESCE(SUM(balance_due), 0) as total
+      FROM invoices
+      WHERE invoice_status IN ('Unpaid', 'Overdue')
+        AND balance_due > 0.01
+        AND createddate::bigint <= $1
+    `;
+    const result = await pool.query(query, [endDateTs]);
+    return parseFloat(result.rows[0]?.total || 0);
+  };
+
+  /**
+   * Calculate Revenue (Note 7) - YTD from Jan 1 of year to period end
+   * Returns the sum of total_excluding_tax from all invoices in the period
+   * @param {number} year - The year
+   * @param {number} endDateTs - End date as milliseconds timestamp
+   */
+  const getRevenue = async (year, endDateTs) => {
+    const startOfYearTs = new Date(year, 0, 1).getTime(); // Jan 1
+    const query = `
+      SELECT COALESCE(SUM(total_excluding_tax), 0) as total
+      FROM invoices
+      WHERE createddate::bigint >= $1
+        AND createddate::bigint <= $2
+    `;
+    const result = await pool.query(query, [startOfYearTs, endDateTs]);
+    return parseFloat(result.rows[0]?.total || 0);
+  };
+
   // ==================== FINANCIAL STATEMENT NOTES ====================
 
   // GET /notes - Get all financial statement notes
@@ -320,6 +357,7 @@ export default function (pool) {
   // ==================== TRIAL BALANCE ====================
 
   // GET /trial-balance/:year/:month - Generate trial balance for a period
+  // Date range: YTD from Jan 1 of year to end of selected month
   router.get("/trial-balance/:year/:month", async (req, res) => {
     try {
       const { year, month } = req.params;
@@ -331,11 +369,14 @@ export default function (pool) {
         return res.status(400).json({ message: validation.error });
       }
 
-      // Calculate period end date (last day of month)
-      const periodEnd = new Date(validation.year, validation.month, 0);
+      // Calculate YTD period: Jan 1 to end of selected month
+      const periodStart = new Date(validation.year, 0, 1); // Jan 1
+      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
+      const periodStartStr = periodStart.toISOString().split("T")[0];
       const periodEndStr = periodEnd.toISOString().split("T")[0];
+      const periodEndTs = new Date(validation.year, validation.month, 0, 23, 59, 59, 999).getTime();
 
-      // Get all account balances from journal entries up to the period end
+      // Get all account balances from journal entries for YTD period
       let query = `
         WITH account_balances AS (
           SELECT
@@ -345,7 +386,8 @@ export default function (pool) {
           FROM journal_entry_lines jel
           JOIN journal_entries je ON jel.journal_entry_id = je.id
           WHERE je.status = 'posted'
-            AND je.entry_date <= $1
+            AND je.entry_date >= $1
+            AND je.entry_date <= $2
           GROUP BY jel.account_code
         )
         SELECT
@@ -368,8 +410,8 @@ export default function (pool) {
         WHERE ac.is_active = true
           AND (ab.total_debit IS NOT NULL OR ab.total_credit IS NOT NULL)
       `;
-      const params = [periodEndStr];
-      let paramIndex = 2;
+      const params = [periodStartStr, periodEndStr];
+      let paramIndex = 3;
 
       if (ledger_type) {
         query += ` AND ac.ledger_type = $${paramIndex}`;
@@ -409,10 +451,15 @@ export default function (pool) {
         };
       });
 
+      // Calculate invoice-based values for Note 22 and Note 7
+      const tradeReceivables = await getTradeReceivables(periodEndTs);
+      const revenue = await getRevenue(validation.year, periodEndTs);
+
       res.json({
         period: {
           year: validation.year,
           month: validation.month,
+          start_date: periodStartStr,
           end_date: periodEndStr,
         },
         accounts,
@@ -421,6 +468,11 @@ export default function (pool) {
           credit: totalCredit,
           difference: Math.abs(totalDebit - totalCredit),
           is_balanced: Math.abs(totalDebit - totalCredit) < 0.01,
+        },
+        // Invoice-based values (override journal-based for these notes)
+        invoice_based: {
+          note_22_trade_receivables: tradeReceivables,
+          note_7_revenue: revenue,
         },
       });
     } catch (error) {
@@ -435,6 +487,7 @@ export default function (pool) {
   // ==================== INCOME STATEMENT ====================
 
   // GET /income-statement/:year/:month - Generate income statement for a period
+  // Date range: YTD from Jan 1 of year to end of selected month
   router.get("/income-statement/:year/:month", async (req, res) => {
     try {
       const { year, month } = req.params;
@@ -445,13 +498,14 @@ export default function (pool) {
         return res.status(400).json({ message: validation.error });
       }
 
-      // Calculate period start and end dates
-      const periodStart = new Date(validation.year, validation.month - 1, 1);
-      const periodEnd = new Date(validation.year, validation.month, 0);
+      // Calculate YTD period: Jan 1 to end of selected month
+      const periodStart = new Date(validation.year, 0, 1); // Jan 1
+      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
       const periodStartStr = periodStart.toISOString().split("T")[0];
       const periodEndStr = periodEnd.toISOString().split("T")[0];
+      const periodEndTs = new Date(validation.year, validation.month, 0, 23, 59, 59, 999).getTime();
 
-      // Get balances grouped by fs_note for the period
+      // Get balances grouped by fs_note for the YTD period
       const query = `
         WITH period_balances AS (
           SELECT
@@ -490,6 +544,9 @@ export default function (pool) {
 
       const result = await pool.query(query, [periodStartStr, periodEndStr]);
 
+      // Calculate invoice-based revenue (Note 7)
+      const invoiceRevenue = await getRevenue(validation.year, periodEndTs);
+
       // Organize into sections
       const revenue = [];
       const expenses = [];
@@ -499,10 +556,17 @@ export default function (pool) {
       let totalCogs = 0;
 
       for (const row of result.rows) {
+        let amount = parseFloat(row.balance);
+
+        // Override Note 7 (Revenue/Sales) with invoice-based value
+        if (row.code === "7") {
+          amount = invoiceRevenue;
+        }
+
         const item = {
           note: row.code,
           name: row.name,
-          amount: parseFloat(row.balance),
+          amount: amount,
         };
 
         if (row.category === "revenue") {
@@ -554,6 +618,7 @@ export default function (pool) {
   // ==================== BALANCE SHEET ====================
 
   // GET /balance-sheet/:year/:month - Generate balance sheet as of period end
+  // Date range: YTD from Jan 1 of year to end of selected month
   router.get("/balance-sheet/:year/:month", async (req, res) => {
     try {
       const { year, month } = req.params;
@@ -564,13 +629,16 @@ export default function (pool) {
         return res.status(400).json({ message: validation.error });
       }
 
-      // Calculate period end date (last day of month)
-      const periodEnd = new Date(validation.year, validation.month, 0);
+      // Calculate YTD period: Jan 1 to end of selected month
+      const periodStart = new Date(validation.year, 0, 1); // Jan 1
+      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
+      const periodStartStr = periodStart.toISOString().split("T")[0];
       const periodEndStr = periodEnd.toISOString().split("T")[0];
+      const periodEndTs = new Date(validation.year, validation.month, 0, 23, 59, 59, 999).getTime();
 
-      // Get cumulative balances grouped by fs_note up to period end
+      // Get YTD balances grouped by fs_note
       const query = `
-        WITH cumulative_balances AS (
+        WITH ytd_balances AS (
           SELECT
             ac.fs_note,
             SUM(COALESCE(jel.debit_amount, 0)) as total_debit,
@@ -579,7 +647,8 @@ export default function (pool) {
           JOIN journal_entries je ON jel.journal_entry_id = je.id
           JOIN account_codes ac ON jel.account_code = ac.code
           WHERE je.status = 'posted'
-            AND je.entry_date <= $1
+            AND je.entry_date >= $1
+            AND je.entry_date <= $2
             AND ac.fs_note IS NOT NULL
           GROUP BY ac.fs_note
         )
@@ -590,22 +659,25 @@ export default function (pool) {
           fsn.report_section,
           fsn.normal_balance,
           fsn.sort_order,
-          COALESCE(cb.total_debit, 0) as total_debit,
-          COALESCE(cb.total_credit, 0) as total_credit,
+          COALESCE(yb.total_debit, 0) as total_debit,
+          COALESCE(yb.total_credit, 0) as total_credit,
           CASE
             WHEN fsn.normal_balance = 'debit' THEN
-              COALESCE(cb.total_debit, 0) - COALESCE(cb.total_credit, 0)
+              COALESCE(yb.total_debit, 0) - COALESCE(yb.total_credit, 0)
             ELSE
-              COALESCE(cb.total_credit, 0) - COALESCE(cb.total_debit, 0)
+              COALESCE(yb.total_credit, 0) - COALESCE(yb.total_debit, 0)
           END as balance
         FROM financial_statement_notes fsn
-        LEFT JOIN cumulative_balances cb ON fsn.code = cb.fs_note
+        LEFT JOIN ytd_balances yb ON fsn.code = yb.fs_note
         WHERE fsn.report_section = 'balance_sheet'
           AND fsn.is_active = true
         ORDER BY fsn.sort_order, fsn.code
       `;
 
-      const result = await pool.query(query, [periodEndStr]);
+      const result = await pool.query(query, [periodStartStr, periodEndStr]);
+
+      // Calculate invoice-based trade receivables (Note 22)
+      const tradeReceivables = await getTradeReceivables(periodEndTs);
 
       // Organize into sections
       const assets = { current: [], non_current: [] };
@@ -621,10 +693,17 @@ export default function (pool) {
       const nonCurrentLiabilityNotes = ["11", "16"]; // Term Loans, Hire Purchase Payable
 
       for (const row of result.rows) {
+        let amount = parseFloat(row.balance);
+
+        // Override Note 22 (Trade Receivables) with invoice-based value
+        if (row.code === "22") {
+          amount = tradeReceivables;
+        }
+
         const item = {
           note: row.code,
           name: row.name,
-          amount: parseFloat(row.balance),
+          amount: amount,
         };
 
         if (row.category === "asset") {
@@ -651,6 +730,7 @@ export default function (pool) {
         period: {
           year: validation.year,
           month: validation.month,
+          start_date: periodStartStr,
           as_of_date: periodEndStr,
         },
         assets: {
@@ -697,6 +777,7 @@ export default function (pool) {
   // ==================== COST OF GOODS MANUFACTURED ====================
 
   // GET /cogm/:year/:month - Generate Cost of Goods Manufactured report
+  // Date range: YTD from Jan 1 of year to end of selected month
   router.get("/cogm/:year/:month", async (req, res) => {
     try {
       const { year, month } = req.params;
@@ -707,9 +788,9 @@ export default function (pool) {
         return res.status(400).json({ message: validation.error });
       }
 
-      // Calculate period start and end dates
-      const periodStart = new Date(validation.year, validation.month - 1, 1);
-      const periodEnd = new Date(validation.year, validation.month, 0);
+      // Calculate YTD period: Jan 1 to end of selected month
+      const periodStart = new Date(validation.year, 0, 1); // Jan 1
+      const periodEnd = new Date(validation.year, validation.month, 0); // Last day of selected month
       const periodStartStr = periodStart.toISOString().split("T")[0];
       const periodEndStr = periodEnd.toISOString().split("T")[0];
 
