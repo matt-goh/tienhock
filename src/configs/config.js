@@ -1,13 +1,8 @@
 // src/config.js
+// Note: dotenv is loaded in server.js before this file is imported
 
 // Check if we're in browser (Vite) or Node.js (server)
 const isBrowser = typeof window !== 'undefined';
-
-// Load .env file for Node.js before reading any env variables
-if (!isBrowser) {
-  const dotenv = await import('dotenv');
-  dotenv.config();
-}
 
 const getEnvVariable = (key, defaultValue) => {
   if (isBrowser) {
