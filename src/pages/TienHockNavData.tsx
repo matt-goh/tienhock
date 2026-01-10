@@ -22,6 +22,12 @@ import VoucherGeneratorPage from "./Accounting/VoucherGeneratorPage";
 // Accounting - Location Mappings
 import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPage";
 
+// Accounting - Financial Reports
+import TrialBalancePage from "./Accounting/Reports/TrialBalancePage";
+import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
+import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
+import CogmPage from "./Accounting/Reports/CogmPage";
+
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
 import InvoiceFormPage from "./Invoice/InvoiceFormPage";
@@ -320,6 +326,26 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Account Mappings",
         path: "/accounting/location-account-mappings",
         component: LocationAccountMappingsPage,
+      },
+      {
+        name: "Trial Balance",
+        path: "/accounting/reports/trial-balance",
+        component: TrialBalancePage,
+      },
+      {
+        name: "Income Statement",
+        path: "/accounting/reports/income-statement",
+        component: IncomeStatementPage,
+      },
+      {
+        name: "Balance Sheet",
+        path: "/accounting/reports/balance-sheet",
+        component: BalanceSheetPage,
+      },
+      {
+        name: "Cost of Goods Manufactured",
+        path: "/accounting/reports/cogm",
+        component: CogmPage,
       },
     ],
   },

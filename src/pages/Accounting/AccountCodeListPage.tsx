@@ -1,5 +1,5 @@
 // src/pages/Accounting/AccountCodeListPage.tsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   IconSearch,
   IconPlus,
@@ -30,6 +30,14 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 
+// Financial statement note interface
+interface FinancialStatementNote {
+  code: string;
+  name: string;
+  category: string;
+  report_section: string;
+}
+
 // Tree node interface for display
 interface AccountTreeNode extends AccountCode {
   children: AccountTreeNode[];
@@ -47,8 +55,27 @@ const AccountCodeListPage: React.FC = () => {
   } = useAccountCodesCache();
   const { ledgerTypes, isLoading: ledgerTypesLoading } = useLedgerTypesCache();
 
+  // Financial statement notes state
+  const [fsNotes, setFsNotes] = useState<FinancialStatementNote[]>([]);
+  const [fsNotesLoading, setFsNotesLoading] = useState(true);
+
+  // Fetch financial statement notes
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        const response = await api.get("/api/financial-reports/notes");
+        setFsNotes(response || []);
+      } catch (error) {
+        console.error("Error fetching financial statement notes:", error);
+      } finally {
+        setFsNotesLoading(false);
+      }
+    };
+    fetchNotes();
+  }, []);
+
   // Derived loading state
-  const loading = accountCodesLoading || ledgerTypesLoading;
+  const loading = accountCodesLoading || ledgerTypesLoading || fsNotesLoading;
 
   // Local state
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -223,11 +250,18 @@ const AccountCodeListPage: React.FC = () => {
     }
   };
 
-  // Get ledger type name
-  const getLedgerTypeName = (code: string | null): string => {
-    if (!code) return "-";
-    const lt = ledgerTypes.find((t) => t.code === code);
-    return lt ? `${lt.code} (${lt.name})` : code;
+  // Handle fs_note update
+  const handleFsNoteChange = async (accountCode: string, newFsNote: string | null) => {
+    try {
+      await api.patch(`/api/account-codes/${accountCode}/fs-note`, {
+        fs_note: newFsNote,
+      });
+      toast.success("Note updated");
+      refreshAccountCodes();
+    } catch (error) {
+      console.error("Error updating fs_note:", error);
+      toast.error("Failed to update note");
+    }
   };
 
   // Render tree node
@@ -304,6 +338,21 @@ const AccountCodeListPage: React.FC = () => {
               "-"
             )}
           </td>
+          <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
+            <select
+              value={node.fs_note || ""}
+              onChange={(e) => handleFsNoteChange(node.code, e.target.value || null)}
+              className="w-full text-xs border border-default-200 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+              title={node.fs_note ? fsNotes.find(n => n.code === node.fs_note)?.name : "No note assigned"}
+            >
+              <option value="">-</option>
+              {fsNotes.map((note) => (
+                <option key={note.code} value={note.code}>
+                  {note.code} - {note.name.substring(0, 20)}{note.name.length > 20 ? "..." : ""}
+                </option>
+              ))}
+            </select>
+          </td>
           <td className="px-4 py-2 text-center text-sm">
             <span
               className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -377,6 +426,21 @@ const AccountCodeListPage: React.FC = () => {
         </td>
         <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300 font-mono">
           {account.parent_code || "-"}
+        </td>
+        <td className="px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
+          <select
+            value={account.fs_note || ""}
+            onChange={(e) => handleFsNoteChange(account.code, e.target.value || null)}
+            className="w-full text-xs border border-default-200 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+            title={account.fs_note ? fsNotes.find(n => n.code === account.fs_note)?.name : "No note assigned"}
+          >
+            <option value="">-</option>
+            {fsNotes.map((note) => (
+              <option key={note.code} value={note.code}>
+                {note.code} - {note.name.substring(0, 20)}{note.name.length > 20 ? "..." : ""}
+              </option>
+            ))}
+          </select>
         </td>
         <td className="px-4 py-2 text-center text-sm">
           <span
@@ -646,6 +710,9 @@ const AccountCodeListPage: React.FC = () => {
                     Parent
                   </th>
                 )}
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-40">
+                  FS Note
+                </th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
                   Status
                 </th>
@@ -661,7 +728,7 @@ const AccountCodeListPage: React.FC = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                     >
                       No account codes found.{" "}
@@ -676,7 +743,7 @@ const AccountCodeListPage: React.FC = () => {
               ) : (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
                     No account codes found.{" "}

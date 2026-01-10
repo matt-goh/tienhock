@@ -74,7 +74,7 @@ export const JOB_CONFIGS: JobTypeConfigs = {
       "BIHUN_FOREMAN",
       "BH_BERAS",
       "BH_CAMPURAN",
-      "BH_SANGKUT",
+      "BIHUN_SANGKUT",
       "BH_DRYER",
     ],
     contextFields: [

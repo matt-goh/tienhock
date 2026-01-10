@@ -86,6 +86,7 @@ const showUnitsInput = (activity: ActivityItem): boolean => {
     activity.rateUnit === "Bag" ||
     activity.rateUnit === "Trip" ||
     activity.rateUnit === "Day" ||
+    activity.rateUnit === "Tray" ||
     activity.rateUnit === "Fixed" ||
     (activity.rateUnit === "Percent" && !!activity.isContextLinked)
   );

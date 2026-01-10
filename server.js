@@ -11,6 +11,7 @@ import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";
 import { checkAndProcessDueConsolidations } from "./src/utils/invoice/autoConsolidation.js";
 import { createAutoBackup, syncLocalToS3, deleteOldS3Backups } from "./src/utils/s3-backup.js";
+import { clearInvalidEInvoicesForNonEligibleCustomers } from "./src/routes/sales/invoices/invoices.js";
 
 dotenv.config();
 
@@ -107,6 +108,25 @@ cron.schedule(
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error in auto-consolidation job:`,
+        error
+      );
+    }
+  },
+  {
+    scheduled: true,
+    timezone: "UTC",
+  }
+);
+
+// --- Daily e-invoice clearing for non-eligible customers ---
+cron.schedule(
+  "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
+  async () => {
+    try {
+      await clearInvalidEInvoicesForNonEligibleCustomers(pool);
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Error in daily e-invoice clearing job:`,
         error
       );
     }
