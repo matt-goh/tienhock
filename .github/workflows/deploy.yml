@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy to Hetzner
 
 on:
   push:
@@ -16,77 +16,56 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets.HETZNER_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      - name: Create env file
         run: |
-          # Create a temporary env file with AWS credentials (handles special characters safely)
-          cat > /tmp/aws_env.txt << 'ENVFILE'
+          cat > /tmp/.env << 'ENVFILE'
+          NODE_ENV=production
+          HOST=127.0.0.1
+          PORT=5000
+          DB_USER=tienhock
+          DB_HOST=localhost
+          DB_NAME=tienhock_prod
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_PORT=5432
+          REACT_APP_API_BASE_URL=https://api.tienhock.com
+          MYINVOIS_API_BASE_URL=https://api.myinvois.hasil.gov.my
+          MYINVOIS_CLIENT_ID=${{ secrets.MYINVOIS_CLIENT_ID }}
+          MYINVOIS_CLIENT_SECRET=${{ secrets.MYINVOIS_CLIENT_SECRET }}
+          MYINVOIS_GT_CLIENT_ID=0233a712-c010-4b4f-afba-9c266076ab50
+          MYINVOIS_GT_CLIENT_SECRET=59f50d71-0b60-42c7-a371-0708fc08c27d
+          MYINVOIS_JP_CLIENT_ID=12bc3955-80f4-4478-a90e-dec05c771824
+          MYINVOIS_JP_CLIENT_SECRET=9106918b-62ec-411a-adc9-34f8990f3f48
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION=${{ secrets.AWS_REGION }}
           S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
           ENVFILE
 
-          # Copy the env file to EC2
-          scp -i ~/.ssh/deploy_key /tmp/aws_env.txt ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/tmp/aws_env.txt
+      - name: Deploy to Hetzner
+        run: |
+          # Copy env file to server
+          scp -i ~/.ssh/deploy_key /tmp/.env ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }}:~/tienhock-app/.env
 
-          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
-            # Navigate to application directory
-            cd ~/tienhock-erp
-
-            # Check available disk space
-            echo "Disk space before cleanup:"
-            df -h
+          ssh -i ~/.ssh/deploy_key ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }} << 'EOF'
+            cd ~/tienhock-app
 
             # Pull latest changes
             git checkout production
             git pull origin production
 
-            # Make sure backup script is executable
-            chmod +x backup.sh
+            # Install dependencies
+            npm install --legacy-peer-deps
 
-            # Update AWS S3 credentials in prod/.env from temp file
-            cd prod
-            touch .env
+            # Build frontend
+            npm run build
 
-            # Remove old AWS entries and append new ones
-            grep -v "^AWS_ACCESS_KEY_ID=" .env | grep -v "^AWS_SECRET_ACCESS_KEY=" | grep -v "^AWS_REGION=" | grep -v "^S3_BUCKET_NAME=" > .env.tmp || true
-            cat /tmp/aws_env.txt | sed 's/^[[:space:]]*//' >> .env.tmp
-            mv .env.tmp .env
-            rm -f /tmp/aws_env.txt
+            # Restart application with PM2
+            pm2 restart tienhock-server || pm2 start ecosystem.config.cjs
 
-            # Stop containers (preserves volumes/database)
-            docker-compose down
-            
-            # Clean up Docker to free space (PRESERVES VOLUMES)
-            docker system prune -f
-            docker builder prune -f
-            
-            # Check disk space after cleanup
-            echo "Disk space after cleanup:"
-            df -h
-            
-            # Build and start services with no-cache to prevent build cache issues
-            docker-compose up --build --force-recreate -d
-            
-            # Show container status
-            docker ps
-            
-            # Check logs of each service
-            echo "=== Cloudflared logs ==="
-            docker logs --tail 20 cloudflared || echo "Cloudflared container not found"
-            
-            echo "=== API Gateway logs ==="
-            docker logs --tail 20 api_gateway || echo "API Gateway container not found"
-            
-            echo "=== Server logs ==="
-            docker logs --tail 20 tienhock_prod_server || echo "Server container not found"
+            # Show status
+            pm2 status
           EOF
