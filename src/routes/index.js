@@ -43,6 +43,7 @@ import accountCodesRouter from "./accounting/account-codes.js";
 import ledgerTypesRouter from "./accounting/ledger-types.js";
 import journalEntriesRouter from "./accounting/journal-entries.js";
 import journalVouchersRouter from "./accounting/journal-vouchers.js";
+import financialReportsRouter from "./accounting/financial-reports.js";
 
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
@@ -160,6 +161,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/ledger-types", ledgerTypesRouter(pool));
   app.use("/api/journal-entries", journalEntriesRouter(pool));
   app.use("/api/journal-vouchers", journalVouchersRouter(pool));
+  app.use("/api/financial-reports", financialReportsRouter(pool));
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
