@@ -1,7 +1,7 @@
 # Migration Plan: AWS to Hetzner CPX12 (Without Docker)
 
 **Created:** January 9, 2026
-**Status:** In Progress - Database migrated, deploying application
+**Status:** Ready for cutover - Hetzner tested via api-test.tienhock.com
 
 ## Server Details
 - **Name:** tienhock-erp
@@ -73,7 +73,7 @@ sudo -u postgres psql -d tienhock_prod -c "\dt"
 
 ---
 
-## Phase 4: Application Deployment (NEXT)
+## ✅ Phase 4: Application Deployment (COMPLETED)
 
 ### 4.1 Clone Application from Git
 ```bash
@@ -124,7 +124,7 @@ pm2 startup  # Follow instructions to enable auto-start on boot
 
 ---
 
-## Phase 5: Nginx Configuration
+## ✅ Phase 5: Nginx Configuration (COMPLETED)
 
 Create `/etc/nginx/sites-available/tienhock-api`:
 
@@ -201,7 +201,7 @@ systemctl reload nginx
 
 ---
 
-## Phase 6: Cloudflare Tunnel Setup
+## ✅ Phase 6: Cloudflare Tunnel Setup (COMPLETED)
 
 ### 6.1 Create New Tunnel (Recommended)
 1. Go to Cloudflare Zero Trust Dashboard
