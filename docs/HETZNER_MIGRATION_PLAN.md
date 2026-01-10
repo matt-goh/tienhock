@@ -1,7 +1,12 @@
 # Migration Plan: AWS to Hetzner CPX12 (Without Docker)
 
 **Created:** January 9, 2026
-**Status:** Pending - awaiting Hetzner account verification
+**Status:** In Progress - Server ready, awaiting database migration
+
+## Server Details
+- **Name:** tienhock-erp
+- **IP:** 5.223.55.190
+- **SSH:** `ssh root@5.223.55.190` or `ssh tienhock@5.223.55.190`
 
 ## Overview
 
@@ -19,72 +24,30 @@ Migrate Tien Hock ERP from AWS (EC2 + RDS) to a single Hetzner VPS, dropping Doc
 
 ---
 
-## Phase 1: Hetzner VPS Setup
+## ✅ Phase 1: Hetzner VPS Setup (COMPLETED)
 
-### 1.1 Create Server
-1. Log in to Hetzner Cloud Console
-2. Create new server:
-   - Location: **Singapore**
-   - Image: **Ubuntu 24.04**
-   - Type: **CPX12** (1 vCPU, 2GB RAM, 40GB NVMe)
-   - Add SSH key for secure access
-   - Enable **IPv4** ($0.60/month extra)
-
-### 1.2 Initial Server Configuration
-```bash
-# SSH into server
-ssh root@<hetzner-ip>
-
-# Update system
-apt update && apt upgrade -y
-
-# Set timezone
-timedatectl set-timezone Asia/Kuala_Lumpur
-
-# Create non-root user
-adduser tienhock
-usermod -aG sudo tienhock
-
-# Set up SSH for new user
-mkdir -p /home/tienhock/.ssh
-cp ~/.ssh/authorized_keys /home/tienhock/.ssh/
-chown -R tienhock:tienhock /home/tienhock/.ssh
-
-# Disable root SSH login (edit /etc/ssh/sshd_config)
-# PermitRootLogin no
-systemctl restart sshd
-```
-
-### 1.3 Firewall Setup (UFW)
-```bash
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow ssh
-ufw allow 80/tcp    # HTTP (for Let's Encrypt)
-ufw allow 443/tcp   # HTTPS (if needed)
-# Note: Cloudflare tunnel doesn't need open ports
-ufw enable
-```
+- Server created: **tienhock-erp** (CPX12, Singapore, Ubuntu 24.04)
+- System updated and timezone set to Asia/Kuala_Lumpur
+- Non-root user `tienhock` created with sudo privileges
+- Hetzner Cloud Firewall configured (TCP 22, TCP 80, ICMP)
 
 ---
 
-## Phase 2: Install Dependencies
+## ✅ Phase 2: Install Dependencies (COMPLETED)
 
-### 2.1 PostgreSQL 16
+Installed on server:
+- PostgreSQL 16
+- Node.js 20 LTS
+- PM2
+- Nginx
+- Cloudflared
+
+---
+
+## Phase 3: Database Migration (NEXT)
+
+### 3.1 Create Database User (on Hetzner server)
 ```bash
-# Add PostgreSQL repo
-sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-apt update
-
-# Install PostgreSQL 16
-apt install postgresql-16 -y
-
-# Start and enable
-systemctl start postgresql
-systemctl enable postgresql
-
-# Create database and user
 sudo -u postgres psql <<EOF
 CREATE USER tienhock WITH PASSWORD 'your_secure_password_here';
 CREATE DATABASE tienhock_prod OWNER tienhock;
@@ -92,55 +55,17 @@ GRANT ALL PRIVILEGES ON DATABASE tienhock_prod TO tienhock;
 EOF
 ```
 
-### 2.2 Node.js 20 LTS
+### 3.2 Download SQL Backup
+Download the SQL backup file from the production app's backup feature.
+
+### 3.3 Transfer to Hetzner (from Windows)
 ```bash
-# Install Node.js via NodeSource
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install nodejs -y
-
-# Verify
-node -v  # Should show v20.x.x
-
-# Install PM2 globally
-npm install -g pm2
+scp C:\Users\matia\tienhock_backup.sql root@5.223.55.190:/root/
 ```
 
-### 2.3 Nginx
+### 3.4 Import to Hetzner PostgreSQL
 ```bash
-apt install nginx -y
-systemctl start nginx
-systemctl enable nginx
-```
-
-### 2.4 Cloudflared
-```bash
-# Download and install cloudflared
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
-dpkg -i cloudflared.deb
-
-# Install as service (will configure later)
-```
-
----
-
-## Phase 3: Database Migration
-
-### 3.1 Export from RDS
-```bash
-# On your local machine or EC2
-pg_dump -h tienhockdb.cfsoo4y6e4d4.ap-southeast-1.rds.amazonaws.com \
-  -U tienhock -d tienhock_prod -F c -f tienhock_backup.dump
-```
-
-### 3.2 Transfer to Hetzner
-```bash
-scp tienhock_backup.dump tienhock@<hetzner-ip>:/home/tienhock/
-```
-
-### 3.3 Import to Hetzner PostgreSQL
-```bash
-# On Hetzner server
-sudo -u postgres pg_restore -d tienhock_prod /home/tienhock/tienhock_backup.dump
+sudo -u postgres psql -d tienhock_prod < /root/tienhock_backup.sql
 
 # Verify
 sudo -u postgres psql -d tienhock_prod -c "\dt"
@@ -164,8 +89,14 @@ npm install --legacy-peer-deps
 npm run build  # Build frontend
 ```
 
-### 4.3 Create PM2 Ecosystem File
-Create `ecosystem.config.cjs` in project root:
+### 4.3 Environment File
+The `.env` file will be created/updated by GitHub Actions during deployment.
+
+- **From GitHub Secrets**: `DB_PASSWORD`, `MYINVOIS_CLIENT_ID`, `MYINVOIS_CLIENT_SECRET`, `AWS_*`
+- **Hardcoded in workflow** (same as docker-compose): `MYINVOIS_GT_*`, `MYINVOIS_JP_*`
+
+### 4.4 Create PM2 Ecosystem File
+Create `ecosystem.config.cjs` in project root (no secrets needed - they're in .env):
 
 ```javascript
 // ecosystem.config.cjs - PM2 configuration for production
@@ -177,46 +108,13 @@ module.exports = {
     instances: 1,
     autorestart: true,
     watch: false,
-    max_memory_restart: '500M',
-    env: {
-      NODE_ENV: 'production',
-      HOST: '127.0.0.1',
-      PORT: 5000,
-
-      // Database (now localhost on Hetzner)
-      DB_USER: 'tienhock',
-      DB_HOST: 'localhost',
-      DB_NAME: 'tienhock_prod',
-      DB_PASSWORD: '<YOUR_DB_PASSWORD>',
-      DB_PORT: 5432,
-
-      // MyInvois API - Tien Hock
-      REACT_APP_API_BASE_URL: 'https://api.tienhock.com',
-      MYINVOIS_API_BASE_URL: 'https://api.myinvois.hasil.gov.my',
-      MYINVOIS_CLIENT_ID: '<YOUR_MYINVOIS_CLIENT_ID>',
-      MYINVOIS_CLIENT_SECRET: '<YOUR_MYINVOIS_CLIENT_SECRET>',
-
-      // MyInvois API - Green Target
-      MYINVOIS_GT_CLIENT_ID: '<YOUR_MYINVOIS_GT_CLIENT_ID>',
-      MYINVOIS_GT_CLIENT_SECRET: '<YOUR_MYINVOIS_GT_CLIENT_SECRET>',
-
-      // MyInvois API - Jelly Polly
-      MYINVOIS_JP_CLIENT_ID: '<YOUR_MYINVOIS_JP_CLIENT_ID>',
-      MYINVOIS_JP_CLIENT_SECRET: '<YOUR_MYINVOIS_JP_CLIENT_SECRET>',
-
-      // AWS S3 (for backups - keep using AWS S3)
-      AWS_ACCESS_KEY_ID: '<YOUR_AWS_ACCESS_KEY_ID>',
-      AWS_SECRET_ACCESS_KEY: '<YOUR_AWS_SECRET_ACCESS_KEY>',
-      AWS_REGION: 'ap-southeast-1',
-      S3_BUCKET_NAME: 'tienhock-prod-bucket'
-    }
+    max_memory_restart: '500M'
+    // No env section needed - app loads from .env file
   }]
 };
 ```
 
-**Note:** Replace all `<YOUR_...>` placeholders with actual values from your current `docker-compose.yml`. Add `ecosystem.config.cjs` to `.gitignore` to avoid committing secrets.
-
-### 4.4 Start Application with PM2
+### 4.5 Start Application with PM2
 ```bash
 cd /home/tienhock/tienhock-app
 pm2 start ecosystem.config.cjs
@@ -263,7 +161,7 @@ server {
 
         # CORS headers
         add_header 'Access-Control-Allow-Origin' 'https://tienhock.com' always;
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
         add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-session-id,api-key' always;
         add_header 'Access-Control-Allow-Credentials' 'true' always;
     }
@@ -272,7 +170,7 @@ server {
     location = / {
         if ($request_method = 'OPTIONS') {
             add_header 'Access-Control-Allow-Origin' 'https://tienhock.com' always;
-            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
             add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-session-id,api-key' always;
             add_header 'Access-Control-Allow-Credentials' 'true' always;
             add_header 'Access-Control-Max-Age' 1728000;
@@ -329,7 +227,99 @@ In Cloudflare Dashboard, add public hostname:
 
 ---
 
-## Phase 7: S3 Backup Configuration
+## Phase 7: Update GitHub Actions CI/CD
+
+### 7.1 Update GitHub Secrets
+Go to GitHub repo → Settings → Secrets and variables → Actions
+
+| Secret | Action |
+|--------|--------|
+| `HETZNER_HOST` | **Add** - `5.223.55.190` |
+| `HETZNER_USERNAME` | **Add** - `tienhock` |
+| `SSH_PRIVATE_KEY` | Update to your SSH private key (run `cat ~/.ssh/id_ed25519` on Windows) |
+
+Keep `EC2_HOST` and `EC2_USERNAME` for rollback. Other secrets - keep as-is.
+
+### 7.2 Update deploy.yml
+Replace `.github/workflows/deploy.yml` with PM2-based deployment:
+
+```yaml
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create env file
+        run: |
+          cat > /tmp/.env << 'ENVFILE'
+          NODE_ENV=production
+          HOST=127.0.0.1
+          PORT=5000
+          DB_USER=tienhock
+          DB_HOST=localhost
+          DB_NAME=tienhock_prod
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_PORT=5432
+          REACT_APP_API_BASE_URL=https://api.tienhock.com
+          MYINVOIS_API_BASE_URL=https://api.myinvois.hasil.gov.my
+          MYINVOIS_CLIENT_ID=${{ secrets.MYINVOIS_CLIENT_ID }}
+          MYINVOIS_CLIENT_SECRET=${{ secrets.MYINVOIS_CLIENT_SECRET }}
+          MYINVOIS_GT_CLIENT_ID=0233a712-c010-4b4f-afba-9c266076ab50
+          MYINVOIS_GT_CLIENT_SECRET=59f50d71-0b60-42c7-a371-0708fc08c27d
+          MYINVOIS_JP_CLIENT_ID=12bc3955-80f4-4478-a90e-dec05c771824
+          MYINVOIS_JP_CLIENT_SECRET=9106918b-62ec-411a-adc9-34f8990f3f48
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          ENVFILE
+
+      - name: Deploy to Hetzner
+        run: |
+          # Copy env file to server
+          scp -i ~/.ssh/deploy_key /tmp/.env ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }}:~/tienhock-app/.env
+
+          ssh -i ~/.ssh/deploy_key ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }} << 'EOF'
+            cd ~/tienhock-app
+
+            # Pull latest changes
+            git checkout production
+            git pull origin production
+
+            # Install dependencies
+            npm install --legacy-peer-deps
+
+            # Build frontend
+            npm run build
+
+            # Restart application
+            pm2 restart tienhock-server
+
+            # Show status
+            pm2 status
+          EOF
+```
+
+---
+
+## Phase 8: S3 Backup Verification
 
 The S3 backup should work as-is since it uses AWS SDK with credentials from environment variables. The `ecosystem.config.cjs` already includes the AWS credentials.
 
@@ -341,9 +331,9 @@ pm2 logs tienhock-server  # Check for backup-related logs
 
 ---
 
-## Phase 8: Testing & Cutover
+## Phase 9: Testing & Cutover
 
-### 8.1 Pre-Cutover Testing
+### 9.1 Pre-Cutover Testing
 1. Test database connectivity:
    ```bash
    sudo -u postgres psql -d tienhock_prod -c "SELECT COUNT(*) FROM invoices;"
@@ -356,7 +346,7 @@ pm2 logs tienhock-server  # Check for backup-related logs
 
 3. Test through Cloudflare tunnel (if using separate test domain)
 
-### 8.2 Cutover Steps
+### 9.2 Cutover Steps
 1. **Set maintenance mode** on current production (if available)
 2. **Final database sync**: Export fresh backup from RDS, import to Hetzner
 3. **Update Cloudflare tunnel** to point to Hetzner server
@@ -367,7 +357,7 @@ pm2 logs tienhock-server  # Check for backup-related logs
    - Payroll operations
    - S3 backup trigger
 
-### 8.3 Post-Cutover
+### 9.3 Post-Cutover
 1. Monitor logs: `pm2 logs tienhock-server`
 2. Monitor resources: `htop`
 3. Keep AWS running for 1 week as fallback
@@ -375,7 +365,7 @@ pm2 logs tienhock-server  # Check for backup-related logs
 
 ---
 
-## Phase 9: AWS Cleanup (After Stability Confirmed)
+## Phase 10: AWS Cleanup (After Stability Confirmed)
 
 1. **Stop RDS instance** (can snapshot first for safety)
 2. **Terminate EC2 instance**
@@ -391,19 +381,6 @@ If migration fails:
 1. Update Cloudflare tunnel to point back to EC2
 2. Ensure RDS is still running
 3. All traffic returns to AWS immediately
-
----
-
-## Files to Create/Modify
-
-| File | Location | Action | Purpose |
-|------|----------|--------|---------|
-| `ecosystem.config.cjs` | Hetzner: `/home/tienhock/tienhock-app/` | Create | PM2 config with env vars |
-| `tienhock-api` | Hetzner: `/etc/nginx/sites-available/` | Create | Nginx reverse proxy |
-| `.gitignore` | Project root | Update | Add `ecosystem.config.cjs` |
-| Cloudflare Dashboard | Web | Configure | New tunnel to Hetzner |
-
-**No changes to existing application code required** - only infrastructure/config files.
 
 ---
 
