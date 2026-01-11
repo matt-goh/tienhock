@@ -337,7 +337,7 @@ const RentalAddonModal = ({
                                 )
                               }
                               disabled={
-                                selectedPaycode &&
+                                selectedPaycode !== null &&
                                 !selectedPaycode.is_variable_amount
                               }
                               className={clsx(
