@@ -143,6 +143,11 @@ This is a comprehensive ERP system supporting three companies:
 - `greentarget.monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
 - `greentarget.monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, rate_used, calculated_amount, is_manually_added, created_at
 - `greentarget.driver_trips` - id, driver_id, year, month, trip_count, completed_rental_ids, auto_calculated, notes, created_at, updated_at
+- `greentarget.pickup_destinations` - id, code (unique), name, is_default, sort_order, is_active, created_at, updated_at (configurable pickup destination options: KILANG, MD, MENGGATAL)
+- `greentarget.payroll_rules` - id, rule_type (PLACEMENT/PICKUP), condition_field, condition_operator, condition_value, secondary_condition_field, secondary_condition_operator, secondary_condition_value, pay_code_id, priority, is_active, description, created_at, updated_at
+- `greentarget.rental_addons` - id, rental_id, pay_code_id, quantity, amount, notes, created_at, created_by (manual add-on paycodes per rental)
+- `greentarget.addon_paycodes` - id, pay_code_id, display_name, default_amount, is_variable_amount, sort_order, is_active, created_at, updated_at (configuration for available add-on paycodes)
+- `greentarget.payroll_settings` - id, setting_key (unique), setting_value, description, created_at, updated_at (global payroll settings)
 
 ### Styling
 - Tailwind CSS with custom color palette

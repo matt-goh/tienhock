@@ -25,6 +25,7 @@ import {
   ListboxButton as HeadlessListboxButton,
 } from "@headlessui/react";
 import LocationFormModal from "../../../components/GreenTarget/LocationFormModal";
+import RentalAddonModal from "../../../components/GreenTarget/RentalAddonModal";
 import { api } from "../../../routes/utils/api";
 import clsx from "clsx";
 import { FormCombobox, SelectOption } from "../../../components/FormComponents";
@@ -63,6 +64,14 @@ interface InvoiceInfo {
   has_payments?: boolean;
 }
 
+interface PickupDestination {
+  id: number;
+  code: string;
+  name: string;
+  is_default: boolean;
+  sort_order: number;
+}
+
 interface Rental {
   rental_id?: number;
   customer_id: number;
@@ -75,6 +84,8 @@ interface Rental {
   date_picked: string | null;
   remarks: string | null;
   invoice_info?: InvoiceInfo | null;
+  pickup_destination?: string | null;
+  addon_count?: number;
 }
 
 // Helper to format date
@@ -129,6 +140,8 @@ const RentalFormPage: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [customerQuery, setCustomerQuery] = useState("");
+  const [pickupDestinations, setPickupDestinations] = useState<PickupDestination[]>([]);
+  const [isAddonModalOpen, setIsAddonModalOpen] = useState(false);
   const previousDateRef = React.useRef<string | null>(null); // Use useRef from React
 
   // Load reference data
@@ -137,25 +150,43 @@ const RentalFormPage: React.FC = () => {
     const loadReferenceData = async () => {
       setLoading(true);
       try {
-        const [customersData, driversData] = await Promise.all([
+        const [customersData, driversData, pickupDestinationsData] = await Promise.all([
           greenTargetApi.getCustomers(),
           api.get("/api/staffs/get-drivers"),
+          greenTargetApi.getPickupDestinations(),
         ]);
         if (isMounted) {
           setCustomers(customersData || []);
           const loadedDrivers = driversData || [];
           setDrivers(loadedDrivers);
+          setPickupDestinations(pickupDestinationsData || []);
+
+          // Get default pickup destination
+          const defaultDest = pickupDestinationsData?.find((d: PickupDestination) => d.is_default);
+
           if (!isEditMode && loadedDrivers.length > 0) {
             const initialDriver = loadedDrivers[0].name;
-            setFormData((prev) => ({ ...prev, driver: initialDriver }));
+            setFormData((prev) => ({
+              ...prev,
+              driver: initialDriver,
+              pickup_destination: defaultDest?.code || null,
+            }));
             // Set initial state for comparison later
             setInitialFormData((prev) => ({
               ...(prev ?? { ...formData, driver: initialDriver }),
               driver: initialDriver,
+              pickup_destination: defaultDest?.code || null,
             }));
           } else if (!isEditMode) {
             // Set initial state even if no drivers loaded
-            setInitialFormData((prev) => ({ ...(prev ?? formData) }));
+            setFormData((prev) => ({
+              ...prev,
+              pickup_destination: defaultDest?.code || null,
+            }));
+            setInitialFormData((prev) => ({
+              ...(prev ?? formData),
+              pickup_destination: defaultDest?.code || null,
+            }));
           }
         }
       } catch (err) {
@@ -286,6 +317,8 @@ const RentalFormPage: React.FC = () => {
         date_picked: formatDateForInput(rental.date_picked),
         remarks: rental.remarks ?? null,
         invoice_info: rental.invoice_info || null,
+        pickup_destination: rental.pickup_destination || null,
+        addon_count: parseInt(rental.addon_count) || 0,
       };
       setFormData(fetchedFormData);
       setInitialFormData(fetchedFormData);
@@ -375,6 +408,12 @@ const RentalFormPage: React.FC = () => {
   };
   const handleDriverChange = (driverName: string) => {
     setFormData((prev) => ({ ...prev, driver: driverName }));
+  };
+  const handlePickupDestinationChange = (destinationCode: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      pickup_destination: destinationCode || null,
+    }));
   };
 
   // Navigation handlers
@@ -591,7 +630,7 @@ const RentalFormPage: React.FC = () => {
     e.preventDefault();
     if (!validateForm()) return;
     setIsSaving(true);
-    const payload: Omit<Rental, "customer_name" | "location_address"> = {
+    const payload: Omit<Rental, "customer_name" | "location_address" | "addon_count"> = {
       customer_id: Number(formData.customer_id),
       location_id: formData.location_id ? Number(formData.location_id) : null,
       tong_no: formData.tong_no,
@@ -599,6 +638,7 @@ const RentalFormPage: React.FC = () => {
       date_placed: formData.date_placed,
       date_picked: formData.date_picked || null,
       remarks: formData.remarks || null,
+      pickup_destination: formData.pickup_destination || null,
     };
     try {
       let response;
@@ -727,27 +767,64 @@ const RentalFormPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-default-200 dark:border-gray-700">
-        <div className="p-6 border-b border-default-200 dark:border-gray-700">
-          <div className="flex items-center gap-4">
-            <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
-            <div>
-              <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                {isEditMode
-                  ? `Edit Rental #${formData.rental_id}`
-                  : "Create New Rental"}
-              </h1>
-              <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                {isEditMode
-                  ? `Update details for the rental placed on ${formatDateForInput(
-                      initialFormData?.date_placed ?? null
-                    )}.`
-                  : "Fill in the details."}
-              </p>
+        <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <BackButton onClick={handleBackClick} />
+              <div className="h-6 w-px bg-default-300 dark:bg-default-600"></div>
+              <div>
+                <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
+                  {isEditMode
+                    ? `Edit Rental #${formData.rental_id}`
+                    : "Create New Rental"}
+                </h1>
+                <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
+                  {isEditMode
+                    ? `Update details for the rental placed on ${formatDateForInput(
+                        initialFormData?.date_placed ?? null
+                      )}.`
+                    : "Fill in the details."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-x-3">
+              {isEditMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  color="rose"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={isDeleting}
+                  icon={IconTrash}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                color="secondary"
+                onClick={handleBackClick}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form="rental-form"
+                variant="filled"
+                color="sky"
+                disabled={isSaving || !isFormChanged || !isValidSelection}
+              >
+                {isSaving
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Save Changes"
+                  : "Create Rental"}
+              </Button>
             </div>
           </div>
         </div>
-        <form onSubmit={handleSubmit} className="p-6">
+        <form id="rental-form" onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             {/* --- Customer & Location Section --- */}
             <div className="border-b border-default-200 dark:border-gray-700 pb-6">
@@ -1278,8 +1355,130 @@ const RentalFormPage: React.FC = () => {
                     </Listbox>
                   </div>
                 </div>
+                {/* Pickup Destination Listbox - shown when there's a pickup date */}
+                {formData.date_picked && (
+                  <div className="sm:col-span-3">
+                    <label
+                      htmlFor="pickup_destination-button"
+                      className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                    >
+                      Pickup Destination
+                    </label>
+                    <div className="mt-2">
+                      <Listbox
+                        value={formData.pickup_destination || ""}
+                        onChange={handlePickupDestinationChange}
+                        name="pickup_destination"
+                      >
+                        <div className="relative">
+                          <HeadlessListboxButton
+                            id="pickup_destination-button"
+                            className={clsx(
+                              "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm",
+                              "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                            )}
+                          >
+                            <span className="block truncate">
+                              {pickupDestinations.find(
+                                (d) => d.code === formData.pickup_destination
+                              )?.name || "Select destination..."}
+                            </span>
+                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                              <IconChevronDown
+                                size={20}
+                                className="text-gray-400"
+                              />
+                            </span>
+                          </HeadlessListboxButton>
+                          <Transition
+                            as={Fragment}
+                            leave="transition ease-in duration-100"
+                            leaveFrom="opacity-100"
+                            leaveTo="opacity-0"
+                          >
+                            <ListboxOptions
+                              className={clsx(
+                                "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+                                "mt-1"
+                              )}
+                            >
+                              {pickupDestinations.map((dest) => (
+                                <ListboxOption
+                                  key={dest.id}
+                                  className={({ active }) =>
+                                    clsx(
+                                      "relative cursor-default select-none py-2 pl-3 pr-10",
+                                      active
+                                        ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                        : "text-gray-900 dark:text-gray-100"
+                                    )
+                                  }
+                                  value={dest.code}
+                                >
+                                  {({ selected }) => (
+                                    <>
+                                      <span
+                                        className={clsx(
+                                          "block truncate",
+                                          selected ? "font-medium" : "font-normal"
+                                        )}
+                                      >
+                                        {dest.name}
+                                        {dest.is_default && (
+                                          <span className="ml-2 text-xs text-default-400">
+                                            (default)
+                                          </span>
+                                        )}
+                                      </span>
+                                      {selected && (
+                                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
+                                          <IconCheck size={20} />
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </ListboxOption>
+                              ))}
+                            </ListboxOptions>
+                          </Transition>
+                        </div>
+                      </Listbox>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+            {/* --- Add-ons Section --- */}
+            {isEditMode && formData.rental_id && (
+              <div className="border-b border-default-200 dark:border-gray-700 pb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100">
+                    Add-ons
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    color="sky"
+                    onClick={() => setIsAddonModalOpen(true)}
+                    icon={IconPlus}
+                  >
+                    Manage Add-ons
+                    {(formData.addon_count ?? 0) > 0 && (
+                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-full">
+                        {formData.addon_count}
+                      </span>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  {(formData.addon_count ?? 0) === 0
+                    ? "No add-ons for this rental yet. Click 'Manage Add-ons' to add manual paycodes."
+                    : `${formData.addon_count} add-on${
+                        (formData.addon_count ?? 0) > 1 ? "s" : ""
+                      } attached to this rental.`}
+                </p>
+              </div>
+            )}
             {/* --- Remarks Section --- */}
             <div className="border-b border-default-200 dark:border-gray-700 pb-6">
               <label
@@ -1319,41 +1518,6 @@ const RentalFormPage: React.FC = () => {
                 />
               </div>
             )}
-          </div>
-          {/* --- Action Buttons --- */}
-          <div className="mt-6 flex items-center justify-end gap-x-4">
-            {isEditMode && (
-              <Button
-                type="button"
-                variant="outline"
-                color="rose"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                disabled={isDeleting}
-                icon={IconTrash}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              color="secondary"
-              onClick={handleBackClick}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="filled"
-              color="sky"
-              disabled={isSaving || !isFormChanged || !isValidSelection}
-            >
-              {isSaving
-                ? "Saving..."
-                : isEditMode
-                ? "Save Changes"
-                : "Create Rental"}
-            </Button>
           </div>
         </form>
       </div>
@@ -1453,6 +1617,26 @@ const RentalFormPage: React.FC = () => {
         confirmButtonText="Discard"
         variant="danger"
       />
+      {formData.rental_id && (
+        <RentalAddonModal
+          isOpen={isAddonModalOpen}
+          onClose={() => setIsAddonModalOpen(false)}
+          rentalId={formData.rental_id}
+          onAddonsChanged={() => {
+            // Refresh the addon count
+            greenTargetApi.getRental(formData.rental_id!)
+              .then((rental) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  addon_count: parseInt(rental.addon_count) || 0,
+                }));
+              })
+              .catch((error) => {
+                console.error("Error refreshing addon count:", error);
+              });
+          }}
+        />
+      )}
     </div>
   );
 };
