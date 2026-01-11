@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Rentals/RentalListPage.tsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -14,12 +14,22 @@ import {
   IconMapPin,
   IconTruck,
   IconPhone,
+  IconX,
+  IconChevronDown,
 } from "@tabler/icons-react";
+import { Dialog, Transition, Listbox } from "@headlessui/react";
 import Button from "../../../components/Button";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import toast from "react-hot-toast";
+
+interface PickupDestination {
+  id: number;
+  code: string;
+  name: string;
+  is_default: boolean;
+}
 
 // Define the Rental interface
 interface Rental {
@@ -38,8 +48,13 @@ interface Rental {
   remarks: string | null;
   invoice_info?: {
     invoice_id: number;
+    invoice_number?: string;
     status: string;
+    amount?: number;
   } | null;
+  pickup_destination?: string | null;
+  pickup_destination_name?: string | null;
+  addon_count?: number;
 }
 
 const RentalCard = ({
@@ -62,280 +77,212 @@ const RentalCard = ({
     navigate(`/greentarget/rentals/${rental.rental_id}`);
   };
 
-  // Format date for display
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Not set";
+  // Format date for display (short format)
+  const formatDateShort = (dateString: string | null) => {
+    if (!dateString) return "-";
     const date = new Date(dateString);
-    // Use DD/MM/YYYY format
-    return `${date.getDate().toString().padStart(2, "0")}/${(
-      date.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}/${date.getFullYear()}`;
+    return `${date.getDate()}/${date.getMonth() + 1}`;
   };
 
   // Calculate rental duration in days
   const calculateDuration = () => {
-    if (!rental.date_placed) return "N/A";
-
+    if (!rental.date_placed) return 0;
     const startDate = new Date(rental.date_placed);
-    const endDate = rental.date_picked
-      ? new Date(rental.date_picked)
-      : new Date();
-
+    const endDate = rental.date_picked ? new Date(rental.date_picked) : new Date();
     const differenceInTime = endDate.getTime() - startDate.getTime();
-    const differenceInDays = Math.ceil(differenceInTime / (1000 * 3600 * 24));
-    
-    // Ensure minimum of 1 day (same day placement and pickup should count as 1 day)
-    const displayDays = Math.max(1, differenceInDays);
-
-    // Return different text for rentals with and without pickup dates
-    if (!rental.date_picked) {
-      return `${displayDays} day${
-        displayDays !== 1 ? "s" : ""
-      } (ongoing)`;
-    } else {
-      return `${displayDays} day${displayDays !== 1 ? "s" : ""}`;
-    }
+    return Math.max(1, Math.ceil(differenceInTime / (1000 * 3600 * 24)));
   };
 
   const isActive = () => {
     if (!rental.date_picked) return true;
-
-    // Convert dates to YYYY-MM-DD format for reliable comparison
-    const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
-
-    const pickupDateStr = rental.date_picked.split("T")[0]; // Get just the date part
-
-    // If pickup date is today or in the past, consider it completed
+    const todayStr = new Date().toISOString().split("T")[0];
+    const pickupDateStr = rental.date_picked.split("T")[0];
     return pickupDateStr > todayStr;
   };
 
   const activeStatus = isActive();
+  const duration = calculateDuration();
+  const hasInvoice = rental?.invoice_info?.status === "active" ||
+    rental?.invoice_info?.status === "overdue" ||
+    rental?.invoice_info?.status === "paid";
 
   return (
     <div
-      className={`relative border text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800 ${
+      className={`relative text-left rounded-lg overflow-hidden transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800 border ${
         isCardHovered ? "shadow-md" : "shadow-sm"
-      } ${activeStatus ? "border-green-400 dark:border-green-500" : "border-default-200 dark:border-gray-700"}`}
+      } ${activeStatus ? "border-emerald-300 dark:border-emerald-600" : "border-default-200 dark:border-gray-700"}`}
       onClick={handleClick}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
     >
-      {/* Status banner */}
-      <div
-        className={`w-full py-1.5 px-4 text-sm font-medium text-white ${
-          activeStatus ? "bg-green-500" : "bg-default-500 dark:bg-gray-600"
-        }`}
-      >
-        <div className="flex justify-between items-center">
-          <span>Rental #{rental.rental_id}</span>
-          <span className="text-xs py-0.5 px-2 bg-white dark:bg-gray-800/20 rounded-full">
-            {activeStatus ? "Ongoing" : "Completed"}
+      {/* Compact Header */}
+      <div className="px-4 py-2 border-b border-default-100 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-default-700 dark:text-gray-200">
+              #{rental.rental_id}
+            </span>
+            <span className="text-default-300 dark:text-gray-600">•</span>
+            <span className="font-medium text-default-800 dark:text-gray-100 text-base">
+              Tong {rental.tong_no}
+            </span>
+          </div>
+          <span
+            className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${
+              activeStatus
+                ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
+                : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-400"
+            }`}
+          >
+            {activeStatus ? "Active" : "Completed"}
           </span>
         </div>
       </div>
 
       <div className="p-4">
-        {/* Customer section */}
-        <div className="mb-3 border-b border-default-200 dark:border-gray-700 pb-3">
-          <div className="flex justify-between items-start w-full">
-            <div className="w-full">
-              <div className="w-full">
-                <h3
-                  className="font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:underline w-fit"
-                  title={rental.customer_name}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/greentarget/customers/${rental.customer_id}`);
-                  }}
-                >
-                  {rental.customer_name}
-                </h3>
-                {(rental.customer_phone_number ||
-                  rental.location_phone_number) && (
-                  <p
-                    className="text-sm text-default-600 dark:text-gray-300 mt-[3px] truncate w-full"
-                    title={
-                      rental.customer_phone_number !==
-                        rental.location_phone_number &&
-                      rental.customer_phone_number &&
-                      rental.location_phone_number
-                        ? `${rental.customer_phone_number}, ${rental.location_phone_number}`
-                        : rental.customer_phone_number ??
-                          rental.location_phone_number ??
-                          undefined
-                    }
-                  >
-                    <IconPhone
-                      size={14}
-                      className="inline mr-1 mt-0.5 align-top flex-shrink-0"
-                    />
-                    {rental.customer_phone_number !==
-                      rental.location_phone_number &&
-                    rental.customer_phone_number &&
-                    rental.location_phone_number
-                      ? `${rental.customer_phone_number}, ${rental.location_phone_number}`
-                      : rental.customer_phone_number ||
-                        rental.location_phone_number}
-                  </p>
-                )}
-              </div>
-              {rental.location_address && (
-                <p
-                  className="text-sm text-default-600 dark:text-gray-300 mt-0.5 truncate"
-                  title={rental.location_address}
-                >
-                  <IconMapPin
-                    size={14}
-                    className="inline mr-1 mt-0.5 align-top flex-shrink-0"
-                  />
-                  {rental.location_address}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Details grid */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Dumpster</p>
-            <p className="font-medium text-default-900 dark:text-gray-100">{rental.tong_no}</p>
-          </div>
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Driver</p>
-            <p className="font-medium text-default-900 dark:text-gray-100 truncate" title={rental.driver}>
-              {rental.driver}
-            </p>
-          </div>
-          <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Duration</p>
-            <p className="font-medium text-default-900 dark:text-gray-100">{calculateDuration()}</p>
-          </div>
-          <div
-            className={`p-2 border border-default-100 dark:border-gray-700 rounded-md ${
-              activeStatus ? "bg-green-50 dark:bg-green-900/30" : "bg-default-50 dark:bg-gray-900/50"
-            }`}
+        {/* Customer Info */}
+        <div className="mb-3">
+          <h3
+            className="text-base font-semibold text-default-900 dark:text-gray-100 truncate cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+            title={rental.customer_name}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/greentarget/customers/${rental.customer_id}`);
+            }}
           >
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Status</p>
+            {rental.customer_name}
+          </h3>
+          {rental.location_address && (
             <p
-              className={`font-medium ${
-                activeStatus ? "text-green-700 dark:text-green-400" : "text-default-700 dark:text-gray-300"
-              }`}
+              className="text-sm text-default-500 dark:text-gray-400 mt-1 truncate flex items-center gap-1.5"
+              title={rental.location_address}
             >
-              {activeStatus ? "Active" : "Completed"}
+              <IconMapPin size={14} className="flex-shrink-0" />
+              {rental.location_address}
+            </p>
+          )}
+          {(rental.customer_phone_number || rental.location_phone_number) && (
+            <p className="text-sm text-default-500 dark:text-gray-400 mt-1 truncate flex items-center gap-1.5">
+              <IconPhone size={14} className="flex-shrink-0" />
+              {rental.customer_phone_number || rental.location_phone_number}
+            </p>
+          )}
+        </div>
+
+        {/* Info Row - Uniform boxes */}
+        <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="text-center p-2.5 bg-default-50 dark:bg-gray-900/50 rounded-md border border-default-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Driver</p>
+            <p className="text-sm font-medium text-default-800 dark:text-gray-200 truncate" title={rental.driver}>
+              {rental.driver.split(" ")[0]}
+            </p>
+          </div>
+          <div className="text-center p-2.5 bg-default-50 dark:bg-gray-900/50 rounded-md border border-default-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Placed</p>
+            <p className="text-sm font-medium text-default-800 dark:text-gray-200">
+              {formatDateShort(rental.date_placed)}
+            </p>
+          </div>
+          <div className="text-center p-2.5 bg-default-50 dark:bg-gray-900/50 rounded-md border border-default-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Pickup</p>
+            <p className={`text-sm font-medium ${!rental.date_picked ? "text-amber-600 dark:text-amber-400" : "text-default-800 dark:text-gray-200"}`}>
+              {formatDateShort(rental.date_picked)}
+            </p>
+          </div>
+          <div className={`text-center p-2.5 rounded-md border ${activeStatus ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" : "bg-default-50 dark:bg-gray-900/50 border-default-200 dark:border-gray-700"}`}>
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Days</p>
+            <p className={`text-sm font-medium ${activeStatus ? "text-emerald-700 dark:text-emerald-400" : "text-default-800 dark:text-gray-200"}`}>
+              {duration}
             </p>
           </div>
         </div>
 
-        {/* Remarks section - only show if there are remarks */}
+        {/* Remarks - compact */}
         {rental.remarks && (
-          <div className="mb-4 bg-default-50 dark:bg-gray-900/50 border border-default-100 dark:border-gray-700 rounded-md p-2">
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-0.5">Remarks</p>
-            <p
-              className="text-xs text-default-700 dark:text-gray-200 truncate"
-              title={rental.remarks}
-            >
-              {rental.remarks}
+          <div className="mb-3 px-3 py-2 bg-default-50 dark:bg-gray-900/50 rounded-md">
+            <p className="text-sm text-default-600 dark:text-gray-400 truncate" title={rental.remarks}>
+              <span className="text-default-400 dark:text-gray-500">Note:</span> {rental.remarks}
             </p>
           </div>
         )}
 
-        {/* Dates section */}
-        <div className="flex justify-end space-x-4 mb-4">
-          <div>
-            <p className="text-xs text-default-500 dark:text-gray-400">Placement Date</p>
-            <p className="font-medium text-default-900 dark:text-gray-100">
-              {formatDate(rental.date_placed)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-default-500 dark:text-gray-400">Pickup Date</p>
-            <p
-              className={`font-medium ${
-                !rental.date_picked ? "text-amber-600 dark:text-amber-400" : "text-default-900 dark:text-gray-100"
-              }`}
-            >
-              {formatDate(rental.date_picked)}
-            </p>
-          </div>
-        </div>
-
-        {/* Action buttons - semi-visible always, fully visible on hover */}
-        <div
-          className={`flex justify-end space-x-2 mt-2 transition-opacity duration-200 ${
-            isCardHovered ? "opacity-100" : "opacity-70"
-          }`}
-        >
-          {/* Add new Pickup button only for active rentals */}
-          {isActive() && (
+        {/* Bottom Row: Destination, Invoice on left | Actions on right */}
+        <div className={`flex items-center justify-between pt-2 border-t border-default-100 dark:border-gray-700 transition-opacity duration-200 ${isCardHovered ? "opacity-100" : "opacity-60"}`}>
+          {/* Left: Destination & Invoice */}
+          <div className="flex items-center gap-1.5">
+            {rental.pickup_destination && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded">
+                <IconTruck size={14} className="text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
+                <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                  {rental.pickup_destination_name || rental.pickup_destination}
+                </span>
+              </div>
+            )}
+            {(rental.addon_count ?? 0) > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 rounded">
+                <IconPlus size={14} className="text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                  {rental.addon_count}
+                </span>
+              </div>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onPickupRental(rental);
-              }}
-              className="p-1.5 bg-amber-100 dark:bg-amber-900/50 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300 rounded-full transition-colors"
-              title="Mark as Picked Up"
-            >
-              <IconTruck size={18} stroke={1.5} />
-            </button>
-          )}
-
-          {/* Show "View Invoice" or "Create Invoice" based on invoice status */}
-          {rental?.invoice_info?.status === "active" ||
-          rental?.invoice_info?.status === "overdue" ||
-          rental?.invoice_info?.status === "paid" ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Navigate to the existing invoice
-                if (rental.invoice_info) {
-                  navigate(
-                    `/greentarget/invoices/${rental.invoice_info.invoice_id}`
-                  );
+                if (hasInvoice && rental.invoice_info) {
+                  navigate(`/greentarget/invoices/${rental.invoice_info.invoice_id}`);
+                } else {
+                  onCreateInvoice(rental);
                 }
               }}
-              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 rounded-full transition-colors"
-              title="View Invoice"
+              className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                hasInvoice
+                  ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
+                  : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-400 hover:bg-default-200 dark:hover:bg-gray-600"
+              }`}
             >
-              <IconFileInvoice size={18} stroke={1.5} />
+              <IconFileInvoice size={14} className="flex-shrink-0" />
+              <span className="text-xs font-medium">
+                {hasInvoice && rental.invoice_info ? (rental.invoice_info.invoice_number || `#${rental.invoice_info.invoice_id}`) : "No Invoice"}
+              </span>
             </button>
-          ) : (
+          </div>
+
+          {/* Right: Action buttons */}
+          <div className="flex items-center gap-1">
+            {activeStatus && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPickupRental(rental);
+                }}
+                className="p-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded transition-colors"
+                title="Mark as Picked Up"
+              >
+                <IconTruck size={16} stroke={1.5} />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onCreateInvoice(rental);
+                onGenerateDeliveryOrder(rental);
               }}
-              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 text-indigo-700 dark:text-indigo-300 rounded-full transition-colors"
-              title="Create Invoice"
+              className="p-1.5 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded transition-colors"
+              title="Delivery Order"
             >
-              <IconFileInvoice size={18} stroke={1.5} />
+              <IconReceipt size={16} stroke={1.5} />
             </button>
-          )}
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onGenerateDeliveryOrder(rental);
-            }}
-            className="p-1.5 bg-sky-100 dark:bg-sky-900/50 hover:bg-sky-200 dark:hover:bg-sky-800/50 text-sky-700 dark:text-sky-300 rounded-full transition-colors"
-            title="Generate Delivery Order"
-          >
-            <IconReceipt size={18} stroke={1.5} />
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteRental(rental);
-            }}
-            className="p-1.5 bg-rose-100 dark:bg-rose-900/50 hover:bg-rose-200 dark:hover:bg-rose-800/50 text-rose-700 dark:text-rose-300 rounded-full transition-colors"
-            title="Delete Rental"
-          >
-            <IconTrash size={18} stroke={1.5} />
-          </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteRental(rental);
+              }}
+              className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded transition-colors"
+              title="Delete"
+            >
+              <IconTrash size={16} stroke={1.5} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -353,13 +300,31 @@ const RentalListPage = () => {
   const [rentalToDelete, setRentalToDelete] = useState<Rental | null>(null);
   const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
   const [rentalToPickup, setRentalToPickup] = useState<Rental | null>(null);
+  const [pickupDestinations, setPickupDestinations] = useState<PickupDestination[]>([]);
+  const [selectedDestination, setSelectedDestination] = useState<string>("");
+  const [isPickingUp, setIsPickingUp] = useState(false);
   const navigate = useNavigate();
 
   const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
     fetchRentals();
+    fetchPickupDestinations();
   }, []);
+
+  const fetchPickupDestinations = async () => {
+    try {
+      const data = await greenTargetApi.getPickupDestinations();
+      setPickupDestinations(data);
+      // Set default destination
+      const defaultDest = data.find((d: PickupDestination) => d.is_default);
+      if (defaultDest) {
+        setSelectedDestination(defaultDest.code);
+      }
+    } catch (error) {
+      console.error("Error fetching pickup destinations:", error);
+    }
+  };
 
   const fetchRentals = async () => {
     try {
@@ -445,11 +410,20 @@ const RentalListPage = () => {
 
   const handlePickupRental = (rental: Rental) => {
     setRentalToPickup(rental);
+    // Reset to default destination when opening dialog
+    const defaultDest = pickupDestinations.find((d) => d.is_default);
+    setSelectedDestination(defaultDest?.code || pickupDestinations[0]?.code || "");
     setIsPickupDialogOpen(true);
   };
 
   const confirmPickupRental = async () => {
     if (!rentalToPickup) return;
+
+    // Require destination selection
+    if (!selectedDestination) {
+      toast.error("Please select a pickup destination");
+      return;
+    }
 
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split("T")[0];
@@ -466,10 +440,12 @@ const RentalListPage = () => {
       return;
     }
 
+    setIsPickingUp(true);
     try {
-      // Update the rental with today as pickup date
+      // Update the rental with today as pickup date and destination
       await greenTargetApi.updateRental(rentalToPickup.rental_id, {
         date_picked: today,
+        pickup_destination: selectedDestination,
       });
 
       toast.success("Rental marked as picked up");
@@ -478,7 +454,7 @@ const RentalListPage = () => {
       setRentals(
         rentals.map((r) =>
           r.rental_id === rentalToPickup.rental_id
-            ? { ...r, date_picked: today }
+            ? { ...r, date_picked: today, pickup_destination: selectedDestination }
             : r
         )
       );
@@ -486,6 +462,7 @@ const RentalListPage = () => {
       console.error("Error updating rental:", error);
       toast.error("Failed to mark rental as picked up");
     } finally {
+      setIsPickingUp(false);
       setIsPickupDialogOpen(false);
       setRentalToPickup(null);
     }
@@ -639,7 +616,7 @@ const RentalListPage = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
           Rentals ({filteredRentals.length})
@@ -698,7 +675,7 @@ const RentalListPage = () => {
           <p className="text-default-500 dark:text-gray-400">No rentals found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
           {paginatedRentals.map((rental) => (
             <RentalCard
               key={rental.rental_id}
@@ -742,17 +719,147 @@ const RentalListPage = () => {
         confirmButtonText="Delete"
         variant="danger"
       />
-      <ConfirmationDialog
-        isOpen={isPickupDialogOpen}
-        onClose={() => setIsPickupDialogOpen(false)}
-        onConfirm={confirmPickupRental}
-        title="Mark Rental as Picked Up"
-        message={`Are you sure you want to mark this rental for ${
-          rentalToPickup?.customer_name || "this customer"
-        } as picked up today? This will set today's date as the pickup date.`}
-        confirmButtonText="Confirm Pickup"
-        variant="default"
-      />
+      {/* Pickup Modal with Destination Selection */}
+      <Transition appear show={isPickupDialogOpen} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={() => setIsPickupDialogOpen(false)}
+        >
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/25 dark:bg-black/50" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
+                      Mark Rental as Picked Up
+                    </Dialog.Title>
+                    <button
+                      onClick={() => setIsPickupDialogOpen(false)}
+                      className="text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+                    >
+                      <IconX size={20} />
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-default-600 dark:text-gray-400 mb-4">
+                    Mark the rental for{" "}
+                    <span className="font-medium text-default-800 dark:text-gray-200">
+                      {rentalToPickup?.customer_name || "this customer"}
+                    </span>{" "}
+                    as picked up today.
+                  </p>
+
+                  {/* Destination Selection */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
+                      Pickup Destination <span className="text-rose-500">*</span>
+                    </label>
+                    <Listbox value={selectedDestination} onChange={setSelectedDestination}>
+                      <div className="relative">
+                        <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-700 py-2.5 pl-3 pr-10 text-left border border-default-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400">
+                          <span className="block truncate text-default-800 dark:text-gray-200">
+                            {pickupDestinations.find((d) => d.code === selectedDestination)?.name ||
+                              "Select destination..."}
+                          </span>
+                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                            <IconChevronDown
+                              size={18}
+                              className="text-default-400 dark:text-gray-500"
+                            />
+                          </span>
+                        </Listbox.Button>
+                        <Transition
+                          as={Fragment}
+                          leave="transition ease-in duration-100"
+                          leaveFrom="opacity-100"
+                          leaveTo="opacity-0"
+                        >
+                          <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white dark:bg-gray-700 py-1 shadow-lg ring-1 ring-black/5 dark:ring-white/10 focus:outline-none">
+                            {pickupDestinations.map((dest) => (
+                              <Listbox.Option
+                                key={dest.id}
+                                value={dest.code}
+                                className={({ active }) =>
+                                  `relative cursor-pointer select-none py-2 pl-10 pr-4 ${
+                                    active
+                                      ? "bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100"
+                                      : "text-default-800 dark:text-gray-200"
+                                  }`
+                                }
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={`block truncate ${
+                                        selected ? "font-medium" : "font-normal"
+                                      }`}
+                                    >
+                                      {dest.name}
+                                      {dest.is_default && (
+                                        <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
+                                          (Default)
+                                        </span>
+                                      )}
+                                    </span>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-amber-600 dark:text-amber-400">
+                                        <IconMapPin size={16} />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </Listbox.Option>
+                            ))}
+                          </Listbox.Options>
+                        </Transition>
+                      </div>
+                    </Listbox>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsPickupDialogOpen(false)}
+                      disabled={isPickingUp}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="filled"
+                      color="amber"
+                      onClick={confirmPickupRental}
+                      disabled={isPickingUp || !selectedDestination}
+                    >
+                      {isPickingUp ? "Processing..." : "Confirm Pickup"}
+                    </Button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 };

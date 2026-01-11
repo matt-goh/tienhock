@@ -64,32 +64,36 @@ export default function (pool) {
 
     try {
       let query = `
-                    SELECT r.*, 
-            c.name as customer_name, 
+                    SELECT r.*,
+            c.name as customer_name,
             c.phone_number as customer_phone_number,
             l.address as location_address,
             l.phone_number as location_phone_number,
             d.status as dumpster_status,
+            pd.name as pickup_destination_name,
             (SELECT json_build_object(
                 'invoice_id', i.invoice_id,
                 'invoice_number', i.invoice_number,
-                'status', i.status
-              ) FROM greentarget.invoices i 
+                'status', i.status,
+                'amount', i.total_amount
+              ) FROM greentarget.invoices i
               JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
-              WHERE ir.rental_id = r.rental_id 
-              ORDER BY 
-                CASE 
+              WHERE ir.rental_id = r.rental_id
+              ORDER BY
+                CASE
                   WHEN i.status IS NULL OR i.status = 'active' THEN 0
                   WHEN i.status = 'paid' THEN 1
                   WHEN i.status = 'overdue' THEN 2
                   WHEN i.status = 'cancelled' THEN 9
                   ELSE 3
                 END
-              LIMIT 1) as invoice_info
+              LIMIT 1) as invoice_info,
+            (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
       FROM greentarget.rentals r
       JOIN greentarget.customers c ON r.customer_id = c.customer_id
       LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
       JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+      LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
       WHERE 1=1
       `;
 
@@ -133,7 +137,7 @@ export default function (pool) {
 
   // Create a new rental
   router.post("/", async (req, res) => {
-    const { customer_id, location_id, tong_no, driver, date_placed, remarks } =
+    const { customer_id, location_id, tong_no, driver, date_placed, remarks, pickup_destination } =
       req.body;
     const client = await pool.connect();
 
@@ -237,15 +241,16 @@ export default function (pool) {
       // Create the rental
       const rentalQuery = `
       INSERT INTO greentarget.rentals (
-        customer_id, 
-        location_id, 
-        tong_no, 
-        driver, 
-        date_placed, 
+        customer_id,
+        location_id,
+        tong_no,
+        driver,
+        date_placed,
         date_picked,
-        remarks
+        remarks,
+        pickup_destination
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
 
@@ -257,6 +262,7 @@ export default function (pool) {
         date_placed,
         date_picked,
         remarks || null,
+        pickup_destination || null,
       ]);
 
       await client.query("COMMIT");
@@ -280,7 +286,7 @@ export default function (pool) {
   // Update rental
   router.put("/:rental_id", async (req, res) => {
     const { rental_id } = req.params;
-    const { location_id, tong_no, driver, date_placed, date_picked, remarks } =
+    const { location_id, tong_no, driver, date_placed, date_picked, remarks, pickup_destination } =
       req.body;
     const client = await pool.connect();
 
@@ -471,14 +477,15 @@ export default function (pool) {
       // Update the rental with all editable fields
       const updateRentalQuery = `
       UPDATE greentarget.rentals
-      SET 
+      SET
         location_id = COALESCE($1, location_id),
         tong_no = COALESCE($2, tong_no),
         driver = COALESCE($3, driver),
         date_placed = COALESCE($4, date_placed),
         date_picked = $5,
-        remarks = $6
-      WHERE rental_id = $7
+        remarks = $6,
+        pickup_destination = $7
+      WHERE rental_id = $8
       RETURNING *
     `;
 
@@ -489,6 +496,7 @@ export default function (pool) {
         date_placed || currentRental.date_placed,
         date_picked, // Allow setting to null
         remarks, // Allow setting to null
+        pickup_destination !== undefined ? pickup_destination : currentRental.pickup_destination,
         rental_id,
       ]);
 
@@ -566,10 +574,11 @@ export default function (pool) {
 
     try {
       const query = `
-        SELECT r.*, 
-               c.name as customer_name, 
+        SELECT r.*,
+               c.name as customer_name,
                l.address as location_address,
                d.status as dumpster_status,
+               pd.name as pickup_destination_name,
                (SELECT json_build_object(
                   'invoice_id', i.invoice_id,
                   'invoice_number', i.invoice_number,
@@ -578,20 +587,22 @@ export default function (pool) {
                   'has_payments', EXISTS(SELECT 1 FROM greentarget.payments p WHERE p.invoice_id = i.invoice_id)
                 ) FROM greentarget.invoices i
                 JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
-                WHERE ir.rental_id = r.rental_id 
-                ORDER BY 
-                  CASE 
+                WHERE ir.rental_id = r.rental_id
+                ORDER BY
+                  CASE
                     WHEN i.status IS NULL OR i.status = 'active' THEN 0
                     WHEN i.status = 'paid' THEN 1
                     WHEN i.status = 'overdue' THEN 2
                     WHEN i.status = 'cancelled' THEN 9
                     ELSE 3
                   END
-                LIMIT 1) as invoice_info
+                LIMIT 1) as invoice_info,
+               (SELECT COUNT(*) FROM greentarget.rental_addons ra WHERE ra.rental_id = r.rental_id) as addon_count
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+        LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
         WHERE r.rental_id = $1
       `;
 
