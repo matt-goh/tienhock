@@ -106,6 +106,253 @@ export default function (pool) {
     }
   });
 
+  // Calculate detailed payroll breakdown based on rules
+  router.get("/calculate-payroll", async (req, res) => {
+    const { year, month, driver_id } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({
+        message: "year and month are required",
+      });
+    }
+
+    try {
+      const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      const endDate = `${year}-${month.toString().padStart(2, "0")}-${lastDay}`;
+
+      // Get default invoice amount from settings
+      const settingsResult = await pool.query(
+        `SELECT setting_value FROM greentarget.payroll_settings WHERE setting_key = 'default_invoice_amount'`
+      );
+      const defaultInvoiceAmount = settingsResult.rows.length > 0
+        ? parseFloat(settingsResult.rows[0].setting_value)
+        : 200;
+
+      // Query completed rentals with invoice amounts
+      let query = `
+        SELECT
+          r.rental_id,
+          r.date_placed,
+          r.date_picked,
+          r.driver,
+          r.pickup_destination,
+          pd.name as pickup_destination_name,
+          c.name as customer_name,
+          COALESCE(
+            (SELECT SUM(i.total_excluding_tax)
+             FROM greentarget.invoice_rentals ir
+             JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
+             WHERE ir.rental_id = r.rental_id AND i.invoice_status != 'Cancelled'),
+            NULL
+          ) as invoice_amount,
+          EXISTS(
+            SELECT 1 FROM greentarget.invoice_rentals ir
+            JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
+            WHERE ir.rental_id = r.rental_id AND i.invoice_status != 'Cancelled'
+          ) as has_invoice,
+          s.name as driver_name
+        FROM greentarget.rentals r
+        LEFT JOIN public.staffs s ON r.driver = s.id
+        LEFT JOIN greentarget.customers c ON r.customer_id = c.customer_id
+        LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
+        WHERE r.date_picked IS NOT NULL
+          AND r.date_placed >= $1
+          AND r.date_placed <= $2
+      `;
+      const values = [startDate, endDate];
+      let paramCount = 3;
+
+      if (driver_id) {
+        query += ` AND r.driver = $${paramCount++}`;
+        values.push(driver_id);
+      }
+
+      query += ` ORDER BY r.driver, r.date_placed`;
+
+      const rentalsResult = await pool.query(query, values);
+
+      // Get all active payroll rules
+      const rulesResult = await pool.query(
+        `SELECT * FROM greentarget.payroll_rules WHERE is_active = true ORDER BY rule_type, priority DESC`
+      );
+      const rules = rulesResult.rows;
+
+      // Get all rental addons for these rentals
+      const rentalIds = rentalsResult.rows.map((r) => r.rental_id);
+      let addonsMap = {};
+      if (rentalIds.length > 0) {
+        const addonsResult = await pool.query(
+          `SELECT ra.*, pc.description as pay_code_description, ap.display_name
+           FROM greentarget.rental_addons ra
+           JOIN pay_codes pc ON ra.pay_code_id = pc.id
+           LEFT JOIN greentarget.addon_paycodes ap ON ra.pay_code_id = ap.pay_code_id
+           WHERE ra.rental_id = ANY($1)`,
+          [rentalIds]
+        );
+        addonsResult.rows.forEach((addon) => {
+          if (!addonsMap[addon.rental_id]) {
+            addonsMap[addon.rental_id] = [];
+          }
+          addonsMap[addon.rental_id].push(addon);
+        });
+      }
+
+      // Get pay codes info for the rules
+      const payCodeIds = [...new Set(rules.map((r) => r.pay_code_id))];
+      const payCodesResult = await pool.query(
+        `SELECT id, description, rate_biasa FROM pay_codes WHERE id = ANY($1)`,
+        [payCodeIds]
+      );
+      const payCodesMap = {};
+      payCodesResult.rows.forEach((pc) => {
+        payCodesMap[pc.id] = pc;
+      });
+
+      // Process each rental and apply rules
+      const processedRentals = [];
+      const driverSummaries = {};
+
+      for (const rental of rentalsResult.rows) {
+        const invoiceAmount = rental.invoice_amount !== null
+          ? parseFloat(rental.invoice_amount)
+          : defaultInvoiceAmount;
+
+        // Find matching PLACEMENT rule
+        let placementRule = null;
+        for (const rule of rules.filter((r) => r.rule_type === "PLACEMENT")) {
+          if (evaluateCondition(invoiceAmount, rule.condition_operator, parseFloat(rule.condition_value))) {
+            placementRule = rule;
+            break;
+          }
+        }
+
+        // Find matching PICKUP rule (only if pickup_destination is set)
+        let pickupRule = null;
+        if (rental.pickup_destination) {
+          for (const rule of rules.filter((r) => r.rule_type === "PICKUP")) {
+            const primaryMatch = evaluateCondition(
+              rental.pickup_destination,
+              rule.condition_operator,
+              rule.condition_value
+            );
+
+            let secondaryMatch = true;
+            if (rule.secondary_condition_field && rule.secondary_condition_operator) {
+              if (rule.secondary_condition_field === "invoice_amount") {
+                secondaryMatch = evaluateCondition(
+                  invoiceAmount,
+                  rule.secondary_condition_operator,
+                  parseFloat(rule.secondary_condition_value)
+                );
+              }
+            }
+
+            if (primaryMatch && secondaryMatch) {
+              pickupRule = rule;
+              break;
+            }
+          }
+        }
+
+        // Build payroll items for this rental
+        const payrollItems = [];
+
+        if (placementRule) {
+          const payCode = payCodesMap[placementRule.pay_code_id];
+          payrollItems.push({
+            type: "PLACEMENT",
+            pay_code_id: placementRule.pay_code_id,
+            pay_code_description: payCode?.description || placementRule.pay_code_id,
+            rate: payCode?.rate_biasa || 0,
+            quantity: 1,
+            amount: payCode?.rate_biasa || 0,
+            rule_description: placementRule.description,
+          });
+        }
+
+        if (pickupRule) {
+          const payCode = payCodesMap[pickupRule.pay_code_id];
+          payrollItems.push({
+            type: "PICKUP",
+            pay_code_id: pickupRule.pay_code_id,
+            pay_code_description: payCode?.description || pickupRule.pay_code_id,
+            rate: payCode?.rate_biasa || 0,
+            quantity: 1,
+            amount: payCode?.rate_biasa || 0,
+            rule_description: pickupRule.description,
+          });
+        }
+
+        // Add rental addons
+        const addons = addonsMap[rental.rental_id] || [];
+        for (const addon of addons) {
+          payrollItems.push({
+            type: "ADDON",
+            pay_code_id: addon.pay_code_id,
+            pay_code_description: addon.display_name || addon.pay_code_description,
+            rate: parseFloat(addon.amount),
+            quantity: parseFloat(addon.quantity),
+            amount: parseFloat(addon.amount) * parseFloat(addon.quantity),
+            notes: addon.notes,
+          });
+        }
+
+        const rentalTotal = payrollItems.reduce((sum, item) => sum + item.amount, 0);
+
+        processedRentals.push({
+          rental_id: rental.rental_id,
+          date_placed: rental.date_placed,
+          date_picked: rental.date_picked,
+          customer_name: rental.customer_name,
+          driver_id: rental.driver,
+          driver_name: rental.driver_name,
+          pickup_destination: rental.pickup_destination,
+          pickup_destination_name: rental.pickup_destination_name,
+          invoice_amount: invoiceAmount,
+          has_invoice: rental.has_invoice,
+          payroll_items: payrollItems,
+          total: rentalTotal,
+        });
+
+        // Aggregate by driver
+        if (!driverSummaries[rental.driver]) {
+          driverSummaries[rental.driver] = {
+            driver_id: rental.driver,
+            driver_name: rental.driver_name,
+            rental_count: 0,
+            total_amount: 0,
+            placement_count: 0,
+            pickup_count: 0,
+            addon_count: 0,
+            no_invoice_count: 0,
+          };
+        }
+
+        driverSummaries[rental.driver].rental_count++;
+        driverSummaries[rental.driver].total_amount += rentalTotal;
+        if (placementRule) driverSummaries[rental.driver].placement_count++;
+        if (pickupRule) driverSummaries[rental.driver].pickup_count++;
+        driverSummaries[rental.driver].addon_count += addons.length;
+        if (!rental.has_invoice) driverSummaries[rental.driver].no_invoice_count++;
+      }
+
+      res.json({
+        year: parseInt(year),
+        month: parseInt(month),
+        default_invoice_amount: defaultInvoiceAmount,
+        rentals: processedRentals,
+        driver_summaries: Object.values(driverSummaries),
+      });
+    } catch (error) {
+      console.error("Error calculating payroll breakdown:", error);
+      res.status(500).json({
+        message: "Error calculating payroll breakdown",
+        error: error.message,
+      });
+    }
+  });
+
   // Get rental details for a driver in a specific month
   router.get("/rentals", async (req, res) => {
     const { year, month, driver_id } = req.query;
@@ -131,12 +378,11 @@ export default function (pool) {
           c.name as customer_name,
           r.location_id,
           l.address as location_address,
-          r.dumpster_id,
-          d.name as dumpster_name
+          r.tong_no,
+          r.pickup_destination
         FROM greentarget.rentals r
         LEFT JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-        LEFT JOIN greentarget.dumpsters d ON r.dumpster_id = d.id
         WHERE r.date_placed >= $1 AND r.date_placed <= $2
       `;
       const values = [startDate, endDate];
@@ -329,4 +575,29 @@ export default function (pool) {
   });
 
   return router;
+}
+
+// Helper function to evaluate conditions
+function evaluateCondition(value, operator, targetValue) {
+  switch (operator) {
+    case "=":
+      return (
+        value === targetValue ||
+        (typeof value === "string" &&
+          typeof targetValue === "string" &&
+          value.toUpperCase() === targetValue.toUpperCase())
+      );
+    case ">":
+      return value > targetValue;
+    case "<":
+      return value < targetValue;
+    case ">=":
+      return value >= targetValue;
+    case "<=":
+      return value <= targetValue;
+    case "ANY":
+      return true;
+    default:
+      return false;
+  }
 }

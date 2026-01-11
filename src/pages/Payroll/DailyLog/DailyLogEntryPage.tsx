@@ -295,6 +295,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
 
     // Compare normalized JSON strings for more reliable comparison
+    // Note: trayCounts excluded - synced with activities anyway
     try {
       return (
         normalizeForComparison(formData) !==
@@ -308,9 +309,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         normalizeForComparison(leaveEmployeeActivities) !==
           normalizeForComparison(initialState.leaveEmployeeActivities) ||
         normalizeForComparison(leaveBalances) !==
-          normalizeForComparison(initialState.leaveBalances) ||
-        normalizeForComparison(trayCounts) !==
-          normalizeForComparison(initialState.trayCounts)
+          normalizeForComparison(initialState.leaveBalances)
       );
     } catch (error) {
       console.warn("Error comparing states, defaulting to no changes:", error);
@@ -323,7 +322,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployees,
     leaveEmployeeActivities,
     leaveBalances,
-    trayCounts,
     initialState,
     isInitializationComplete,
     mode,
@@ -662,6 +660,30 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Add this useEffect to capture initial state - only once after initialization is complete
   const initialStateSetRef = useRef(false);
+  // Use refs to access latest state values in timeout callback
+  const latestStateRef = useRef({
+    formData,
+    employeeSelectionState,
+    employeeActivities,
+    leaveEmployees,
+    leaveEmployeeActivities,
+    leaveBalances,
+    trayCounts,
+  });
+
+  // Keep the ref updated with latest values
+  useEffect(() => {
+    latestStateRef.current = {
+      formData,
+      employeeSelectionState,
+      employeeActivities,
+      leaveEmployees,
+      leaveEmployeeActivities,
+      leaveBalances,
+      trayCounts,
+    };
+  }, [formData, employeeSelectionState, employeeActivities, leaveEmployees, leaveEmployeeActivities, leaveBalances, trayCounts]);
+
   useEffect(() => {
     if (
       !initialStateSetRef.current &&
@@ -674,25 +696,26 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       // Use a longer delay to ensure all initialization state updates are complete
       const timeoutId = setTimeout(() => {
         initialStateSetRef.current = true;
+        // Capture from ref to get the latest values
+        const current = latestStateRef.current;
         setInitialState({
-          formData: JSON.parse(JSON.stringify(formData)),
+          formData: JSON.parse(JSON.stringify(current.formData)),
           employeeSelectionState: JSON.parse(
-            JSON.stringify(employeeSelectionState)
+            JSON.stringify(current.employeeSelectionState)
           ),
-          employeeActivities: JSON.parse(JSON.stringify(employeeActivities)),
-          leaveEmployees: JSON.parse(JSON.stringify(leaveEmployees)),
+          employeeActivities: JSON.parse(JSON.stringify(current.employeeActivities)),
+          leaveEmployees: JSON.parse(JSON.stringify(current.leaveEmployees)),
           leaveEmployeeActivities: JSON.parse(
-            JSON.stringify(leaveEmployeeActivities)
+            JSON.stringify(current.leaveEmployeeActivities)
           ),
-          leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
-          trayCounts: JSON.parse(JSON.stringify(trayCounts)),
+          leaveBalances: JSON.parse(JSON.stringify(current.leaveBalances)),
+          trayCounts: JSON.parse(JSON.stringify(current.trayCounts)),
         });
-      }, 300); // Longer delay to ensure stability
+      }, 10000); // 10 second delay to ensure all initialization effects complete
 
       return () => clearTimeout(timeoutId);
     }
   }, [
-    // Only depend on initialization-related variables
     loadingStaffs,
     loadingJobs,
     loadingPayCodeMappings,
@@ -1112,6 +1135,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         if (!updatedJobHours[employeeId][jobType]) {
           updatedJobHours[employeeId][jobType] = getDefaultHours(formData.logDate);
         }
+
+        // Initialize tray count for BIHUN_SANGKUT employees (BIHUN page only)
+        if (isBihunPage && jobType === "BIHUN_SANGKUT") {
+          setTrayCounts((prev) => ({
+            ...prev,
+            [rowKey]: prev[rowKey] ?? 3, // Default tray count is 3
+          }));
+        }
       }
 
       return {
@@ -1195,19 +1226,27 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       return;
     }
 
-    // Validate that all selected employees have hours
+    // Validate that all selected employees have hours (or tray for BIHUN_SANGKUT)
     const invalidEmployees = allSelectedEmployees.filter(
       ([employeeId, jobTypes]) => {
         return jobTypes.some((jobType) => {
           const hours =
             employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+
+          // For BIHUN_SANGKUT employees, check tray count instead of hours
+          if (isBihunPage && jobType === "BIHUN_SANGKUT") {
+            const rowKey = `${employeeId}-${jobType}`;
+            const trayCount = trayCounts[rowKey] || 0;
+            return trayCount <= 0;
+          }
+
           return hours <= 0;
         });
       }
     );
 
     if (invalidEmployees.length > 0) {
-      toast.error("All selected employees must have hours greater than 0");
+      toast.error("All selected employees must have hours or tray greater than 0");
       return;
     }
 
@@ -1297,6 +1336,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       // Create a new selection state that selects all employees
       const newSelectedJobs: Record<string, string[]> = {};
       const newJobHours: Record<string, Record<string, number>> = {};
+      const newTrayCounts: Record<string, number> = {};
 
       expandedEmployees.forEach((employee: { id: any; jobType: any }) => {
         const employeeId = employee.id;
@@ -1315,6 +1355,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
         // Set default hours based on day of week (5 for Saturday, 7 for other days)
         newJobHours[employeeId][jobType] = getDefaultHours(formData.logDate);
+
+        // Initialize tray count for BIHUN_SANGKUT employees (BIHUN page only)
+        if (isBihunPage && jobType === "BIHUN_SANGKUT") {
+          const rowKey = `${employeeId}-${jobType}`;
+          newTrayCounts[rowKey] = 3; // Default tray count is 3
+        }
       });
 
       // Update the state with all employees selected
@@ -1322,8 +1368,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         selectedJobs: newSelectedJobs,
         jobHours: newJobHours,
       });
+
+      // Set tray counts if any BIHUN_SANGKUT employees were selected
+      if (Object.keys(newTrayCounts).length > 0) {
+        setTrayCounts((prev) => ({ ...prev, ...newTrayCounts }));
+      }
     }
-  }, [expandedEmployees, loadingStaffs, loadingJobs, formData.logDate]);
+  }, [expandedEmployees, loadingStaffs, loadingJobs, formData.logDate, isBihunPage]);
 
   // Handle select all/deselect all employees
   const handleSelectAll = () => {
@@ -1331,6 +1382,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     const allAvailableSelected = availableForWork.every((emp) =>
       employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
     );
+
+    if (!allAvailableSelected && isBihunPage) {
+      // Initialize tray counts for BIHUN_SANGKUT employees being selected
+      const newTrayCounts: Record<string, number> = {};
+      availableForWork.forEach((emp) => {
+        if (emp.jobType === "BIHUN_SANGKUT") {
+          const rowKey = `${emp.id}-${emp.jobType}`;
+          if (trayCounts[rowKey] === undefined) {
+            newTrayCounts[rowKey] = 3; // Default tray count is 3
+          }
+        }
+      });
+      if (Object.keys(newTrayCounts).length > 0) {
+        setTrayCounts((prev) => ({ ...prev, ...newTrayCounts }));
+      }
+    }
 
     setEmployeeSelectionState((prev) => {
       if (allAvailableSelected) {
@@ -1957,8 +2024,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             );
             if (bhangkutActivity && bhangkutActivity.units_produced > 0) {
               newTrayCounts[rowKey] = parseFloat(bhangkutActivity.units_produced);
+            } else {
+              // Default tray count is 3 if not saved
+              newTrayCounts[rowKey] = 3;
             }
           }
+        } else if (entry.job_id === "BIHUN_SANGKUT") {
+          // No activities saved, default tray count is 3
+          newTrayCounts[rowKey] = 3;
         }
       });
 
@@ -2292,16 +2365,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Hours
+                          {isBihunPage ? "Units" : "Hours"}
                         </th>
-                        {isBihunPage && (
-                          <th
-                            scope="col"
-                            className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                          >
-                            Tray
-                          </th>
-                        )}
                         <th
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
@@ -2392,54 +2457,49 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             <td className="px-6 py-2 whitespace-nowrap text-right">
                               <div className="flex justify-end">
-                                <input
-                                  type="number"
-                                  value={isSelected ? hours.toString() : ""}
-                                  onChange={(e) =>
-                                    handleEmployeeHoursChange(
-                                      row.rowKey,
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={() => handleHoursBlur(row.rowKey)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={`max-w-[80px] py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
-                                    hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) &&
-                                    jobConfig?.requiresOvertimeCalc
-                                      ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
-                                      : "border-default-300 dark:border-gray-600"
-                                  }`}
-                                  step="0.5"
-                                  min="0"
-                                  max="24"
-                                  disabled={
-                                    !isSelected ||
-                                    isSaving ||
-                                    leaveEmployees[row.id]?.selected
-                                  }
-                                  placeholder={isSelected ? "0" : "-"}
-                                />
-                              </div>
-                            </td>
-                            {isBihunPage && (
-                              <td className="px-4 py-2 whitespace-nowrap text-center">
-                                {row.jobType === "BIHUN_SANGKUT" ? (
+                                {isBihunPage && row.jobType === "BIHUN_SANGKUT" ? (
                                   <input
                                     type="number"
                                     value={isSelected ? (trayCounts[row.rowKey || ""] || 0).toString() : ""}
                                     onChange={(e) => handleTrayCountChange(row.rowKey || "", e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="w-16 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
+                                    className="w-20 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
                                     min="0"
                                     step="1"
                                     disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
                                     placeholder={isSelected ? "0" : "-"}
                                   />
                                 ) : (
-                                  <span className="text-xs text-default-400 dark:text-gray-500">-</span>
+                                  <input
+                                    type="number"
+                                    value={isSelected ? hours.toString() : ""}
+                                    onChange={(e) =>
+                                      handleEmployeeHoursChange(
+                                        row.rowKey,
+                                        e.target.value
+                                      )
+                                    }
+                                    onBlur={() => handleHoursBlur(row.rowKey)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={`w-20 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                      hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) &&
+                                      jobConfig?.requiresOvertimeCalc
+                                        ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
+                                        : "border-default-300 dark:border-gray-600"
+                                    }`}
+                                    step="0.5"
+                                    min="0"
+                                    max="24"
+                                    disabled={
+                                      !isSelected ||
+                                      isSaving ||
+                                      leaveEmployees[row.id]?.selected
+                                    }
+                                    placeholder={isSelected ? "0" : "-"}
+                                  />
                                 )}
-                              </td>
-                            )}
+                              </div>
+                            </td>
                             <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(

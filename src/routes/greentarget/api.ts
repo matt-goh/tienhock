@@ -9,6 +9,22 @@ import {
 } from "../../utils/greenTarget/cacheUtils";
 
 export const greenTargetApi = {
+  // Generic request method
+  request: (method: "GET" | "POST" | "PUT" | "DELETE", url: string, data?: any) => {
+    switch (method) {
+      case "GET":
+        return api.get(url);
+      case "POST":
+        return api.post(url, data);
+      case "PUT":
+        return api.put(url, data);
+      case "DELETE":
+        return api.delete(url);
+      default:
+        throw new Error(`Unsupported method: ${method}`);
+    }
+  },
+
   // Dashboard endpoints
   getDashboardMetrics: () => api.get("/greentarget/api/dashboard"),
   getDashboardActivities: (limit: number = 10) =>
@@ -233,4 +249,100 @@ export const greenTargetApi = {
 
   // Debtors endpoints
   getDebtorsReport: () => api.get("/greentarget/api/payments/debtors"),
+
+  // Pickup destinations endpoints
+  getPickupDestinations: (includeInactive = false) =>
+    api.get(
+      `/greentarget/api/pickup-destinations${
+        includeInactive ? "?include_inactive=true" : ""
+      }`
+    ),
+  createPickupDestination: (data: {
+    code: string;
+    name: string;
+    is_default?: boolean;
+    sort_order?: number;
+  }) => api.post("/greentarget/api/pickup-destinations", data),
+  updatePickupDestination: (
+    id: number,
+    data: {
+      code?: string;
+      name?: string;
+      is_default?: boolean;
+      sort_order?: number;
+      is_active?: boolean;
+    }
+  ) => api.put(`/greentarget/api/pickup-destinations/${id}`, data),
+  deletePickupDestination: (id: number, permanent = false) =>
+    api.delete(
+      `/greentarget/api/pickup-destinations/${id}${
+        permanent ? "?permanent=true" : ""
+      }`
+    ),
+
+  // Payroll rules endpoints
+  getPayrollRules: (ruleType?: "PLACEMENT" | "PICKUP", includeInactive = false) => {
+    const params = new URLSearchParams();
+    if (ruleType) params.append("rule_type", ruleType);
+    if (includeInactive) params.append("include_inactive", "true");
+    const queryString = params.toString();
+    return api.get(
+      `/greentarget/api/payroll-rules${queryString ? `?${queryString}` : ""}`
+    );
+  },
+  createPayrollRule: (data: {
+    rule_type: "PLACEMENT" | "PICKUP";
+    condition_field: string;
+    condition_operator: string;
+    condition_value?: string;
+    secondary_condition_field?: string;
+    secondary_condition_operator?: string;
+    secondary_condition_value?: string;
+    pay_code_id: string;
+    priority?: number;
+    description?: string;
+  }) => api.post("/greentarget/api/payroll-rules", data),
+  updatePayrollRule: (id: number, data: any) =>
+    api.put(`/greentarget/api/payroll-rules/${id}`, data),
+  deletePayrollRule: (id: number) =>
+    api.delete(`/greentarget/api/payroll-rules/${id}`),
+  evaluatePayrollRule: (
+    ruleType: "PLACEMENT" | "PICKUP",
+    invoiceAmount?: number,
+    destination?: string
+  ) => {
+    const params = new URLSearchParams();
+    if (invoiceAmount !== undefined)
+      params.append("invoice_amount", invoiceAmount.toString());
+    if (destination) params.append("destination", destination);
+    return api.get(
+      `/greentarget/api/payroll-rules/evaluate/${ruleType}?${params.toString()}`
+    );
+  },
+  getAddonPaycodes: () => api.get("/greentarget/api/payroll-rules/addon-paycodes/list"),
+  getPayrollSettings: () => api.get("/greentarget/api/payroll-rules/settings/all"),
+  updatePayrollSetting: (key: string, value: string) =>
+    api.put(`/greentarget/api/payroll-rules/settings/${key}`, { value }),
+
+  // Rental addons endpoints
+  getRentalAddons: (rentalId: number) =>
+    api.get(`/greentarget/api/rental-addons/rentals/${rentalId}/addons`),
+  createRentalAddon: (
+    rentalId: number,
+    data: {
+      pay_code_id: string;
+      quantity?: number;
+      amount?: number;
+      notes?: string;
+      created_by?: string;
+    }
+  ) => api.post(`/greentarget/api/rental-addons/rentals/${rentalId}/addons`, data),
+  updateRentalAddon: (
+    id: number,
+    data: { quantity?: number; amount?: number; notes?: string }
+  ) => api.put(`/greentarget/api/rental-addons/${id}`, data),
+  deleteRentalAddon: (id: number) =>
+    api.delete(`/greentarget/api/rental-addons/${id}`),
+  getBatchRentalAddons: (rentalIds: number[]) =>
+    api.post("/greentarget/api/rental-addons/batch", { rental_ids: rentalIds }),
 };

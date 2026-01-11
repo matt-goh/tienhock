@@ -12,6 +12,7 @@ import {
   IconChevronDown,
   IconChevronUp,
   IconSettings,
+  IconAdjustments,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -255,33 +256,119 @@ const GTPayrollPage: React.FC = () => {
   }
 
   return (
-    <div className="px-6 pb-6 space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-default-800 dark:text-gray-100">
-            GT Payroll
-          </h1>
-          <p className="text-sm text-default-500 dark:text-gray-400">
-            Green Target Monthly Payroll
-          </p>
+    <div className="space-y-3">
+      {/* Compact Header Row */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+        {/* Left side: Month Navigator, Title, Stats */}
+        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={handleMonthChange}
+            showGoToCurrentButton={false}
+            size="sm"
+          />
+          {/* Compact Stats */}
+          {payroll && (
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
+              <div className="flex items-center gap-1.5">
+                <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
+                <span className="font-medium text-default-700 dark:text-gray-200">
+                  {payroll.employeePayrolls?.length || 0}
+                </span>
+                <span className="text-default-400 dark:text-gray-400">employees</span>
+              </div>
+              <span className="text-default-300 dark:text-gray-600">•</span>
+              <div className="flex items-center gap-1.5">
+                <IconCash size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                  RM {totalGross.toFixed(2)}
+                </span>
+              </div>
+              <span className="text-default-300 dark:text-gray-600">|</span>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  payroll.status === "Finalized"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                }`}
+              >
+                {payroll.status === "Finalized" ? (
+                  <IconLock size={12} className="mr-1" />
+                ) : (
+                  <IconRefresh size={12} className="mr-1" />
+                )}
+                {payroll.status}
+              </span>
+              {payroll.status === "Processing" && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <button
+                    onClick={handleProcessPayroll}
+                    disabled={isProcessing}
+                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
+                    title="Process payroll"
+                  >
+                    <IconRefresh
+                      size={14}
+                      className={isProcessing ? "animate-spin" : ""}
+                    />
+                    <span>{isProcessing ? "Processing..." : "Process"}</span>
+                  </button>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <button
+                    onClick={() => setShowFinalizeDialog(true)}
+                    disabled={!payroll.employeePayrolls?.length}
+                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors disabled:opacity-50"
+                    title="Finalize payroll"
+                  >
+                    <IconLock size={14} />
+                    <span>Finalize</span>
+                  </button>
+                </>
+              )}
+              {payroll.status === "Finalized" && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <span className="text-default-500 dark:text-gray-400 text-xs">
+                    {formatDistanceToNow(new Date(payroll.updated_at), { addSuffix: true })}
+                  </span>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <button
+                    onClick={handleUnlockPayroll}
+                    disabled={isUpdatingStatus}
+                    className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
+                    title="Unlock payroll"
+                  >
+                    <IconLock size={14} />
+                    <span>{isUpdatingStatus ? "Unlocking..." : "Unlock"}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() => setShowManageModal(true)}
-          icon={IconSettings}
-          iconSize={18}
-        >
-          Manage Employees
-        </Button>
+        {/* Right side: Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/greentarget/payroll/settings")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-default-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+            title="Payroll Settings"
+          >
+            <IconAdjustments size={16} />
+            <span>Rules</span>
+          </button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowManageModal(true)}
+            icon={IconSettings}
+            iconSize={16}
+          >
+            Employees
+          </Button>
+        </div>
       </div>
-
-      {/* Month Navigator */}
-      <MonthNavigator
-        selectedMonth={selectedMonth}
-        onChange={handleMonthChange}
-      />
 
       {/* No Payroll State */}
       {!payroll && (
@@ -314,63 +401,6 @@ const GTPayrollPage: React.FC = () => {
       {/* Payroll Exists */}
       {payroll && (
         <>
-          {/* Status Bar */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    payroll.status === "Finalized"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  }`}
-                >
-                  {payroll.status}
-                </span>
-                <span className="text-sm text-default-500 dark:text-gray-400">
-                  Updated {formatDistanceToNow(new Date(payroll.updated_at), { addSuffix: true })}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {payroll.status === "Processing" && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={handleProcessPayroll}
-                      disabled={isProcessing}
-                      icon={isProcessing ? undefined : IconRefresh}
-                      iconSize={18}
-                    >
-                      {isProcessing ? "Processing..." : "Process All"}
-                    </Button>
-                    <Button
-                      color="emerald"
-                      variant="filled"
-                      onClick={() => setShowFinalizeDialog(true)}
-                      disabled={!payroll.employeePayrolls?.length}
-                      icon={IconLock}
-                      iconSize={18}
-                    >
-                      Finalize
-                    </Button>
-                  </>
-                )}
-                {payroll.status === "Finalized" && (
-                  <Button
-                    variant="outline"
-                    onClick={handleUnlockPayroll}
-                    disabled={isUpdatingStatus}
-                    icon={IconLock}
-                    iconSize={18}
-                  >
-                    {isUpdatingStatus ? "Unlocking..." : "Unlock"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
