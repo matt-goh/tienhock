@@ -1101,3 +1101,109 @@ export interface StockAdjustmentEntry {
 
 // Stock View Type
 export type StockViewType = "month" | "rolling" | "custom";
+
+// ==================== MATERIALS (INGREDIENTS/RAW/PACKING) TYPES ====================
+
+export type MaterialCategory = "ingredient" | "raw_material" | "packing_material";
+export type MaterialAppliesTo = "mee" | "bihun" | "both";
+export type ProductLine = "mee" | "bihun";
+
+// Material Master Data
+export interface Material {
+  id: number;
+  code: string;
+  name: string;
+  category: MaterialCategory;
+  unit: string;
+  unit_size?: string | null;
+  default_unit_cost: number;
+  applies_to: MaterialAppliesTo;
+  sort_order: number;
+  is_active: boolean;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+}
+
+// For creating/updating materials
+export interface MaterialInput {
+  code: string;
+  name: string;
+  category: MaterialCategory;
+  unit: string;
+  unit_size?: string | null;
+  default_unit_cost: number;
+  applies_to?: MaterialAppliesTo;
+  sort_order?: number;
+  is_active?: boolean;
+  notes?: string | null;
+}
+
+// Material Stock Entry (monthly closing stock)
+export interface MaterialStockEntry {
+  id: number;
+  year: number;
+  month: number;
+  material_id: number;
+  product_line: ProductLine;
+  quantity: number;
+  unit_cost: number;
+  total_value: number;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+  // Joined fields
+  material_code?: string;
+  material_name?: string;
+  material_category?: MaterialCategory;
+  material_unit?: string;
+  material_unit_size?: string | null;
+  default_unit_cost?: number;
+}
+
+// Material with opening and closing balances (for stock entry page)
+export interface MaterialWithStock extends Material {
+  opening_quantity: number;
+  opening_unit_cost: number;
+  opening_value: number;
+  closing_id: number | null;
+  closing_quantity: number;
+  closing_unit_cost: number;
+  closing_value: number;
+  closing_notes?: string | null;
+}
+
+// Stock entry input for batch save
+export interface MaterialStockEntryInput {
+  material_id: number;
+  quantity: number;
+  unit_cost: number;
+  notes?: string | null;
+}
+
+// Stock data response from API
+export interface MaterialStockWithOpeningResponse {
+  year: number;
+  month: number;
+  product_line: ProductLine;
+  opening_period: { year: number; month: number };
+  materials: MaterialWithStock[];
+}
+
+// Stock summary by category
+export interface MaterialStockSummary {
+  category: MaterialCategory;
+  product_line: ProductLine;
+  total_value: number;
+  entry_count: number;
+}
+
+// Filters for material list
+export interface MaterialFilters {
+  search?: string;
+  category?: MaterialCategory | null;
+  is_active?: boolean | null;
+  applies_to?: MaterialAppliesTo | "all" | null;
+}

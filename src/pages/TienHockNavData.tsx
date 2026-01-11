@@ -28,6 +28,11 @@ import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
 import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
 import CogmPage from "./Accounting/Reports/CogmPage";
 
+// Stock - Materials
+import MaterialsListPage from "./Stock/Materials/MaterialsListPage";
+import MaterialFormPage from "./Stock/Materials/MaterialFormPage";
+import MaterialStockEntryPage from "./Stock/Materials/MaterialStockEntryPage";
+
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
 import InvoiceFormPage from "./Invoice/InvoiceFormPage";
@@ -395,19 +400,42 @@ export const TienHockNavData: SidebarItem[] = [
     icon: IconPackage,
     subItems: [
       {
-        name: "Stock Movement",
-        path: "/stock/movement",
-        component: StockMovementPage,
-      },
-      {
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
       },
       {
-        name: "Stock Adjustments",
+        name: "Product Movement",
+        path: "/stock/movement",
+        component: StockMovementPage,
+      },
+      {
+        name: "Product Adjustments",
         path: "/stock/adjustments",
         component: StockAdjustmentEntryPage,
+      },
+      {
+        name: "Material Stock Entry",
+        path: "/materials-entry",
+        component: MaterialStockEntryPage,
+      },
+      {
+        name: "Materials",
+        path: "/materials",
+        component: MaterialsListPage,
+        subItems: [
+          {
+            name: "New Material",
+            path: "/materials/new",
+            component: MaterialFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Material",
+            path: "/materials/:id",
+            component: MaterialFormPage,
+          },
+        ],
       },
     ],
   },

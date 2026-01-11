@@ -79,6 +79,10 @@ This is a comprehensive ERP system supporting three companies:
 - `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes
 - `taxes` - name, rate
 
+**Materials (Ingredients/Raw/Packing):**
+- `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), unit, unit_size, default_unit_cost, applies_to (mee/bihun/both), sort_order, is_active, notes, created_at, updated_at, created_by
+- `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun), quantity, unit_cost, total_value, notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line)
+
 **Staff & Employees:**
 - `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
