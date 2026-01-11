@@ -265,7 +265,8 @@ const MaterialFormPage: React.FC = () => {
           <div className="flex space-x-2">
             {isEditMode && formData.is_active && (
               <Button
-                variant="danger"
+                color="red"
+                variant="filled"
                 size="sm"
                 onClick={() => setShowDeleteDialog(true)}
               >
@@ -302,7 +303,6 @@ const MaterialFormPage: React.FC = () => {
             required
             disabled={isEditMode}
             placeholder="e.g., GARAM, TEPUNG"
-            className="uppercase"
           />
 
           {/* Name */}
@@ -359,10 +359,9 @@ const MaterialFormPage: React.FC = () => {
             label="Default Unit Cost (RM)"
             name="default_unit_cost"
             type="number"
-            value={formData.default_unit_cost}
+            value={formData.default_unit_cost.toString()}
             onChange={handleInputChange}
             step="0.01"
-            min="0"
           />
 
           {/* Sort Order */}
@@ -370,9 +369,8 @@ const MaterialFormPage: React.FC = () => {
             label="Sort Order"
             name="sort_order"
             type="number"
-            value={formData.sort_order}
+            value={formData.sort_order.toString()}
             onChange={handleInputChange}
-            min="0"
           />
 
           {/* Active Status (only in edit mode) */}
@@ -413,9 +411,8 @@ const MaterialFormPage: React.FC = () => {
         onConfirm={() => navigate("/materials")}
         title="Unsaved Changes"
         message="You have unsaved changes. Are you sure you want to leave? Your changes will be lost."
-        confirmText="Leave"
-        cancelText="Stay"
-        type="warning"
+        confirmButtonText="Leave"
+        variant="danger"
       />
 
       {/* Delete Confirmation */}
@@ -425,9 +422,8 @@ const MaterialFormPage: React.FC = () => {
         onConfirm={handleDelete}
         title="Deactivate Material"
         message={`Are you sure you want to deactivate "${formData.name}"? This material will be hidden but not permanently deleted.`}
-        confirmText="Deactivate"
-        cancelText="Cancel"
-        type="warning"
+        confirmButtonText="Deactivate"
+        variant="danger"
       />
     </div>
   );
