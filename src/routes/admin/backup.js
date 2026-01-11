@@ -159,6 +159,117 @@ export default function backupRouter(pool) {
     }
   }
 
+  async function restoreSqlFile(sqlPath) {
+    let cachedSessions = [];
+    const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
+    const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
+
+    try {
+      restoreState = {
+        status: 'RESTORING',
+        phase: 'INITIALIZATION',
+        startTime: Date.now()
+      };
+
+      // Set maintenance mode
+      pool.pool.maintenanceMode = true;
+
+      // Phase 1: Cache active sessions
+      try {
+        const { rows } = await pool.query(`
+          SELECT
+            created_at,
+            last_active,
+            session_id,
+            staff_id,
+            status
+          FROM active_sessions
+          WHERE status = 'active'
+          AND last_active > NOW() - INTERVAL '7 days'
+        `);
+        cachedSessions = rows;
+      } catch (error) {
+        console.warn('Failed to cache sessions:', error);
+      }
+
+      // Phase 2: Execute SQL file
+      restoreState.phase = 'DATABASE_RESTORE';
+
+      const psqlCommand = `PGPASSWORD=${DB_PASSWORD} psql -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d ${DB_NAME} -f "${sqlPath}"`;
+
+      await executeCommand(psqlCommand, { maxBuffer: 100 * 1024 * 1024 });
+
+      // Phase 3: Session restoration
+      if (cachedSessions.length > 0) {
+        restoreState.phase = 'SESSION_RESTORE';
+        try {
+          // Ensure active_sessions table exists
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS active_sessions (
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              session_id VARCHAR(255) PRIMARY KEY,
+              staff_id VARCHAR(255),
+              status VARCHAR(50) DEFAULT 'active'
+            )
+          `);
+
+          // Reinsert sessions in batches
+          const batchSize = 50;
+          for (let i = 0; i < cachedSessions.length; i += batchSize) {
+            const batch = cachedSessions.slice(i, i + batchSize);
+            const values = batch.map(session => `(
+              '${session.created_at.toISOString()}',
+              NOW(),
+              '${session.session_id}',
+              ${session.staff_id ? `'${session.staff_id}'` : 'NULL'},
+              'active'
+            )`).join(',');
+
+            await pool.query(`
+              INSERT INTO active_sessions (
+                created_at,
+                last_active,
+                session_id,
+                staff_id,
+                status
+              )
+              VALUES ${values}
+              ON CONFLICT (session_id)
+              DO UPDATE SET
+                last_active = EXCLUDED.last_active,
+                status = EXCLUDED.status
+            `);
+          }
+        } catch (error) {
+          console.error('Failed to restore sessions:', error);
+        }
+      }
+
+      // Complete restore
+      pool.pool.maintenanceMode = false;
+      restoreState = {
+        status: 'COMPLETED',
+        phase: 'COMPLETED',
+        startTime: null
+      };
+
+      return true;
+    } catch (error) {
+      console.error('Error in restoreSqlFile:', error);
+      restoreState = {
+        status: 'FAILED',
+        phase: 'FAILED',
+        startTime: null
+      };
+
+      // Ensure maintenance mode is disabled on failure
+      pool.pool.maintenanceMode = false;
+
+      throw error;
+    }
+  }
+
   router.post('/create', async (req, res) => {
     try {
       if (pool.pool.maintenanceMode) {
@@ -490,6 +601,76 @@ export default function backupRouter(pool) {
     } catch (error) {
       console.error('Restore failed:', error);
       pool.pool.maintenanceMode = false;
+    }
+  });
+
+  // Development-only endpoint for uploading raw SQL files
+  router.post('/upload-sql', async (req, res) => {
+    // Only allow in development
+    if (env !== 'development') {
+      return res.status(403).json({ error: 'SQL upload only available in development' });
+    }
+
+    if (restoreState.status === 'RESTORING') {
+      return res.status(503).json({
+        error: 'Service unavailable',
+        message: 'A restore operation is already in progress'
+      });
+    }
+
+    const { sqlContent } = req.body;
+    if (!sqlContent) {
+      return res.status(400).json({ error: 'SQL content is required' });
+    }
+
+    try {
+      // Respond immediately like existing restore endpoint
+      res.json({
+        message: 'SQL import initiated',
+        status: 'RESTORING'
+      });
+
+      // Strip \restrict and \unrestrict lines
+      const cleanedSql = sqlContent
+        .split('\n')
+        .filter(line => !line.startsWith('\\restrict') && !line.startsWith('\\unrestrict'))
+        .join('\n');
+
+      // Write to temp file inside Docker container
+      const tempFilename = `temp_upload_${Date.now()}.sql`;
+      const envBackupDir = `${backupDir}/${env}`;
+      const tempPath = `${envBackupDir}/${tempFilename}`;
+
+      // Ensure directory exists
+      await executeCommand(`mkdir -p "${envBackupDir}"`);
+
+      // Write SQL content to file via docker exec stdin
+      const containerName = getContainerName();
+      await new Promise((resolve, reject) => {
+        const proc = exec(
+          `docker exec -i ${containerName} bash -c "cat > ${tempPath}"`,
+          { maxBuffer: 100 * 1024 * 1024 },
+          (error) => error ? reject(error) : resolve()
+        );
+        proc.stdin.write(cleanedSql);
+        proc.stdin.end();
+      });
+
+      // Execute SQL file using restoreSqlFile
+      await restoreSqlFile(tempPath);
+
+      // Clean up temp file
+      try {
+        await executeCommand(`rm -f "${tempPath}"`);
+        console.log(`[Upload SQL] Cleaned up temp file: ${tempFilename}`);
+      } catch (err) {
+        console.warn(`[Upload SQL] Failed to cleanup temp file: ${err.message}`);
+      }
+
+    } catch (error) {
+      console.error('SQL upload failed:', error);
+      pool.pool.maintenanceMode = false;
+      restoreState = { status: 'FAILED', phase: 'FAILED', startTime: null };
     }
   });
 
