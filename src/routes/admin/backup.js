@@ -83,7 +83,7 @@ export default function backupRouter(pool) {
       // Phase 2: Database restore
       restoreState.phase = 'DATABASE_RESTORE';
 
-      const restoreCommand = `PGPASSWORD=${DB_PASSWORD} pg_restore -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d ${DB_NAME} --clean --if-exists --no-owner --no-privileges -v "${backupPath}"`;
+      const restoreCommand = `PGPASSWORD=${DB_PASSWORD} pg_restore -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d ${DB_NAME} --clean --if-exists -v "${backupPath}"`;
 
       await executeCommand(restoreCommand);
 
