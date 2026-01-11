@@ -79,6 +79,10 @@ This is a comprehensive ERP system supporting three companies:
 - `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes
 - `taxes` - name, rate
 
+**Materials (Ingredients/Raw/Packing):**
+- `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), unit, unit_size, default_unit_cost, applies_to (mee/bihun/both), sort_order, is_active, notes, created_at, updated_at, created_by
+- `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun), quantity, unit_cost, total_value, notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line)
+
 **Staff & Employees:**
 - `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
@@ -143,6 +147,11 @@ This is a comprehensive ERP system supporting three companies:
 - `greentarget.monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
 - `greentarget.monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, rate_used, calculated_amount, is_manually_added, created_at
 - `greentarget.driver_trips` - id, driver_id, year, month, trip_count, completed_rental_ids, auto_calculated, notes, created_at, updated_at
+- `greentarget.pickup_destinations` - id, code (unique), name, is_default, sort_order, is_active, created_at, updated_at (configurable pickup destination options: KILANG, MD, MENGGATAL)
+- `greentarget.payroll_rules` - id, rule_type (PLACEMENT/PICKUP), condition_field, condition_operator, condition_value, secondary_condition_field, secondary_condition_operator, secondary_condition_value, pay_code_id, priority, is_active, description, created_at, updated_at
+- `greentarget.rental_addons` - id, rental_id, pay_code_id, quantity, amount, notes, created_at, created_by (manual add-on paycodes per rental)
+- `greentarget.addon_paycodes` - id, pay_code_id, display_name, default_amount, is_variable_amount, sort_order, is_active, created_at, updated_at (configuration for available add-on paycodes)
+- `greentarget.payroll_settings` - id, setting_key (unique), setting_value, description, created_at, updated_at (global payroll settings)
 
 ### Styling
 - Tailwind CSS with custom color palette

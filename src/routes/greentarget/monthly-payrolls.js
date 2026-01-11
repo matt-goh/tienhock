@@ -234,6 +234,10 @@ export default function (pool) {
       const { year, month } = payrollResult.rows[0];
 
       // 2. Fetch all required data in parallel
+      const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, "0")}-${lastDay}`;
+
       const [
         monthlyLogsResult,
         driverTripsResult,
@@ -243,6 +247,11 @@ export default function (pool) {
         socsoRatesResult,
         sipRatesResult,
         incomeTaxRatesResult,
+        payrollRulesResult,
+        payrollSettingsResult,
+        driverRentalsResult,
+        rentalAddonsResult,
+        allPayCodesResult,
       ] = await Promise.all([
         // Monthly work logs for OFFICE workers (from GT schema)
         client.query(`
@@ -298,6 +307,65 @@ export default function (pool) {
         client.query("SELECT * FROM public.socso_rates WHERE is_active = true ORDER BY wage_from"),
         client.query("SELECT * FROM public.sip_rates WHERE is_active = true ORDER BY wage_from"),
         client.query("SELECT * FROM public.income_tax_rates WHERE is_active = true ORDER BY wage_from"),
+
+        // Payroll rules for DRIVER processing
+        client.query(`
+          SELECT * FROM greentarget.payroll_rules
+          WHERE is_active = true
+          ORDER BY rule_type, priority DESC
+        `),
+
+        // Payroll settings (default invoice amount)
+        client.query(`
+          SELECT setting_key, setting_value
+          FROM greentarget.payroll_settings
+        `),
+
+        // Completed rentals with invoice amounts for the month
+        client.query(`
+          SELECT
+            r.rental_id,
+            r.driver,
+            r.pickup_destination,
+            COALESCE(
+              (SELECT SUM(i.total_excluding_tax)
+               FROM greentarget.invoice_rentals ir
+               JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
+               WHERE ir.rental_id = r.rental_id AND i.invoice_status != 'Cancelled'),
+              NULL
+            ) as invoice_amount,
+            EXISTS(
+              SELECT 1 FROM greentarget.invoice_rentals ir
+              JOIN greentarget.invoices i ON ir.invoice_id = i.invoice_id
+              WHERE ir.rental_id = r.rental_id AND i.invoice_status != 'Cancelled'
+            ) as has_invoice
+          FROM greentarget.rentals r
+          WHERE r.date_picked IS NOT NULL
+            AND r.date_placed >= $1
+            AND r.date_placed <= $2
+        `, [startDate, endDate]),
+
+        // All rental addons for completed rentals this month
+        client.query(`
+          SELECT ra.*, pc.description as pay_code_description, ap.display_name
+          FROM greentarget.rental_addons ra
+          JOIN pay_codes pc ON ra.pay_code_id = pc.id
+          LEFT JOIN greentarget.addon_paycodes ap ON ra.pay_code_id = ap.pay_code_id
+          WHERE ra.rental_id IN (
+            SELECT r.rental_id
+            FROM greentarget.rentals r
+            WHERE r.date_picked IS NOT NULL
+              AND r.date_placed >= $1
+              AND r.date_placed <= $2
+          )
+        `, [startDate, endDate]),
+
+        // All pay codes for rate lookups
+        client.query(`
+          SELECT id, description, rate_biasa, pay_type, rate_unit
+          FROM pay_codes
+          WHERE is_active = true
+        `),
       ]);
 
       // Build lookup maps
@@ -320,6 +388,67 @@ export default function (pool) {
       const driverTripsMap = new Map(
         driverTripsResult.rows.map((t) => [t.driver_id, t.trip_count])
       );
+
+      // Build payroll rules map
+      const payrollRules = payrollRulesResult.rows;
+      const placementRules = payrollRules.filter((r) => r.rule_type === "PLACEMENT");
+      const pickupRules = payrollRules.filter((r) => r.rule_type === "PICKUP");
+
+      // Build settings map
+      const settingsMap = {};
+      payrollSettingsResult.rows.forEach((s) => {
+        settingsMap[s.setting_key] = s.setting_value;
+      });
+      const defaultInvoiceAmount = parseFloat(settingsMap.default_invoice_amount) || 200;
+
+      // Build all pay codes map for rate lookups
+      const allPayCodesMap = {};
+      allPayCodesResult.rows.forEach((pc) => {
+        allPayCodesMap[pc.id] = pc;
+      });
+
+      // Build rentals by driver map
+      const rentalsByDriver = {};
+      driverRentalsResult.rows.forEach((rental) => {
+        if (!rentalsByDriver[rental.driver]) {
+          rentalsByDriver[rental.driver] = [];
+        }
+        rentalsByDriver[rental.driver].push(rental);
+      });
+
+      // Build addons by rental map
+      const addonsByRental = {};
+      rentalAddonsResult.rows.forEach((addon) => {
+        if (!addonsByRental[addon.rental_id]) {
+          addonsByRental[addon.rental_id] = [];
+        }
+        addonsByRental[addon.rental_id].push(addon);
+      });
+
+      // Helper function to evaluate payroll rule conditions
+      const evaluateCondition = (value, operator, targetValue) => {
+        switch (operator) {
+          case "=":
+            return (
+              value === targetValue ||
+              (typeof value === "string" &&
+                typeof targetValue === "string" &&
+                value.toUpperCase() === targetValue.toUpperCase())
+            );
+          case ">":
+            return value > targetValue;
+          case "<":
+            return value < targetValue;
+          case ">=":
+            return value >= targetValue;
+          case "<=":
+            return value <= targetValue;
+          case "ANY":
+            return true;
+          default:
+            return false;
+        }
+      };
 
       // Process work logs into items per employee
       const workLogsByEmployee = {};
@@ -408,32 +537,115 @@ export default function (pool) {
               });
             }
           } else if (jobType === "DRIVER") {
-            // Get trip count for DRIVER workers
-            const tripCount = driverTripsMap.get(employeeId) || 0;
+            // Process DRIVER using rule-based calculation from rentals
+            const driverRentals = rentalsByDriver[employeeId] || [];
 
-            // Find the driver trip pay code
-            const driverPayCodes = jobPayCodesMap["DRIVER"] || [];
-            const tripPayCode = driverPayCodes.find(
-              (pc) => pc.rate_unit === "Trip" || pc.pay_code_id.includes("TRIP")
-            );
+            // Process each completed rental
+            for (const rental of driverRentals) {
+              const invoiceAmount = rental.invoice_amount !== null
+                ? parseFloat(rental.invoice_amount)
+                : defaultInvoiceAmount;
 
-            if (tripPayCode && tripCount > 0) {
-              const rate = tripPayCode.override_rate_biasa || tripPayCode.rate_biasa || 0;
-              combinedItems.push({
-                pay_code_id: tripPayCode.pay_code_id,
-                description: tripPayCode.description,
-                pay_type: tripPayCode.pay_type || "Base",
-                rate: rate,
-                rate_unit: "Trip",
-                quantity: tripCount,
-                amount: Math.round(tripCount * rate * 100) / 100,
-                job_type: "DRIVER",
-                source_employee_id: employeeId,
-                is_manual: false,
-              });
+              // Find matching PLACEMENT rule
+              let placementRule = null;
+              for (const rule of placementRules) {
+                if (evaluateCondition(invoiceAmount, rule.condition_operator, parseFloat(rule.condition_value))) {
+                  placementRule = rule;
+                  break;
+                }
+              }
+
+              // Add PLACEMENT payroll item
+              if (placementRule) {
+                const payCode = allPayCodesMap[placementRule.pay_code_id];
+                const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
+                combinedItems.push({
+                  pay_code_id: placementRule.pay_code_id,
+                  description: payCode?.description || placementRule.description || placementRule.pay_code_id,
+                  pay_type: "Tambahan",
+                  rate: rate,
+                  rate_unit: "Trip",
+                  quantity: 1,
+                  amount: rate,
+                  job_type: "DRIVER",
+                  source_employee_id: employeeId,
+                  is_manual: false,
+                  rental_id: rental.rental_id,
+                  source_type: "PLACEMENT",
+                });
+              }
+
+              // Find matching PICKUP rule (only if pickup_destination is set)
+              if (rental.pickup_destination) {
+                let pickupRule = null;
+                for (const rule of pickupRules) {
+                  const primaryMatch = evaluateCondition(
+                    rental.pickup_destination,
+                    rule.condition_operator,
+                    rule.condition_value
+                  );
+
+                  let secondaryMatch = true;
+                  if (rule.secondary_condition_field && rule.secondary_condition_operator) {
+                    if (rule.secondary_condition_field === "invoice_amount") {
+                      secondaryMatch = evaluateCondition(
+                        invoiceAmount,
+                        rule.secondary_condition_operator,
+                        parseFloat(rule.secondary_condition_value)
+                      );
+                    }
+                  }
+
+                  if (primaryMatch && secondaryMatch) {
+                    pickupRule = rule;
+                    break;
+                  }
+                }
+
+                // Add PICKUP payroll item
+                if (pickupRule) {
+                  const payCode = allPayCodesMap[pickupRule.pay_code_id];
+                  const rate = payCode ? parseFloat(payCode.rate_biasa) || 0 : 0;
+                  combinedItems.push({
+                    pay_code_id: pickupRule.pay_code_id,
+                    description: payCode?.description || pickupRule.description || pickupRule.pay_code_id,
+                    pay_type: "Tambahan",
+                    rate: rate,
+                    rate_unit: "Trip",
+                    quantity: 1,
+                    amount: rate,
+                    job_type: "DRIVER",
+                    source_employee_id: employeeId,
+                    is_manual: false,
+                    rental_id: rental.rental_id,
+                    source_type: "PICKUP",
+                  });
+                }
+              }
+
+              // Add rental addons
+              const addons = addonsByRental[rental.rental_id] || [];
+              for (const addon of addons) {
+                const addonAmount = parseFloat(addon.amount) * parseFloat(addon.quantity);
+                combinedItems.push({
+                  pay_code_id: addon.pay_code_id,
+                  description: addon.display_name || addon.pay_code_description || addon.pay_code_id,
+                  pay_type: "Tambahan",
+                  rate: parseFloat(addon.amount),
+                  rate_unit: "Fixed",
+                  quantity: parseFloat(addon.quantity),
+                  amount: Math.round(addonAmount * 100) / 100,
+                  job_type: "DRIVER",
+                  source_employee_id: employeeId,
+                  is_manual: false,
+                  rental_id: rental.rental_id,
+                  source_type: "ADDON",
+                });
+              }
             }
 
             // Also check for base salary pay code for drivers
+            const driverPayCodes = jobPayCodesMap["DRIVER"] || [];
             const baseSalaryCode = driverPayCodes.find(
               (pc) => pc.pay_type === "Base" && pc.rate_unit === "Month"
             );

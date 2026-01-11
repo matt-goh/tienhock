@@ -14,6 +14,7 @@ import {
   IconRefresh,
   IconAlertTriangle,
   IconClock,
+  IconUpload,
 } from "@tabler/icons-react";
 import { API_BASE_URL, DB_NAME } from "../configs/config";
 import toast from "react-hot-toast";
@@ -51,6 +52,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const [hasScrollbar, setHasScrollbar] = useState(false);
   const tableBodyRef = useRef<HTMLDivElement>(null);
   const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Reset backup name when modal closes
   useEffect(() => {
@@ -114,11 +117,14 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
 
         setRestorePhase("COOLDOWN");
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        toast.success("Database restored successfully!");
+        toast.success(
+          uploading ? "SQL imported successfully!" : "Database restored successfully!"
+        );
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         setRestorePhase(null);
         setRestoring(false);
+        setUploading(false);
         onClose();
         window.location.reload();
 
@@ -143,9 +149,10 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       }
       setRestorePhase(null);
       setRestoring(false);
+      setUploading(false);
       return false;
     }
-  }, [statusCheckInterval, onClose]);
+  }, [statusCheckInterval, onClose, uploading]);
 
   const handleCreateBackup = async () => {
     try {
@@ -268,6 +275,40 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleUploadSql = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      setError(null);
+
+      // Read file as text
+      const sqlContent = await file.text();
+
+      // Send to backend
+      await api.post("/api/backup/upload-sql", { sqlContent });
+
+      // Start polling for status (reuse existing restore status polling)
+      const interval = setInterval(() => {
+        checkRestoreStatus();
+      }, 2000);
+      setStatusCheckInterval(interval);
+    } catch (error: any) {
+      console.error("SQL upload failed:", error);
+      setError("Failed to upload SQL file. Please try again.");
+      toast.error("Failed to upload SQL file.");
+      setUploading(false);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, "0");
@@ -318,7 +359,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
         <Dialog
           className="fixed inset-0 z-50 overflow-y-auto"
           open={isOpen}
-          onClose={restoring ? () => {} : onClose}
+          onClose={restoring || uploading ? () => {} : onClose}
         >
           <div className="min-h-screen px-4 text-center">
             <TransitionChild
@@ -374,18 +415,39 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 )}
 
+                {/* Hidden file input for SQL upload */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleUploadSql}
+                  accept=".sql"
+                  className="hidden"
+                />
+
                 {/* Action Buttons */}
                 <div className="mt-4">
                   <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center space-x-2">
                       {!showBackupNameInput ? (
-                        <Button
-                          onClick={() => setShowBackupNameInput(true)}
-                          disabled={loading || restoring}
-                          icon={IconDatabasePlus}
-                        >
-                          Create New Backup
-                        </Button>
+                        <>
+                          <Button
+                            onClick={() => setShowBackupNameInput(true)}
+                            disabled={loading || restoring || uploading}
+                            icon={IconDatabasePlus}
+                          >
+                            Create New Backup
+                          </Button>
+                          {NODE_ENV === "development" && (
+                            <Button
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={loading || restoring || uploading}
+                              variant="outline"
+                              icon={IconUpload}
+                            >
+                              Upload SQL
+                            </Button>
+                          )}
+                        </>
                       ) : (
                         <div className="flex items-center space-x-2">
                           <input
@@ -573,13 +635,13 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
                 {/* Full Modal Loading Overlay */}
-                {restoring && (
+                {(restoring || uploading) && (
                   <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-50">
                     <div className="flex flex-col items-center space-y-3 p-6 rounded-lg text-center">
                       <LoadingSpinner size="lg" hideText />
                       <div className="space-y-2">
                         <h3 className="text-lg font-medium text-default-900 dark:text-gray-100">
-                          Restoring Database
+                          {uploading ? "Importing SQL" : "Restoring Database"}
                         </h3>
                         <p className="text-default-600 dark:text-gray-300">
                           {restorePhase === "INITIALIZATION"
@@ -587,11 +649,15 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                             : restorePhase === "CLEANUP"
                             ? "Cleaning up existing data..."
                             : restorePhase === "DATABASE_RESTORE"
-                            ? "Restoring database from backup..."
+                            ? uploading
+                              ? "Importing SQL file..."
+                              : "Restoring database from backup..."
                             : restorePhase === "SESSION_RESTORE"
                             ? "Restoring active sessions..."
                             : restorePhase === "COOLDOWN"
                             ? "Finalizing restore process..."
+                            : uploading
+                            ? "Please wait while the SQL is being imported"
                             : "Please wait while the database is being restored"}
                         </p>
                         <p className="text-sm text-default-500 dark:text-gray-400">

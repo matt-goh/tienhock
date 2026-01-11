@@ -27,6 +27,7 @@ import GTPayrollPage from "./GreenTarget/Payroll/GTPayrollPage";
 import GTMonthlyLogEntryPage from "./GreenTarget/Payroll/GTMonthlyLogEntryPage";
 import DriverTripEntryPage from "./GreenTarget/Payroll/DriverTripEntryPage";
 import GTPayrollDetailsPage from "./GreenTarget/Payroll/GTPayrollDetailsPage";
+import PayrollRulesPage from "./GreenTarget/Payroll/PayrollRulesPage";
 
 export const GreenTargetNavData: SidebarItem[] = [
   {
@@ -111,6 +112,12 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Payroll Details",
         path: "/payroll/details/:id",
         component: GTPayrollDetailsPage,
+      },
+      {
+        name: "Payroll Settings",
+        path: "/payroll/settings",
+        component: PayrollRulesPage,
+        showInPopover: true,
       },
     ],
   },

@@ -44,6 +44,7 @@ import ledgerTypesRouter from "./accounting/ledger-types.js";
 import journalEntriesRouter from "./accounting/journal-entries.js";
 import journalVouchersRouter from "./accounting/journal-vouchers.js";
 import financialReportsRouter from "./accounting/financial-reports.js";
+import materialsRouter from "./accounting/materials.js";
 
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
@@ -82,6 +83,9 @@ import greenTargetMonthlyPayrollsRouter from "./greentarget/monthly-payrolls.js"
 import greenTargetMonthlyWorkLogsRouter from "./greentarget/monthly-work-logs.js";
 import greenTargetDriverTripsRouter from "./greentarget/driver-trips.js";
 import greenTargetEmployeePayrollsRouter from "./greentarget/employee-payrolls.js";
+import greenTargetPickupDestinationsRouter from "./greentarget/pickup-destinations.js";
+import greenTargetPayrollRulesRouter from "./greentarget/payroll-rules.js";
+import greenTargetRentalAddonsRouter from "./greentarget/rental-addons.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -162,6 +166,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/journal-entries", journalEntriesRouter(pool));
   app.use("/api/journal-vouchers", journalVouchersRouter(pool));
   app.use("/api/financial-reports", financialReportsRouter(pool));
+  app.use("/api/materials", materialsRouter(pool));
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
@@ -217,6 +222,18 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/employee-payrolls",
     greenTargetEmployeePayrollsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/pickup-destinations",
+    greenTargetPickupDestinationsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/payroll-rules",
+    greenTargetPayrollRulesRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/rental-addons",
+    greenTargetRentalAddonsRouter(pool)
   );
 
   // Jellypolly routes
