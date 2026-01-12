@@ -20,7 +20,8 @@ export function calculateActivityAmount(
   hours: number = 0,
   contextData: Record<string, any> = {},
   locationType?: "Local" | "Outstation",
-  logDate?: string
+  logDate?: string,
+  forceOTHours: number = 0
 ): number {
   if (!activity.isSelected) return 0;
 
@@ -38,10 +39,11 @@ export function calculateActivityAmount(
           // Monthly entry: use the explicitly provided overtime hours
           calculatedAmount = multiplyMoney(activity.rate, activity.hoursApplied);
         } else {
-          // Daily entry: calculate overtime based on day-specific threshold
+          // Daily entry: calculate overtime based on day-specific threshold + forceOT
           const overtimeThreshold = getOvertimeThreshold(logDate);
-          const overtimeHours = Math.max(0, hours - overtimeThreshold);
-          calculatedAmount = multiplyMoney(activity.rate, overtimeHours);
+          const naturalOvertimeHours = Math.max(0, hours - overtimeThreshold);
+          const totalOvertimeHours = naturalOvertimeHours + forceOTHours;
+          calculatedAmount = multiplyMoney(activity.rate, totalOvertimeHours);
         }
       } else {
         // Non-OT pay codes
@@ -111,7 +113,8 @@ export function calculateActivitiesAmounts(
   hours: number = 0,
   contextData: Record<string, any> = {},
   locationType?: "Local" | "Outstation",
-  logDate?: string
+  logDate?: string,
+  forceOTHours: number = 0
 ): any[] {
   return activities.map((activity) => {
     const calculatedAmount = calculateActivityAmount(
@@ -119,7 +122,8 @@ export function calculateActivitiesAmounts(
       hours,
       contextData,
       locationType,
-      logDate
+      logDate,
+      forceOTHours
     );
 
     // Auto-deselect zero amount activities unless they are context-linked or special types

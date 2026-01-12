@@ -145,9 +145,10 @@ export default function (pool) {
 
       // Get employee entries with job information
       const entriesQuery = `
-      SELECT 
+      SELECT
         dwle.*,
         CAST(dwle.total_hours AS NUMERIC(10, 2)) as total_hours,
+        CAST(COALESCE(dwle.force_ot_hours, 0) AS NUMERIC(4, 2)) as force_ot_hours,
         s.name as employee_name,
         j.name as job_name,
         fs.name as following_salesman_name
@@ -183,6 +184,7 @@ export default function (pool) {
           return {
             ...entry,
             total_hours: parseFloat(entry.total_hours),
+            force_ot_hours: parseFloat(entry.force_ot_hours || 0),
             activities: activitiesResult.rows.map((activity) => ({
               ...activity,
               hours_applied: activity.hours_applied
@@ -312,8 +314,9 @@ export default function (pool) {
           const entryQuery = `
           INSERT INTO daily_work_log_entries (
             work_log_id, employee_id, job_id, total_hours,
-            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled,
+            force_ot_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING id
         `;
 
@@ -327,6 +330,7 @@ export default function (pool) {
             entry.muatBihunBags || 0,
             entry.locationType || "Local",
             entry.isDoubled || false,
+            entry.forceOTHours || 0,
           ]);
 
           const entryId = entryResult.rows[0].id;
@@ -335,13 +339,15 @@ export default function (pool) {
           if (activities && activities.length > 0) {
             // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
             const overtimeThreshold = getOvertimeThreshold(logDate);
+            const forceOT = entry.forceOTHours || 0;
 
             for (const activity of activities) {
               if (activity.isSelected) {
                 let hoursApplied = null;
                 if (activity.rateUnit === "Hour") {
                   if (activity.payType === "Overtime") {
-                    hoursApplied = Math.max(0, hours - overtimeThreshold);
+                    // Total OT = natural OT + forced OT
+                    hoursApplied = Math.max(0, hours - overtimeThreshold) + forceOT;
                   } else {
                     hoursApplied = hours;
                   }
@@ -582,8 +588,9 @@ export default function (pool) {
           const entryQuery = `
           INSERT INTO daily_work_log_entries (
             work_log_id, employee_id, job_id, total_hours,
-            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled,
+            force_ot_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING id
         `;
 
@@ -597,6 +604,7 @@ export default function (pool) {
             entry.muatBihunBags || 0,
             entry.locationType || "Local",
             entry.isDoubled || false,
+            entry.forceOTHours || 0,
           ]);
 
           const entryId = entryResult.rows[0].id;
@@ -605,13 +613,15 @@ export default function (pool) {
           if (activities && activities.length > 0) {
             // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
             const overtimeThreshold = getOvertimeThreshold(logDate);
+            const forceOT = entry.forceOTHours || 0;
 
             for (const activity of activities) {
               if (activity.isSelected) {
                 let hoursApplied = null;
                 if (activity.rateUnit === "Hour") {
                   if (activity.payType === "Overtime") {
-                    hoursApplied = Math.max(0, hours - overtimeThreshold);
+                    // Total OT = natural OT + forced OT
+                    hoursApplied = Math.max(0, hours - overtimeThreshold) + forceOT;
                   } else {
                     hoursApplied = hours;
                   }
