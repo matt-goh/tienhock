@@ -148,14 +148,14 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
     if (doc.longId) {
       return {
         statusText: "Valid",
-        statusColorClass: "text-emerald-600",
+        statusColorClass: "text-emerald-600 dark:text-emerald-400",
         Icon: IconCheck,
       };
     } else {
       // If no longId, it's pending regardless of doc.status ('Submitted' etc)
       return {
         statusText: "Pending Validation",
-        statusColorClass: "text-sky-600",
+        statusColorClass: "text-sky-600 dark:text-sky-400",
         Icon: IconClockHour4,
       };
     }
@@ -168,19 +168,19 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
       case "valid":
         return {
           text: "Valid",
-          color: "text-emerald-600",
+          color: "text-emerald-600 dark:text-emerald-400",
           Icon: IconRefresh,
         };
       case "invalid":
         return {
           text: "Invalid",
-          color: "text-red-600",
+          color: "text-red-600 dark:text-red-400",
           Icon: IconAlertTriangle,
         };
       default:
         return {
           text: item.status || "Unknown",
-          color: "text-gray-500",
+          color: "text-gray-500 dark:text-gray-400",
           Icon: IconInfoCircle,
         };
     }
@@ -188,16 +188,16 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 transition-opacity duration-300 ease-out">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-scale">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in-scale">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-default-200">
-          <h2 className="text-lg font-semibold text-default-900">
+        <div className="flex items-center justify-between p-4 border-b border-default-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
             e-Invoice Submission
           </h2>
           {!isLoading && (
             <button
               onClick={onClose}
-              className="text-default-500 hover:text-default-800 hover:bg-default-100 rounded-full p-1 transition-all"
+              className="text-default-500 hover:text-default-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 rounded-full p-1 transition-all"
               aria-label="Close modal"
             >
               <IconX size={22} />
@@ -206,14 +206,14 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-grow bg-default-50/50">
+        <div className="p-6 overflow-y-auto flex-grow bg-default-50/50 dark:bg-gray-900/50">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="h-10 w-10 border-4 border-t-sky-500 border-sky-100 rounded-full animate-spin mb-5"></div>
-              <p className="text-default-700 text-lg font-medium">
+              <div className="h-10 w-10 border-4 border-t-sky-500 border-sky-100 dark:border-sky-900 rounded-full animate-spin mb-5"></div>
+              <p className="text-default-700 dark:text-gray-200 text-lg font-medium">
                 Processing Submission
               </p>
-              <p className="text-default-500 text-sm">
+              <p className="text-default-500 dark:text-gray-400 text-sm">
                 Please wait a moment...
               </p>
             </div>
@@ -241,7 +241,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                     </p>
                   )}
                   {results.submissionUid && (
-                    <p className="text-xs text-gray-500 mt-1 font-mono">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
                       Submission UID: {results.submissionUid}
                     </p>
                   )}
@@ -251,13 +251,13 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
               {/* ----- Conditional Rendering for Pending Update Response ----- */}
               {
                 isPendingUpdateResponse ? (
-                  <div className="bg-white border border-default-200 rounded-lg shadow-sm overflow-hidden">
-                    <div className="px-4 py-3 border-b border-default-200 bg-default-50">
-                      <h3 className="text-base font-semibold text-default-700">
+                  <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-700/50">
+                      <h3 className="text-base font-semibold text-default-700 dark:text-gray-200">
                         Pending Invoice Status Updates
                       </h3>
                     </div>
-                    <div className="divide-y divide-default-200 max-h-[calc(90vh-300px)] overflow-y-auto">
+                    <div className="divide-y divide-default-200 dark:divide-gray-700 max-h-[calc(90vh-300px)] overflow-y-auto">
                       {/* Updated Pending Invoices */}
                       {pendingUpdated.map((item) => {
                         const statusInfo = getPendingUpdateStatusInfo(item);
@@ -265,7 +265,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                         return (
                           <div
                             key={item.id}
-                            className="px-4 py-3 hover:bg-default-50/70 transition-colors duration-150"
+                            className="px-4 py-3 hover:bg-default-50/70 dark:hover:bg-gray-700/50 transition-colors duration-150"
                           >
                             <div className="flex items-center">
                               <div className="flex-shrink-0 mr-3">
@@ -276,7 +276,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-baseline">
-                                  <p className="font-medium text-default-800 truncate pr-2">
+                                  <p className="font-medium text-default-800 dark:text-gray-200 truncate pr-2">
                                     #{item.id}
                                   </p>
                                   <p
@@ -286,7 +286,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                   </p>
                                 </div>
                                 {item.longId && (
-                                  <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
+                                  <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5 font-mono truncate">
                                     Long ID: {item.longId}
                                   </p>
                                 )}
@@ -299,25 +299,25 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                       {pendingFailed.map((item) => (
                         <div
                           key={item.id}
-                          className="px-4 py-3 bg-rose-50/50 hover:bg-rose-50/80 transition-colors duration-150"
+                          className="px-4 py-3 bg-rose-50/50 dark:bg-rose-900/20 hover:bg-rose-50/80 dark:hover:bg-rose-900/30 transition-colors duration-150"
                         >
                           <div className="flex items-center">
                             <div className="flex-shrink-0 mr-3">
                               <IconRefreshAlert
                                 size={20}
-                                className="text-rose-600"
+                                className="text-rose-600 dark:text-rose-400"
                               />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-baseline">
-                                <p className="font-medium text-default-800 truncate pr-2">
+                                <p className="font-medium text-default-800 dark:text-gray-200 truncate pr-2">
                                   #{item.id}
                                 </p>
-                                <p className="text-sm font-medium text-rose-600 flex-shrink-0">
+                                <p className="text-sm font-medium text-rose-600 dark:text-rose-400 flex-shrink-0">
                                   Update Check Failed
                                 </p>
                               </div>
-                              <p className="text-xs text-rose-700 mt-0.5 truncate">
+                              <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5 truncate">
                                 Error: {item.error}
                               </p>
                             </div>
@@ -332,39 +332,39 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                     {/* ----- Summary Section (Adjusted logic for pending) ----- */}
                     {stats.totalDocuments > 0 && (
                       <div>
-                        <h3 className="text-base font-medium text-default-600 mb-3">
+                        <h3 className="text-base font-medium text-default-600 dark:text-gray-300 mb-3">
                           Document Summary
                         </h3>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                          <div className="bg-default-100 p-3 rounded-lg border border-default-200 text-center">
-                            <div className="text-xl font-bold text-default-800">
+                          <div className="bg-default-100 dark:bg-gray-700 p-3 rounded-lg border border-default-200 dark:border-gray-600 text-center">
+                            <div className="text-xl font-bold text-default-800 dark:text-gray-100">
                               {stats.totalDocuments}
                             </div>
-                            <div className="text-xs font-medium text-default-500 uppercase tracking-wide mt-1">
+                            <div className="text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wide mt-1">
                               Total
                             </div>
                           </div>
-                          <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-center">
-                            <div className="text-xl font-bold text-emerald-700">
+                          <div className="bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 text-center">
+                            <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
                               {stats.valid}
                             </div>
-                            <div className="text-xs font-medium text-emerald-600 uppercase tracking-wide mt-1">
+                            <div className="text-xs font-medium text-emerald-600 dark:text-emerald-500 uppercase tracking-wide mt-1">
                               Valid
                             </div>
                           </div>
-                          <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 text-center">
-                            <div className="text-xl font-bold text-sky-700">
+                          <div className="bg-sky-50 dark:bg-sky-900/30 p-3 rounded-lg border border-sky-200 dark:border-sky-700 text-center">
+                            <div className="text-xl font-bold text-sky-700 dark:text-sky-400">
                               {stats.pending}
                             </div>
-                            <div className="text-xs font-medium text-sky-600 uppercase tracking-wide mt-1">
+                            <div className="text-xs font-medium text-sky-600 dark:text-sky-500 uppercase tracking-wide mt-1">
                               Pending
                             </div>
                           </div>
-                          <div className="bg-rose-50 p-3 rounded-lg border border-rose-200 text-center">
-                            <div className="text-xl font-bold text-rose-700">
+                          <div className="bg-rose-50 dark:bg-rose-900/30 p-3 rounded-lg border border-rose-200 dark:border-rose-700 text-center">
+                            <div className="text-xl font-bold text-rose-700 dark:text-rose-400">
                               {stats.rejected}
                             </div>
-                            <div className="text-xs font-medium text-rose-600 uppercase tracking-wide mt-1">
+                            <div className="text-xs font-medium text-rose-600 dark:text-rose-500 uppercase tracking-wide mt-1">
                               Rejected
                             </div>
                           </div>
@@ -374,13 +374,13 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
 
                     {/* ----- Document list (Adjusted status display) ----- */}
                     {stats.totalDocuments > 0 ? (
-                      <div className="bg-white border border-default-200 rounded-lg shadow-sm overflow-hidden">
-                        <div className="px-4 py-3 border-b border-default-200 bg-default-50">
-                          <h3 className="text-base font-semibold text-default-700">
+                      <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-700/50">
+                          <h3 className="text-base font-semibold text-default-700 dark:text-gray-200">
                             Document Details
                           </h3>
                         </div>
-                        <div className="divide-y divide-default-200 max-h-[calc(90vh-450px)] overflow-y-auto">
+                        <div className="divide-y divide-default-200 dark:divide-gray-700 max-h-[calc(90vh-450px)] overflow-y-auto">
                           {/* Accepted Documents (Handles Pending) */}
                           {acceptedDocs.map((doc) => {
                             const { statusText, statusColorClass, Icon } =
@@ -388,7 +388,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                             return (
                               <div
                                 key={doc.internalId}
-                                className="px-4 py-3 hover:bg-default-50/70 transition-colors duration-150"
+                                className="px-4 py-3 hover:bg-default-50/70 dark:hover:bg-gray-700/50 transition-colors duration-150"
                               >
                                 <div className="flex items-center">
                                   <div className="flex-shrink-0 mr-3">
@@ -399,7 +399,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline">
-                                      <p className="font-medium text-default-800 truncate pr-2">
+                                      <p className="font-medium text-default-800 dark:text-gray-200 truncate pr-2">
                                         #{doc.internalId}
                                       </p>
                                       <p
@@ -409,12 +409,12 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                       </p>
                                     </div>
                                     {doc.uuid && (
-                                      <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
+                                      <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5 font-mono truncate">
                                         UUID: {doc.uuid}
                                       </p>
                                     )}
                                     {doc.longId && (
-                                      <p className="text-xs text-default-500 mt-0.5 font-mono truncate">
+                                      <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5 font-mono truncate">
                                         Long ID: {doc.longId}
                                       </p>
                                     )}
@@ -427,37 +427,37 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                           {rejectedDocs.map((doc) => (
                             <div
                               key={doc.internalId}
-                              className="px-4 py-3 bg-rose-50/50 hover:bg-rose-50/80 transition-colors duration-150"
+                              className="px-4 py-3 bg-rose-50/50 dark:bg-rose-900/20 hover:bg-rose-50/80 dark:hover:bg-rose-900/30 transition-colors duration-150"
                             >
                               <div className="flex items-start">
                                 <div className="flex-shrink-0 mr-3 mt-0.5">
                                   <IconAlertTriangle
                                     size={20}
-                                    className="text-rose-600"
+                                    className="text-rose-600 dark:text-rose-400"
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex justify-between items-baseline">
-                                    <p className="font-medium text-default-800 truncate pr-2">
+                                    <p className="font-medium text-default-800 dark:text-gray-200 truncate pr-2">
                                       #{doc.internalId}
                                     </p>
-                                    <p className="text-sm font-medium text-rose-600 flex-shrink-0">
+                                    <p className="text-sm font-medium text-rose-600 dark:text-rose-400 flex-shrink-0">
                                       Rejected
                                     </p>
                                   </div>
-                                  <p className="text-sm text-rose-700 mt-1 font-medium">
+                                  <p className="text-sm text-rose-700 dark:text-rose-300 mt-1 font-medium">
                                     {doc.error?.message ||
                                       "Rejection reason not specified"}
                                   </p>
                                   {doc.error?.details &&
                                     doc.error.details.length > 0 && (
-                                      <div className="mt-1.5 space-y-1 border-l-2 border-rose-200 pl-2">
+                                      <div className="mt-1.5 space-y-1 border-l-2 border-rose-200 dark:border-rose-700 pl-2">
                                         {doc.error.details
                                           .slice(0, 5)
                                           .map((detail, idx) => (
                                             <p
                                               key={idx}
-                                              className="text-xs text-rose-600"
+                                              className="text-xs text-rose-600 dark:text-rose-400"
                                             >
                                               • {detail.message}{" "}
                                               {detail.target &&
@@ -465,7 +465,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                                             </p>
                                           ))}
                                         {doc.error.details.length > 5 && (
-                                          <p className="text-xs text-default-500 italic mt-1">
+                                          <p className="text-xs text-default-500 dark:text-gray-400 italic mt-1">
                                             ({doc.error.details.length - 5} more
                                             issue
                                             {doc.error.details.length - 5 > 1
@@ -483,7 +483,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-default-500">
+                      <div className="text-center py-6 text-default-500 dark:text-gray-400">
                         No documents were found in the submission results.
                       </div>
                     )}
@@ -505,7 +505,7 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
 
         {/* Footer */}
         {!isLoading && (
-          <div className="p-4 border-t border-default-200 bg-white">
+          <div className="p-4 border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <Button onClick={onClose} className="w-full justify-center py-2.5">
               Done
             </Button>
