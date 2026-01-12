@@ -58,6 +58,7 @@ interface ManageActivitiesModalProps {
   onNavigateAttempt?: (to: string) => void;
   logDate?: string;
   isDoubled?: boolean;
+  forceOTHours?: number;
 }
 
 // Paycodes that are doubled when x2 is active for SALESMAN_IKUT (for visual indicator)
@@ -110,6 +111,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   onNavigateAttempt = () => {},
   logDate,
   isDoubled = false,
+  forceOTHours = 0,
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
@@ -189,7 +191,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             (isSalesman || isSalesmanIkut) ? 0 : employeeHours,
             contextData,
             locationType,
-            logDate
+            logDate,
+            forceOTHours
           );
 
           const finalActivities = isSalesmanIkut
@@ -219,6 +222,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     jobConfig,
     salesmanProducts,
     logDate,
+    forceOTHours,
   ]);
 
   // Toggle selection (move between columns)
@@ -233,7 +237,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity.hoursApplied || employeeHours,
         contextData,
         locationType,
-        logDate
+        logDate,
+        forceOTHours
       )
     }));
 
@@ -255,7 +260,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
         contextData,
         locationType,
-        logDate
+        logDate,
+        forceOTHours
       )
     }));
 
@@ -277,7 +283,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
         contextData,
         locationType,
-        logDate
+        logDate,
+        forceOTHours
       )
     }));
 
