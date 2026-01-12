@@ -56,14 +56,34 @@ export default function NavbarMenu({
     setOpenDropdown(name);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (name: string) => {
+    // Only set close timeout if we're leaving the currently open dropdown
+    // This prevents closing dropdown B when leaving dropdown A's area
     hoverTimeoutRef.current = setTimeout(() => {
-      setOpenDropdown(null);
+      setOpenDropdown((current) => (current === name ? null : current));
     }, 150);
   };
 
   const handleButtonClick = (name: string) => {
     setOpenDropdown(openDropdown === name ? null : name);
+  };
+
+  const handleButtonMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    // Only close dropdowns if user hovers and stays on the link button
+    // This prevents closing when just passing through to another dropdown
+    hoverTimeoutRef.current = setTimeout(() => {
+      setOpenDropdown(null);
+    }, 100);
+  };
+
+  const handleButtonMouseLeave = () => {
+    // If leaving the link button before the timeout fires, cancel it
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
   };
 
   const handleItemClick = () => {
@@ -97,7 +117,7 @@ export default function NavbarMenu({
           key={item.name}
           className="relative"
           onMouseEnter={() => handleMouseEnter(item.name)}
-          onMouseLeave={handleMouseLeave}
+          onMouseLeave={() => handleMouseLeave(item.name)}
         >
           <button
             ref={buttonRef}
@@ -132,7 +152,7 @@ export default function NavbarMenu({
             onBookmarkUpdate={onBookmarkUpdate}
             showBookmarkIcon={showBookmarkIcon}
             onMouseEnter={() => handleMouseEnter(item.name)}
-            onMouseLeave={handleMouseLeave}
+            onMouseLeave={() => handleMouseLeave(item.name)}
           />
         </div>
       );
@@ -145,6 +165,8 @@ export default function NavbarMenu({
           key={item.name}
           to={item.path}
           onClick={() => onNavigate?.()}
+          onMouseEnter={handleButtonMouseEnter}
+          onMouseLeave={handleButtonMouseLeave}
           className={`
             flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium
             transition-colors duration-150

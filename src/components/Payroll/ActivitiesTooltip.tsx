@@ -267,9 +267,13 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                         (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") && (
                           <span
                             className="text-amber-600 dark:text-amber-400 truncate"
-                            title={`(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
+                            title={activity.payCodeId === "BH_OT_STIM"
+                              ? "JAGA STIM (OT)"
+                              : `(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
                           >
-                            (Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
+                            {activity.payCodeId === "BH_OT_STIM"
+                              ? "JAGA STIM"
+                              : `(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
                           </span>
                         )}
                     </div>

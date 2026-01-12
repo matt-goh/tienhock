@@ -145,12 +145,32 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   >({});
   // State for BIHUN_SANGKUT tray counts (only used for BIHUN jobType)
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
-  // State for Force OT hours (only used for BIHUN jobType)
+  // State for JAGA STIM (OT) hours - only applies to BH_OT_STIM paycode (only used for BIHUN jobType)
   const [forceOTHours, setForceOTHours] = useState<Record<string, number>>({});
-  // State for Sunday Cleaning Mode (only for BIHUN and BOILER on AHAD days)
+  // State for Cleaning Mode (for BIHUN and BOILER on BIASA and AHAD days)
   const [isCleaningMode, setIsCleaningMode] = useState(false);
-  // State for HARI_AHAD_JAM paycode data (fetched when cleaning mode is enabled)
+  // State for HARI_AHAD_JAM paycode data (fetched when cleaning mode is enabled on Ahad)
   const [cleaningPayCode, setCleaningPayCode] = useState<{
+    id: string;
+    description: string;
+    pay_type: string;
+    rate_unit: string;
+    rate_biasa: number;
+    rate_ahad: number;
+    rate_umum: number;
+  } | null>(null);
+  // State for HARI_BIASA_JAM paycode data (fetched when cleaning mode is enabled on Biasa)
+  const [cleaningPayCodeBiasa, setCleaningPayCodeBiasa] = useState<{
+    id: string;
+    description: string;
+    pay_type: string;
+    rate_unit: string;
+    rate_biasa: number;
+    rate_ahad: number;
+    rate_umum: number;
+  } | null>(null);
+  // State for OT_A paycode data (for cleaning mode overtime hours)
+  const [cleaningOTPayCode, setCleaningOTPayCode] = useState<{
     id: string;
     description: string;
     pay_type: string;
@@ -170,6 +190,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Constant for the BHANGKUT paycode ID (for BIHUN_SANGKUT tray linking)
   const BHANGKUT_PAYCODE = "BHANGKUT";
+  // Constant for the BH_OT_STIM paycode ID (for JAGA STIM forced OT)
+  const BH_OT_STIM_PAYCODE = "BH_OT_STIM";
 
   // Check if current page is BIHUN production (for conditionally showing Tray column)
   const isBihunPage = jobType === "BIHUN";
@@ -227,9 +249,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     };
   });
 
-  // Show cleaning mode toggle only for BIHUN and BOILER on AHAD (Sunday) days
+  // Show cleaning mode toggle for BIHUN and BOILER on BIASA and AHAD days (not on UMUM)
   const showCleaningModeToggle = useMemo(() => {
-    return (jobType === "BIHUN" || jobType === "BOILER") && formData.dayType === "Ahad";
+    return (jobType === "BIHUN" || jobType === "BOILER") &&
+           (formData.dayType === "Ahad" || formData.dayType === "Biasa");
   }, [jobType, formData.dayType]);
 
   const {
@@ -439,20 +462,53 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [formData.dayType]);
 
-  // Reset cleaning mode when day type changes from Ahad to non-Ahad
+  // Reset cleaning mode when day type changes to Umum (cleaning not typical on holidays)
   useEffect(() => {
-    if (formData.dayType !== "Ahad" && isCleaningMode) {
+    if (formData.dayType === "Umum" && isCleaningMode) {
       setIsCleaningMode(false);
     }
   }, [formData.dayType, isCleaningMode]);
 
-  // Fetch HARI_AHAD_JAM paycode proactively when the toggle could appear
-  // This ensures the paycode is ready when the user toggles cleaning mode
+  // Fetch cleaning paycodes proactively when the toggle could appear
+  // HARI_AHAD_JAM for Ahad days, HARI_BIASA_JAM for Biasa days
   useEffect(() => {
-    if (showCleaningModeToggle && !cleaningPayCode) {
-      api.get("/api/pay-codes/HARI_AHAD_JAM")
-        .then((res: any) => {
+    if (showCleaningModeToggle && (!cleaningPayCode || !cleaningOTPayCode)) {
+      Promise.all([
+        api.get("/api/pay-codes/HARI_AHAD_JAM"),
+        api.get("/api/pay-codes/OT_A")
+      ])
+        .then(([hariAhadRes, otARes]: [any, any]) => {
           setCleaningPayCode({
+            id: hariAhadRes.id,
+            description: hariAhadRes.description,
+            pay_type: hariAhadRes.pay_type,
+            rate_unit: hariAhadRes.rate_unit,
+            rate_biasa: parseFloat(hariAhadRes.rate_biasa) || 0,
+            rate_ahad: parseFloat(hariAhadRes.rate_ahad) || 0,
+            rate_umum: parseFloat(hariAhadRes.rate_umum) || 0,
+          });
+          setCleaningOTPayCode({
+            id: otARes.id,
+            description: otARes.description,
+            pay_type: otARes.pay_type,
+            rate_unit: otARes.rate_unit,
+            rate_biasa: parseFloat(otARes.rate_biasa) || 0,
+            rate_ahad: parseFloat(otARes.rate_ahad) || 0,
+            rate_umum: parseFloat(otARes.rate_umum) || 0,
+          });
+        })
+        .catch(() => {
+          // Silently fail - will show error when user tries to toggle
+        });
+    }
+  }, [showCleaningModeToggle, cleaningPayCode, cleaningOTPayCode]);
+
+  // Fetch HARI_BIASA_JAM paycode for cleaning mode on Biasa days
+  useEffect(() => {
+    if (showCleaningModeToggle && !cleaningPayCodeBiasa) {
+      api.get("/api/pay-codes/HARI_BIASA_JAM")
+        .then((res: any) => {
+          setCleaningPayCodeBiasa({
             id: res.id,
             description: res.description,
             pay_type: res.pay_type,
@@ -463,16 +519,23 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           });
         })
         .catch(() => {
-          // Silently fail - will show error when user tries to toggle
+          // Silently fail - will show error when user tries to toggle on Biasa day
         });
     }
-  }, [showCleaningModeToggle, cleaningPayCode]);
+  }, [showCleaningModeToggle, cleaningPayCodeBiasa]);
 
-  // Handle toggle when paycode is not available
+  // Handle toggle when paycodes are not available
   const handleCleaningModeToggle = () => {
-    if (!isCleaningMode && !cleaningPayCode) {
-      toast.error("HARI_AHAD_JAM paycode not found. Please create it first.");
-      return;
+    if (!isCleaningMode) {
+      // Check for the appropriate paycode based on day type
+      if (formData.dayType === "Ahad" && (!cleaningPayCode || !cleaningOTPayCode)) {
+        toast.error("Required paycodes (HARI_AHAD_JAM, OT_A) not found. Please create them first.");
+        return;
+      }
+      if (formData.dayType === "Biasa" && !cleaningPayCodeBiasa) {
+        toast.error("HARI_BIASA_JAM paycode not found. Please create it first.");
+        return;
+      }
     }
     setIsCleaningMode(!isCleaningMode);
   };
@@ -518,7 +581,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trayCounts, isInitializationComplete, isBihunPage]);
 
-  // Update OT activities when forceOTHours changes (BIHUN only)
+  // Update BH_OT_STIM activity when forceOTHours changes (BIHUN only)
+  // Only BH_OT_STIM paycode uses the JAGA STIM (OT) forced overtime hours
   useEffect(() => {
     if (!isInitializationComplete || !isBihunPage) return;
 
@@ -535,7 +599,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           let hasChanges = false;
 
           const updatedActivities = activities.map((activity) => {
-            if (activity.payType === "Overtime" && activity.rateUnit === "Hour") {
+            // Only apply forced OT hours to BH_OT_STIM paycode
+            if (activity.payCodeId === BH_OT_STIM_PAYCODE) {
               const newAmount = totalOT * (activity.rate || 0);
               const newSelected = totalOT > 0;
               if (
@@ -1309,7 +1374,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }));
   };
 
-  // Handle Force OT hours changes (BIHUN only)
+  // Handle JAGA STIM (OT) hours changes (BIHUN only - applies only to BH_OT_STIM paycode)
   const handleForceOTChange = (rowKey: string, value: string) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
     setForceOTHours((prev) => ({
@@ -1749,6 +1814,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     existingWorkLog,
     isCleaningMode,
     cleaningPayCode,
+    cleaningPayCodeBiasa,
+    cleaningOTPayCode,
     forceOTHours,
   ]);
 
@@ -1796,26 +1863,62 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Convert map back to array
           let mergedPayCodes = Array.from(allPayCodes.values());
 
-          // In cleaning mode (BIHUN/BOILER on Sunday), override with only HARI_AHAD_JAM paycode
-          // Use component-level jobType prop (not the loop variable empJobType)
-          // Same rate applies for all hours (regular + OT), so use single paycode with hoursApplied
-          if (isCleaningMode && cleaningPayCode && (jobType === "BIHUN" || jobType === "BOILER")) {
-            const cleaningActivity = {
-              id: cleaningPayCode.id,
-              description: cleaningPayCode.description,
-              pay_type: cleaningPayCode.pay_type, // Use original pay_type
-              rate_unit: cleaningPayCode.rate_unit,
-              rate_biasa: cleaningPayCode.rate_biasa,
-              rate_ahad: cleaningPayCode.rate_ahad,
-              rate_umum: cleaningPayCode.rate_umum,
-              is_default_setting: true,
-              requires_units_input: false,
-              source: "cleaning_mode",
-              // Set hoursApplied so all hours are calculated directly (bypasses OT threshold logic)
-              hoursApplied: hours,
-            };
+          // In cleaning mode (BIHUN/BOILER), use appropriate cleaning paycode:
+          // - On Ahad: HARI_AHAD_JAM for first 8 hours, OT_A for hours > 8
+          // - On Biasa: HARI_BIASA_JAM for all hours (single rate)
+          if (isCleaningMode && (jobType === "BIHUN" || jobType === "BOILER")) {
+            mergedPayCodes = [];
 
-            mergedPayCodes = [cleaningActivity];
+            if (formData.dayType === "Ahad" && cleaningPayCode) {
+              // Ahad: split into base + OT
+              const baseHours = Math.min(hours, 8);
+              mergedPayCodes.push({
+                id: cleaningPayCode.id,
+                description: cleaningPayCode.description,
+                pay_type: cleaningPayCode.pay_type,
+                rate_unit: cleaningPayCode.rate_unit,
+                rate_biasa: cleaningPayCode.rate_biasa,
+                rate_ahad: cleaningPayCode.rate_ahad,
+                rate_umum: cleaningPayCode.rate_umum,
+                is_default_setting: true,
+                requires_units_input: false,
+                source: "cleaning_mode",
+                hoursApplied: baseHours,
+              });
+
+              // Add OT_A for overtime hours (hours > 8) - only if OT hours exist
+              const otHours = Math.max(0, hours - 8);
+              if (otHours > 0 && cleaningOTPayCode) {
+                mergedPayCodes.push({
+                  id: cleaningOTPayCode.id,
+                  description: cleaningOTPayCode.description,
+                  pay_type: cleaningOTPayCode.pay_type,
+                  rate_unit: cleaningOTPayCode.rate_unit,
+                  rate_biasa: cleaningOTPayCode.rate_biasa,
+                  rate_ahad: cleaningOTPayCode.rate_ahad,
+                  rate_umum: cleaningOTPayCode.rate_umum,
+                  is_default_setting: true,
+                  requires_units_input: false,
+                  source: "cleaning_mode",
+                  hoursApplied: otHours,
+                });
+              }
+            } else if (formData.dayType === "Biasa" && cleaningPayCodeBiasa) {
+              // Biasa: single paycode for all hours (same rate for all)
+              mergedPayCodes.push({
+                id: cleaningPayCodeBiasa.id,
+                description: cleaningPayCodeBiasa.description,
+                pay_type: cleaningPayCodeBiasa.pay_type,
+                rate_unit: cleaningPayCodeBiasa.rate_unit,
+                rate_biasa: cleaningPayCodeBiasa.rate_biasa,
+                rate_ahad: cleaningPayCodeBiasa.rate_ahad,
+                rate_umum: cleaningPayCodeBiasa.rate_umum,
+                is_default_setting: true,
+                requires_units_input: false,
+                source: "cleaning_mode",
+                hoursApplied: hours,
+              });
+            }
           }
 
           // Check if this employee was originally saved in the work log
@@ -1831,11 +1934,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // In cleaning mode, threshold is always 8
           const otThreshold = isCleaningMode ? 8 : (getDefaultHours(formData.logDate) === 5 ? 5 : 8);
           const forceOT = isCleaningMode ? 0 : (forceOTHours[rowKey] || 0); // No forceOT in cleaning mode
-          // Include OT pay codes if hours exceed threshold OR if forceOT is set
-          const filteredPayCodes =
-            hours > otThreshold || forceOT > 0
-              ? mergedPayCodes
-              : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
+          const hasNaturalOT = hours > otThreshold;
+          // Filter OT pay codes:
+          // - BH_OT_STIM: include if natural OT OR forced OT (JAGA STIM)
+          // - Other OT paycodes: only include if natural OT (hours > threshold)
+          const filteredPayCodes = mergedPayCodes.filter((pc) => {
+            if (pc.pay_type !== "Overtime") return true;
+            if (pc.id === BH_OT_STIM_PAYCODE) return hasNaturalOT || forceOT > 0;
+            return hasNaturalOT;
+          });
 
           // Convert to activity format
           const activities = filteredPayCodes.map((payCode) => {
@@ -1885,12 +1992,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
-                // Auto-select OT codes if:
-                // - hours exceed threshold AND is_default_setting, OR
-                // - forceOT > 0 (forced OT regardless of hours)
+                // Auto-select OT codes based on natural OT (hours > threshold)
+                // Only BH_OT_STIM uses forced OT from JAGA STIM column
                 const hasNaturalOT = hours > otThreshold;
                 const hasForcedOT = forceOT > 0;
-                isSelected = (hasNaturalOT || hasForcedOT) && payCode.is_default_setting;
+                if (payCode.id === BH_OT_STIM_PAYCODE) {
+                  // BH_OT_STIM: select if natural OT OR forced OT
+                  isSelected = (hasNaturalOT || hasForcedOT) && payCode.is_default_setting;
+                } else {
+                  // Other OT paycodes: only select if natural OT (hours > threshold)
+                  isSelected = hasNaturalOT && payCode.is_default_setting;
+                }
               } else if (payCode.pay_type === "Base") {
                 // Base pay codes follow default settings
                 isSelected = payCode.is_default_setting;
@@ -1917,9 +2029,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               }
             }
 
-            // In cleaning mode, always select the HARI_AHAD_JAM paycode
-            if (isCleaningMode && payCode.id === "HARI_AHAD_JAM") {
-              isSelected = true;
+            // In cleaning mode, auto-select the appropriate cleaning paycode
+            if (isCleaningMode) {
+              // On Ahad: select HARI_AHAD_JAM, and OT_A for overtime
+              if (formData.dayType === "Ahad" && payCode.id === "HARI_AHAD_JAM") {
+                isSelected = true;
+              }
+              if (formData.dayType === "Ahad" && payCode.id === "OT_A" && hours > 8) {
+                isSelected = true;
+              }
+              // On Biasa: select HARI_BIASA_JAM
+              if (formData.dayType === "Biasa" && payCode.id === "HARI_BIASA_JAM") {
+                isSelected = true;
+              }
             }
 
             // Determine units produced
@@ -2604,7 +2726,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             scope="col"
                             className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            Force OT
+                            JAGA STIM (OT)
                           </th>
                         )}
                         <th

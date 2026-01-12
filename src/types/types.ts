@@ -1117,6 +1117,7 @@ export interface Material {
   unit: string;
   unit_size?: string | null;
   default_unit_cost: number;
+  default_description?: string | null; // Default supplier/pricing note from PDF
   applies_to: MaterialAppliesTo;
   sort_order: number;
   is_active: boolean;
@@ -1140,20 +1141,35 @@ export interface MaterialInput {
   notes?: string | null;
 }
 
-// Material Stock Entry (monthly closing stock)
+// Material Stock Entry (monthly stock with purchases/consumption)
 export interface MaterialStockEntry {
   id: number;
   year: number;
   month: number;
   material_id: number;
   product_line: ProductLine;
-  quantity: number;
+
+  // Per-entry customization
+  custom_name?: string | null;
+  custom_description?: string | null;
+
+  // Stock quantities (REDESIGNED)
+  opening_quantity: number;
+  purchases_quantity: number;
+  consumption_quantity: number;
+  closing_quantity: number;  // Auto-calculated by DB
+
+  // Pricing
   unit_cost: number;
-  total_value: number;
+  opening_value: number;
+  purchases_value: number;
+  closing_value: number;
+
   notes?: string | null;
   created_at?: string;
   updated_at?: string;
   created_by?: string | null;
+
   // Joined fields
   material_code?: string;
   material_name?: string;
@@ -1165,21 +1181,39 @@ export interface MaterialStockEntry {
 
 // Material with opening and closing balances (for stock entry page)
 export interface MaterialWithStock extends Material {
+  // Opening (from previous month's closing)
   opening_quantity: number;
-  opening_unit_cost: number;
   opening_value: number;
-  closing_id: number | null;
-  closing_quantity: number;
-  closing_unit_cost: number;
+
+  // User inputs
+  purchases_quantity: number;
+  purchases_value: number;
+  consumption_quantity: number;
+
+  // Calculated closing
+  closing_quantity: number;  // Auto-calculated: opening + purchases - consumption
   closing_value: number;
+
+  // Per-entry customization
+  custom_name?: string | null;
+  custom_description?: string | null;
+
+  // Pricing
+  unit_cost: number;
+
+  // Entry metadata
+  closing_id: number | null;
   closing_notes?: string | null;
 }
 
 // Stock entry input for batch save
 export interface MaterialStockEntryInput {
   material_id: number;
-  quantity: number;
+  purchases_quantity: number;
+  consumption_quantity: number;
   unit_cost: number;
+  custom_name?: string | null;
+  custom_description?: string | null;
   notes?: string | null;
 }
 
