@@ -357,6 +357,129 @@ export default function (pool) {
     }
   });
 
+  /**
+   * GET /api/stock/closing-batch - Batch fetch closing stock for multiple products
+   * More efficient than calling /movements for each product individually.
+   *
+   * Query params:
+   * - product_ids: comma-separated product IDs (required)
+   * - year: year (required)
+   * - month: month 1-12 (required)
+   *
+   * Returns: { [product_id]: closing_quantity }
+   */
+  router.get("/closing-batch", async (req, res) => {
+    try {
+      const { product_ids, year, month } = req.query;
+
+      if (!product_ids || !year || !month) {
+        return res.status(400).json({
+          message: "product_ids, year, and month are required",
+        });
+      }
+
+      const productIdList = product_ids.split(",").map((id) => id.trim());
+      const yearNum = parseInt(year);
+      const monthNum = parseInt(month);
+
+      // Calculate date range for the month
+      const startDate = new Date(yearNum, monthNum - 1, 1);
+      const endDate = new Date(yearNum, monthNum, 0); // Last day of month
+      const startDateStr = formatDateLocal(startDate);
+      const endDateStr = formatDateLocal(endDate);
+
+      // Results map
+      const results = {};
+
+      // Process in parallel for efficiency
+      await Promise.all(
+        productIdList.map(async (product_id) => {
+          try {
+            // Get initial balance
+            const initialResult = await pool.query(
+              `SELECT balance FROM stock_opening_balances
+               WHERE product_id = $1
+               ORDER BY effective_date DESC LIMIT 1`,
+              [product_id]
+            );
+            const initialBalance = initialResult.rows.length > 0
+              ? parseInt(initialResult.rows[0].balance) || 0
+              : 0;
+
+            // Get all production up to and including end date
+            const productionResult = await pool.query(
+              `SELECT COALESCE(SUM(bags_packed), 0) as total
+               FROM production_entries
+               WHERE product_id = $1 AND entry_date <= $2::date`,
+              [product_id, endDateStr]
+            );
+            const totalProduction = parseInt(productionResult.rows[0]?.total) || 0;
+
+            // Get all sales up to and including end date
+            const salesResult = await pool.query(
+              `SELECT
+                 COALESCE(SUM(od.quantity), 0) as sold,
+                 COALESCE(SUM(COALESCE(od.freeproduct, 0)), 0) as foc,
+                 COALESCE(SUM(COALESCE(od.returnproduct, 0)), 0) as returns
+               FROM invoices i
+               JOIN order_details od ON od.invoiceid = i.id
+               WHERE od.code = $1
+                 AND i.invoice_status != 'cancelled'
+                 AND od.issubtotal IS NOT TRUE
+                 AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+                 AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) <= $2::date`,
+              [product_id, endDateStr]
+            );
+            const totalSold = parseInt(salesResult.rows[0]?.sold) || 0;
+            const totalFoc = parseInt(salesResult.rows[0]?.foc) || 0;
+            const totalReturns = parseInt(salesResult.rows[0]?.returns) || 0;
+
+            // Get all adjustments up to and including end date
+            const adjustmentsResult = await pool.query(
+              `SELECT
+                 COALESCE(SUM(CASE WHEN adjustment_type = 'ADJ_IN' THEN quantity ELSE 0 END), 0) as adj_in,
+                 COALESCE(SUM(CASE WHEN adjustment_type IN ('ADJ_OUT', 'DEFECT') THEN quantity ELSE 0 END), 0) as adj_out
+               FROM stock_adjustments
+               WHERE product_id = $1 AND entry_date <= $2`,
+              [product_id, endDateStr]
+            );
+            const totalAdjIn = parseInt(adjustmentsResult.rows[0]?.adj_in) || 0;
+            const totalAdjOut = parseInt(adjustmentsResult.rows[0]?.adj_out) || 0;
+
+            // Calculate closing balance
+            // CF = Initial + Production + AdjIn - Sold - FOC - AdjOut - Returns
+            const closingBalance =
+              initialBalance +
+              totalProduction +
+              totalAdjIn -
+              totalSold -
+              totalFoc -
+              totalAdjOut -
+              totalReturns;
+
+            results[product_id] = closingBalance;
+          } catch (err) {
+            console.error(`Error calculating closing for product ${product_id}:`, err);
+            results[product_id] = 0;
+          }
+        })
+      );
+
+      res.json({
+        year: yearNum,
+        month: monthNum,
+        end_date: endDateStr,
+        closing_balances: results,
+      });
+    } catch (error) {
+      console.error("Error fetching batch closing stock:", error);
+      res.status(500).json({
+        message: "Error fetching batch closing stock",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/stock/opening-balance/:product_id - Get opening balance for product
   router.get("/opening-balance/:product_id", async (req, res) => {
     try {

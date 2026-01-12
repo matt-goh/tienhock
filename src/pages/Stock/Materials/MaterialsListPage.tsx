@@ -99,7 +99,9 @@ const MaterialsListPage: React.FC = () => {
     };
 
     filteredMaterials.forEach((m) => {
-      groups[m.category].push(m);
+      if (groups[m.category]) {
+        groups[m.category].push(m);
+      }
     });
 
     return groups;

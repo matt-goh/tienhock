@@ -14,7 +14,7 @@ export default function (pool) {
       let query = `
         SELECT
           id, code, name, category, unit, unit_size,
-          default_unit_cost, applies_to, sort_order,
+          default_unit_cost, default_description, applies_to, sort_order,
           is_active, notes, created_at, updated_at
         FROM materials
         WHERE 1=1
@@ -185,7 +185,8 @@ export default function (pool) {
     }
   });
 
-  // GET /stock/with-opening - Get all materials with their closing stock and opening balance for a period
+  // GET /stock/with-opening - Get all materials with their stock data for a period
+  // REDESIGNED: Returns opening (from prev month), purchases, consumption, closing
   router.get("/stock/with-opening", async (req, res) => {
     try {
       const { year, month, product_line } = req.query;
@@ -208,7 +209,7 @@ export default function (pool) {
       const materialsQuery = `
         SELECT
           m.id, m.code, m.name, m.category, m.unit, m.unit_size,
-          m.default_unit_cost, m.applies_to, m.sort_order
+          m.default_unit_cost, m.default_description, m.applies_to, m.sort_order
         FROM materials m
         WHERE m.is_active = true
           AND (m.applies_to = $1 OR m.applies_to = 'both')
@@ -216,47 +217,61 @@ export default function (pool) {
       `;
       const materials = await pool.query(materialsQuery, [product_line]);
 
-      // Get previous month's closing (this month's opening)
+      // Get previous month's closing_quantity (this month's opening)
       const openingQuery = `
-        SELECT material_id, quantity, unit_cost, total_value
+        SELECT material_id, closing_quantity, unit_cost
         FROM material_stock_entries
         WHERE year = $1 AND month = $2 AND product_line = $3
       `;
       const openingResult = await pool.query(openingQuery, [prevYear, prevMonth, product_line]);
       const openingMap = new Map(openingResult.rows.map(r => [r.material_id, r]));
 
-      // Get current month's closing
-      const closingQuery = `
-        SELECT id, material_id, quantity, unit_cost, total_value, notes
+      // Get current month's entry (if exists)
+      const currentQuery = `
+        SELECT id, material_id, custom_name, custom_description,
+               opening_quantity, purchases_quantity, consumption_quantity, closing_quantity,
+               unit_cost, opening_value, purchases_value, closing_value, notes
         FROM material_stock_entries
         WHERE year = $1 AND month = $2 AND product_line = $3
       `;
-      const closingResult = await pool.query(closingQuery, [parseInt(year), parseInt(month), product_line]);
-      const closingMap = new Map(closingResult.rows.map(r => [r.material_id, r]));
+      const currentResult = await pool.query(currentQuery, [parseInt(year), parseInt(month), product_line]);
+      const currentMap = new Map(currentResult.rows.map(r => [r.material_id, r]));
 
-      // Combine data - ensure numeric values are parsed as floats (pg returns numeric as strings)
+      // Combine data
       const data = materials.rows.map(m => {
-        const opening = openingMap.get(m.id);
-        const closing = closingMap.get(m.id);
+        const prevEntry = openingMap.get(m.id);
+        const current = currentMap.get(m.id);
 
-        const openingQty = parseFloat(opening?.quantity) || 0;
-        const openingCost = parseFloat(opening?.unit_cost) || parseFloat(m.default_unit_cost) || 0;
-        const openingVal = parseFloat(opening?.total_value) || 0;
-        const closingQty = parseFloat(closing?.quantity) || 0;
-        const closingCost = parseFloat(closing?.unit_cost) || parseFloat(m.default_unit_cost) || 0;
-        const closingVal = parseFloat(closing?.total_value) || 0;
+        // Opening = previous month's closing_quantity
+        const openingQty = parseFloat(prevEntry?.closing_quantity) || 0;
+        const unitCost = parseFloat(current?.unit_cost) || parseFloat(m.default_unit_cost) || 0;
+        const openingValue = openingQty * unitCost;
+
+        // If current entry exists, use its values; otherwise defaults
+        const purchasesQty = parseFloat(current?.purchases_quantity) || 0;
+        const consumptionQty = parseFloat(current?.consumption_quantity) || 0;
+        const closingQty = openingQty + purchasesQty - consumptionQty;
+        const purchasesValue = purchasesQty * unitCost;
+        const closingValue = closingQty * unitCost;
 
         return {
           ...m,
           default_unit_cost: parseFloat(m.default_unit_cost) || 0,
+          // Stock quantities
           opening_quantity: openingQty,
-          opening_unit_cost: openingCost,
-          opening_value: openingVal,
-          closing_id: closing?.id || null,
+          opening_value: openingValue,
+          purchases_quantity: purchasesQty,
+          purchases_value: purchasesValue,
+          consumption_quantity: consumptionQty,
           closing_quantity: closingQty,
-          closing_unit_cost: closingCost,
-          closing_value: closingVal,
-          closing_notes: closing?.notes || null,
+          closing_value: closingValue,
+          // Per-entry customization
+          custom_name: current?.custom_name || null,
+          custom_description: current?.custom_description || null,
+          // Entry metadata
+          closing_id: current?.id || null,
+          unit_cost: unitCost,
+          closing_notes: current?.notes || null,
         };
       });
 
@@ -277,6 +292,7 @@ export default function (pool) {
   });
 
   // POST /stock/batch - Batch upsert stock entries for a month
+  // REDESIGNED: Accepts purchases_quantity, consumption_quantity, custom_name, custom_description
   router.post("/stock/batch", async (req, res) => {
     const { year, month, product_line, entries } = req.body;
 
@@ -296,20 +312,57 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
+      // Calculate previous month for opening quantities
+      let prevYear = parseInt(year);
+      let prevMonth = parseInt(month) - 1;
+      if (prevMonth === 0) {
+        prevMonth = 12;
+        prevYear -= 1;
+      }
+
+      // Get previous month's closing quantities (for opening)
+      const openingQuery = `
+        SELECT material_id, closing_quantity
+        FROM material_stock_entries
+        WHERE year = $1 AND month = $2 AND product_line = $3
+      `;
+      const openingResult = await client.query(openingQuery, [prevYear, prevMonth, product_line]);
+      const openingMap = new Map(openingResult.rows.map(r => [
+        r.material_id,
+        parseFloat(r.closing_quantity) || 0
+      ]));
+
       let upsertedCount = 0;
       let deletedCount = 0;
 
       for (const entry of entries) {
-        const { material_id, quantity, unit_cost, notes } = entry;
+        const {
+          material_id,
+          purchases_quantity,
+          consumption_quantity,
+          unit_cost,
+          custom_name,
+          custom_description,
+          notes
+        } = entry;
 
         if (!material_id) continue;
 
-        const qty = parseFloat(quantity) || 0;
+        const purchasesQty = parseFloat(purchases_quantity) || 0;
+        const consumptionQty = parseFloat(consumption_quantity) || 0;
         const cost = parseFloat(unit_cost) || 0;
-        const totalValue = qty * cost;
 
-        if (qty === 0 && cost === 0) {
-          // Delete entry if quantity and cost are both 0
+        // Get opening from previous month's closing
+        const openingQty = openingMap.get(material_id) || 0;
+
+        // Calculate values (closing_quantity is auto-calculated by DB GENERATED column)
+        const openingValue = openingQty * cost;
+        const purchasesValue = purchasesQty * cost;
+        const closingQty = openingQty + purchasesQty - consumptionQty;
+        const closingValue = closingQty * cost;
+
+        if (purchasesQty === 0 && consumptionQty === 0 && cost === 0 && !custom_name && !custom_description) {
+          // Delete entry if all values are zero/empty
           const deleteQuery = `
             DELETE FROM material_stock_entries
             WHERE year = $1 AND month = $2 AND material_id = $3 AND product_line = $4
@@ -322,17 +375,26 @@ export default function (pool) {
           ]);
           if (deleteResult.rowCount > 0) deletedCount++;
         } else {
-          // Upsert entry
+          // Upsert entry with new schema
           const upsertQuery = `
             INSERT INTO material_stock_entries (
               year, month, material_id, product_line,
-              quantity, unit_cost, total_value, notes, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              custom_name, custom_description,
+              opening_quantity, purchases_quantity, consumption_quantity,
+              unit_cost, opening_value, purchases_value, closing_value,
+              notes, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             ON CONFLICT (year, month, material_id, product_line)
             DO UPDATE SET
-              quantity = EXCLUDED.quantity,
+              custom_name = EXCLUDED.custom_name,
+              custom_description = EXCLUDED.custom_description,
+              opening_quantity = EXCLUDED.opening_quantity,
+              purchases_quantity = EXCLUDED.purchases_quantity,
+              consumption_quantity = EXCLUDED.consumption_quantity,
               unit_cost = EXCLUDED.unit_cost,
-              total_value = EXCLUDED.total_value,
+              opening_value = EXCLUDED.opening_value,
+              purchases_value = EXCLUDED.purchases_value,
+              closing_value = EXCLUDED.closing_value,
               notes = EXCLUDED.notes,
               updated_at = CURRENT_TIMESTAMP
             RETURNING id
@@ -343,9 +405,15 @@ export default function (pool) {
             parseInt(month),
             material_id,
             product_line,
-            qty,
+            custom_name?.trim() || null,
+            custom_description?.trim() || null,
+            openingQty,
+            purchasesQty,
+            consumptionQty,
             cost,
-            totalValue,
+            openingValue,
+            purchasesValue,
+            closingValue,
             notes?.trim() || null,
             req.staffId || null,
           ]);
@@ -463,7 +531,7 @@ export default function (pool) {
       const query = `
         SELECT
           id, code, name, category, unit, unit_size,
-          default_unit_cost, applies_to, sort_order,
+          default_unit_cost, default_description, applies_to, sort_order,
           is_active, notes, created_at, updated_at, created_by
         FROM materials
         WHERE id = $1

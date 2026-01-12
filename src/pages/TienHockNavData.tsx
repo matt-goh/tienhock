@@ -400,6 +400,11 @@ export const TienHockNavData: SidebarItem[] = [
     icon: IconPackage,
     subItems: [
       {
+        name: "Stock Entry",
+        path: "/stock/entry",
+        component: MaterialStockEntryPage,
+      },
+      {
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
@@ -413,11 +418,6 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Product Adjustments",
         path: "/stock/adjustments",
         component: StockAdjustmentEntryPage,
-      },
-      {
-        name: "Material Stock Entry",
-        path: "/materials-entry",
-        component: MaterialStockEntryPage,
       },
       {
         name: "Materials",
