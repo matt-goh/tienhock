@@ -145,6 +145,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   >({});
   // State for BIHUN_SANGKUT tray counts (only used for BIHUN jobType)
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
+  // State for Force OT hours (only used for BIHUN jobType)
+  const [forceOTHours, setForceOTHours] = useState<Record<string, number>>({});
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
@@ -228,6 +230,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployeeActivities: Record<string, ActivityItem[]>;
     leaveBalances: Record<string, any>;
     trayCounts: Record<string, number>;
+    forceOTHours: Record<string, number>;
   } | null>(null);
 
   // Ref to track which work log's formData has been initialized
@@ -309,7 +312,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         normalizeForComparison(leaveEmployeeActivities) !==
           normalizeForComparison(initialState.leaveEmployeeActivities) ||
         normalizeForComparison(leaveBalances) !==
-          normalizeForComparison(initialState.leaveBalances)
+          normalizeForComparison(initialState.leaveBalances) ||
+        normalizeForComparison(forceOTHours) !==
+          normalizeForComparison(initialState.forceOTHours)
       );
     } catch (error) {
       console.warn("Error comparing states, defaulting to no changes:", error);
@@ -322,6 +327,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployees,
     leaveEmployeeActivities,
     leaveBalances,
+    forceOTHours,
     initialState,
     isInitializationComplete,
     mode,
@@ -445,6 +451,51 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trayCounts, isInitializationComplete, isBihunPage]);
+
+  // Update OT activities when forceOTHours changes (BIHUN only)
+  useEffect(() => {
+    if (!isInitializationComplete || !isBihunPage) return;
+
+    Object.entries(forceOTHours).forEach(([rowKey, forceOT]) => {
+      if (employeeActivities[rowKey] && employeeActivities[rowKey].length > 0) {
+        setEmployeeActivities((prev) => {
+          const activities = prev[rowKey] || [];
+          const [employeeId, jobType] = rowKey.split("-");
+          const hours =
+            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+          const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
+          const naturalOT = Math.max(0, hours - otThreshold);
+          const totalOT = naturalOT + forceOT;
+          let hasChanges = false;
+
+          const updatedActivities = activities.map((activity) => {
+            if (activity.payType === "Overtime" && activity.rateUnit === "Hour") {
+              const newAmount = totalOT * (activity.rate || 0);
+              const newSelected = totalOT > 0;
+              if (
+                activity.calculatedAmount !== newAmount ||
+                activity.isSelected !== newSelected
+              ) {
+                hasChanges = true;
+                return {
+                  ...activity,
+                  calculatedAmount: newAmount,
+                  isSelected: newSelected,
+                };
+              }
+            }
+            return activity;
+          });
+
+          if (hasChanges) {
+            return { ...prev, [rowKey]: updatedActivities };
+          }
+          return prev;
+        });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceOTHours, isInitializationComplete, isBihunPage, employeeSelectionState.jobHours, formData.logDate]);
 
   // Update the jobs filter based on dynamic configuration
   const jobs = useMemo(() => {
@@ -669,6 +720,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployeeActivities,
     leaveBalances,
     trayCounts,
+    forceOTHours,
   });
 
   // Keep the ref updated with latest values
@@ -681,8 +733,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       leaveEmployeeActivities,
       leaveBalances,
       trayCounts,
+      forceOTHours,
     };
-  }, [formData, employeeSelectionState, employeeActivities, leaveEmployees, leaveEmployeeActivities, leaveBalances, trayCounts]);
+  }, [formData, employeeSelectionState, employeeActivities, leaveEmployees, leaveEmployeeActivities, leaveBalances, trayCounts, forceOTHours]);
 
   useEffect(() => {
     if (
@@ -710,6 +763,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           ),
           leaveBalances: JSON.parse(JSON.stringify(current.leaveBalances)),
           trayCounts: JSON.parse(JSON.stringify(current.trayCounts)),
+          forceOTHours: JSON.parse(JSON.stringify(current.forceOTHours)),
         });
       }, 10000); // 10 second delay to ensure all initialization effects complete
 
@@ -1185,6 +1239,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }));
   };
 
+  // Handle Force OT hours changes (BIHUN only)
+  const handleForceOTChange = (rowKey: string, value: string) => {
+    const numValue = value === "" ? 0 : parseFloat(value) || 0;
+    setForceOTHours((prev) => ({
+      ...prev,
+      [rowKey]: numValue,
+    }));
+  };
+
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
     if (!employee.rowKey) {
@@ -1264,6 +1327,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             jobType,
             hours,
             activities,
+            forceOTHours: forceOTHours[rowKey] || 0,
           };
         });
       })
@@ -1312,6 +1376,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         ),
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
         trayCounts: JSON.parse(JSON.stringify(trayCounts)),
+        forceOTHours: JSON.parse(JSON.stringify(forceOTHours)),
       });
       // Navigate to details page after edit, list page after create
       if (mode === "edit" && existingWorkLog) {
@@ -1664,8 +1729,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
           // Use day-specific OT threshold (5 for Saturday, 8 for others)
           const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
+          const forceOT = forceOTHours[rowKey] || 0;
+          // Include OT pay codes if hours exceed threshold OR if forceOT is set
           const filteredPayCodes =
-            hours > otThreshold
+            hours > otThreshold || forceOT > 0
               ? mergedPayCodes
               : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
 
@@ -1717,8 +1784,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
-                // Only auto-select OT codes if hours exceed threshold AND is_default_setting is true
-                isSelected = hours > otThreshold && payCode.is_default_setting;
+                // Auto-select OT codes if:
+                // - hours exceed threshold AND is_default_setting, OR
+                // - forceOT > 0 (forced OT regardless of hours)
+                const hasNaturalOT = hours > otThreshold;
+                const hasForcedOT = forceOT > 0;
+                isSelected = (hasNaturalOT || hasForcedOT) && payCode.is_default_setting;
               } else if (payCode.pay_type === "Base") {
                 // Base pay codes follow default settings
                 isSelected = payCode.is_default_setting;
@@ -1781,7 +1852,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 hours,
                 formData.contextData,
                 undefined,
-                formData.logDate
+                formData.logDate,
+                forceOT
               ),
             };
           });
@@ -1792,7 +1864,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             hours,
             formData.contextData,
             undefined,
-            formData.logDate
+            formData.logDate,
+            forceOT
           );
           newEmployeeActivities[rowKey] = processedActivities;
         });
@@ -1975,6 +2048,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const newJobHours: Record<string, Record<string, number>> = {};
       const newEmployeeActivities: Record<string, any[]> = {};
       const newTrayCounts: Record<string, number> = {};
+      const newForceOTHours: Record<string, number> = {};
 
       // Clear and populate the saved employee row keys ref
       // This tracks which employees were originally in the work log
@@ -2376,6 +2450,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         >
                           {isBihunPage ? "Units" : "Hours"}
                         </th>
+                        {isBihunPage && (
+                          <th
+                            scope="col"
+                            className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                          >
+                            Force OT
+                          </th>
+                        )}
                         <th
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
@@ -2509,6 +2591,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 )}
                               </div>
                             </td>
+                            {isBihunPage && (
+                              <td className="px-4 py-2 whitespace-nowrap text-right">
+                                <input
+                                  type="number"
+                                  value={isSelected ? (forceOTHours[row.rowKey || ""] || 0).toString() : ""}
+                                  onChange={(e) => handleForceOTChange(row.rowKey || "", e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-16 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-amber-400 dark:border-amber-600"
+                                  min="0"
+                                  step="0.5"
+                                  max="8"
+                                  disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
+                                  placeholder="0"
+                                />
+                              </td>
+                            )}
                             <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <ActivitiesTooltip
                                 activities={(
