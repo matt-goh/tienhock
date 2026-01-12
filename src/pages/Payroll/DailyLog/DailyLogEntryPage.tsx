@@ -147,6 +147,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
   // State for Force OT hours (only used for BIHUN jobType)
   const [forceOTHours, setForceOTHours] = useState<Record<string, number>>({});
+  // State for Sunday Cleaning Mode (only for BIHUN and BOILER on AHAD days)
+  const [isCleaningMode, setIsCleaningMode] = useState(false);
+  // State for HARI_AHAD_JAM paycode data (fetched when cleaning mode is enabled)
+  const [cleaningPayCode, setCleaningPayCode] = useState<{
+    id: string;
+    description: string;
+    pay_type: string;
+    rate_unit: string;
+    rate_biasa: number;
+    rate_ahad: number;
+    rate_umum: number;
+  } | null>(null);
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
@@ -214,6 +226,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       employees: [],
     };
   });
+
+  // Show cleaning mode toggle only for BIHUN and BOILER on AHAD (Sunday) days
+  const showCleaningModeToggle = useMemo(() => {
+    return (jobType === "BIHUN" || jobType === "BOILER") && formData.dayType === "Ahad";
+  }, [jobType, formData.dayType]);
+
   const {
     employeeMappings,
     detailedMappings: jobPayCodeDetails,
@@ -231,6 +249,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveBalances: Record<string, any>;
     trayCounts: Record<string, number>;
     forceOTHours: Record<string, number>;
+    isCleaningMode: boolean;
   } | null>(null);
 
   // Ref to track which work log's formData has been initialized
@@ -261,6 +280,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           dayType: existingWorkLog.day_type,
           employees: [],
         });
+
+        // Restore cleaning mode state from context_data (for BIHUN/BOILER on Sundays)
+        if (existingWorkLog.context_data?.isCleaningMode) {
+          setIsCleaningMode(true);
+        } else {
+          setIsCleaningMode(false);
+        }
       }
     }
   }, [mode, existingWorkLog]);
@@ -314,7 +340,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         normalizeForComparison(leaveBalances) !==
           normalizeForComparison(initialState.leaveBalances) ||
         normalizeForComparison(forceOTHours) !==
-          normalizeForComparison(initialState.forceOTHours)
+          normalizeForComparison(initialState.forceOTHours) ||
+        isCleaningMode !== initialState.isCleaningMode
       );
     } catch (error) {
       console.warn("Error comparing states, defaulting to no changes:", error);
@@ -328,6 +355,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveEmployeeActivities,
     leaveBalances,
     forceOTHours,
+    isCleaningMode,
     initialState,
     isInitializationComplete,
     mode,
@@ -410,6 +438,35 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       });
     }
   }, [formData.dayType]);
+
+  // Reset cleaning mode when day type changes from Ahad to non-Ahad
+  useEffect(() => {
+    if (formData.dayType !== "Ahad" && isCleaningMode) {
+      setIsCleaningMode(false);
+    }
+  }, [formData.dayType, isCleaningMode]);
+
+  // Fetch HARI_AHAD_JAM paycode when cleaning mode is enabled
+  useEffect(() => {
+    if (isCleaningMode && !cleaningPayCode) {
+      api.get("/api/pay-codes/HARI_AHAD_JAM")
+        .then((res: any) => {
+          setCleaningPayCode({
+            id: res.id,
+            description: res.description,
+            pay_type: res.pay_type,
+            rate_unit: res.rate_unit,
+            rate_biasa: parseFloat(res.rate_biasa) || 0,
+            rate_ahad: parseFloat(res.rate_ahad) || 0,
+            rate_umum: parseFloat(res.rate_umum) || 0,
+          });
+        })
+        .catch(() => {
+          toast.error("HARI_AHAD_JAM paycode not found. Please create it first.");
+          setIsCleaningMode(false);
+        });
+    }
+  }, [isCleaningMode, cleaningPayCode]);
 
   // Update BHANGKUT activities when trayCounts changes (BIHUN jobType only)
   useEffect(() => {
@@ -721,6 +778,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     leaveBalances,
     trayCounts,
     forceOTHours,
+    isCleaningMode,
   });
 
   // Keep the ref updated with latest values
@@ -734,8 +792,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       leaveBalances,
       trayCounts,
       forceOTHours,
+      isCleaningMode,
     };
-  }, [formData, employeeSelectionState, employeeActivities, leaveEmployees, leaveEmployeeActivities, leaveBalances, trayCounts, forceOTHours]);
+  }, [formData, employeeSelectionState, employeeActivities, leaveEmployees, leaveEmployeeActivities, leaveBalances, trayCounts, forceOTHours, isCleaningMode]);
 
   useEffect(() => {
     if (
@@ -764,6 +823,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           leaveBalances: JSON.parse(JSON.stringify(current.leaveBalances)),
           trayCounts: JSON.parse(JSON.stringify(current.trayCounts)),
           forceOTHours: JSON.parse(JSON.stringify(current.forceOTHours)),
+          isCleaningMode: current.isCleaningMode,
         });
       }, 10000); // 10 second delay to ensure all initialization effects complete
 
@@ -1346,7 +1406,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       shift: formData.shift,
       dayType: formData.dayType,
       section: section,
-      contextData: formData.contextData,
+      contextData: {
+        ...formData.contextData,
+        isCleaningMode: isCleaningMode, // Save cleaning mode state for BIHUN/BOILER on Sundays
+      },
       status: "Submitted",
       employeeEntries: selectedEmployeeData,
       leaveEntries: leaveEntries,
@@ -1377,6 +1440,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         leaveBalances: JSON.parse(JSON.stringify(leaveBalances)),
         trayCounts: JSON.parse(JSON.stringify(trayCounts)),
         forceOTHours: JSON.parse(JSON.stringify(forceOTHours)),
+        isCleaningMode: isCleaningMode,
       });
       // Navigate to details page after edit, list page after create
       if (mode === "edit" && existingWorkLog) {
@@ -1672,6 +1736,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     loadingPayCodeMappings,
     mode,
     existingWorkLog,
+    isCleaningMode,
+    cleaningPayCode,
+    forceOTHours,
   ]);
 
   const fetchAndApplyActivities = () => {
@@ -1716,7 +1783,23 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           });
 
           // Convert map back to array
-          const mergedPayCodes = Array.from(allPayCodes.values());
+          let mergedPayCodes = Array.from(allPayCodes.values());
+
+          // In cleaning mode (BIHUN/BOILER on Sunday), override with only HARI_AHAD_JAM paycode
+          if (isCleaningMode && cleaningPayCode && (jobType.startsWith("BIHUN") || jobType.startsWith("BOILER"))) {
+            mergedPayCodes = [{
+              id: cleaningPayCode.id,
+              description: cleaningPayCode.description,
+              pay_type: cleaningPayCode.pay_type,
+              rate_unit: cleaningPayCode.rate_unit,
+              rate_biasa: cleaningPayCode.rate_biasa,
+              rate_ahad: cleaningPayCode.rate_ahad,
+              rate_umum: cleaningPayCode.rate_umum,
+              is_default_setting: true,
+              requires_units_input: false,
+              source: "cleaning_mode",
+            }];
+          }
 
           // Check if this employee was originally saved in the work log
           const wasOriginallySaved = savedEmployeeRowKeysRef.current.has(rowKey);
@@ -1814,6 +1897,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 const trayCount = trayCounts[rowKey] ?? 0;
                 isSelected = trayCount > 0;
               }
+            }
+
+            // In cleaning mode, always select the HARI_AHAD_JAM paycode
+            if (isCleaningMode && payCode.id === "HARI_AHAD_JAM") {
+              isSelected = true;
             }
 
             // Determine units produced
@@ -2116,6 +2204,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // No activities saved, default tray count is 3
           newTrayCounts[rowKey] = 3;
         }
+
+        // Restore force OT hours if saved (BIHUN only)
+        if (entry.force_ot_hours && parseFloat(entry.force_ot_hours) > 0) {
+          newForceOTHours[rowKey] = parseFloat(entry.force_ot_hours);
+        }
       });
 
       // Apply all the restored state
@@ -2128,6 +2221,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       // Apply tray counts if any were restored (BIHUN only)
       if (Object.keys(newTrayCounts).length > 0) {
         setTrayCounts(newTrayCounts);
+      }
+
+      // Apply force OT hours if any were restored (BIHUN only)
+      if (Object.keys(newForceOTHours).length > 0) {
+        setForceOTHours(newForceOTHours);
       }
 
       // Restore leave records if they exist
@@ -2373,6 +2471,35 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               required
             />
           </div>
+
+          {/* Cleaning Mode Toggle - only for BIHUN/BOILER on Sunday (Ahad) */}
+          {showCleaningModeToggle && (
+            <div className="flex items-center gap-2 pb-2">
+              <button
+                type="button"
+                onClick={() => setIsCleaningMode(!isCleaningMode)}
+                disabled={isSaving}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  isCleaningMode
+                    ? "bg-sky-600"
+                    : "bg-gray-200 dark:bg-gray-700"
+                } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isCleaningMode ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <span className={`text-sm font-medium ${
+                isCleaningMode
+                  ? "text-sky-700 dark:text-sky-300"
+                  : "text-default-600 dark:text-gray-400"
+              }`}>
+                {isCleaningMode ? "Cleaning" : "Regular"}
+              </span>
+            </div>
+          )}
 
           {/* Show Context Form here only if 3 or fewer fields */}
           {jobConfig?.contextFields && jobConfig.contextFields.length <= 3 && (
