@@ -159,6 +159,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     rate_ahad: number;
     rate_umum: number;
   } | null>(null);
+  // State for OT_A paycode data (for cleaning mode overtime hours)
+  const [cleaningOTPayCode, setCleaningOTPayCode] = useState<{
+    id: string;
+    description: string;
+    pay_type: string;
+    rate_unit: string;
+    rate_biasa: number;
+    rate_ahad: number;
+    rate_umum: number;
+  } | null>(null);
 
   const { isHoliday, getHolidayDescription, holidays } = useHolidayCache();
   const JOB_IDS = getJobIds(jobType);
@@ -448,32 +458,44 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [formData.dayType, isCleaningMode]);
 
-  // Fetch HARI_AHAD_JAM paycode proactively when the toggle could appear
-  // This ensures the paycode is ready when the user toggles cleaning mode
+  // Fetch HARI_AHAD_JAM and OT_A paycodes proactively when the toggle could appear
+  // This ensures the paycodes are ready when the user toggles cleaning mode
   useEffect(() => {
-    if (showCleaningModeToggle && !cleaningPayCode) {
-      api.get("/api/pay-codes/HARI_AHAD_JAM")
-        .then((res: any) => {
+    if (showCleaningModeToggle && (!cleaningPayCode || !cleaningOTPayCode)) {
+      Promise.all([
+        api.get("/api/pay-codes/HARI_AHAD_JAM"),
+        api.get("/api/pay-codes/OT_A")
+      ])
+        .then(([hariAhadRes, otARes]: [any, any]) => {
           setCleaningPayCode({
-            id: res.id,
-            description: res.description,
-            pay_type: res.pay_type,
-            rate_unit: res.rate_unit,
-            rate_biasa: parseFloat(res.rate_biasa) || 0,
-            rate_ahad: parseFloat(res.rate_ahad) || 0,
-            rate_umum: parseFloat(res.rate_umum) || 0,
+            id: hariAhadRes.id,
+            description: hariAhadRes.description,
+            pay_type: hariAhadRes.pay_type,
+            rate_unit: hariAhadRes.rate_unit,
+            rate_biasa: parseFloat(hariAhadRes.rate_biasa) || 0,
+            rate_ahad: parseFloat(hariAhadRes.rate_ahad) || 0,
+            rate_umum: parseFloat(hariAhadRes.rate_umum) || 0,
+          });
+          setCleaningOTPayCode({
+            id: otARes.id,
+            description: otARes.description,
+            pay_type: otARes.pay_type,
+            rate_unit: otARes.rate_unit,
+            rate_biasa: parseFloat(otARes.rate_biasa) || 0,
+            rate_ahad: parseFloat(otARes.rate_ahad) || 0,
+            rate_umum: parseFloat(otARes.rate_umum) || 0,
           });
         })
         .catch(() => {
           // Silently fail - will show error when user tries to toggle
         });
     }
-  }, [showCleaningModeToggle, cleaningPayCode]);
+  }, [showCleaningModeToggle, cleaningPayCode, cleaningOTPayCode]);
 
-  // Handle toggle when paycode is not available
+  // Handle toggle when paycodes are not available
   const handleCleaningModeToggle = () => {
-    if (!isCleaningMode && !cleaningPayCode) {
-      toast.error("HARI_AHAD_JAM paycode not found. Please create it first.");
+    if (!isCleaningMode && (!cleaningPayCode || !cleaningOTPayCode)) {
+      toast.error("Required paycodes (HARI_AHAD_JAM, OT_A) not found. Please create them first.");
       return;
     }
     setIsCleaningMode(!isCleaningMode);
@@ -1753,6 +1775,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     existingWorkLog,
     isCleaningMode,
     cleaningPayCode,
+    cleaningOTPayCode,
     forceOTHours,
   ]);
 
@@ -1800,14 +1823,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Convert map back to array
           let mergedPayCodes = Array.from(allPayCodes.values());
 
-          // In cleaning mode (BIHUN/BOILER on Sunday), override with only HARI_AHAD_JAM paycode
-          // Use component-level jobType prop (not the loop variable empJobType)
-          // Same rate applies for all hours (regular + OT), so use single paycode with hoursApplied
+          // In cleaning mode (BIHUN/BOILER on Sunday), split hours:
+          // - HARI_AHAD_JAM for first 8 hours
+          // - OT_A for hours exceeding 8
           if (isCleaningMode && cleaningPayCode && (jobType === "BIHUN" || jobType === "BOILER")) {
-            const cleaningActivity = {
+            mergedPayCodes = [];
+
+            // Always add HARI_AHAD_JAM for base hours (up to 8)
+            const baseHours = Math.min(hours, 8);
+            mergedPayCodes.push({
               id: cleaningPayCode.id,
               description: cleaningPayCode.description,
-              pay_type: cleaningPayCode.pay_type, // Use original pay_type
+              pay_type: cleaningPayCode.pay_type,
               rate_unit: cleaningPayCode.rate_unit,
               rate_biasa: cleaningPayCode.rate_biasa,
               rate_ahad: cleaningPayCode.rate_ahad,
@@ -1815,11 +1842,26 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               is_default_setting: true,
               requires_units_input: false,
               source: "cleaning_mode",
-              // Set hoursApplied so all hours are calculated directly (bypasses OT threshold logic)
-              hoursApplied: hours,
-            };
+              hoursApplied: baseHours,
+            });
 
-            mergedPayCodes = [cleaningActivity];
+            // Add OT_A for overtime hours (hours > 8) - only if OT hours exist
+            const otHours = Math.max(0, hours - 8);
+            if (otHours > 0 && cleaningOTPayCode) {
+              mergedPayCodes.push({
+                id: cleaningOTPayCode.id,
+                description: cleaningOTPayCode.description,
+                pay_type: cleaningOTPayCode.pay_type,
+                rate_unit: cleaningOTPayCode.rate_unit,
+                rate_biasa: cleaningOTPayCode.rate_biasa,
+                rate_ahad: cleaningOTPayCode.rate_ahad,
+                rate_umum: cleaningOTPayCode.rate_umum,
+                is_default_setting: true,
+                requires_units_input: false,
+                source: "cleaning_mode",
+                hoursApplied: otHours,
+              });
+            }
           }
 
           // Check if this employee was originally saved in the work log
@@ -1932,6 +1974,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
             // In cleaning mode, always select the HARI_AHAD_JAM paycode
             if (isCleaningMode && payCode.id === "HARI_AHAD_JAM") {
+              isSelected = true;
+            }
+            // In cleaning mode, also select OT_A when OT hours exist
+            if (isCleaningMode && payCode.id === "OT_A" && hours > 8) {
               isSelected = true;
             }
 
