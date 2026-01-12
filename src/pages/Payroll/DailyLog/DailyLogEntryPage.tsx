@@ -1737,13 +1737,22 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // Don't auto-select these types
                 isSelected = false;
               }
+
+              // Special handling for BHANGKUT on BIHUN page - auto-select if tray count > 0
+              if (isBihunPage && payCode.id === BHANGKUT_PAYCODE) {
+                const trayCount = trayCounts[rowKey] ?? 0;
+                isSelected = trayCount > 0;
+              }
             }
 
             // Determine units produced
+            // For BHANGKUT paycode on BIHUN page, use trayCounts state
             const unitsProduced =
               isContextLinked && contextLinkedPayCodes[payCode.id]
                 ? formData.contextData[contextLinkedPayCodes[payCode.id].id] ||
                   0
+                : isBihunPage && payCode.id === BHANGKUT_PAYCODE
+                ? trayCounts[rowKey] ?? 0
                 : existingActivity
                 ? existingActivity.unitsProduced
                 : payCode.requires_units_input
