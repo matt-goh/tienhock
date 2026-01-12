@@ -147,10 +147,20 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
   // State for JAGA STIM (OT) hours - only applies to BH_OT_STIM paycode (only used for BIHUN jobType)
   const [forceOTHours, setForceOTHours] = useState<Record<string, number>>({});
-  // State for Sunday Cleaning Mode (only for BIHUN and BOILER on AHAD days)
+  // State for Cleaning Mode (for BIHUN and BOILER on BIASA and AHAD days)
   const [isCleaningMode, setIsCleaningMode] = useState(false);
-  // State for HARI_AHAD_JAM paycode data (fetched when cleaning mode is enabled)
+  // State for HARI_AHAD_JAM paycode data (fetched when cleaning mode is enabled on Ahad)
   const [cleaningPayCode, setCleaningPayCode] = useState<{
+    id: string;
+    description: string;
+    pay_type: string;
+    rate_unit: string;
+    rate_biasa: number;
+    rate_ahad: number;
+    rate_umum: number;
+  } | null>(null);
+  // State for HARI_BIASA_JAM paycode data (fetched when cleaning mode is enabled on Biasa)
+  const [cleaningPayCodeBiasa, setCleaningPayCodeBiasa] = useState<{
     id: string;
     description: string;
     pay_type: string;
@@ -239,9 +249,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     };
   });
 
-  // Show cleaning mode toggle only for BIHUN and BOILER on AHAD (Sunday) days
+  // Show cleaning mode toggle for BIHUN and BOILER on BIASA and AHAD days (not on UMUM)
   const showCleaningModeToggle = useMemo(() => {
-    return (jobType === "BIHUN" || jobType === "BOILER") && formData.dayType === "Ahad";
+    return (jobType === "BIHUN" || jobType === "BOILER") &&
+           (formData.dayType === "Ahad" || formData.dayType === "Biasa");
   }, [jobType, formData.dayType]);
 
   const {
@@ -451,15 +462,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [formData.dayType]);
 
-  // Reset cleaning mode when day type changes from Ahad to non-Ahad
+  // Reset cleaning mode when day type changes to Umum (cleaning not typical on holidays)
   useEffect(() => {
-    if (formData.dayType !== "Ahad" && isCleaningMode) {
+    if (formData.dayType === "Umum" && isCleaningMode) {
       setIsCleaningMode(false);
     }
   }, [formData.dayType, isCleaningMode]);
 
-  // Fetch HARI_AHAD_JAM and OT_A paycodes proactively when the toggle could appear
-  // This ensures the paycodes are ready when the user toggles cleaning mode
+  // Fetch cleaning paycodes proactively when the toggle could appear
+  // HARI_AHAD_JAM for Ahad days, HARI_BIASA_JAM for Biasa days
   useEffect(() => {
     if (showCleaningModeToggle && (!cleaningPayCode || !cleaningOTPayCode)) {
       Promise.all([
@@ -492,11 +503,39 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [showCleaningModeToggle, cleaningPayCode, cleaningOTPayCode]);
 
+  // Fetch HARI_BIASA_JAM paycode for cleaning mode on Biasa days
+  useEffect(() => {
+    if (showCleaningModeToggle && !cleaningPayCodeBiasa) {
+      api.get("/api/pay-codes/HARI_BIASA_JAM")
+        .then((res: any) => {
+          setCleaningPayCodeBiasa({
+            id: res.id,
+            description: res.description,
+            pay_type: res.pay_type,
+            rate_unit: res.rate_unit,
+            rate_biasa: parseFloat(res.rate_biasa) || 0,
+            rate_ahad: parseFloat(res.rate_ahad) || 0,
+            rate_umum: parseFloat(res.rate_umum) || 0,
+          });
+        })
+        .catch(() => {
+          // Silently fail - will show error when user tries to toggle on Biasa day
+        });
+    }
+  }, [showCleaningModeToggle, cleaningPayCodeBiasa]);
+
   // Handle toggle when paycodes are not available
   const handleCleaningModeToggle = () => {
-    if (!isCleaningMode && (!cleaningPayCode || !cleaningOTPayCode)) {
-      toast.error("Required paycodes (HARI_AHAD_JAM, OT_A) not found. Please create them first.");
-      return;
+    if (!isCleaningMode) {
+      // Check for the appropriate paycode based on day type
+      if (formData.dayType === "Ahad" && (!cleaningPayCode || !cleaningOTPayCode)) {
+        toast.error("Required paycodes (HARI_AHAD_JAM, OT_A) not found. Please create them first.");
+        return;
+      }
+      if (formData.dayType === "Biasa" && !cleaningPayCodeBiasa) {
+        toast.error("HARI_BIASA_JAM paycode not found. Please create it first.");
+        return;
+      }
     }
     setIsCleaningMode(!isCleaningMode);
   };
@@ -1775,6 +1814,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     existingWorkLog,
     isCleaningMode,
     cleaningPayCode,
+    cleaningPayCodeBiasa,
     cleaningOTPayCode,
     forceOTHours,
   ]);
@@ -1823,43 +1863,60 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // Convert map back to array
           let mergedPayCodes = Array.from(allPayCodes.values());
 
-          // In cleaning mode (BIHUN/BOILER on Sunday), split hours:
-          // - HARI_AHAD_JAM for first 8 hours
-          // - OT_A for hours exceeding 8
-          if (isCleaningMode && cleaningPayCode && (jobType === "BIHUN" || jobType === "BOILER")) {
+          // In cleaning mode (BIHUN/BOILER), use appropriate cleaning paycode:
+          // - On Ahad: HARI_AHAD_JAM for first 8 hours, OT_A for hours > 8
+          // - On Biasa: HARI_BIASA_JAM for all hours (single rate)
+          if (isCleaningMode && (jobType === "BIHUN" || jobType === "BOILER")) {
             mergedPayCodes = [];
 
-            // Always add HARI_AHAD_JAM for base hours (up to 8)
-            const baseHours = Math.min(hours, 8);
-            mergedPayCodes.push({
-              id: cleaningPayCode.id,
-              description: cleaningPayCode.description,
-              pay_type: cleaningPayCode.pay_type,
-              rate_unit: cleaningPayCode.rate_unit,
-              rate_biasa: cleaningPayCode.rate_biasa,
-              rate_ahad: cleaningPayCode.rate_ahad,
-              rate_umum: cleaningPayCode.rate_umum,
-              is_default_setting: true,
-              requires_units_input: false,
-              source: "cleaning_mode",
-              hoursApplied: baseHours,
-            });
-
-            // Add OT_A for overtime hours (hours > 8) - only if OT hours exist
-            const otHours = Math.max(0, hours - 8);
-            if (otHours > 0 && cleaningOTPayCode) {
+            if (formData.dayType === "Ahad" && cleaningPayCode) {
+              // Ahad: split into base + OT
+              const baseHours = Math.min(hours, 8);
               mergedPayCodes.push({
-                id: cleaningOTPayCode.id,
-                description: cleaningOTPayCode.description,
-                pay_type: cleaningOTPayCode.pay_type,
-                rate_unit: cleaningOTPayCode.rate_unit,
-                rate_biasa: cleaningOTPayCode.rate_biasa,
-                rate_ahad: cleaningOTPayCode.rate_ahad,
-                rate_umum: cleaningOTPayCode.rate_umum,
+                id: cleaningPayCode.id,
+                description: cleaningPayCode.description,
+                pay_type: cleaningPayCode.pay_type,
+                rate_unit: cleaningPayCode.rate_unit,
+                rate_biasa: cleaningPayCode.rate_biasa,
+                rate_ahad: cleaningPayCode.rate_ahad,
+                rate_umum: cleaningPayCode.rate_umum,
                 is_default_setting: true,
                 requires_units_input: false,
                 source: "cleaning_mode",
-                hoursApplied: otHours,
+                hoursApplied: baseHours,
+              });
+
+              // Add OT_A for overtime hours (hours > 8) - only if OT hours exist
+              const otHours = Math.max(0, hours - 8);
+              if (otHours > 0 && cleaningOTPayCode) {
+                mergedPayCodes.push({
+                  id: cleaningOTPayCode.id,
+                  description: cleaningOTPayCode.description,
+                  pay_type: cleaningOTPayCode.pay_type,
+                  rate_unit: cleaningOTPayCode.rate_unit,
+                  rate_biasa: cleaningOTPayCode.rate_biasa,
+                  rate_ahad: cleaningOTPayCode.rate_ahad,
+                  rate_umum: cleaningOTPayCode.rate_umum,
+                  is_default_setting: true,
+                  requires_units_input: false,
+                  source: "cleaning_mode",
+                  hoursApplied: otHours,
+                });
+              }
+            } else if (formData.dayType === "Biasa" && cleaningPayCodeBiasa) {
+              // Biasa: single paycode for all hours (same rate for all)
+              mergedPayCodes.push({
+                id: cleaningPayCodeBiasa.id,
+                description: cleaningPayCodeBiasa.description,
+                pay_type: cleaningPayCodeBiasa.pay_type,
+                rate_unit: cleaningPayCodeBiasa.rate_unit,
+                rate_biasa: cleaningPayCodeBiasa.rate_biasa,
+                rate_ahad: cleaningPayCodeBiasa.rate_ahad,
+                rate_umum: cleaningPayCodeBiasa.rate_umum,
+                is_default_setting: true,
+                requires_units_input: false,
+                source: "cleaning_mode",
+                hoursApplied: hours,
               });
             }
           }
@@ -1972,13 +2029,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               }
             }
 
-            // In cleaning mode, always select the HARI_AHAD_JAM paycode
-            if (isCleaningMode && payCode.id === "HARI_AHAD_JAM") {
-              isSelected = true;
-            }
-            // In cleaning mode, also select OT_A when OT hours exist
-            if (isCleaningMode && payCode.id === "OT_A" && hours > 8) {
-              isSelected = true;
+            // In cleaning mode, auto-select the appropriate cleaning paycode
+            if (isCleaningMode) {
+              // On Ahad: select HARI_AHAD_JAM, and OT_A for overtime
+              if (formData.dayType === "Ahad" && payCode.id === "HARI_AHAD_JAM") {
+                isSelected = true;
+              }
+              if (formData.dayType === "Ahad" && payCode.id === "OT_A" && hours > 8) {
+                isSelected = true;
+              }
+              // On Biasa: select HARI_BIASA_JAM
+              if (formData.dayType === "Biasa" && payCode.id === "HARI_BIASA_JAM") {
+                isSelected = true;
+              }
             }
 
             // Determine units produced
