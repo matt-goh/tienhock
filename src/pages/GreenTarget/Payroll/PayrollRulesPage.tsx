@@ -28,7 +28,6 @@ import {
   IconChevronDown,
   IconRuler,
   IconPackage,
-  IconAdjustments,
   IconSearch,
 } from "@tabler/icons-react";
 import clsx from "clsx";
@@ -81,11 +80,11 @@ interface PayrollSettings {
   };
 }
 
-type TabType = "destinations" | "rules" | "addons" | "settings";
+type TabType = "rules" | "settings";
 
 const PayrollRulesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>("destinations");
+  const [activeTab, setActiveTab] = useState<TabType>("rules");
   const [isLoading, setIsLoading] = useState(true);
 
   // Data states
@@ -94,12 +93,15 @@ const PayrollRulesPage: React.FC = () => {
   const [addonPaycodes, setAddonPaycodes] = useState<AddonPaycode[]>([]);
   const [payCodes, setPayCodes] = useState<PayCode[]>([]);
   const [settings, setSettings] = useState<PayrollSettings>({});
+  const [editedSettings, setEditedSettings] = useState<PayrollSettings>({});
+  const [hasUnsavedSettings, setHasUnsavedSettings] = useState(false);
 
   // Modal states
   const [isDestinationModalOpen, setIsDestinationModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [isAddonModalOpen, setIsAddonModalOpen] = useState(false);
-  const [editingDestination, setEditingDestination] = useState<PickupDestination | null>(null);
+  const [editingDestination, setEditingDestination] =
+    useState<PickupDestination | null>(null);
   const [editingRule, setEditingRule] = useState<PayrollRule | null>(null);
   const [editingAddon, setEditingAddon] = useState<AddonPaycode | null>(null);
 
@@ -149,19 +151,25 @@ const PayrollRulesPage: React.FC = () => {
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const [destinationsRes, rulesRes, addonsRes, payCodesRes, settingsRes] = await Promise.all([
-        greenTargetApi.getPickupDestinations(),
-        greenTargetApi.getPayrollRules(),
-        greenTargetApi.getAddonPaycodes(),
-        greenTargetApi.request("GET", "/greentarget/api/payroll-rules/pay-codes"),
-        greenTargetApi.getPayrollSettings(),
-      ]);
+      const [destinationsRes, rulesRes, addonsRes, payCodesRes, settingsRes] =
+        await Promise.all([
+          greenTargetApi.getPickupDestinations(),
+          greenTargetApi.getPayrollRules(),
+          greenTargetApi.getAddonPaycodes(),
+          greenTargetApi.request(
+            "GET",
+            "/greentarget/api/payroll-rules/pay-codes"
+          ),
+          greenTargetApi.getPayrollSettings(),
+        ]);
 
       setDestinations(destinationsRes || []);
       setRules(rulesRes || []);
       setAddonPaycodes(addonsRes || []);
       setPayCodes(payCodesRes || []);
       setSettings(settingsRes || {});
+      setEditedSettings(settingsRes || {});
+      setHasUnsavedSettings(false);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load settings data");
@@ -201,7 +209,10 @@ const PayrollRulesPage: React.FC = () => {
     setIsSaving(true);
     try {
       if (editingDestination) {
-        await greenTargetApi.updatePickupDestination(editingDestination.id, destinationForm);
+        await greenTargetApi.updatePickupDestination(
+          editingDestination.id,
+          destinationForm
+        );
         toast.success("Destination updated");
       } else {
         await greenTargetApi.createPickupDestination(destinationForm);
@@ -217,7 +228,10 @@ const PayrollRulesPage: React.FC = () => {
     }
   };
 
-  const openDeleteConfirm = (type: "destination" | "rule" | "addon", item: PickupDestination | PayrollRule | AddonPaycode) => {
+  const openDeleteConfirm = (
+    type: "destination" | "rule" | "addon",
+    item: PickupDestination | PayrollRule | AddonPaycode
+  ) => {
     setDeleteTarget({ type, item });
     setDeleteConfirmOpen(true);
   };
@@ -227,19 +241,29 @@ const PayrollRulesPage: React.FC = () => {
 
     try {
       if (deleteTarget.type === "destination") {
-        await greenTargetApi.deletePickupDestination((deleteTarget.item as PickupDestination).id);
+        await greenTargetApi.deletePickupDestination(
+          (deleteTarget.item as PickupDestination).id
+        );
         toast.success("Destination deleted");
       } else if (deleteTarget.type === "rule") {
-        await greenTargetApi.deletePayrollRule((deleteTarget.item as PayrollRule).id);
+        await greenTargetApi.deletePayrollRule(
+          (deleteTarget.item as PayrollRule).id
+        );
         toast.success("Rule deleted");
       } else if (deleteTarget.type === "addon") {
-        await greenTargetApi.request("DELETE", `/greentarget/api/payroll-rules/addon-paycodes/${(deleteTarget.item as AddonPaycode).id}`);
+        await greenTargetApi.request(
+          "DELETE",
+          `/greentarget/api/payroll-rules/addon-paycodes/${
+            (deleteTarget.item as AddonPaycode).id
+          }`
+        );
         toast.success("Addon paycode deleted");
       }
       fetchAllData();
     } catch (error: unknown) {
       console.error("Error deleting:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete";
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete";
       toast.error(errorMessage);
     } finally {
       setDeleteConfirmOpen(false);
@@ -250,12 +274,16 @@ const PayrollRulesPage: React.FC = () => {
   const getDeleteMessage = () => {
     if (!deleteTarget) return "";
     if (deleteTarget.type === "destination") {
-      return `Delete destination "${(deleteTarget.item as PickupDestination).name}"?`;
+      return `Delete destination "${
+        (deleteTarget.item as PickupDestination).name
+      }"?`;
     } else if (deleteTarget.type === "rule") {
       const rule = deleteTarget.item as PayrollRule;
       return `Delete rule "${rule.description || rule.pay_code_id}"?`;
     } else {
-      return `Delete addon paycode "${(deleteTarget.item as AddonPaycode).display_name}"?`;
+      return `Delete addon paycode "${
+        (deleteTarget.item as AddonPaycode).display_name
+      }"?`;
     }
   };
 
@@ -294,18 +322,27 @@ const PayrollRulesPage: React.FC = () => {
   };
 
   const handleSaveRule = async () => {
-    if (!ruleForm.condition_value || !ruleForm.pay_code_id) {
+    if (!ruleForm.condition_value) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     // Validate numeric values for invoice_amount conditions
-    if (ruleForm.condition_field === "invoice_amount" && isNaN(parseFloat(ruleForm.condition_value))) {
+    if (
+      ruleForm.condition_field === "invoice_amount" &&
+      isNaN(parseFloat(ruleForm.condition_value))
+    ) {
       toast.error("Condition value must be a number for invoice_amount");
       return;
     }
-    if (ruleForm.secondary_condition_field === "invoice_amount" && ruleForm.secondary_condition_value && isNaN(parseFloat(ruleForm.secondary_condition_value))) {
-      toast.error("Secondary condition value must be a number for invoice_amount");
+    if (
+      ruleForm.secondary_condition_field === "invoice_amount" &&
+      ruleForm.secondary_condition_value &&
+      isNaN(parseFloat(ruleForm.secondary_condition_value))
+    ) {
+      toast.error(
+        "Secondary condition value must be a number for invoice_amount"
+      );
       return;
     }
 
@@ -313,9 +350,12 @@ const PayrollRulesPage: React.FC = () => {
     try {
       const payload = {
         ...ruleForm,
-        secondary_condition_field: ruleForm.secondary_condition_field || undefined,
-        secondary_condition_operator: ruleForm.secondary_condition_operator || undefined,
-        secondary_condition_value: ruleForm.secondary_condition_value || undefined,
+        secondary_condition_field:
+          ruleForm.secondary_condition_field || undefined,
+        secondary_condition_operator:
+          ruleForm.secondary_condition_operator || undefined,
+        secondary_condition_value:
+          ruleForm.secondary_condition_value || undefined,
       };
 
       if (editingRule) {
@@ -334,7 +374,6 @@ const PayrollRulesPage: React.FC = () => {
       setIsSaving(false);
     }
   };
-
 
   // Addon handlers
   const openAddonModal = (addon?: AddonPaycode) => {
@@ -361,7 +400,7 @@ const PayrollRulesPage: React.FC = () => {
   };
 
   const handleSaveAddon = async () => {
-    if (!addonForm.pay_code_id || !addonForm.display_name) {
+    if (!addonForm.display_name) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -369,10 +408,18 @@ const PayrollRulesPage: React.FC = () => {
     setIsSaving(true);
     try {
       if (editingAddon) {
-        await greenTargetApi.request("PUT", `/greentarget/api/payroll-rules/addon-paycodes/${editingAddon.id}`, addonForm);
+        await greenTargetApi.request(
+          "PUT",
+          `/greentarget/api/payroll-rules/addon-paycodes/${editingAddon.id}`,
+          addonForm
+        );
         toast.success("Addon paycode updated");
       } else {
-        await greenTargetApi.request("POST", "/greentarget/api/payroll-rules/addon-paycodes", addonForm);
+        await greenTargetApi.request(
+          "POST",
+          "/greentarget/api/payroll-rules/addon-paycodes",
+          addonForm
+        );
         toast.success("Addon paycode created");
       }
       setIsAddonModalOpen(false);
@@ -385,19 +432,35 @@ const PayrollRulesPage: React.FC = () => {
     }
   };
 
-
   // Settings handlers
-  const handleUpdateSetting = async (key: string, value: string) => {
+  const handleLocalSettingChange = (key: string, value: string) => {
+    setEditedSettings((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], value },
+    }));
+    setHasUnsavedSettings(true);
+  };
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true);
     try {
-      await greenTargetApi.updatePayrollSetting(key, value);
-      setSettings((prev) => ({
-        ...prev,
-        [key]: { ...prev[key], value },
-      }));
-      toast.success("Setting updated");
+      // Save each modified setting
+      const savePromises = Object.entries(editedSettings).map(([key, setting]) => {
+        if (settings[key]?.value !== setting.value) {
+          return greenTargetApi.updatePayrollSetting(key, setting.value);
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(savePromises);
+
+      setSettings(editedSettings);
+      setHasUnsavedSettings(false);
+      toast.success("Settings saved");
     } catch (error) {
-      console.error("Error updating setting:", error);
-      toast.error("Failed to update setting");
+      console.error("Error saving settings:", error);
+      toast.error("Failed to save settings");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -415,55 +478,21 @@ const PayrollRulesPage: React.FC = () => {
   const pickupRules = rules.filter((r) => r.rule_type === "PICKUP");
 
   // Filtered data based on search term
-  const filteredDestinations = destinations.filter(
-    (d) =>
-      d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
   const filteredPlacementRules = placementRules.filter(
     (r) =>
-      r.pay_code_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.pay_code_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.description || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredPickupRules = pickupRules.filter(
     (r) =>
-      r.pay_code_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.pay_code_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.description || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredAddonPaycodes = addonPaycodes.filter(
     (a) =>
-      a.pay_code_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.pay_code_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.display_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // Get add button text based on active tab
-  const getAddButtonText = () => {
-    switch (activeTab) {
-      case "destinations":
-        return "Add Destination";
-      case "rules":
-        return "Add Rule";
-      case "addons":
-        return "Add Addon";
-      default:
-        return "";
-    }
-  };
-
-  // Handle add button click
-  const handleAddClick = () => {
-    switch (activeTab) {
-      case "destinations":
-        openDestinationModal();
-        break;
-      case "rules":
-        openRuleModal();
-        break;
-      case "addons":
-        openAddonModal();
-        break;
-    }
-  };
 
   if (isLoading) {
     return (
@@ -480,6 +509,7 @@ const PayrollRulesPage: React.FC = () => {
         {/* Left side: Back button, Title, Stats */}
         <div className="flex items-center gap-3">
           <BackButton onClick={() => navigate("/greentarget/payroll")} />
+          <span className="text-default-300 dark:text-gray-600">|</span>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Payroll Settings
           </h1>
@@ -487,7 +517,10 @@ const PayrollRulesPage: React.FC = () => {
           {/* Stats */}
           <div className="flex items-center gap-3 text-sm">
             <div className="flex items-center gap-1.5">
-              <IconMapPin size={15} className="text-amber-600 dark:text-amber-400" />
+              <IconMapPin
+                size={15}
+                className="text-amber-600 dark:text-amber-400"
+              />
               <span className="font-medium text-default-700 dark:text-gray-200">
                 {destinations.length}
               </span>
@@ -503,30 +536,53 @@ const PayrollRulesPage: React.FC = () => {
             </div>
             <span className="text-default-300 dark:text-gray-600">•</span>
             <div className="flex items-center gap-1.5">
-              <IconPackage size={15} className="text-emerald-600 dark:text-emerald-400" />
+              <IconPackage
+                size={15}
+                className="text-emerald-600 dark:text-emerald-400"
+              />
               <span className="font-medium text-default-700 dark:text-gray-200">
                 {addonPaycodes.length}
               </span>
-              <span className="text-default-400 dark:text-gray-400">addons</span>
+              <span className="text-default-400 dark:text-gray-400">
+                addons
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Right side: Pill filters, Search, Add button */}
+        {/* Right side: Search, Pill filters */}
         <div className="flex items-center gap-2">
+          {/* Compact Search Input */}
+          {activeTab === "rules" && (
+            <>
+              <div className="relative">
+                <IconSearch
+                  size={14}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
+                />
+                {searchTerm && (
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
+                    onClick={() => setSearchTerm("")}
+                    title="Clear search"
+                  >
+                    <IconX size={12} />
+                  </button>
+                )}
+              </div>
+              <span className="text-default-300 dark:text-gray-600">|</span>
+            </>
+          )}
+
           {/* Pill Button Filters */}
           <div className="flex items-center bg-default-100 dark:bg-gray-800 rounded-full p-0.5">
-            <button
-              onClick={() => setActiveTab("destinations")}
-              className={clsx(
-                "px-3 py-1 rounded-full text-xs font-medium transition-colors",
-                activeTab === "destinations"
-                  ? "bg-amber-500 text-white shadow-sm"
-                  : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
-              )}
-            >
-              Destinations
-            </button>
             <button
               onClick={() => setActiveTab("rules")}
               className={clsx(
@@ -536,18 +592,7 @@ const PayrollRulesPage: React.FC = () => {
                   : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
               )}
             >
-              Rules
-            </button>
-            <button
-              onClick={() => setActiveTab("addons")}
-              className={clsx(
-                "px-3 py-1 rounded-full text-xs font-medium transition-colors",
-                activeTab === "addons"
-                  ? "bg-amber-500 text-white shadow-sm"
-                  : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
-              )}
-            >
-              Addons
+              Rules & Addons
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -561,138 +606,33 @@ const PayrollRulesPage: React.FC = () => {
               Settings
             </button>
           </div>
-
-          <span className="text-default-300 dark:text-gray-600">|</span>
-
-          {/* Compact Search Input */}
-          {activeTab !== "settings" && (
-            <div className="relative">
-              <IconSearch
-                size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
-              />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-              {searchTerm && (
-                <button
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
-                  onClick={() => setSearchTerm("")}
-                  title="Clear search"
-                >
-                  <IconX size={12} />
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Add Button */}
-          {activeTab !== "settings" && (
-            <Button
-              size="sm"
-              variant="filled"
-              color="amber"
-              icon={IconPlus}
-              onClick={handleAddClick}
-            >
-              {getAddButtonText()}
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Destinations Tab */}
-      {activeTab === "destinations" && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-default-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-default-600 dark:text-gray-300 font-medium">
-                  Code
-                </th>
-                <th className="px-4 py-3 text-left text-default-600 dark:text-gray-300 font-medium">
-                  Name
-                </th>
-                <th className="px-4 py-3 text-center text-default-600 dark:text-gray-300 font-medium w-24">
-                  Default
-                </th>
-                <th className="px-4 py-3 text-center text-default-600 dark:text-gray-300 font-medium w-24">
-                  Order
-                </th>
-                <th className="px-4 py-3 text-center text-default-600 dark:text-gray-300 font-medium w-32">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDestinations.map((dest) => (
-                <tr
-                  key={dest.id}
-                  className="border-b border-default-100 dark:border-gray-700"
-                >
-                  <td className="px-4 py-3">
-                    <span className="font-mono font-medium text-default-800 dark:text-gray-200">
-                      {dest.code}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-default-800 dark:text-gray-200">
-                    {dest.name}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {dest.is_default && (
-                      <span className="inline-flex items-center px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded text-xs">
-                        <IconCheck size={14} className="mr-1" />
-                        Default
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center text-default-600 dark:text-gray-400">
-                    {dest.sort_order}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => openDestinationModal(dest)}
-                        className="p-1.5 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded"
-                        title="Edit"
-                      >
-                        <IconEdit size={18} />
-                      </button>
-                      <button
-                        onClick={() => openDeleteConfirm("destination", dest)}
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded"
-                        title="Delete"
-                      >
-                        <IconTrash size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredDestinations.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-default-500 dark:text-gray-400">
-                    {searchTerm ? "No destinations matching search" : "No pickup destinations configured"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Rules Tab */}
+      {/* Rules & Addons Tab */}
       {activeTab === "rules" && (
         <div className="space-y-3">
           {/* PLACEMENT Rules */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50">
-              <span className="text-sm font-medium text-default-700 dark:text-gray-300">PLACEMENT Rules</span>
-              <span className="text-xs text-default-400 dark:text-gray-500 ml-2">Based on invoice amount</span>
+            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                  PLACEMENT Rules
+                </span>
+                <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
+                  Based on invoice amount
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setRuleForm((prev) => ({ ...prev, rule_type: "PLACEMENT", condition_field: "invoice_amount" }));
+                  openRuleModal();
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+              >
+                <IconPlus size={14} />
+                Add Rule
+              </button>
             </div>
             <table className="w-full text-sm">
               <thead className="bg-default-50 dark:bg-gray-700">
@@ -729,12 +669,20 @@ const PayrollRulesPage: React.FC = () => {
                       </code>
                     </td>
                     <td className="px-4 py-2">
-                      <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
-                        {rule.pay_code_id}
-                      </span>
-                      {rule.pay_code_description && (
-                        <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
-                          ({rule.pay_code_description})
+                      {rule.pay_code_id ? (
+                        <>
+                          <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
+                            {rule.pay_code_id}
+                          </span>
+                          {rule.pay_code_description && (
+                            <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
+                              ({rule.pay_code_description})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400 text-xs italic">
+                          Not assigned
                         </span>
                       )}
                     </td>
@@ -763,8 +711,13 @@ const PayrollRulesPage: React.FC = () => {
                 ))}
                 {filteredPlacementRules.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm">
-                      {searchTerm ? "No PLACEMENT rules matching search" : "No PLACEMENT rules configured"}
+                    <td
+                      colSpan={5}
+                      className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
+                    >
+                      {searchTerm
+                        ? "No PLACEMENT rules matching search"
+                        : "No PLACEMENT rules configured"}
                     </td>
                   </tr>
                 )}
@@ -774,9 +727,25 @@ const PayrollRulesPage: React.FC = () => {
 
           {/* PICKUP Rules */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50">
-              <span className="text-sm font-medium text-default-700 dark:text-gray-300">PICKUP Rules</span>
-              <span className="text-xs text-default-400 dark:text-gray-500 ml-2">Based on destination & amount</span>
+            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                  PICKUP Rules
+                </span>
+                <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
+                  Based on destination & amount
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setRuleForm((prev) => ({ ...prev, rule_type: "PICKUP", condition_field: "destination" }));
+                  openRuleModal();
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+              >
+                <IconPlus size={14} />
+                Add Rule
+              </button>
             </div>
             <table className="w-full text-sm">
               <thead className="bg-default-50 dark:bg-gray-700">
@@ -813,12 +782,20 @@ const PayrollRulesPage: React.FC = () => {
                       </code>
                     </td>
                     <td className="px-4 py-2">
-                      <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
-                        {rule.pay_code_id}
-                      </span>
-                      {rule.pay_code_description && (
-                        <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
-                          ({rule.pay_code_description})
+                      {rule.pay_code_id ? (
+                        <>
+                          <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
+                            {rule.pay_code_id}
+                          </span>
+                          {rule.pay_code_description && (
+                            <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
+                              ({rule.pay_code_description})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400 text-xs italic">
+                          Not assigned
                         </span>
                       )}
                     </td>
@@ -847,20 +824,39 @@ const PayrollRulesPage: React.FC = () => {
                 ))}
                 {filteredPickupRules.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm">
-                      {searchTerm ? "No PICKUP rules matching search" : "No PICKUP rules configured"}
+                    <td
+                      colSpan={5}
+                      className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
+                    >
+                      {searchTerm
+                        ? "No PICKUP rules matching search"
+                        : "No PICKUP rules configured"}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
-      {/* Addons Tab */}
-      {activeTab === "addons" && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          {/* Addon Paycodes Section */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                  Addon Paycodes
+                </span>
+                <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
+                  Manual add-ons for rentals
+                </span>
+              </div>
+              <button
+                onClick={() => openAddonModal()}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+              >
+                <IconPlus size={14} />
+                Add Addon
+              </button>
+            </div>
           <table className="w-full text-sm">
             <thead className="bg-default-50 dark:bg-gray-700">
               <tr>
@@ -891,12 +887,20 @@ const PayrollRulesPage: React.FC = () => {
                   className="border-b border-default-100 dark:border-gray-700"
                 >
                   <td className="px-4 py-2">
-                    <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
-                      {addon.pay_code_id}
-                    </span>
-                    {addon.pay_code_description && (
-                      <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
-                        ({addon.pay_code_description})
+                    {addon.pay_code_id ? (
+                      <>
+                        <span className="font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
+                          {addon.pay_code_id}
+                        </span>
+                        {addon.pay_code_description && (
+                          <span className="text-default-500 dark:text-gray-400 text-xs ml-1">
+                            ({addon.pay_code_description})
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400 text-xs italic">
+                        Not assigned
                       </span>
                     )}
                   </td>
@@ -942,20 +946,28 @@ const PayrollRulesPage: React.FC = () => {
               ))}
               {filteredAddonPaycodes.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm">
-                    {searchTerm ? "No addon paycodes matching search" : "No addon paycodes configured"}
+                  <td
+                    colSpan={6}
+                    className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
+                  >
+                    {searchTerm
+                      ? "No addon paycodes matching search"
+                      : "No addon paycodes configured"}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Settings Tab */}
       {activeTab === "settings" && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="p-4 space-y-3">
+        <div className="space-y-3">
+          {/* Payroll Settings Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+            <div className="p-4 space-y-3">
             {/* Default Invoice Amount */}
             <div className="flex items-center justify-between p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-100 dark:border-gray-700">
               <div>
@@ -967,20 +979,27 @@ const PayrollRulesPage: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-default-600 dark:text-gray-400">RM</span>
+                <span className="text-sm text-default-600 dark:text-gray-400">
+                  RM
+                </span>
                 <input
                   type="number"
                   min="0"
                   step="1"
-                  value={settings.default_invoice_amount?.value || "200"}
-                  onChange={(e) => handleUpdateSetting("default_invoice_amount", e.target.value)}
+                  value={editedSettings.default_invoice_amount?.value || "200"}
+                  onChange={(e) =>
+                    handleLocalSettingChange(
+                      "default_invoice_amount",
+                      e.target.value
+                    )
+                  }
                   className="w-20 px-2 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-right text-sm"
                 />
               </div>
             </div>
 
             {/* Display other settings if they exist */}
-            {Object.entries(settings)
+            {Object.entries(editedSettings)
               .filter(([key]) => key !== "default_invoice_amount")
               .map(([key, setting]) => (
                 <div
@@ -989,7 +1008,9 @@ const PayrollRulesPage: React.FC = () => {
                 >
                   <div>
                     <h4 className="text-sm font-medium text-default-800 dark:text-gray-200">
-                      {key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                      {key
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
                     </h4>
                     {setting.description && (
                       <p className="text-xs text-default-500 dark:text-gray-400">
@@ -1001,7 +1022,7 @@ const PayrollRulesPage: React.FC = () => {
                     <input
                       type="text"
                       value={setting.value}
-                      onChange={(e) => handleUpdateSetting(key, e.target.value)}
+                      onChange={(e) => handleLocalSettingChange(key, e.target.value)}
                       className="w-28 px-2 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
                     />
                   </div>
@@ -1013,13 +1034,133 @@ const PayrollRulesPage: React.FC = () => {
                 No settings configured. Settings will appear here once added.
               </div>
             )}
+
+            {/* Save Button */}
+            {Object.keys(editedSettings).length > 0 && (
+              <div className="flex justify-end pt-3 border-t border-default-200 dark:border-gray-700">
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={!hasUnsavedSettings || isSaving}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    hasUnsavedSettings
+                      ? "bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+                      : "bg-default-200 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  {isSaving ? "Saving..." : "Save Settings"}
+                </button>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Pickup Destinations Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                Pickup Destinations
+              </span>
+              <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
+                Available pickup locations
+              </span>
+            </div>
+            <button
+              onClick={() => openDestinationModal()}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+            >
+              <IconPlus size={14} />
+              Add Destination
+            </button>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-default-50 dark:bg-gray-700">
+              <tr>
+                <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
+                  Code
+                </th>
+                <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
+                  Name
+                </th>
+                <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
+                  Order
+                </th>
+                <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
+                  Default
+                </th>
+                <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-24">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {destinations.map((dest) => (
+                <tr
+                  key={dest.id}
+                  className="border-b border-default-100 dark:border-gray-700"
+                >
+                  <td className="px-4 py-2">
+                    <span className="font-mono font-medium text-amber-600 dark:text-amber-400 text-xs">
+                      {dest.code}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-default-800 dark:text-gray-200">
+                    {dest.name}
+                  </td>
+                  <td className="px-4 py-2 text-center text-default-600 dark:text-gray-400">
+                    {dest.sort_order}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {dest.is_default && (
+                      <IconCheck
+                        size={16}
+                        className="inline text-emerald-500"
+                      />
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => openDestinationModal(dest)}
+                        className="p-1 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded"
+                        title="Edit"
+                      >
+                        <IconEdit size={16} />
+                      </button>
+                      <button
+                        onClick={() => openDeleteConfirm("destination", dest)}
+                        className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded"
+                        title="Delete"
+                      >
+                        <IconTrash size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {destinations.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
+                  >
+                    No pickup destinations configured
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
         </div>
       )}
 
       {/* Destination Modal */}
       <Transition appear show={isDestinationModalOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setIsDestinationModalOpen(false)}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={() => setIsDestinationModalOpen(false)}
+        >
           <TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
@@ -1032,7 +1173,7 @@ const PayrollRulesPage: React.FC = () => {
             <div className="fixed inset-0 bg-black/30 dark:bg-black/50" />
           </TransitionChild>
 
-          <div className="fixed inset-0 overflow-y-auto">
+          <div className="fixed inset-0">
             <div className="flex min-h-full items-center justify-center p-4">
               <TransitionChild
                 as={Fragment}
@@ -1043,10 +1184,12 @@ const PayrollRulesPage: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
+                <DialogPanel className="w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
                   <div className="flex items-center justify-between border-b border-default-200 dark:border-gray-700 px-6 py-4">
                     <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      {editingDestination ? "Edit Destination" : "Add Destination"}
+                      {editingDestination
+                        ? "Edit Destination"
+                        : "Add Destination"}
                     </DialogTitle>
                     <button
                       onClick={() => setIsDestinationModalOpen(false)}
@@ -1064,7 +1207,12 @@ const PayrollRulesPage: React.FC = () => {
                       <input
                         type="text"
                         value={destinationForm.code}
-                        onChange={(e) => setDestinationForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                        onChange={(e) =>
+                          setDestinationForm((prev) => ({
+                            ...prev,
+                            code: e.target.value.toUpperCase(),
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         placeholder="e.g., TH, MD"
                       />
@@ -1076,7 +1224,12 @@ const PayrollRulesPage: React.FC = () => {
                       <input
                         type="text"
                         value={destinationForm.name}
-                        onChange={(e) => setDestinationForm((prev) => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) =>
+                          setDestinationForm((prev) => ({
+                            ...prev,
+                            name: e.target.value,
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         placeholder="e.g., Tien Hock"
                       />
@@ -1089,7 +1242,12 @@ const PayrollRulesPage: React.FC = () => {
                         <input
                           type="number"
                           value={destinationForm.sort_order}
-                          onChange={(e) => setDestinationForm((prev) => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
+                          onChange={(e) =>
+                            setDestinationForm((prev) => ({
+                              ...prev,
+                              sort_order: parseInt(e.target.value) || 0,
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         />
                       </div>
@@ -1098,17 +1256,27 @@ const PayrollRulesPage: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={destinationForm.is_default}
-                            onChange={(e) => setDestinationForm((prev) => ({ ...prev, is_default: e.target.checked }))}
+                            onChange={(e) =>
+                              setDestinationForm((prev) => ({
+                                ...prev,
+                                is_default: e.target.checked,
+                              }))
+                            }
                             className="w-4 h-4 rounded border-default-300 dark:border-gray-600"
                           />
-                          <span className="text-sm text-default-600 dark:text-gray-300">Default</span>
+                          <span className="text-sm text-default-600 dark:text-gray-300">
+                            Default
+                          </span>
                         </label>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-default-200 dark:border-gray-700">
-                    <Button variant="outline" onClick={() => setIsDestinationModalOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDestinationModalOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button
@@ -1129,7 +1297,11 @@ const PayrollRulesPage: React.FC = () => {
 
       {/* Rule Modal */}
       <Transition appear show={isRuleModalOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setIsRuleModalOpen(false)}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={() => setIsRuleModalOpen(false)}
+        >
           <TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
@@ -1142,7 +1314,7 @@ const PayrollRulesPage: React.FC = () => {
             <div className="fixed inset-0 bg-black/30 dark:bg-black/50" />
           </TransitionChild>
 
-          <div className="fixed inset-0 overflow-y-auto">
+          <div className="fixed inset-0">
             <div className="flex min-h-full items-center justify-center p-4">
               <TransitionChild
                 as={Fragment}
@@ -1153,7 +1325,7 @@ const PayrollRulesPage: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="w-full max-w-lg transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
+                <DialogPanel className="w-full max-w-lg transform rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
                   <div className="flex items-center justify-between border-b border-default-200 dark:border-gray-700 px-6 py-4">
                     <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
                       {editingRule ? "Edit Rule" : "Add Rule"}
@@ -1171,21 +1343,86 @@ const PayrollRulesPage: React.FC = () => {
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
                         Rule Type
                       </label>
-                      <select
+                      <Listbox
                         value={ruleForm.rule_type}
-                        onChange={(e) => {
-                          const ruleType = e.target.value as "PLACEMENT" | "PICKUP";
+                        onChange={(value: "PLACEMENT" | "PICKUP") => {
                           setRuleForm((prev) => ({
                             ...prev,
-                            rule_type: ruleType,
-                            condition_field: ruleType === "PLACEMENT" ? "invoice_amount" : "destination",
+                            rule_type: value,
+                            condition_field:
+                              value === "PLACEMENT"
+                                ? "invoice_amount"
+                                : "destination",
                           }));
                         }}
-                        className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                       >
-                        <option value="PLACEMENT">PLACEMENT</option>
-                        <option value="PICKUP">PICKUP</option>
-                      </select>
+                        <div className="relative">
+                          <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
+                            <span className="block truncate text-default-800 dark:text-gray-200">
+                              {ruleForm.rule_type}
+                            </span>
+                            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                              <IconChevronDown
+                                size={20}
+                                className="text-gray-400"
+                              />
+                            </span>
+                          </ListboxButton>
+                          <Transition
+                            as={Fragment}
+                            leave="transition ease-in duration-100"
+                            leaveFrom="opacity-100"
+                            leaveTo="opacity-0"
+                          >
+                            <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                              <ListboxOption
+                                value="PLACEMENT"
+                                className="relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={clsx(
+                                        "block truncate",
+                                        selected ? "font-medium" : "font-normal"
+                                      )}
+                                    >
+                                      PLACEMENT
+                                    </span>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                        <IconCheck size={20} />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                              <ListboxOption
+                                value="PICKUP"
+                                className="relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={clsx(
+                                        "block truncate",
+                                        selected ? "font-medium" : "font-normal"
+                                      )}
+                                    >
+                                      PICKUP
+                                    </span>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                        <IconCheck size={20} />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
+                            </ListboxOptions>
+                          </Transition>
+                        </div>
+                      </Listbox>
                     </div>
 
                     <div>
@@ -1195,7 +1432,12 @@ const PayrollRulesPage: React.FC = () => {
                       <input
                         type="text"
                         value={ruleForm.description}
-                        onChange={(e) => setRuleForm((prev) => ({ ...prev, description: e.target.value }))}
+                        onChange={(e) =>
+                          setRuleForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         placeholder="e.g., Invoice <= RM180"
                       />
@@ -1203,38 +1445,142 @@ const PayrollRulesPage: React.FC = () => {
 
                     {/* Primary Condition */}
                     <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg space-y-3">
-                      <p className="text-sm font-medium text-default-700 dark:text-gray-200">Primary Condition</p>
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200">
+                        Primary Condition
+                      </p>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <select
+                          <Listbox
                             value={ruleForm.condition_field}
-                            onChange={(e) => setRuleForm((prev) => ({ ...prev, condition_field: e.target.value }))}
-                            className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
+                            onChange={(value: string) =>
+                              setRuleForm((prev) => ({
+                                ...prev,
+                                condition_field: value,
+                              }))
+                            }
                           >
-                            <option value="invoice_amount">invoice_amount</option>
-                            <option value="destination">destination</option>
-                          </select>
+                            <div className="relative">
+                              <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                <span className="block truncate text-default-800 dark:text-gray-200">
+                                  {ruleForm.condition_field}
+                                </span>
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                  <IconChevronDown
+                                    size={16}
+                                    className="text-gray-400"
+                                  />
+                                </span>
+                              </ListboxButton>
+                              <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                {["invoice_amount", "destination"].map(
+                                  (field) => (
+                                    <ListboxOption
+                                      key={field}
+                                      value={field}
+                                      className="relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <span
+                                            className={clsx(
+                                              "block truncate",
+                                              selected
+                                                ? "font-medium"
+                                                : "font-normal"
+                                            )}
+                                          >
+                                            {field}
+                                          </span>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                              <IconCheck size={16} />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </ListboxOption>
+                                  )
+                                )}
+                              </ListboxOptions>
+                            </div>
+                          </Listbox>
                         </div>
                         <div>
-                          <select
+                          <Listbox
                             value={ruleForm.condition_operator}
-                            onChange={(e) => setRuleForm((prev) => ({ ...prev, condition_operator: e.target.value }))}
-                            className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
+                            onChange={(value: string) =>
+                              setRuleForm((prev) => ({
+                                ...prev,
+                                condition_operator: value,
+                              }))
+                            }
                           >
-                            <option value="=">=</option>
-                            <option value="<=">&lt;=</option>
-                            <option value=">">&gt;</option>
-                            <option value="<">&lt;</option>
-                            <option value=">=">{">"} =</option>
-                          </select>
+                            <div className="relative">
+                              <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                <span className="block truncate text-default-800 dark:text-gray-200">
+                                  {ruleForm.condition_operator}
+                                </span>
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                  <IconChevronDown
+                                    size={16}
+                                    className="text-gray-400"
+                                  />
+                                </span>
+                              </ListboxButton>
+                              <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                {[
+                                  { value: "=", label: "=" },
+                                  { value: "<=", label: "<=" },
+                                  { value: ">", label: ">" },
+                                  { value: "<", label: "<" },
+                                  { value: ">=", label: ">=" },
+                                ].map((op) => (
+                                  <ListboxOption
+                                    key={op.value}
+                                    value={op.value}
+                                    className="relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                                  >
+                                    {({ selected }) => (
+                                      <>
+                                        <span
+                                          className={clsx(
+                                            "block truncate",
+                                            selected
+                                              ? "font-medium"
+                                              : "font-normal"
+                                          )}
+                                        >
+                                          {op.label}
+                                        </span>
+                                        {selected && (
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                            <IconCheck size={16} />
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </ListboxOption>
+                                ))}
+                              </ListboxOptions>
+                            </div>
+                          </Listbox>
                         </div>
                         <div>
                           <input
                             type="text"
                             value={ruleForm.condition_value}
-                            onChange={(e) => setRuleForm((prev) => ({ ...prev, condition_value: e.target.value }))}
+                            onChange={(e) =>
+                              setRuleForm((prev) => ({
+                                ...prev,
+                                condition_value: e.target.value,
+                              }))
+                            }
                             className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
-                            placeholder={ruleForm.condition_field === "destination" ? "TH" : "180"}
+                            placeholder={
+                              ruleForm.condition_field === "destination"
+                                ? "TH"
+                                : "180"
+                            }
                           />
                         </div>
                       </div>
@@ -1243,36 +1589,148 @@ const PayrollRulesPage: React.FC = () => {
                     {/* Secondary Condition (for PICKUP rules) */}
                     {ruleForm.rule_type === "PICKUP" && (
                       <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg space-y-3">
-                        <p className="text-sm font-medium text-default-700 dark:text-gray-200">Secondary Condition (optional)</p>
+                        <p className="text-sm font-medium text-default-700 dark:text-gray-200">
+                          Secondary Condition (optional)
+                        </p>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <select
+                            <Listbox
                               value={ruleForm.secondary_condition_field}
-                              onChange={(e) => setRuleForm((prev) => ({ ...prev, secondary_condition_field: e.target.value }))}
-                              className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
+                              onChange={(value: string) =>
+                                setRuleForm((prev) => ({
+                                  ...prev,
+                                  secondary_condition_field: value,
+                                }))
+                              }
                             >
-                              <option value="">None</option>
-                              <option value="invoice_amount">invoice_amount</option>
-                            </select>
+                              <div className="relative">
+                                <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
+                                  <span className="block truncate text-default-800 dark:text-gray-200">
+                                    {ruleForm.secondary_condition_field ||
+                                      "None"}
+                                  </span>
+                                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                    <IconChevronDown
+                                      size={16}
+                                      className="text-gray-400"
+                                    />
+                                  </span>
+                                </ListboxButton>
+                                <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                  {[
+                                    { value: "", label: "None" },
+                                    {
+                                      value: "invoice_amount",
+                                      label: "invoice_amount",
+                                    },
+                                  ].map((field) => (
+                                    <ListboxOption
+                                      key={field.value}
+                                      value={field.value}
+                                      className="relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <span
+                                            className={clsx(
+                                              "block truncate",
+                                              selected
+                                                ? "font-medium"
+                                                : "font-normal"
+                                            )}
+                                          >
+                                            {field.label}
+                                          </span>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                              <IconCheck size={16} />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </ListboxOption>
+                                  ))}
+                                </ListboxOptions>
+                              </div>
+                            </Listbox>
                           </div>
                           <div>
-                            <select
+                            <Listbox
                               value={ruleForm.secondary_condition_operator}
-                              onChange={(e) => setRuleForm((prev) => ({ ...prev, secondary_condition_operator: e.target.value }))}
-                              className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
+                              onChange={(value: string) =>
+                                setRuleForm((prev) => ({
+                                  ...prev,
+                                  secondary_condition_operator: value,
+                                }))
+                              }
                               disabled={!ruleForm.secondary_condition_field}
                             >
-                              <option value="=">=</option>
-                              <option value="<=">&lt;=</option>
-                              <option value=">">&gt;</option>
-                            </select>
+                              <div className="relative">
+                                <ListboxButton
+                                  className={clsx(
+                                    "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500",
+                                    !ruleForm.secondary_condition_field &&
+                                      "opacity-50 cursor-not-allowed"
+                                  )}
+                                  disabled={!ruleForm.secondary_condition_field}
+                                >
+                                  <span className="block truncate text-default-800 dark:text-gray-200">
+                                    {ruleForm.secondary_condition_operator}
+                                  </span>
+                                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                    <IconChevronDown
+                                      size={16}
+                                      className="text-gray-400"
+                                    />
+                                  </span>
+                                </ListboxButton>
+                                <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                  {[
+                                    { value: "=", label: "=" },
+                                    { value: "<=", label: "<=" },
+                                    { value: ">", label: ">" },
+                                  ].map((op) => (
+                                    <ListboxOption
+                                      key={op.value}
+                                      value={op.value}
+                                      className="relative cursor-default select-none py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <span
+                                            className={clsx(
+                                              "block truncate",
+                                              selected
+                                                ? "font-medium"
+                                                : "font-normal"
+                                            )}
+                                          >
+                                            {op.label}
+                                          </span>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                              <IconCheck size={16} />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </ListboxOption>
+                                  ))}
+                                </ListboxOptions>
+                              </div>
+                            </Listbox>
                           </div>
                           <div>
                             <input
                               type="text"
                               value={ruleForm.secondary_condition_value}
-                              onChange={(e) => setRuleForm((prev) => ({ ...prev, secondary_condition_value: e.target.value }))}
-                              className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm"
+                              onChange={(e) =>
+                                setRuleForm((prev) => ({
+                                  ...prev,
+                                  secondary_condition_value: e.target.value,
+                                }))
+                              }
+                              className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                               placeholder="200"
                               disabled={!ruleForm.secondary_condition_field}
                             />
@@ -1284,21 +1742,40 @@ const PayrollRulesPage: React.FC = () => {
                     {/* Pay Code Selection */}
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Pay Code *
+                        Pay Code
                       </label>
                       <Listbox
                         value={ruleForm.pay_code_id}
-                        onChange={(value) => setRuleForm((prev) => ({ ...prev, pay_code_id: value }))}
+                        onChange={(value) =>
+                          setRuleForm((prev) => ({
+                            ...prev,
+                            pay_code_id: value,
+                          }))
+                        }
                       >
                         <div className="relative">
                           <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
-                            <span className="block truncate text-default-800 dark:text-gray-200">
+                            <span
+                              className={clsx(
+                                "block truncate",
+                                ruleForm.pay_code_id
+                                  ? "text-default-800 dark:text-gray-200"
+                                  : "text-amber-600 dark:text-amber-400 italic"
+                              )}
+                            >
                               {ruleForm.pay_code_id
-                                ? `${ruleForm.pay_code_id} - ${payCodes.find((p) => p.id === ruleForm.pay_code_id)?.description || ""}`
-                                : "Select pay code..."}
+                                ? `${ruleForm.pay_code_id} - ${
+                                    payCodes.find(
+                                      (p) => p.id === ruleForm.pay_code_id
+                                    )?.description || ""
+                                  }`
+                                : "Not assigned"}
                             </span>
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                              <IconChevronDown size={20} className="text-gray-400" />
+                              <IconChevronDown
+                                size={20}
+                                className="text-gray-400"
+                              />
                             </span>
                           </ListboxButton>
                           <Transition
@@ -1308,28 +1785,53 @@ const PayrollRulesPage: React.FC = () => {
                             leaveTo="opacity-0"
                           >
                             <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                              <ListboxOption
+                                value=""
+                                className="relative cursor-default select-none py-2 pl-3 pr-10 text-amber-600 dark:text-amber-400 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={clsx(
+                                        "block truncate italic",
+                                        selected ? "font-medium" : "font-normal"
+                                      )}
+                                    >
+                                      Not assigned
+                                    </span>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                        <IconCheck size={20} />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
                               {payCodes
-                                .filter((p) => p.id.startsWith("TRIP") || p.id.startsWith("GT_"))
+                                .filter((p) => p.id.startsWith("TRIP"))
                                 .map((paycode) => (
                                   <ListboxOption
                                     key={paycode.id}
                                     value={paycode.id}
-                                    className={({ active }) =>
-                                      clsx(
-                                        "relative cursor-default select-none py-2 pl-3 pr-10",
-                                        active
-                                          ? "bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-100"
-                                          : "text-gray-900 dark:text-gray-100"
-                                      )
-                                    }
+                                    className="relative cursor-default select-none py-2 pl-3 pr-10 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
                                   >
                                     {({ selected }) => (
                                       <>
-                                        <span className={clsx("block truncate", selected ? "font-medium" : "font-normal")}>
+                                        <span
+                                          className={clsx(
+                                            "block truncate",
+                                            selected
+                                              ? "font-medium"
+                                              : "font-normal"
+                                          )}
+                                        >
                                           {paycode.id} - {paycode.description}
                                         </span>
                                         <span className="text-xs text-default-500 dark:text-gray-400">
-                                          RM {paycode.rate_biasa.toFixed(2)}
+                                          RM{" "}
+                                          {(
+                                            Number(paycode.rate_biasa) || 0
+                                          ).toFixed(2)}
                                         </span>
                                         {selected && (
                                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
@@ -1353,14 +1855,22 @@ const PayrollRulesPage: React.FC = () => {
                       <input
                         type="number"
                         value={ruleForm.priority}
-                        onChange={(e) => setRuleForm((prev) => ({ ...prev, priority: parseInt(e.target.value) || 0 }))}
+                        onChange={(e) =>
+                          setRuleForm((prev) => ({
+                            ...prev,
+                            priority: parseInt(e.target.value) || 0,
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                       />
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-default-200 dark:border-gray-700">
-                    <Button variant="outline" onClick={() => setIsRuleModalOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsRuleModalOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button
@@ -1381,7 +1891,11 @@ const PayrollRulesPage: React.FC = () => {
 
       {/* Addon Modal */}
       <Transition appear show={isAddonModalOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setIsAddonModalOpen(false)}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={() => setIsAddonModalOpen(false)}
+        >
           <TransitionChild
             as={Fragment}
             enter="ease-out duration-300"
@@ -1405,10 +1919,12 @@ const PayrollRulesPage: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
+                <DialogPanel className="w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
                   <div className="flex items-center justify-between border-b border-default-200 dark:border-gray-700 px-6 py-4">
                     <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      {editingAddon ? "Edit Addon Paycode" : "Add Addon Paycode"}
+                      {editingAddon
+                        ? "Edit Addon Paycode"
+                        : "Add Addon Paycode"}
                     </DialogTitle>
                     <button
                       onClick={() => setIsAddonModalOpen(false)}
@@ -1421,7 +1937,7 @@ const PayrollRulesPage: React.FC = () => {
                   <div className="p-6 space-y-3">
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Pay Code *
+                        Pay Code
                       </label>
                       <Listbox
                         value={addonForm.pay_code_id}
@@ -1430,19 +1946,36 @@ const PayrollRulesPage: React.FC = () => {
                           setAddonForm((prev) => ({
                             ...prev,
                             pay_code_id: value,
-                            default_amount: paycode?.rate_biasa || prev.default_amount,
+                            default_amount: value
+                              ? Number(paycode?.rate_biasa) ||
+                                prev.default_amount
+                              : prev.default_amount,
                           }));
                         }}
                       >
                         <div className="relative">
                           <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
-                            <span className="block truncate text-default-800 dark:text-gray-200">
+                            <span
+                              className={clsx(
+                                "block truncate",
+                                addonForm.pay_code_id
+                                  ? "text-default-800 dark:text-gray-200"
+                                  : "text-amber-600 dark:text-amber-400 italic"
+                              )}
+                            >
                               {addonForm.pay_code_id
-                                ? `${addonForm.pay_code_id} - ${payCodes.find((p) => p.id === addonForm.pay_code_id)?.description || ""}`
-                                : "Select pay code..."}
+                                ? `${addonForm.pay_code_id} - ${
+                                    payCodes.find(
+                                      (p) => p.id === addonForm.pay_code_id
+                                    )?.description || ""
+                                  }`
+                                : "Not assigned"}
                             </span>
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                              <IconChevronDown size={20} className="text-gray-400" />
+                              <IconChevronDown
+                                size={20}
+                                className="text-gray-400"
+                              />
                             </span>
                           </ListboxButton>
                           <Transition
@@ -1452,24 +1985,46 @@ const PayrollRulesPage: React.FC = () => {
                             leaveTo="opacity-0"
                           >
                             <ListboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                              <ListboxOption
+                                value=""
+                                className="relative cursor-default select-none py-2 pl-3 pr-10 text-amber-600 dark:text-amber-400 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
+                              >
+                                {({ selected }) => (
+                                  <>
+                                    <span
+                                      className={clsx(
+                                        "block truncate italic",
+                                        selected ? "font-medium" : "font-normal"
+                                      )}
+                                    >
+                                      Not assigned
+                                    </span>
+                                    {selected && (
+                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
+                                        <IconCheck size={20} />
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </ListboxOption>
                               {payCodes
-                                .filter((p) => p.id.startsWith("GT_") || p.id === "HTRB")
+                                .filter((p) => p.id.startsWith("TRIP"))
                                 .map((paycode) => (
                                   <ListboxOption
                                     key={paycode.id}
                                     value={paycode.id}
-                                    className={({ active }) =>
-                                      clsx(
-                                        "relative cursor-default select-none py-2 pl-3 pr-10",
-                                        active
-                                          ? "bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-100"
-                                          : "text-gray-900 dark:text-gray-100"
-                                      )
-                                    }
+                                    className="relative cursor-default select-none py-2 pl-3 pr-10 text-gray-900 dark:text-gray-100 data-[focus]:bg-amber-100 dark:data-[focus]:bg-amber-900/50 data-[focus]:text-amber-900 dark:data-[focus]:text-amber-100"
                                   >
                                     {({ selected }) => (
                                       <>
-                                        <span className={clsx("block truncate", selected ? "font-medium" : "font-normal")}>
+                                        <span
+                                          className={clsx(
+                                            "block truncate",
+                                            selected
+                                              ? "font-medium"
+                                              : "font-normal"
+                                          )}
+                                        >
                                           {paycode.id} - {paycode.description}
                                         </span>
                                         {selected && (
@@ -1494,7 +2049,12 @@ const PayrollRulesPage: React.FC = () => {
                       <input
                         type="text"
                         value={addonForm.display_name}
-                        onChange={(e) => setAddonForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                        onChange={(e) =>
+                          setAddonForm((prev) => ({
+                            ...prev,
+                            display_name: e.target.value,
+                          }))
+                        }
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         placeholder="e.g., Hantar Barang"
                       />
@@ -1510,7 +2070,12 @@ const PayrollRulesPage: React.FC = () => {
                           min="0"
                           step="0.01"
                           value={addonForm.default_amount}
-                          onChange={(e) => setAddonForm((prev) => ({ ...prev, default_amount: parseFloat(e.target.value) || 0 }))}
+                          onChange={(e) =>
+                            setAddonForm((prev) => ({
+                              ...prev,
+                              default_amount: parseFloat(e.target.value) || 0,
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         />
                       </div>
@@ -1521,7 +2086,12 @@ const PayrollRulesPage: React.FC = () => {
                         <input
                           type="number"
                           value={addonForm.sort_order}
-                          onChange={(e) => setAddonForm((prev) => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
+                          onChange={(e) =>
+                            setAddonForm((prev) => ({
+                              ...prev,
+                              sort_order: parseInt(e.target.value) || 0,
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-default-800 dark:text-gray-200"
                         />
                       </div>
@@ -1532,17 +2102,28 @@ const PayrollRulesPage: React.FC = () => {
                         type="checkbox"
                         id="is_variable_amount"
                         checked={addonForm.is_variable_amount}
-                        onChange={(e) => setAddonForm((prev) => ({ ...prev, is_variable_amount: e.target.checked }))}
+                        onChange={(e) =>
+                          setAddonForm((prev) => ({
+                            ...prev,
+                            is_variable_amount: e.target.checked,
+                          }))
+                        }
                         className="w-4 h-4 rounded border-default-300 dark:border-gray-600"
                       />
-                      <label htmlFor="is_variable_amount" className="text-sm text-default-600 dark:text-gray-300 cursor-pointer">
+                      <label
+                        htmlFor="is_variable_amount"
+                        className="text-sm text-default-600 dark:text-gray-300 cursor-pointer"
+                      >
                         Variable amount (user can change)
                       </label>
                     </div>
                   </div>
 
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-default-200 dark:border-gray-700">
-                    <Button variant="outline" onClick={() => setIsAddonModalOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsAddonModalOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button

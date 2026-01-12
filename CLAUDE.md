@@ -17,6 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 12. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
 13. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
 14. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
+15. Never use the vanilla <Select> for listboxes, use the listbox in @src/components/FormComponents.tsx, @src/components/StyledListbox.tsx, or listbox in similar design.
 
 ## Architecture Overview
 
