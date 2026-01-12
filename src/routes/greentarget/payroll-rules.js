@@ -28,7 +28,7 @@ export default function (pool) {
           pc.description as pay_code_description,
           pc.rate_biasa as pay_code_rate
         FROM greentarget.payroll_rules pr
-        JOIN pay_codes pc ON pr.pay_code_id = pc.id
+        LEFT JOIN pay_codes pc ON pr.pay_code_id = pc.id
         WHERE 1=1
       `;
       const params = [];
@@ -53,13 +53,13 @@ export default function (pool) {
     }
   });
 
-  // GET all GT-related pay codes (MUST be before /:id route)
+  // GET all trip-related pay codes (MUST be before /:id route)
   router.get("/pay-codes", async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT id, description, rate_biasa, rate_ahad, rate_umum, pay_type, rate_unit, is_active
          FROM pay_codes
-         WHERE (id LIKE 'GT_%' OR id LIKE 'TRIP%' OR id = 'HTRB') AND is_active = true
+         WHERE id LIKE 'TRIP%' AND is_active = true
          ORDER BY id`
       );
 
@@ -94,7 +94,7 @@ export default function (pool) {
           pc.description as pay_code_description,
           pc.rate_biasa as pay_code_rate
         FROM greentarget.payroll_rules pr
-        JOIN pay_codes pc ON pr.pay_code_id = pc.id
+        LEFT JOIN pay_codes pc ON pr.pay_code_id = pc.id
         WHERE pr.id = $1`,
         [id]
       );
@@ -126,10 +126,10 @@ export default function (pool) {
         description
       } = req.body;
 
-      // Validate required fields
-      if (!rule_type || !condition_field || !condition_operator || !pay_code_id) {
+      // Validate required fields (pay_code_id is now optional)
+      if (!rule_type || !condition_field || !condition_operator) {
         return res.status(400).json({
-          error: "rule_type, condition_field, condition_operator, and pay_code_id are required"
+          error: "rule_type, condition_field, and condition_operator are required"
         });
       }
 
@@ -362,7 +362,7 @@ export default function (pool) {
           pc.description as pay_code_description,
           pc.rate_biasa
         FROM greentarget.addon_paycodes ap
-        JOIN pay_codes pc ON ap.pay_code_id = pc.id
+        LEFT JOIN pay_codes pc ON ap.pay_code_id = pc.id
         WHERE ap.is_active = true
         ORDER BY ap.sort_order ASC`
       );
