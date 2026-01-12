@@ -420,7 +420,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                           <>
                             <button
                               onClick={() => handleEditLog(log)}
-                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded transition-colors"
+                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-900/30 rounded transition-colors"
                               title="Edit"
                             >
                               <IconPencil size={16} />
@@ -430,7 +430,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
                                 setLogToDelete(log);
                                 setShowDeleteDialog(true);
                               }}
-                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded transition-colors"
+                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-900/30 rounded transition-colors"
                               title="Delete"
                             >
                               <IconTrash size={16} />
