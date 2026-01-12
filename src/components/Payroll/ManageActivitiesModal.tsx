@@ -58,6 +58,7 @@ interface ManageActivitiesModalProps {
   onNavigateAttempt?: (to: string) => void;
   logDate?: string;
   isDoubled?: boolean;
+  forceOTHours?: number;
 }
 
 // Paycodes that are doubled when x2 is active for SALESMAN_IKUT (for visual indicator)
@@ -110,12 +111,16 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   onNavigateAttempt = () => {},
   logDate,
   isDoubled = false,
+  forceOTHours = 0,
 }) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [originalActivities, setOriginalActivities] = useState<ActivityItem[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  // Track raw input strings to allow typing decimals like "49.0" without truncation
+  const [unitsInputValues, setUnitsInputValues] = useState<Record<string, string>>({});
+  const [focInputValues, setFocInputValues] = useState<Record<string, string>>({});
   const isSalesman = jobType === "SALESMAN";
   const isSalesmanIkut = jobType === "SALESMAN_IKUT";
   const jobConfig = getJobConfig(jobType);
@@ -189,7 +194,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             (isSalesman || isSalesmanIkut) ? 0 : employeeHours,
             contextData,
             locationType,
-            logDate
+            logDate,
+            forceOTHours
           );
 
           const finalActivities = isSalesmanIkut
@@ -219,6 +225,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     jobConfig,
     salesmanProducts,
     logDate,
+    forceOTHours,
   ]);
 
   // Toggle selection (move between columns)
@@ -233,7 +240,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity.hoursApplied || employeeHours,
         contextData,
         locationType,
-        logDate
+        logDate,
+        forceOTHours
       )
     }));
 
@@ -244,7 +252,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   };
 
   // Update units produced
-  const handleUnitsChange = (index: number, value: string) => {
+  const handleUnitsChange = (index: number, value: string, payCodeId: string) => {
+    // Store raw string value to allow typing decimals like "49.0"
+    setUnitsInputValues(prev => ({ ...prev, [payCodeId]: value }));
+
     const newActivities = [...activities];
     newActivities[index].unitsProduced = value === "" ? 0 : Number(value);
 
@@ -255,7 +266,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
         contextData,
         locationType,
-        logDate
+        logDate,
+        forceOTHours
       )
     }));
 
@@ -266,7 +278,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   };
 
   // Update FOC units
-  const handleFOCChange = (index: number, value: string) => {
+  const handleFOCChange = (index: number, value: string, payCodeId: string) => {
+    // Store raw string value to allow typing decimals like "49.0"
+    setFocInputValues(prev => ({ ...prev, [payCodeId]: value }));
+
     const newActivities = [...activities];
     newActivities[index].unitsFOC = value === "" ? 0 : Number(value);
 
@@ -277,7 +292,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
         activity.hoursApplied || ((isSalesman || isSalesmanIkut) ? 0 : employeeHours),
         contextData,
         locationType,
-        logDate
+        logDate,
+        forceOTHours
       )
     }));
 
@@ -316,11 +332,15 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
   const handleSave = () => {
     onActivitiesUpdated(activities);
+    setUnitsInputValues({});
+    setFocInputValues({});
     onClose();
   };
 
   const handleClose = () => {
     setActivities([...originalActivities]);
+    setUnitsInputValues({});
+    setFocInputValues({});
     onClose();
   };
 
@@ -557,8 +577,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                                 className={`w-20 text-center border border-gray-300 dark:border-gray-600 rounded py-0.5 pl-3 text-sm bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 ${
                                                   activity.isContextLinked ? "bg-gray-100 dark:bg-gray-600 cursor-not-allowed" : ""
                                                 }`}
-                                                value={activity.unitsProduced?.toString() || "0"}
-                                                onChange={(e) => handleUnitsChange(originalIndex, e.target.value)}
+                                                value={unitsInputValues[activity.payCodeId] ?? activity.unitsProduced?.toString() ?? "0"}
+                                                onChange={(e) => handleUnitsChange(originalIndex, e.target.value, activity.payCodeId)}
                                                 onClick={(e) => e.stopPropagation()}
                                                 disabled={activity.isContextLinked}
                                                 readOnly={activity.isContextLinked}
@@ -578,8 +598,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                               <input
                                                 type="number"
                                                 className="w-16 text-center border border-amber-300 dark:border-amber-600 rounded py-0.5 pl-2 text-sm bg-amber-50 dark:bg-amber-900/30 text-default-900 dark:text-gray-100"
-                                                value={activity.unitsFOC?.toString() || "0"}
-                                                onChange={(e) => handleFOCChange(originalIndex, e.target.value)}
+                                                value={focInputValues[activity.payCodeId] ?? activity.unitsFOC?.toString() ?? "0"}
+                                                onChange={(e) => handleFOCChange(originalIndex, e.target.value, activity.payCodeId)}
                                                 onClick={(e) => e.stopPropagation()}
                                                 min="0"
                                                 step="1"

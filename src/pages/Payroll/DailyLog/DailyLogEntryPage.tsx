@@ -446,9 +446,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
   }, [formData.dayType, isCleaningMode]);
 
-  // Fetch HARI_AHAD_JAM paycode when cleaning mode is enabled
+  // Fetch HARI_AHAD_JAM paycode proactively when the toggle could appear
+  // This ensures the paycode is ready when the user toggles cleaning mode
   useEffect(() => {
-    if (isCleaningMode && !cleaningPayCode) {
+    if (showCleaningModeToggle && !cleaningPayCode) {
       api.get("/api/pay-codes/HARI_AHAD_JAM")
         .then((res: any) => {
           setCleaningPayCode({
@@ -462,11 +463,19 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           });
         })
         .catch(() => {
-          toast.error("HARI_AHAD_JAM paycode not found. Please create it first.");
-          setIsCleaningMode(false);
+          // Silently fail - will show error when user tries to toggle
         });
     }
-  }, [isCleaningMode, cleaningPayCode]);
+  }, [showCleaningModeToggle, cleaningPayCode]);
+
+  // Handle toggle when paycode is not available
+  const handleCleaningModeToggle = () => {
+    if (!isCleaningMode && !cleaningPayCode) {
+      toast.error("HARI_AHAD_JAM paycode not found. Please create it first.");
+      return;
+    }
+    setIsCleaningMode(!isCleaningMode);
+  };
 
   // Update BHANGKUT activities when trayCounts changes (BIHUN jobType only)
   useEffect(() => {
@@ -1243,15 +1252,16 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       let updatedJobHours = { ...prev.jobHours };
       if (!wasSelected) {
         // Selecting - ensure hours are initialized
+        // In cleaning mode, default hours is 8
         if (!updatedJobHours[employeeId]) {
           updatedJobHours[employeeId] = {};
         }
         if (!updatedJobHours[employeeId][jobType]) {
-          updatedJobHours[employeeId][jobType] = getDefaultHours(formData.logDate);
+          updatedJobHours[employeeId][jobType] = isCleaningMode ? 8 : getDefaultHours(formData.logDate);
         }
 
-        // Initialize tray count for BIHUN_SANGKUT employees (BIHUN page only)
-        if (isBihunPage && jobType === "BIHUN_SANGKUT") {
+        // Initialize tray count for BIHUN_SANGKUT employees (BIHUN page only, not in cleaning mode)
+        if (isBihunPage && jobType === "BIHUN_SANGKUT" && !isCleaningMode) {
           setTrayCounts((prev) => ({
             ...prev,
             [rowKey]: prev[rowKey] ?? 3, // Default tray count is 3
@@ -1292,7 +1302,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Handle tray count changes for BIHUN_SANGKUT employees (BIHUN only)
   const handleTrayCountChange = (rowKey: string, value: string) => {
-    const numValue = value === "" ? 0 : parseInt(value) || 0;
+    const numValue = value === "" ? 0 : parseFloat(value) || 0;
     setTrayCounts((prev) => ({
       ...prev,
       [rowKey]: numValue,
@@ -1512,8 +1522,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       employeeSelectionState.selectedJobs[emp.id]?.includes(emp.jobType)
     );
 
-    if (!allAvailableSelected && isBihunPage) {
-      // Initialize tray counts for BIHUN_SANGKUT employees being selected
+    // Initialize tray counts for BIHUN_SANGKUT employees (not in cleaning mode)
+    if (!allAvailableSelected && isBihunPage && !isCleaningMode) {
       const newTrayCounts: Record<string, number> = {};
       availableForWork.forEach((emp) => {
         if (emp.jobType === "BIHUN_SANGKUT") {
@@ -1565,7 +1575,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           }
 
           if (!newJobHours[emp.id][emp.jobType]) {
-            newJobHours[emp.id][emp.jobType] = getDefaultHours(formData.logDate);
+            // In cleaning mode, default hours is 8
+            newJobHours[emp.id][emp.jobType] = isCleaningMode ? 8 : getDefaultHours(formData.logDate);
           }
         });
 
@@ -1757,14 +1768,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     const newEmployeeActivities: Record<string, any[]> = {};
 
     Object.entries(employeeSelectionState.selectedJobs).forEach(
-      ([employeeId, jobTypes]) => {
-        jobTypes.forEach((jobType) => {
-          const rowKey = `${employeeId}-${jobType}`;
+      ([employeeId, empJobTypes]) => {
+        empJobTypes.forEach((empJobType) => {
+          const rowKey = `${employeeId}-${empJobType}`;
           const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
+            employeeSelectionState.jobHours[employeeId]?.[empJobType] || 0;
 
           // Get job pay codes from cache
-          const jobPayCodes = jobPayCodeDetails[jobType] || [];
+          const jobPayCodes = jobPayCodeDetails[empJobType] || [];
 
           // Get employee-specific pay codes from cache
           const employeePayCodes = employeeMappings[employeeId] || [];
@@ -1786,11 +1797,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           let mergedPayCodes = Array.from(allPayCodes.values());
 
           // In cleaning mode (BIHUN/BOILER on Sunday), override with only HARI_AHAD_JAM paycode
-          if (isCleaningMode && cleaningPayCode && (jobType.startsWith("BIHUN") || jobType.startsWith("BOILER"))) {
-            mergedPayCodes = [{
+          // Use component-level jobType prop (not the loop variable empJobType)
+          // Same rate applies for all hours (regular + OT), so use single paycode with hoursApplied
+          if (isCleaningMode && cleaningPayCode && (jobType === "BIHUN" || jobType === "BOILER")) {
+            const cleaningActivity = {
               id: cleaningPayCode.id,
               description: cleaningPayCode.description,
-              pay_type: cleaningPayCode.pay_type,
+              pay_type: cleaningPayCode.pay_type, // Use original pay_type
               rate_unit: cleaningPayCode.rate_unit,
               rate_biasa: cleaningPayCode.rate_biasa,
               rate_ahad: cleaningPayCode.rate_ahad,
@@ -1798,7 +1811,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               is_default_setting: true,
               requires_units_input: false,
               source: "cleaning_mode",
-            }];
+              // Set hoursApplied so all hours are calculated directly (bypasses OT threshold logic)
+              hoursApplied: hours,
+            };
+
+            mergedPayCodes = [cleaningActivity];
           }
 
           // Check if this employee was originally saved in the work log
@@ -1811,8 +1828,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             : employeeActivities[rowKey] || [];
 
           // Use day-specific OT threshold (5 for Saturday, 8 for others)
-          const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
-          const forceOT = forceOTHours[rowKey] || 0;
+          // In cleaning mode, threshold is always 8
+          const otThreshold = isCleaningMode ? 8 : (getDefaultHours(formData.logDate) === 5 ? 5 : 8);
+          const forceOT = isCleaningMode ? 0 : (forceOTHours[rowKey] || 0); // No forceOT in cleaning mode
           // Include OT pay codes if hours exceed threshold OR if forceOT is set
           const filteredPayCodes =
             hours > otThreshold || forceOT > 0
@@ -1929,6 +1947,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               unitsProduced: unitsProduced,
               isContextLinked: isContextLinked,
               source: payCode.source,
+              // Include hoursApplied for cleaning mode (all hours calculated directly)
+              hoursApplied: payCode.hoursApplied,
               calculatedAmount: calculateActivityAmount(
                 {
                   isSelected,
@@ -1936,6 +1956,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   rateUnit: payCode.rate_unit,
                   rate,
                   unitsProduced,
+                  // Pass hoursApplied for cleaning mode to bypass OT threshold calculation
+                  hoursApplied: payCode.hoursApplied,
                 },
                 hours,
                 formData.contextData,
@@ -2477,7 +2499,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             <div className="flex items-center gap-2 pb-2">
               <button
                 type="button"
-                onClick={() => setIsCleaningMode(!isCleaningMode)}
+                onClick={handleCleaningModeToggle}
                 disabled={isSaving}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   isCleaningMode
@@ -2575,9 +2597,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          {isBihunPage ? "Units" : "Hours"}
+                          {isBihunPage && !isCleaningMode ? "Units" : "Hours"}
                         </th>
-                        {isBihunPage && (
+                        {isBihunPage && !isCleaningMode && (
                           <th
                             scope="col"
                             className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
@@ -2599,12 +2621,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           employeeSelectionState.selectedJobs[row.id]?.includes(
                             row.jobType
                           ) || false;
+                        // In cleaning mode, default hours is 8
+                        const defaultHrs = isCleaningMode ? 8 : (jobConfig?.defaultHours ?? 7);
                         const hours =
                           employeeSelectionState.jobHours[row.id]?.[
                             row.jobType
-                          ] ??
-                          jobConfig?.defaultHours ??
-                          7;
+                          ] ?? defaultHrs;
 
                         return (
                           <tr
@@ -2675,7 +2697,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             </td>
                             <td className="px-6 py-2 whitespace-nowrap text-right">
                               <div className="flex justify-end">
-                                {isBihunPage && row.jobType === "BIHUN_SANGKUT" ? (
+                                {isBihunPage && row.jobType === "BIHUN_SANGKUT" && !isCleaningMode ? (
                                   <input
                                     type="number"
                                     value={isSelected ? (trayCounts[row.rowKey || ""] || 0).toString() : ""}
@@ -2683,7 +2705,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     onClick={(e) => e.stopPropagation()}
                                     className="w-20 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-default-300 dark:border-gray-600"
                                     min="0"
-                                    step="1"
+                                    step="0.5"
                                     disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
                                     placeholder={isSelected ? "0" : "-"}
                                   />
@@ -2700,10 +2722,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                     onBlur={() => handleHoursBlur(row.rowKey)}
                                     onClick={(e) => e.stopPropagation()}
                                     className={`w-20 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
-                                      hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) &&
-                                      jobConfig?.requiresOvertimeCalc
-                                        ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
-                                        : "border-default-300 dark:border-gray-600"
+                                      // In cleaning mode, OT threshold is 8; otherwise use day-specific threshold
+                                      isCleaningMode
+                                        ? (hours > 8 ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20" : "border-default-300 dark:border-gray-600")
+                                        : (hours > (getDefaultHours(formData.logDate) === 5 ? 5 : 8) && jobConfig?.requiresOvertimeCalc
+                                          ? "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20"
+                                          : "border-default-300 dark:border-gray-600")
                                     }`}
                                     step="0.5"
                                     min="0"
@@ -2718,14 +2742,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 )}
                               </div>
                             </td>
-                            {isBihunPage && (
+                            {isBihunPage && !isCleaningMode && (
                               <td className="px-4 py-2 whitespace-nowrap text-right">
                                 <input
                                   type="number"
                                   value={isSelected ? (forceOTHours[row.rowKey || ""] || 0).toString() : ""}
                                   onChange={(e) => handleForceOTChange(row.rowKey || "", e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="w-16 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed border-amber-400 dark:border-amber-600"
+                                  className={`w-16 py-1 text-sm text-right border rounded-md bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed ${
+                                    (forceOTHours[row.rowKey || ""] || 0) > 0
+                                      ? "border-amber-400 dark:border-amber-600"
+                                      : "border-default-300 dark:border-gray-600"
+                                  }`}
                                   min="0"
                                   step="0.5"
                                   max="8"
@@ -3063,6 +3091,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         hasUnsavedChanges={hasUnsavedChanges}
         onNavigateAttempt={safeNavigate}
         logDate={formData.logDate}
+        forceOTHours={forceOTHours[selectedEmployee?.rowKey || ""] || 0}
       />
       <ManageActivitiesModal
         isOpen={showLeaveActivitiesModal}
