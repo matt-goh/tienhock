@@ -145,7 +145,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   >({});
   // State for BIHUN_SANGKUT tray counts (only used for BIHUN jobType)
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
-  // State for Force OT hours (only used for BIHUN jobType)
+  // State for JAGA STIM (OT) hours - only applies to BH_OT_STIM paycode (only used for BIHUN jobType)
   const [forceOTHours, setForceOTHours] = useState<Record<string, number>>({});
   // State for Sunday Cleaning Mode (only for BIHUN and BOILER on AHAD days)
   const [isCleaningMode, setIsCleaningMode] = useState(false);
@@ -170,6 +170,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   // Constant for the BHANGKUT paycode ID (for BIHUN_SANGKUT tray linking)
   const BHANGKUT_PAYCODE = "BHANGKUT";
+  // Constant for the BH_OT_STIM paycode ID (for JAGA STIM forced OT)
+  const BH_OT_STIM_PAYCODE = "BH_OT_STIM";
 
   // Check if current page is BIHUN production (for conditionally showing Tray column)
   const isBihunPage = jobType === "BIHUN";
@@ -518,7 +520,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trayCounts, isInitializationComplete, isBihunPage]);
 
-  // Update OT activities when forceOTHours changes (BIHUN only)
+  // Update BH_OT_STIM activity when forceOTHours changes (BIHUN only)
+  // Only BH_OT_STIM paycode uses the JAGA STIM (OT) forced overtime hours
   useEffect(() => {
     if (!isInitializationComplete || !isBihunPage) return;
 
@@ -535,7 +538,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           let hasChanges = false;
 
           const updatedActivities = activities.map((activity) => {
-            if (activity.payType === "Overtime" && activity.rateUnit === "Hour") {
+            // Only apply forced OT hours to BH_OT_STIM paycode
+            if (activity.payCodeId === BH_OT_STIM_PAYCODE) {
               const newAmount = totalOT * (activity.rate || 0);
               const newSelected = totalOT > 0;
               if (
@@ -1309,7 +1313,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }));
   };
 
-  // Handle Force OT hours changes (BIHUN only)
+  // Handle JAGA STIM (OT) hours changes (BIHUN only - applies only to BH_OT_STIM paycode)
   const handleForceOTChange = (rowKey: string, value: string) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
     setForceOTHours((prev) => ({
@@ -1831,11 +1835,15 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           // In cleaning mode, threshold is always 8
           const otThreshold = isCleaningMode ? 8 : (getDefaultHours(formData.logDate) === 5 ? 5 : 8);
           const forceOT = isCleaningMode ? 0 : (forceOTHours[rowKey] || 0); // No forceOT in cleaning mode
-          // Include OT pay codes if hours exceed threshold OR if forceOT is set
-          const filteredPayCodes =
-            hours > otThreshold || forceOT > 0
-              ? mergedPayCodes
-              : mergedPayCodes.filter((pc) => pc.pay_type !== "Overtime");
+          const hasNaturalOT = hours > otThreshold;
+          // Filter OT pay codes:
+          // - BH_OT_STIM: include if natural OT OR forced OT (JAGA STIM)
+          // - Other OT paycodes: only include if natural OT (hours > threshold)
+          const filteredPayCodes = mergedPayCodes.filter((pc) => {
+            if (pc.pay_type !== "Overtime") return true;
+            if (pc.id === BH_OT_STIM_PAYCODE) return hasNaturalOT || forceOT > 0;
+            return hasNaturalOT;
+          });
 
           // Convert to activity format
           const activities = filteredPayCodes.map((payCode) => {
@@ -1885,12 +1893,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 // NEVER auto-select Tambahan pay codes
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
-                // Auto-select OT codes if:
-                // - hours exceed threshold AND is_default_setting, OR
-                // - forceOT > 0 (forced OT regardless of hours)
+                // Auto-select OT codes based on natural OT (hours > threshold)
+                // Only BH_OT_STIM uses forced OT from JAGA STIM column
                 const hasNaturalOT = hours > otThreshold;
                 const hasForcedOT = forceOT > 0;
-                isSelected = (hasNaturalOT || hasForcedOT) && payCode.is_default_setting;
+                if (payCode.id === BH_OT_STIM_PAYCODE) {
+                  // BH_OT_STIM: select if natural OT OR forced OT
+                  isSelected = (hasNaturalOT || hasForcedOT) && payCode.is_default_setting;
+                } else {
+                  // Other OT paycodes: only select if natural OT (hours > threshold)
+                  isSelected = hasNaturalOT && payCode.is_default_setting;
+                }
               } else if (payCode.pay_type === "Base") {
                 // Base pay codes follow default settings
                 isSelected = payCode.is_default_setting;
@@ -2604,7 +2617,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             scope="col"
                             className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            Force OT
+                            JAGA STIM (OT)
                           </th>
                         )}
                         <th

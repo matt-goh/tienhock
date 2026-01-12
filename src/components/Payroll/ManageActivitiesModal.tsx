@@ -423,6 +423,15 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                       <span className="text-gray-500 dark:text-gray-400">Day:</span>
                       <span className="font-medium text-default-900 dark:text-gray-100">{dayType}</span>
                     </div>
+                    {forceOTHours > 0 && (
+                      <>
+                        <span className="text-gray-300 dark:text-gray-600 flex-shrink-0">•</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-amber-600 dark:text-amber-400">JAGA STIM:</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-400">{forceOTHours}h</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="relative w-full sm:w-auto sm:flex-shrink-0">
                     <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -562,7 +571,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         )}
                                         {activity.payType === "Overtime" && (activity.rateUnit === "Hour" || activity.rateUnit === "Bill") && (
                                           <span className="text-amber-600 dark:text-amber-400">
-                                            {" "}(Hours {">"} {logDate && new Date(logDate).getDay() === 6 ? 5 : 8})
+                                            {" "}{activity.payCodeId === "BH_OT_STIM"
+                                              ? "JAGA STIM"
+                                              : `(Hours > ${logDate && new Date(logDate).getDay() === 6 ? 5 : 8})`}
                                           </span>
                                         )}
                                       </div>
