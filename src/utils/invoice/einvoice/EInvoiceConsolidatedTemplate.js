@@ -10,11 +10,11 @@ const formatDate = (date) => {
   )}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-// Helper function to format time
+// Helper function to format time in UTC (since we're using Z suffix which means UTC)
 const formatTime = () => {
   const now = new Date();
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const hours = String(now.getUTCHours()).padStart(2, "0");
+  const minutes = String(now.getUTCMinutes()).padStart(2, "0");
   return `${hours}:${minutes}:00Z`;
 };
 

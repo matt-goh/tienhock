@@ -118,10 +118,10 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
     // Format the date using our robust date formatter (YYYY-MM-DD)
     const formattedDate = formatDate(invoiceDate.toISOString().split("T")[0]);
 
-    // Get time from the timestamp
-    const hours = invoiceDate.getHours().toString().padStart(2, "0");
-    const minutes = invoiceDate.getMinutes().toString().padStart(2, "0");
-    const seconds = invoiceDate.getSeconds().toString().padStart(2, "0");
+    // Get time in UTC (since we're using Z suffix which means UTC)
+    const hours = invoiceDate.getUTCHours().toString().padStart(2, "0");
+    const minutes = invoiceDate.getUTCMinutes().toString().padStart(2, "0");
+    const seconds = invoiceDate.getUTCSeconds().toString().padStart(2, "0");
     const formattedTime = `${hours}:${minutes}:${seconds}Z`;
 
     // Validate customer data
