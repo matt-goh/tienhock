@@ -2,6 +2,7 @@
 import express from 'express';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
 import { uploadBackupToS3, listS3Backups, deleteS3Backup, downloadS3Backup } from '../../utils/s3-backup.js';
 
@@ -430,11 +431,49 @@ export default function backupRouter(pool) {
       const filePath = `${envBackupDir}/${filename}`;
       const containerName = getContainerName();
 
-      // Check if file exists
+      // Check if file exists locally, if not download from S3
+      let fileExists = false;
+      let downloadedFromS3 = false;
       try {
         await executeCommand(`test -f "${filePath}"`);
+        fileExists = true;
+        console.log(`[Download] Using local file: ${filePath}`);
       } catch {
-        return res.status(404).json({ error: 'Backup file not found' });
+        console.log(`[Download] File not found locally, downloading from S3...`);
+      }
+
+      if (!fileExists) {
+        // Download from S3 - need to handle dev vs prod differently
+        if (shouldUseDockerExec()) {
+          // Dev: Download to host, then copy into Docker container
+          const tempHostPath = `./${filename}`;
+          const downloadedPath = await downloadS3Backup(filename, env, '.');
+          if (!downloadedPath) {
+            return res.status(404).json({ error: 'Backup file not found in S3' });
+          }
+
+          // Ensure directory exists in container and copy file into Docker
+          await executeCommand(`mkdir -p "${envBackupDir}"`);
+          await execAsync(`docker cp "${tempHostPath}" ${containerName}:${filePath}`);
+
+          // Clean up temp file on host
+          try {
+            fs.unlinkSync(tempHostPath);
+          } catch (cleanupErr) {
+            console.warn(`[Download] Failed to cleanup temp host file: ${cleanupErr.message}`);
+          }
+
+          console.log(`[Download] Downloaded from S3 and copied to Docker: ${filePath}`);
+          downloadedFromS3 = true;
+        } else {
+          // Production: Download directly to local filesystem
+          const downloadedPath = await downloadS3Backup(filename, env, envBackupDir);
+          if (!downloadedPath) {
+            return res.status(404).json({ error: 'Backup file not found in S3' });
+          }
+          console.log(`[Download] Downloaded from S3: ${downloadedPath}`);
+          downloadedFromS3 = true;
+        }
       }
 
       // Convert .gz to .sql filename for download
@@ -483,12 +522,12 @@ export default function backupRouter(pool) {
 
           dockerProcess.on('close', async (code) => {
             console.log(`docker exec process exited with code ${code}`);
-            await cleanupTempDb(tempDbName, 'localhost', '5432');
+            await cleanupTempDb(tempDbName, 'localhost', '5432', downloadedFromS3 ? filePath : null);
           });
 
           req.on('close', async () => {
             if (!dockerProcess.killed) dockerProcess.kill();
-            await cleanupTempDb(tempDbName, 'localhost', '5432');
+            await cleanupTempDb(tempDbName, 'localhost', '5432', downloadedFromS3 ? filePath : null);
           });
         } else {
           // Running on Linux (Hetzner production), spawn pg_dump directly
@@ -519,18 +558,18 @@ export default function backupRouter(pool) {
 
           pgDump.on('close', async (code) => {
             console.log(`pg_dump process exited with code ${code}`);
-            await cleanupTempDb(tempDbName, dbHost, dbPort);
+            await cleanupTempDb(tempDbName, dbHost, dbPort, downloadedFromS3 ? filePath : null);
           });
 
           req.on('close', async () => {
             if (!pgDump.killed) pgDump.kill();
-            await cleanupTempDb(tempDbName, dbHost, dbPort);
+            await cleanupTempDb(tempDbName, dbHost, dbPort, downloadedFromS3 ? filePath : null);
           });
         }
 
       } catch (error) {
         console.error('Error during backup conversion:', error);
-        await cleanupTempDb(tempDbName, shouldUseDockerExec() ? 'localhost' : DB_HOST, shouldUseDockerExec() ? '5432' : DB_PORT);
+        await cleanupTempDb(tempDbName, shouldUseDockerExec() ? 'localhost' : DB_HOST, shouldUseDockerExec() ? '5432' : DB_PORT, downloadedFromS3 ? filePath : null);
         throw error;
       }
 
@@ -541,14 +580,24 @@ export default function backupRouter(pool) {
       }
     }
 
-    // Helper function to clean up temporary database
-    async function cleanupTempDb(dbName, dbHost, dbPort) {
+    // Helper function to clean up temporary database and optionally the downloaded backup file
+    async function cleanupTempDb(dbName, dbHost, dbPort, backupFilePath = null) {
       try {
         console.log(`Cleaning up temporary database: ${dbName}`);
         await executeCommand(`PGPASSWORD=${DB_PASSWORD} dropdb -h ${dbHost} -p ${dbPort} -U ${DB_USER} "${dbName}"`);
         console.log(`Successfully dropped temporary database: ${dbName}`);
       } catch (cleanupError) {
         console.error(`Failed to cleanup temporary database ${dbName}:`, cleanupError);
+      }
+
+      // Clean up downloaded backup file if it was downloaded from S3
+      if (backupFilePath) {
+        try {
+          await executeCommand(`rm -f "${backupFilePath}"`);
+          console.log(`[Download] Cleaned up downloaded backup file: ${backupFilePath}`);
+        } catch (fileCleanupError) {
+          console.warn(`[Download] Failed to cleanup backup file: ${fileCleanupError.message}`);
+        }
       }
     }
   });
