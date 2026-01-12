@@ -234,20 +234,28 @@ export default function (pool) {
       const closingResult = await pool.query(closingQuery, [parseInt(year), parseInt(month), product_line]);
       const closingMap = new Map(closingResult.rows.map(r => [r.material_id, r]));
 
-      // Combine data
+      // Combine data - ensure numeric values are parsed as floats (pg returns numeric as strings)
       const data = materials.rows.map(m => {
         const opening = openingMap.get(m.id);
         const closing = closingMap.get(m.id);
 
+        const openingQty = parseFloat(opening?.quantity) || 0;
+        const openingCost = parseFloat(opening?.unit_cost) || parseFloat(m.default_unit_cost) || 0;
+        const openingVal = parseFloat(opening?.total_value) || 0;
+        const closingQty = parseFloat(closing?.quantity) || 0;
+        const closingCost = parseFloat(closing?.unit_cost) || parseFloat(m.default_unit_cost) || 0;
+        const closingVal = parseFloat(closing?.total_value) || 0;
+
         return {
           ...m,
-          opening_quantity: opening?.quantity || 0,
-          opening_unit_cost: opening?.unit_cost || m.default_unit_cost,
-          opening_value: opening?.total_value || 0,
+          default_unit_cost: parseFloat(m.default_unit_cost) || 0,
+          opening_quantity: openingQty,
+          opening_unit_cost: openingCost,
+          opening_value: openingVal,
           closing_id: closing?.id || null,
-          closing_quantity: closing?.quantity || 0,
-          closing_unit_cost: closing?.unit_cost || m.default_unit_cost,
-          closing_value: closing?.total_value || 0,
+          closing_quantity: closingQty,
+          closing_unit_cost: closingCost,
+          closing_value: closingVal,
           closing_notes: closing?.notes || null,
         };
       });
