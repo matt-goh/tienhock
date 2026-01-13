@@ -12,14 +12,16 @@ import Checkbox from "../Checkbox";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../LoadingSpinner";
-import { IconSearch, IconPackage, IconX, IconCheck, IconPlus, IconMinus } from "@tabler/icons-react";
+import { IconSearch, IconPackage, IconX, IconCheck, IconPlus, IconMinus, IconSparkles } from "@tabler/icons-react";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
+import { SPECIAL_ITEMS, isSpecialItem } from "../../config/specialItems";
 
 interface Product {
   id: string;
   description: string;
-  type: "MEE" | "BH";
+  type: "MEE" | "BH" | "BUNDLE";
+  isSpecial?: boolean;
 }
 
 interface PayCodeOption {
@@ -54,29 +56,66 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   const [productSearch, setProductSearch] = useState("");
   const [payCodeSearch, setPayCodeSearch] = useState("");
 
-  // Get products from cache (only MEE and BH types for packing)
-  const { products: cachedProducts, isLoading } = useProductsCache(["MEE", "BH"]);
+  // Get products from cache (MEE, BH, and BUNDLE types for packing)
+  const { products: cachedProducts, isLoading } = useProductsCache(["MEE", "BH", "BUNDLE"]);
 
-  // Map cached products to the Product interface (type assertion for MEE/BH)
+  // Map cached products and add special items
   const products: Product[] = useMemo(() => {
-    return cachedProducts.map((p) => ({
-      id: p.id,
-      description: p.description,
-      type: p.type as "MEE" | "BH",
+    // Regular products (exclude special items that might be in the DB)
+    const regularProducts = cachedProducts
+      .filter((p) => !isSpecialItem(p.id))
+      .map((p) => ({
+        id: p.id,
+        description: p.description,
+        type: p.type as "MEE" | "BH" | "BUNDLE",
+        isSpecial: false,
+      }));
+
+    // Add special items from config
+    const specialProducts = SPECIAL_ITEMS.map((item) => ({
+      id: item.id,
+      description: `${item.name} (${item.nameBM})`,
+      type: item.productType as "MEE" | "BH" | "BUNDLE",
+      isSpecial: true,
     }));
+
+    return [...regularProducts, ...specialProducts];
   }, [cachedProducts]);
 
-  // Get job pay code mappings for filtering
-  const { detailedMappings, productMappings, refreshData } =
+  // Get job pay code mappings and all pay codes for filtering
+  const { detailedMappings, productMappings, payCodes, refreshData } =
     useJobPayCodeMappings();
 
   // Get available pay codes for the selected product type
   const availablePayCodes = useMemo((): PayCodeOption[] => {
     if (!selectedProduct) return [];
 
-    // Get pay codes from MEE_PACKING or BH_PACKING job based on product type
-    const jobId =
-      selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING";
+    // For special items, show ALL pay codes (they may have unique pay codes not mapped to jobs)
+    if (selectedProduct.isSpecial) {
+      return payCodes.map((pc) => ({
+        id: pc.id,
+        description: pc.description,
+        pay_type: pc.pay_type,
+        rate_unit: pc.rate_unit,
+        rate_biasa: pc.rate_biasa,
+        rate_ahad: pc.rate_ahad,
+        rate_umum: pc.rate_umum,
+      }));
+    }
+
+    // For regular products, filter by job
+    // Determine job ID based on product type
+    // BUNDLE type uses BH_PACKING for BP/BH bundles, MEE_PACKING for MEE bundles
+    let jobId: string;
+    if (selectedProduct.type === "MEE") {
+      jobId = "MEE_PACKING";
+    } else if (selectedProduct.type === "BUNDLE") {
+      // BUNDLE_MEE uses MEE_PACKING, others use BH_PACKING
+      jobId = selectedProduct.id === "BUNDLE_MEE" ? "MEE_PACKING" : "BH_PACKING";
+    } else {
+      jobId = "BH_PACKING";
+    }
+
     const jobPayCodes = detailedMappings[jobId] || [];
 
     // Filter to only show pay codes with Bag rate unit (piece rate codes)
@@ -91,7 +130,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
         rate_ahad: pc.rate_ahad,
         rate_umum: pc.rate_umum,
       }));
-  }, [selectedProduct, detailedMappings]);
+  }, [selectedProduct, detailedMappings, payCodes]);
 
   // Filter and sort pay codes - saved ones at top
   const filteredPayCodes = useMemo(() => {
@@ -141,15 +180,23 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
     }
   }, [isOpen, selectedProduct, productMappings]);
 
-  // Filter products based on search
-  const filteredProducts = useMemo(() => {
-    if (!productSearch) return products;
-    const search = productSearch.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.id.toLowerCase().includes(search) ||
-        p.description.toLowerCase().includes(search)
-    );
+  // Filter and group products (regular and special items)
+  const { regularProducts: filteredRegular, specialProducts: filteredSpecial } = useMemo(() => {
+    let filtered = products;
+
+    if (productSearch) {
+      const search = productSearch.toLowerCase();
+      filtered = products.filter(
+        (p) =>
+          p.id.toLowerCase().includes(search) ||
+          p.description.toLowerCase().includes(search)
+      );
+    }
+
+    return {
+      regularProducts: filtered.filter((p) => !p.isSpecial),
+      specialProducts: filtered.filter((p) => p.isSpecial),
+    };
   }, [products, productSearch]);
 
   // Get mapping count for a product
@@ -344,13 +391,14 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                       </div>
 
                       <div className="max-h-[400px] overflow-y-auto">
-                        {filteredProducts.length === 0 ? (
+                        {filteredRegular.length === 0 && filteredSpecial.length === 0 ? (
                           <div className="py-4 text-center text-sm text-default-500 dark:text-gray-400">
                             No products found
                           </div>
                         ) : (
                           <ul className="divide-y divide-default-100 dark:divide-gray-600">
-                            {filteredProducts.map((product) => {
+                            {/* Regular Products */}
+                            {filteredRegular.map((product) => {
                               const mappingCount = getMappingCount(product.id);
                               const isSelected =
                                 selectedProduct?.id === product.id;
@@ -378,6 +426,8 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                         className={`px-1.5 py-0.5 text-xs rounded ${
                                           product.type === "MEE"
                                             ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                            : product.type === "BUNDLE"
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
                                             : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                         }`}
                                       >
@@ -393,6 +443,64 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                 </li>
                               );
                             })}
+
+                            {/* Special Items Section */}
+                            {filteredSpecial.length > 0 && (
+                              <>
+                                <li className="px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-xs text-purple-700 dark:text-purple-300 font-medium flex items-center gap-1.5 sticky top-0">
+                                  <IconSparkles size={12} />
+                                  Special Items ({filteredSpecial.length})
+                                </li>
+                                {filteredSpecial.map((product) => {
+                                  const mappingCount = getMappingCount(product.id);
+                                  const isSelected =
+                                    selectedProduct?.id === product.id;
+                                  return (
+                                    <li
+                                      key={product.id}
+                                      className={`px-3 py-2 cursor-pointer transition-colors ${
+                                        isSelected
+                                          ? "bg-sky-50 dark:bg-sky-900/30 shadow-[inset_3px_0_0_0_#0ea5e9]"
+                                          : "bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-100 dark:hover:bg-purple-900/20"
+                                      }`}
+                                      onClick={() => setSelectedProduct(product)}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-1.5">
+                                            {product.id}
+                                            <span className="text-[10px] bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200 px-1 rounded">
+                                              System
+                                            </span>
+                                          </div>
+                                          <div className="text-xs text-default-500 dark:text-gray-400 truncate max-w-[200px]">
+                                            {product.description}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span
+                                            className={`px-1.5 py-0.5 text-xs rounded ${
+                                              product.type === "MEE"
+                                                ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                                : product.type === "BUNDLE"
+                                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                                            }`}
+                                          >
+                                            {product.type}
+                                          </span>
+                                          {mappingCount > 0 && (
+                                            <span className="text-xs bg-default-100 text-default-600 dark:bg-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded">
+                                              {mappingCount}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </>
+                            )}
                           </ul>
                         )}
                       </div>
@@ -490,7 +598,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                           {payCode.description}
                                         </div>
                                         <div className="text-xs text-default-400 dark:text-gray-500 mt-0.5">
-                                          RM{payCode.rate_biasa.toFixed(2)}/bag
+                                          RM{payCode.rate_biasa.toFixed(2)}/{payCode.rate_unit.toLowerCase()}
                                         </div>
                                       </div>
                                       {status !== 'none' && (

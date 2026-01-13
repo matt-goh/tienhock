@@ -981,7 +981,7 @@ export interface AccountCodeFilters {
 export interface StockProduct {
   id: string;
   description: string;
-  type: "BH" | "MEE" | "JP" | "OTH" | "TAX";
+  type: "BH" | "MEE" | "JP" | "OTH" | "TAX" | "BUNDLE";
   price_per_unit?: number;
   is_active?: boolean;
 }
@@ -1017,6 +1017,30 @@ export interface ProductionWorker {
   id: string;
   name: string;
   job: string[];
+}
+
+// Special Item Configuration (for Hancur, Bundle entries)
+export type SpecialItemCategory = "HANCUR" | "KARUNG_HANCUR" | "BUNDLE";
+export type SpecialItemUnit = "kg" | "bags" | "pcs" | "sack";
+
+export interface SpecialItemConfig {
+  id: string;
+  name: string;
+  nameBM: string;
+  description: string;
+  descriptionBM: string;
+  category: SpecialItemCategory;
+  productType: "BH" | "MEE" | "BUNDLE";
+  workerJob: "BH_PACKING" | "MEE_PACKING";
+  payCodeId: string;
+  unit: SpecialItemUnit;
+  inputStep: number; // 1 for integer, 0.01 for decimal
+  defaultValue?: number;
+  singleWorkerEntry?: {
+    defaultWorkerId: string;
+    allowChange: boolean;
+  };
+  hiddenFromUI?: boolean; // If true, item is internal and not shown in product selectors
 }
 
 // Stock Movement (single day)
@@ -1206,13 +1230,9 @@ export interface StockEntryRow {
   is_new_variant: boolean;  // True if this is a newly added ad-hoc variant
 
   // Stock quantities
-  opening_quantity: number;
-  opening_value: number;
-  purchases_quantity: number;
-  purchases_value: number;
-  consumption_quantity: number;
-  closing_quantity: number;
-  closing_value: number;
+  opening_quantity: number;  // Read-only, from previous month's quantity
+  quantity: number;          // Editable closing quantity
+  value: number;             // Calculated: quantity * unit_cost
 
   // Pricing
   unit_cost: number;
@@ -1221,22 +1241,13 @@ export interface StockEntryRow {
   notes?: string | null;
 }
 
-// Material with opening and closing balances (for stock entry page)
+// Material with stock data (for stock entry page)
 // Now supports multiple variant rows per material
 export interface MaterialWithStock extends Material {
-  // For materials WITHOUT variants: single entry data
-  // Opening (from previous month's closing)
-  opening_quantity: number;
-  opening_value: number;
-
-  // User inputs
-  purchases_quantity: number;
-  purchases_value: number;
-  consumption_quantity: number;
-
-  // Calculated closing
-  closing_quantity: number;  // Auto-calculated: opening + purchases - consumption
-  closing_value: number;
+  // Stock quantities
+  opening_quantity: number;  // Read-only, from previous month's quantity
+  quantity: number;          // Editable closing quantity
+  value: number;             // Calculated: quantity * unit_cost
 
   // Per-entry customization (for single-entry materials)
   custom_name?: string | null;
@@ -1246,8 +1257,8 @@ export interface MaterialWithStock extends Material {
   unit_cost: number;
 
   // Entry metadata
-  closing_id: number | null;
-  closing_notes?: string | null;
+  entry_id: number | null;
+  notes?: string | null;
 
   // Variant support
   variant_id?: number | null;  // For single-entry or when representing a specific variant
@@ -1260,8 +1271,7 @@ export interface MaterialWithStock extends Material {
 export interface MaterialStockEntryInput {
   material_id: number;
   variant_id?: number | null;  // Reference to registered variant (null for ad-hoc or single-entry)
-  purchases_quantity: number;
-  consumption_quantity: number;
+  quantity: number;            // Closing quantity
   unit_cost: number;
   custom_name?: string | null;
   custom_description?: string | null;  // Used for ad-hoc variants when variant_id is null
@@ -1292,4 +1302,43 @@ export interface MaterialFilters {
   category?: MaterialCategory | null;
   is_active?: boolean | null;
   applies_to?: MaterialAppliesTo | "all" | null;
+}
+
+// ==================== CASH RECEIPT VOUCHER TYPES ====================
+
+// Cash Receipt Voucher data for PDF generation
+export interface CashReceiptVoucherData {
+  // Voucher identification
+  voucher_number: string; // REC reference (e.g., "REC001/01")
+  voucher_date: string; // Payment date
+
+  // Payment info
+  payment_id: number;
+  amount: number;
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  payment_reference: string | null;
+  bank_account: string;
+  bank_account_description: string;
+
+  // Customer/Invoice info
+  customer_name: string;
+  invoice_id: string;
+
+  // Journal entry info
+  journal_entry_id: number;
+  description: string | null;
+
+  // Journal entry lines for display
+  lines: CashReceiptVoucherLine[];
+
+  // Metadata
+  created_at: string | null;
+  created_by: string | null;
+}
+
+export interface CashReceiptVoucherLine {
+  account_code: string;
+  account_description: string;
+  debit_amount: number;
+  credit_amount: number;
 }

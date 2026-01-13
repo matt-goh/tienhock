@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
-import { JournalEntry } from "../../types/types";
+import { JournalEntry, CashReceiptVoucherData } from "../../types/types";
 import {
   useAccountCodesCache,
   useJournalEntryTypesCache,
@@ -12,11 +12,13 @@ import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import CashReceiptVoucherModal from "../../components/Accounting/CashReceiptVoucherModal";
 import {
   IconFileText,
   IconPencil,
   IconTrash,
   IconX,
+  IconPrinter,
 } from "@tabler/icons-react";
 
 const JournalDetailsPage: React.FC = () => {
@@ -44,6 +46,11 @@ const JournalDetailsPage: React.FC = () => {
     invoice_id?: string;
     suggestion?: string;
   } | null>(null);
+
+  // Receipt voucher modal states
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [voucherData, setVoucherData] = useState<CashReceiptVoucherData | null>(null);
+  const [isLoadingVoucher, setIsLoadingVoucher] = useState(false);
 
   // Fetch entry data
   const fetchEntry = useCallback(async () => {
@@ -184,6 +191,24 @@ const JournalDetailsPage: React.FC = () => {
     }
   };
 
+  // Handle print receipt voucher
+  const handlePrintVoucher = async () => {
+    if (!id) return;
+
+    setIsLoadingVoucher(true);
+    try {
+      const response = await api.get(`/api/journal-entries/${id}/receipt-voucher`);
+      setVoucherData(response as CashReceiptVoucherData);
+      setShowVoucherModal(true);
+    } catch (err: unknown) {
+      console.error("Error fetching voucher data:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to load voucher data";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoadingVoucher(false);
+    }
+  };
+
   // Status badge
   const getStatusBadge = (status: string) => {
     const isCancelled = status === "cancelled";
@@ -224,6 +249,7 @@ const JournalDetailsPage: React.FC = () => {
   const canEdit = entry.status !== "cancelled";
   const canCancel = entry.status !== "cancelled";
   const canDelete = true;
+  const canPrintVoucher = entry.entry_type === "REC" && entry.status !== "cancelled";
 
   return (
     <div className="space-y-3">
@@ -256,6 +282,18 @@ const JournalDetailsPage: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {canPrintVoucher && (
+                <Button
+                  onClick={handlePrintVoucher}
+                  variant="filled"
+                  color="sky"
+                  icon={IconPrinter}
+                  iconPosition="left"
+                  disabled={isLoadingVoucher}
+                >
+                  {isLoadingVoucher ? "Loading..." : "Print Voucher"}
+                </Button>
+              )}
               {canEdit && (
                 <Button
                   onClick={handleEdit}
@@ -508,6 +546,16 @@ const JournalDetailsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Cash Receipt Voucher Modal */}
+      <CashReceiptVoucherModal
+        isOpen={showVoucherModal}
+        onClose={() => {
+          setShowVoucherModal(false);
+          setVoucherData(null);
+        }}
+        voucherData={voucherData}
+      />
     </div>
   );
 };
