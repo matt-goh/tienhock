@@ -1206,13 +1206,9 @@ export interface StockEntryRow {
   is_new_variant: boolean;  // True if this is a newly added ad-hoc variant
 
   // Stock quantities
-  opening_quantity: number;
-  opening_value: number;
-  purchases_quantity: number;
-  purchases_value: number;
-  consumption_quantity: number;
-  closing_quantity: number;
-  closing_value: number;
+  opening_quantity: number;  // Read-only, from previous month's quantity
+  quantity: number;          // Editable closing quantity
+  value: number;             // Calculated: quantity * unit_cost
 
   // Pricing
   unit_cost: number;
@@ -1221,22 +1217,13 @@ export interface StockEntryRow {
   notes?: string | null;
 }
 
-// Material with opening and closing balances (for stock entry page)
+// Material with stock data (for stock entry page)
 // Now supports multiple variant rows per material
 export interface MaterialWithStock extends Material {
-  // For materials WITHOUT variants: single entry data
-  // Opening (from previous month's closing)
-  opening_quantity: number;
-  opening_value: number;
-
-  // User inputs
-  purchases_quantity: number;
-  purchases_value: number;
-  consumption_quantity: number;
-
-  // Calculated closing
-  closing_quantity: number;  // Auto-calculated: opening + purchases - consumption
-  closing_value: number;
+  // Stock quantities
+  opening_quantity: number;  // Read-only, from previous month's quantity
+  quantity: number;          // Editable closing quantity
+  value: number;             // Calculated: quantity * unit_cost
 
   // Per-entry customization (for single-entry materials)
   custom_name?: string | null;
@@ -1246,8 +1233,8 @@ export interface MaterialWithStock extends Material {
   unit_cost: number;
 
   // Entry metadata
-  closing_id: number | null;
-  closing_notes?: string | null;
+  entry_id: number | null;
+  notes?: string | null;
 
   // Variant support
   variant_id?: number | null;  // For single-entry or when representing a specific variant
@@ -1260,8 +1247,7 @@ export interface MaterialWithStock extends Material {
 export interface MaterialStockEntryInput {
   material_id: number;
   variant_id?: number | null;  // Reference to registered variant (null for ad-hoc or single-entry)
-  purchases_quantity: number;
-  consumption_quantity: number;
+  quantity: number;            // Closing quantity
   unit_cost: number;
   custom_name?: string | null;
   custom_description?: string | null;  // Used for ad-hoc variants when variant_id is null
