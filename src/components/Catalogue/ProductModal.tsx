@@ -10,6 +10,7 @@ import { IconX } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../Button";
 import { FormInput, FormListbox } from "../FormComponents";
+import Checkbox from "../Checkbox";
 
 interface Product {
   id: string;
@@ -17,6 +18,7 @@ interface Product {
   price_per_unit: number;
   type: string;
   tax: string;
+  is_active: boolean;
 }
 
 interface ProductModalProps {
@@ -40,12 +42,17 @@ const ProductModal: React.FC<ProductModalProps> = ({
     price_per_unit: 0,
     type: "",
     tax: "None",
+    is_active: true,
   });
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
     if (product && mode === "edit") {
-      setFormData(product);
+      // Ensure is_active defaults to true if undefined (for backwards compatibility)
+      setFormData({
+        ...product,
+        is_active: product.is_active ?? true,
+      });
     } else {
       setFormData({
         id: "",
@@ -53,6 +60,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
         price_per_unit: 0,
         type: "",
         tax: "None",
+        is_active: true,
       });
     }
   }, [product, mode, isOpen]);
@@ -202,6 +210,17 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   options={taxOptions}
                   required
                 />
+
+                <div className="pt-2">
+                  <Checkbox
+                    checked={formData.is_active}
+                    onChange={(checked: boolean) =>
+                      setFormData({ ...formData, is_active: checked })
+                    }
+                    label="Active"
+                    labelPosition="right"
+                  />
+                </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
                   <Button

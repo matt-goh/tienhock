@@ -9,7 +9,14 @@ import {
   refreshProductsCache,
   useProductsCache,
 } from "../../utils/invoice/useProductsCache";
-import { IconPlus, IconEdit, IconTrash } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconEdit,
+  IconTrash,
+  IconCheck,
+  IconX,
+  IconRefresh,
+} from "@tabler/icons-react";
 import { FormListbox } from "../../components/FormComponents";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import CustomersUsingProductTooltip from "../../components/Catalogue/CustomersUsingProductTooltip";
@@ -20,6 +27,7 @@ interface Product {
   price_per_unit: number;
   type: string;
   tax: string;
+  is_active: boolean;
 }
 
 const ProductPage: React.FC = () => {
@@ -27,7 +35,7 @@ const ProductPage: React.FC = () => {
     products: cachedProductsData,
     isLoading: cacheLoading,
     error: cacheError,
-  } = useProductsCache("all");
+  } = useProductsCache("all", { includeInactive: true });
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -35,6 +43,10 @@ const ProductPage: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [reactivateConfirmOpen, setReactivateConfirmOpen] = useState<boolean>(false);
+  const [productToReactivate, setProductToReactivate] = useState<Product | null>(null);
+  const [hardDeleteConfirmOpen, setHardDeleteConfirmOpen] = useState<boolean>(false);
+  const [productToHardDelete, setProductToHardDelete] = useState<Product | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const {
     customers,
@@ -112,33 +124,77 @@ const ProductPage: React.FC = () => {
     setDeleteConfirmOpen(true);
   }, []);
 
+  const handleReactivateProduct = useCallback((product: Product) => {
+    setProductToReactivate(product);
+    setReactivateConfirmOpen(true);
+  }, []);
+
+  const handleHardDeleteProduct = useCallback((product: Product) => {
+    setProductToHardDelete(product);
+    setHardDeleteConfirmOpen(true);
+  }, []);
+
   const confirmDelete = useCallback(async () => {
     if (!productToDelete) return;
 
     try {
-      await api.delete("/api/products", [productToDelete.id]);
+      // Soft delete by setting is_active to false
+      await api.put(`/api/products/${productToDelete.id}`, {
+        ...productToDelete,
+        is_active: false,
+      });
       await refreshProductsCache();
-      toast.success("Product deleted successfully");
+      toast.success("Product deactivated successfully");
       setDeleteConfirmOpen(false);
       setProductToDelete(null);
     } catch (error: any) {
-      console.error("Error deleting product:", error);
+      console.error("Error deactivating product:", error);
+      toast.error("Failed to deactivate product. Please try again.");
+    }
+  }, [productToDelete]);
 
-      // Check for foreign key constraint violation
-      const errorMessage = error?.error || error?.message || "";
-      if (
-        errorMessage.includes("foreign key constraint") ||
-        errorMessage.includes("customer_products_product_id_fkey")
-      ) {
+  const confirmReactivate = useCallback(async () => {
+    if (!productToReactivate) return;
+
+    try {
+      await api.put(`/api/products/${productToReactivate.id}`, {
+        ...productToReactivate,
+        is_active: true,
+      });
+      await refreshProductsCache();
+      toast.success("Product reactivated successfully");
+      setReactivateConfirmOpen(false);
+      setProductToReactivate(null);
+    } catch (error: any) {
+      console.error("Error reactivating product:", error);
+      toast.error("Failed to reactivate product. Please try again.");
+    }
+  }, [productToReactivate]);
+
+  const confirmHardDelete = useCallback(async () => {
+    if (!productToHardDelete) return;
+
+    try {
+      // api.delete wraps payload as { products: payload }, so just pass the array
+      await api.delete("/api/products", [productToHardDelete.id]);
+      await refreshProductsCache();
+      toast.success("Product permanently deleted");
+      setHardDeleteConfirmOpen(false);
+      setProductToHardDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting product:", error);
+      // Check for foreign key constraint error
+      const errorMessage = error?.data?.error || error?.message || "";
+      if (errorMessage.includes("foreign key constraint") || errorMessage.includes("customer_products")) {
         toast.error(
-          `Cannot delete "${productToDelete.description}" because it is associated with customer records. Please remove all customer associations first.`,
-          { duration: 6000 }
+          "Cannot delete this product - it is assigned to one or more customers. Remove customer assignments first or deactivate instead.",
+          { duration: 5000 }
         );
       } else {
         toast.error("Failed to delete product. Please try again.");
       }
     }
-  }, [productToDelete]);
+  }, [productToHardDelete]);
 
   const handleSaveProduct = useCallback(
     async (productData: Product) => {
@@ -255,13 +311,13 @@ const ProductPage: React.FC = () => {
             <table className="min-w-full">
               <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[15%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[12%]">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[35%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[32%]">
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[12%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
                     Price/Unit
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
@@ -270,7 +326,10 @@ const ProductPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[8%]">
                     Tax
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[20%]">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[18%]">
                     Actions
                   </th>
                 </tr>
@@ -284,7 +343,7 @@ const ProductPage: React.FC = () => {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredProducts.map((product: Product) => (
                   <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 w-[15%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 w-[12%]">
                       <div className="flex items-center">
                         {product.id}
                         <CustomersUsingProductTooltip
@@ -294,12 +353,12 @@ const ProductPage: React.FC = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[35%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[32%]">
                       <div className="truncate" title={product.description}>
                         {product.description}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[12%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
                       {product.price_per_unit.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
@@ -322,7 +381,20 @@ const ProductPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[8%]">
                       {product.tax}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center w-[20%]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
+                      {product.is_active ? (
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-300">
+                          <IconCheck className="w-3 h-3 mr-0.5" />
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-400">
+                          <IconX className="w-3 h-3 mr-0.5" />
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center w-[18%]">
                       <div className="flex justify-center space-x-2">
                         <Button
                           onClick={() => handleEditProduct(product)}
@@ -333,8 +405,29 @@ const ProductPage: React.FC = () => {
                         >
                           Edit
                         </Button>
+                        {product.is_active ? (
+                          <Button
+                            onClick={() => handleDeleteProduct(product)}
+                            icon={IconX}
+                            size="sm"
+                            variant="outline"
+                            color="amber"
+                          >
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleReactivateProduct(product)}
+                            icon={IconRefresh}
+                            size="sm"
+                            variant="outline"
+                            color="green"
+                          >
+                            Reactivate
+                          </Button>
+                        )}
                         <Button
-                          onClick={() => handleDeleteProduct(product)}
+                          onClick={() => handleHardDeleteProduct(product)}
                           icon={IconTrash}
                           size="sm"
                           variant="outline"
@@ -375,20 +468,56 @@ const ProductPage: React.FC = () => {
         isOpen={deleteConfirmOpen}
         onClose={handleCloseDeleteConfirm}
         onConfirm={confirmDelete}
-        title="Delete Product"
+        title="Deactivate Product"
         message={
           <>
             <p>
-              Are you sure you want to delete the product "
+              Are you sure you want to deactivate the product "
               {productToDelete?.description}"?
             </p>
-            <p className="mt-2 text-sm text-gray-600">
-              Note: Products that are associated with customers cannot be
-              deleted. You will need to remove all customer associations first.
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              This product will be hidden but not permanently deleted. You can
+              reactivate it later if needed.
             </p>
           </>
         }
-        confirmButtonText="Delete"
+        confirmButtonText="Deactivate"
+        variant="danger"
+      />
+
+      <ConfirmationDialog
+        isOpen={reactivateConfirmOpen}
+        onClose={() => {
+          setReactivateConfirmOpen(false);
+          setProductToReactivate(null);
+        }}
+        onConfirm={confirmReactivate}
+        title="Reactivate Product"
+        message={`Are you sure you want to reactivate "${productToReactivate?.description}"? This product will be visible and available for use again.`}
+        confirmButtonText="Reactivate"
+        variant="success"
+      />
+
+      <ConfirmationDialog
+        isOpen={hardDeleteConfirmOpen}
+        onClose={() => {
+          setHardDeleteConfirmOpen(false);
+          setProductToHardDelete(null);
+        }}
+        onConfirm={confirmHardDelete}
+        title="Permanently Delete Product"
+        message={
+          <>
+            <p>
+              Are you sure you want to <strong>permanently delete</strong> the product "
+              {productToHardDelete?.description}"?
+            </p>
+            <p className="mt-2 text-sm text-rose-600 dark:text-rose-400 font-medium">
+              This action cannot be undone. The product will be removed from the database.
+            </p>
+          </>
+        }
+        confirmButtonText="Delete Permanently"
         variant="danger"
       />
     </div>

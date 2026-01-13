@@ -8,6 +8,7 @@ interface Product {
   description: string;
   price_per_unit: number;
   type: string;
+  is_active?: boolean;
 }
 
 interface CachedProducts {
@@ -20,13 +21,16 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const PRODUCTS_UPDATED_EVENT = "products-updated";
 
 // Create a global function to refresh products cache
-export const refreshProductsCache = async () => {
+// Always fetches ALL products (including inactive) to maintain cache consistency
+// Client-side filtering handles active/inactive display per component needs
+export const refreshProductsCache = async (includeInactive = true) => {
   try {
     // Remove the current cache
     localStorage.removeItem(CACHE_KEY);
 
-    // Fetch all products
-    const data = await api.get("/api/products?all");
+    // Fetch all products (include inactive by default for admin views)
+    const includeInactiveParam = includeInactive ? '&includeInactive=true' : '';
+    const data = await api.get(`/api/products?all${includeInactiveParam}`);
 
     // Store in cache
     const cacheData = {
@@ -68,34 +72,40 @@ if (typeof window !== "undefined") {
 // Client-side filtering function
 const filterProducts = (
   products: Product[],
-  filterType: string | string[]
+  filterType: string | string[],
+  includeInactive = false
 ): Product[] => {
+  // First filter by active status (unless includeInactive is true)
+  let filtered = includeInactive
+    ? products
+    : products.filter((product) => product.is_active !== false);
+
   // Handle array of types
   if (Array.isArray(filterType)) {
-    return products.filter((product) => filterType.includes(product.type));
+    return filtered.filter((product) => filterType.includes(product.type));
   }
 
   // Handle comma-separated string
   if (typeof filterType === "string" && filterType.includes(",")) {
     const types = filterType.split(",").map((t) => t.trim().toUpperCase());
-    return products.filter((product) => types.includes(product.type));
+    return filtered.filter((product) => types.includes(product.type));
   }
 
   // Handle single type
   switch (filterType) {
     case "all":
-      return products;
+      return filtered;
     case "jp":
-      return products.filter((product) => product.type === "JP");
+      return filtered.filter((product) => product.type === "JP");
     case "oth":
-      return products.filter((product) => product.type === "OTH");
+      return filtered.filter((product) => product.type === "OTH");
     case "mee":
-      return products.filter((product) => product.type === "MEE");
+      return filtered.filter((product) => product.type === "MEE");
     case "bh":
-      return products.filter((product) => product.type === "BH");
+      return filtered.filter((product) => product.type === "BH");
     case "default":
     default:
-      return products.filter((product) => ["MEE", "BH", "OTH"].includes(product.type));
+      return filtered.filter((product) => ["MEE", "BH", "OTH"].includes(product.type));
   }
 };
 
@@ -108,7 +118,8 @@ export const useProductsCache = (
     | "bh"
     | "default"
     | string
-    | string[] = "default"
+    | string[] = "default",
+  options?: { includeInactive?: boolean }
 ) => {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -128,7 +139,7 @@ export const useProductsCache = (
 
           if (!isExpired) {
             setAllProducts(data);
-            setProducts(filterProducts(data, type));
+            setProducts(filterProducts(data, type, options?.includeInactive));
             setIsLoading(false);
             setError(null);
             return data;
@@ -137,7 +148,8 @@ export const useProductsCache = (
       }
 
       // If cache is missing, expired, or force refresh is requested, fetch fresh data
-      const data = await api.get("/api/products?all");
+      const includeInactiveParam = options?.includeInactive ? '&includeInactive=true' : '';
+      const data = await api.get(`/api/products?all${includeInactiveParam}`);
 
       // Update cache
       const cacheData: CachedProducts = {
@@ -147,7 +159,7 @@ export const useProductsCache = (
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
       setAllProducts(data);
-      setProducts(filterProducts(data, type));
+      setProducts(filterProducts(data, type, options?.includeInactive));
       setError(null);
       return data;
     } catch (error) {
@@ -173,16 +185,16 @@ export const useProductsCache = (
   // Update filtered products when type changes
   useEffect(() => {
     if (allProducts.length > 0) {
-      setProducts(filterProducts(allProducts, type));
+      setProducts(filterProducts(allProducts, type, options?.includeInactive));
     }
-  }, [typeKey, allProducts]);
+  }, [typeKey, allProducts, options?.includeInactive]);
 
   // Listen for product updates
   useEffect(() => {
     const handleProductsUpdated = (event: CustomEvent) => {
       if (event.detail) {
         setAllProducts(event.detail);
-        setProducts(filterProducts(event.detail, type));
+        setProducts(filterProducts(event.detail, type, options?.includeInactive));
       } else {
         fetchProducts(true);
       }
@@ -199,7 +211,7 @@ export const useProductsCache = (
         handleProductsUpdated as EventListener
       );
     };
-  }, [typeKey]);
+  }, [typeKey, options?.includeInactive]);
 
   const invalidateCache = () => {
     localStorage.removeItem(CACHE_KEY);

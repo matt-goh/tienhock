@@ -8,9 +8,9 @@ export default function (pool) {
   // Get products based on params
   router.get("/", async (req, res) => {
     try {
-      // Check for specific type filters
-      const { type, all } = req.query;
-      const cacheKey = `${CACHE_KEYS.PRODUCTS}:${all !== undefined ? 'all' : type || 'default'}`;
+      // Check for specific type filters and includeInactive flag
+      const { type, all, includeInactive } = req.query;
+      const cacheKey = `${CACHE_KEYS.PRODUCTS}:${all !== undefined ? 'all' : type || 'default'}:${includeInactive === 'true' ? 'all' : 'active'}`;
 
       // Check cache first
       const cached = cache.get(cacheKey);
@@ -21,21 +21,31 @@ export default function (pool) {
       let query;
       let whereClause = "";
 
+      // Build WHERE clause for is_active filtering
+      const activeFilter = includeInactive === 'true' ? '' : 'is_active = true';
+
       if (all !== undefined) {
         // Return all products with all columns /api/products?all
-        query = "SELECT * FROM products";
+        whereClause = activeFilter ? `WHERE ${activeFilter}` : '';
+        query = `SELECT * FROM products ${whereClause}`;
       } else if (type) {
         // Filter by specific type(s) /api/products?type=JP or /api/products?type=MEE,BH
         const types = type
           .split(",")
           .map((t) => `'${t.trim()}'`)
           .join(",");
-        whereClause = `WHERE type IN (${types})`;
-        query = `SELECT id, description, price_per_unit, type FROM products ${whereClause}`;
+        const typeFilter = `type IN (${types})`;
+        whereClause = activeFilter
+          ? `WHERE ${typeFilter} AND ${activeFilter}`
+          : `WHERE ${typeFilter}`;
+        query = `SELECT id, description, price_per_unit, type, is_active FROM products ${whereClause}`;
       } else {
-        // Default: Return only BH and MEE type products (excluding tax)
-        query =
-          "SELECT id, description, price_per_unit, type FROM products WHERE type IN ('BH', 'MEE', 'JP')";
+        // Default: Return only BH, MEE, JP type products (excluding tax)
+        const typeFilter = "type IN ('BH', 'MEE', 'JP')";
+        whereClause = activeFilter
+          ? `WHERE ${typeFilter} AND ${activeFilter}`
+          : `WHERE ${typeFilter}`;
+        query = `SELECT id, description, price_per_unit, type, is_active FROM products ${whereClause}`;
       }
 
       const result = await pool.query(query);
@@ -80,16 +90,16 @@ export default function (pool) {
 
   // Create a new product
   router.post("/", async (req, res) => {
-    const { id, description, price_per_unit, type, tax } = req.body;
+    const { id, description, price_per_unit, type, tax, is_active } = req.body;
 
     try {
       const query = `
-        INSERT INTO products (id, description, price_per_unit, type, tax)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO products (id, description, price_per_unit, type, tax, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
       `;
 
-      const values = [id, description, price_per_unit, type, tax];
+      const values = [id, description, price_per_unit, type, tax, is_active ?? true];
 
       const result = await pool.query(query, values);
 
@@ -160,18 +170,19 @@ export default function (pool) {
         const processedProducts = [];
 
         for (const product of products) {
-          const { id, newId, description, price_per_unit, type, tax } = product;
+          const { id, newId, description, price_per_unit, type, tax, is_active } = product;
 
           if (newId && newId !== id) {
             // This is an existing product with an ID change
             const upsertQuery = `
-              INSERT INTO products (id, description, price_per_unit, type, tax)
-              VALUES ($1, $2, $3, $4, $5)
+              INSERT INTO products (id, description, price_per_unit, type, tax, is_active)
+              VALUES ($1, $2, $3, $4, $5, $6)
               ON CONFLICT (id) DO UPDATE
               SET description = EXCLUDED.description,
                   price_per_unit = EXCLUDED.price_per_unit,
                   type = EXCLUDED.type,
-                  tax = EXCLUDED.tax
+                  tax = EXCLUDED.tax,
+                  is_active = EXCLUDED.is_active
               RETURNING *
             `;
             const upsertValues = [
@@ -180,6 +191,7 @@ export default function (pool) {
               price_per_unit,
               type,
               tax,
+              is_active ?? true,
             ];
             const upsertResult = await client.query(upsertQuery, upsertValues);
 
@@ -190,16 +202,17 @@ export default function (pool) {
           } else {
             // This is an existing product without ID change or a new product
             const upsertQuery = `
-              INSERT INTO products (id, description, price_per_unit, type, tax)
-              VALUES ($1, $2, $3, $4, $5)
+              INSERT INTO products (id, description, price_per_unit, type, tax, is_active)
+              VALUES ($1, $2, $3, $4, $5, $6)
               ON CONFLICT (id) DO UPDATE
               SET description = EXCLUDED.description,
                   price_per_unit = EXCLUDED.price_per_unit,
                   type = EXCLUDED.type,
-                  tax = EXCLUDED.tax
+                  tax = EXCLUDED.tax,
+                  is_active = EXCLUDED.is_active
               RETURNING *
             `;
-            const upsertValues = [id, description, price_per_unit, type, tax];
+            const upsertValues = [id, description, price_per_unit, type, tax, is_active ?? true];
             const result = await client.query(upsertQuery, upsertValues);
             processedProducts.push(result.rows[0]);
           }
@@ -231,17 +244,17 @@ export default function (pool) {
   // Update a single product
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { description, price_per_unit, type, tax } = req.body;
+    const { description, price_per_unit, type, tax, is_active } = req.body;
 
     try {
       const query = `
         UPDATE products
-        SET description = $1, price_per_unit = $2, type = $3, tax = $4
-        WHERE id = $5
+        SET description = $1, price_per_unit = $2, type = $3, tax = $4, is_active = $5
+        WHERE id = $6
         RETURNING *
       `;
 
-      const values = [description, price_per_unit, type, tax, id];
+      const values = [description, price_per_unit, type, tax, is_active, id];
 
       const result = await pool.query(query, values);
 
