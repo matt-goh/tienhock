@@ -980,6 +980,7 @@ export interface StockProduct {
   description: string;
   type: "BH" | "MEE" | "JP" | "OTH" | "TAX";
   price_per_unit?: number;
+  is_active?: boolean;
 }
 
 // Production Entry

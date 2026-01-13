@@ -73,7 +73,7 @@ This is a comprehensive ERP system supporting three companies:
 - `consolidation_tracking` - id, company_id, year, month, status, consolidated_invoice_id, last_attempt, next_attempt, attempt_count, error
 
 **Products & Inventory:**
-- `products` - id, description, price_per_unit, type, tax
+- `products` - id, description, price_per_unit, type, tax, is_active
 - `production_entries` - id, entry_date, product_id, worker_id, bags_packed, created_at, updated_at, created_by
 - `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
 - `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
