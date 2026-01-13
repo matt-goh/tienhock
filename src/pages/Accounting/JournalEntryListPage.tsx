@@ -146,6 +146,14 @@ const JournalEntryListPage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [entryToDelete, setEntryToDelete] =
     useState<JournalEntryListItem | null>(null);
+  const [showDeleteErrorDialog, setShowDeleteErrorDialog] = useState(false);
+  const [deleteErrorData, setDeleteErrorData] = useState<{
+    message: string;
+    detail?: string;
+    payment_id?: number;
+    invoice_id?: string;
+    suggestion?: string;
+  } | null>(null);
 
   // Helper function to format a Date object into 'YYYY-MM-DD' string in local time
   const formatDateForAPI = (date: Date): string => {
@@ -270,9 +278,37 @@ const JournalEntryListPage: React.FC = () => {
       fetchEntries();
     } catch (error: unknown) {
       console.error("Error deleting entry:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete entry";
-      toast.error(errorMessage);
+
+      // Close the delete confirmation dialog first
+      setShowDeleteDialog(false);
+
+      // Handle enhanced error response from backend
+      const errorData = (error as any)?.data;
+
+      if (errorData) {
+        // Store error data and show error dialog
+        setDeleteErrorData({
+          message: errorData.message || "Failed to delete journal entry",
+          detail: errorData.detail,
+          payment_id: errorData.payment_id,
+          invoice_id: errorData.invoice_id,
+          suggestion: errorData.suggestion,
+        });
+        setShowDeleteErrorDialog(true);
+      } else {
+        // Fallback to simple toast error
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to delete entry";
+        toast.error(errorMessage);
+      }
+    }
+  };
+
+  // Handle navigation to invoice from error dialog
+  const handleGoToInvoice = () => {
+    if (deleteErrorData?.invoice_id) {
+      setShowDeleteErrorDialog(false);
+      navigate(`/sales/invoice/${deleteErrorData.invoice_id}`);
     }
   };
 
@@ -728,6 +764,71 @@ const JournalEntryListPage: React.FC = () => {
         message={`Are you sure you want to delete entry "${entryToDelete?.reference_no}"? This action cannot be undone.`}
         variant="danger"
       />
+
+      {/* Delete Error Dialog */}
+      {deleteErrorData && (
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
+            showDeleteErrorDialog ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowDeleteErrorDialog(false)}
+          />
+
+          {/* Dialog */}
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 border border-red-200 dark:border-red-800">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+              <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
+                {deleteErrorData.message}
+              </h3>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4 space-y-3">
+              {deleteErrorData.detail && (
+                <p className="text-sm text-default-700 dark:text-gray-300">
+                  {deleteErrorData.detail}
+                </p>
+              )}
+
+              {deleteErrorData.suggestion && (
+                <p className="text-sm text-default-600 dark:text-gray-400 italic">
+                  {deleteErrorData.suggestion}
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30 flex justify-end gap-3">
+              {deleteErrorData.invoice_id && (
+                <Button
+                  onClick={handleGoToInvoice}
+                  color="sky"
+                  variant="filled"
+                  size="md"
+                >
+                  Go to Invoice #{deleteErrorData.invoice_id}
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  setShowDeleteErrorDialog(false);
+                  setDeleteErrorData(null);
+                }}
+                color="default"
+                variant="outline"
+                size="md"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
