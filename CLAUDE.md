@@ -49,7 +49,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (70 tables)
+#### Database Schema (71 tables)
 
 **Accounting & Finance:**
 - `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
@@ -81,8 +81,9 @@ This is a comprehensive ERP system supporting three companies:
 - `taxes` - name, rate
 
 **Materials (Ingredients/Raw/Packing):**
-- `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), unit, unit_size, default_unit_cost, default_description (supplier notes from PDF), applies_to (mee/bihun/both), sort_order, is_active, notes, created_at, updated_at, created_by
-- `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun), custom_name, custom_description, opening_quantity, purchases_quantity, consumption_quantity, closing_quantity (GENERATED: opening + purchases - consumption), unit_cost, opening_value, purchases_value, closing_value, notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line)
+- `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), default_unit_cost, applies_to (mee/bihun/both), sort_order, is_active, created_at, updated_at, created_by
+- `material_variants` - id, material_id (FK), variant_name, default_unit_cost, sort_order, is_active, created_at, updated_at (unique: material_id, variant_name). For materials with multiple suppliers/types like "Beras 50KG" having Vietnam Coklat, Vietnam Hijau, etc.
+- `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun), variant_id (nullable FK to material_variants), custom_name, custom_description, opening_quantity, purchases_quantity, consumption_quantity, closing_quantity (GENERATED: opening + purchases - consumption), unit_cost, opening_value, purchases_value, closing_value, notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default'))
 
 **Staff & Employees:**
 - `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
