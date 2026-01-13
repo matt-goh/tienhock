@@ -590,12 +590,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       if (employeeActivities[rowKey] && employeeActivities[rowKey].length > 0) {
         setEmployeeActivities((prev) => {
           const activities = prev[rowKey] || [];
-          const [employeeId, jobType] = rowKey.split("-");
-          const hours =
-            employeeSelectionState.jobHours[employeeId]?.[jobType] || 0;
-          const otThreshold = getDefaultHours(formData.logDate) === 5 ? 5 : 8;
-          const naturalOT = Math.max(0, hours - otThreshold);
-          const totalOT = naturalOT + forceOT;
+          // BH_OT_STIM uses ONLY forced OT (jaga stim hours), not natural OT
+          const totalOT = forceOT;
           let hasChanges = false;
 
           const updatedActivities = activities.map((activity) => {
@@ -1936,11 +1932,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           const forceOT = isCleaningMode ? 0 : (forceOTHours[rowKey] || 0); // No forceOT in cleaning mode
           const hasNaturalOT = hours > otThreshold;
           // Filter OT pay codes:
-          // - BH_OT_STIM: include if natural OT OR forced OT (JAGA STIM)
+          // - BH_OT_STIM: include ONLY if forced OT (JAGA STIM column has hours)
           // - Other OT paycodes: only include if natural OT (hours > threshold)
           const filteredPayCodes = mergedPayCodes.filter((pc) => {
             if (pc.pay_type !== "Overtime") return true;
-            if (pc.id === BH_OT_STIM_PAYCODE) return hasNaturalOT || forceOT > 0;
+            if (pc.id === BH_OT_STIM_PAYCODE) return forceOT > 0;
             return hasNaturalOT;
           });
 
@@ -1993,12 +1989,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 isSelected = false;
               } else if (payCode.pay_type === "Overtime") {
                 // Auto-select OT codes based on natural OT (hours > threshold)
-                // Only BH_OT_STIM uses forced OT from JAGA STIM column
+                // BH_OT_STIM uses ONLY forced OT from JAGA STIM column
                 const hasNaturalOT = hours > otThreshold;
                 const hasForcedOT = forceOT > 0;
                 if (payCode.id === BH_OT_STIM_PAYCODE) {
-                  // BH_OT_STIM: select if natural OT OR forced OT
-                  isSelected = (hasNaturalOT || hasForcedOT) && payCode.is_default_setting;
+                  // BH_OT_STIM: select ONLY if forced OT (JAGA STIM column has hours)
+                  isSelected = hasForcedOT && payCode.is_default_setting;
                 } else {
                   // Other OT paycodes: only select if natural OT (hours > threshold)
                   isSelected = hasNaturalOT && payCode.is_default_setting;
