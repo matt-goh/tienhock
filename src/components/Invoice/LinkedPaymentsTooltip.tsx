@@ -101,7 +101,7 @@ const LinkedPaymentsTooltip: React.FC<LinkedPaymentsTooltipProps> = ({
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex items-center ml-2"
+        className="text-default-400 dark:text-gray-500 hover:text-default-600 cursor-help inline-flex items-center ml-2"
       >
         <IconInfoCircle size={14} />
       </span>

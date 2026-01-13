@@ -1,5 +1,6 @@
 // src/pages/Stock/Materials/MaterialStockEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -7,6 +8,7 @@ import {
   MaterialCategory,
   ProductLine,
   MaterialStockEntryInput,
+  StockEntryRow,
 } from "../../../types/types";
 import {
   IconDeviceFloppy,
@@ -14,6 +16,10 @@ import {
   IconBox,
   IconAlertTriangle,
   IconBuildingFactory2,
+  IconChevronDown,
+  IconChevronRight,
+  IconPlus,
+  IconX,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
@@ -61,6 +67,15 @@ const MaterialStockEntryPage: React.FC = () => {
   const [stockKilang, setStockKilang] = useState<StockKilangItem[]>([]);
   const [isLoadingStockKilang, setIsLoadingStockKilang] = useState(false);
 
+  // Variant expansion state (tracks which materials are expanded to show variants)
+  const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
+
+  // New variant row state (tracks materials with a new ad-hoc variant being added)
+  const [newVariantRows, setNewVariantRows] = useState<Map<number, StockEntryRow>>(new Map());
+
+  // Collapse all toggle state
+  const [allCollapsed, setAllCollapsed] = useState(false);
+
   // Get products for stock kilang (MEE or BH based on active tab)
   const productType = activeTab === "mee" ? "mee" : "bh";
   const { products, isLoading: isLoadingProducts } = useProductsCache(productType);
@@ -80,6 +95,15 @@ const MaterialStockEntryPage: React.FC = () => {
       const data = response.materials || [];
       setMaterials(data);
       setOriginalMaterials(JSON.parse(JSON.stringify(data))); // Deep copy
+
+      // Auto-expand materials that have variants
+      const materialsWithVariants = data
+        .filter((m: MaterialWithStock) => m.has_variants && m.variants && m.variants.length > 0)
+        .map((m: MaterialWithStock) => m.id);
+      setExpandedMaterials(new Set(materialsWithVariants));
+
+      // Clear new variant rows on data refresh
+      setNewVariantRows(new Map());
     } catch (error) {
       console.error("Error fetching materials:", error);
       toast.error("Failed to load materials data");
@@ -158,6 +182,15 @@ const MaterialStockEntryPage: React.FC = () => {
 
   // Calculate if there are unsaved changes (compare by material ID)
   const hasUnsavedChanges = useMemo(() => {
+    // Check if there are new variant rows with data
+    if (newVariantRows.size > 0) {
+      for (const row of newVariantRows.values()) {
+        if (row.variant_name?.trim() || row.purchases_quantity > 0 || row.consumption_quantity > 0 || row.unit_cost > 0) {
+          return true;
+        }
+      }
+    }
+
     if (materials.length !== originalMaterials.length) return true;
 
     // Create a map of original materials by ID for faster lookup
@@ -171,28 +204,205 @@ const MaterialStockEntryPage: React.FC = () => {
       // If material doesn't exist in original, there's a change
       if (!original) return true;
 
+      // Check non-variant material fields
       if (
         current.purchases_quantity !== original.purchases_quantity ||
         current.consumption_quantity !== original.consumption_quantity ||
-        current.unit_cost !== original.unit_cost ||
-        current.custom_description !== original.custom_description
+        current.unit_cost !== original.unit_cost
       ) {
         return true;
+      }
+
+      // Check variant fields
+      if (current.has_variants && current.variants && original.variants) {
+        for (const cv of current.variants) {
+          const ov = original.variants.find((v) => v.variant_id === cv.variant_id);
+          if (!ov) return true;
+          if (
+            cv.purchases_quantity !== ov.purchases_quantity ||
+            cv.consumption_quantity !== ov.consumption_quantity ||
+            cv.unit_cost !== ov.unit_cost ||
+            cv.variant_name !== ov.variant_name
+          ) {
+            return true;
+          }
+        }
       }
     }
 
     return false;
-  }, [materials, originalMaterials]);
+  }, [materials, originalMaterials, newVariantRows]);
+
+  // Toggle material expansion
+  const toggleMaterialExpansion = (materialId: number) => {
+    setExpandedMaterials((prev) => {
+      const next = new Set(prev);
+      if (next.has(materialId)) {
+        next.delete(materialId);
+      } else {
+        next.add(materialId);
+      }
+      return next;
+    });
+  };
+
+  // Toggle all materials expansion
+  const toggleAllExpansion = () => {
+    const materialsWithVariants = materials
+      .filter((m) => m.has_variants && m.variants && m.variants.length > 0)
+      .map((m) => m.id);
+
+    if (allCollapsed) {
+      // Expand all
+      setExpandedMaterials(new Set(materialsWithVariants));
+      setAllCollapsed(false);
+    } else {
+      // Collapse all
+      setExpandedMaterials(new Set());
+      setAllCollapsed(true);
+    }
+  };
+
+  // Count materials with variants
+  const variantMaterialCount = useMemo(() => {
+    return materials.filter((m) => m.has_variants && m.variants && m.variants.length > 0).length;
+  }, [materials]);
+
+  // Add new variant row for a material
+  const handleAddVariantRow = (materialId: number, defaultUnitCost: number) => {
+    const newRow: StockEntryRow = {
+      entry_id: null,
+      variant_id: null,
+      variant_name: "",
+      is_new_variant: true,
+      opening_quantity: 0,
+      opening_value: 0,
+      purchases_quantity: 0,
+      purchases_value: 0,
+      consumption_quantity: 0,
+      closing_quantity: 0,
+      closing_value: 0,
+      unit_cost: defaultUnitCost,
+      notes: null,
+    };
+    setNewVariantRows((prev) => new Map(prev).set(materialId, newRow));
+    // Ensure material is expanded
+    setExpandedMaterials((prev) => new Set(prev).add(materialId));
+  };
+
+  // Cancel adding new variant
+  const handleCancelNewVariant = (materialId: number) => {
+    setNewVariantRows((prev) => {
+      const next = new Map(prev);
+      next.delete(materialId);
+      return next;
+    });
+  };
+
+  // Update variant name (for existing variants)
+  const handleVariantNameChange = (
+    materialId: number,
+    variantId: number | null,
+    newName: string
+  ) => {
+    setMaterials((prev) =>
+      prev.map((m) => {
+        if (m.id === materialId && m.has_variants && m.variants) {
+          const updatedVariants = m.variants.map((v) => {
+            if (v.variant_id === variantId) {
+              return { ...v, variant_name: newName };
+            }
+            return v;
+          });
+          return { ...m, variants: updatedVariants };
+        }
+        return m;
+      })
+    );
+  };
+
+  // Update new variant row
+  const handleNewVariantChange = (
+    materialId: number,
+    field: keyof StockEntryRow,
+    value: string | number
+  ) => {
+    setNewVariantRows((prev) => {
+      const next = new Map(prev);
+      const row = next.get(materialId);
+      if (row) {
+        const updated = { ...row };
+        if (field === "variant_name") {
+          updated.variant_name = String(value);
+        } else if (field === "unit_cost" || field === "purchases_quantity" || field === "consumption_quantity") {
+          const numValue = parseFloat(String(value)) || 0;
+          (updated as any)[field] = numValue;
+          // Recalculate
+          updated.closing_quantity = updated.opening_quantity + updated.purchases_quantity - updated.consumption_quantity;
+          updated.purchases_value = updated.purchases_quantity * updated.unit_cost;
+          updated.closing_value = updated.closing_quantity * updated.unit_cost;
+        }
+        next.set(materialId, updated);
+      }
+      return next;
+    });
+  };
 
   // Handle input change for purchases, consumption, unit_cost, or custom_description
+  // Now supports both material-level and variant-level changes
   const handleInputChange = (
     materialId: number,
     field: "purchases_quantity" | "consumption_quantity" | "unit_cost" | "custom_description",
-    value: string
+    value: string,
+    variantId?: number | null
   ) => {
     setMaterials((prev) =>
       prev.map((m) => {
         if (m.id === materialId) {
+          // If this is a variant-level change
+          if (variantId !== undefined && m.has_variants && m.variants) {
+            const updatedVariants = m.variants.map((v) => {
+              if (v.variant_id === variantId) {
+                const updated = { ...v };
+                if (field === "custom_description") {
+                  // Variants use variant_name instead
+                  return updated;
+                } else {
+                  const numValue = parseFloat(value) || 0;
+                  (updated as any)[field] = numValue;
+                }
+                // Recalculate variant closing
+                updated.closing_quantity = updated.opening_quantity + updated.purchases_quantity - updated.consumption_quantity;
+                updated.purchases_value = updated.purchases_quantity * updated.unit_cost;
+                updated.closing_value = updated.closing_quantity * updated.unit_cost;
+                return updated;
+              }
+              return v;
+            });
+
+            // Recalculate material totals from variants
+            const totalOpening = updatedVariants.reduce((sum, v) => sum + v.opening_quantity, 0);
+            const totalOpeningValue = updatedVariants.reduce((sum, v) => sum + v.opening_value, 0);
+            const totalPurchases = updatedVariants.reduce((sum, v) => sum + v.purchases_quantity, 0);
+            const totalPurchasesValue = updatedVariants.reduce((sum, v) => sum + v.purchases_value, 0);
+            const totalConsumption = updatedVariants.reduce((sum, v) => sum + v.consumption_quantity, 0);
+            const totalClosing = updatedVariants.reduce((sum, v) => sum + v.closing_quantity, 0);
+            const totalClosingValue = updatedVariants.reduce((sum, v) => sum + v.closing_value, 0);
+
+            return {
+              ...m,
+              variants: updatedVariants,
+              opening_quantity: totalOpening,
+              opening_value: totalOpeningValue,
+              purchases_quantity: totalPurchases,
+              purchases_value: totalPurchasesValue,
+              consumption_quantity: totalConsumption,
+              closing_quantity: totalClosing,
+              closing_value: totalClosingValue,
+            };
+          }
+
+          // Material-level change (non-variant materials)
           const updated = { ...m };
 
           if (field === "custom_description") {
@@ -237,35 +447,144 @@ const MaterialStockEntryPage: React.FC = () => {
 
   // Save entries
   const handleSave = async () => {
-    // Check for negative closing quantities
-    const negativeItems = materials.filter((m) => m.closing_quantity < 0);
-    if (negativeItems.length > 0) {
+    // Check for negative closing quantities (including variants)
+    let negativeCount = 0;
+    materials.forEach((m) => {
+      if (m.has_variants && m.variants) {
+        negativeCount += m.variants.filter((v) => v.closing_quantity < 0).length;
+      } else if (m.closing_quantity < 0) {
+        negativeCount++;
+      }
+    });
+
+    if (negativeCount > 0) {
       const confirmed = window.confirm(
-        `Warning: ${negativeItems.length} material(s) have negative closing stock. Do you want to save anyway?`
+        `Warning: ${negativeCount} item(s) have negative closing stock. Do you want to save anyway?`
       );
       if (!confirmed) return;
     }
 
+    // Check for new variants that need names
+    const incompleteNewVariants: string[] = [];
+    newVariantRows.forEach((row, materialId) => {
+      if ((row.purchases_quantity > 0 || row.consumption_quantity > 0) && !row.variant_name?.trim()) {
+        const material = materials.find((m) => m.id === materialId);
+        incompleteNewVariants.push(material?.name || `Material ${materialId}`);
+      }
+    });
+
+    if (incompleteNewVariants.length > 0) {
+      toast.error(`Please enter a name for new variants in: ${incompleteNewVariants.join(", ")}`);
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const entries: MaterialStockEntryInput[] = materials.map((m) => ({
-        material_id: m.id,
-        purchases_quantity: m.purchases_quantity,
-        consumption_quantity: m.consumption_quantity,
-        unit_cost: m.unit_cost,
-        custom_name: m.custom_name || null,
-        custom_description: m.custom_description || null,
-        notes: m.closing_notes || null,
-      }));
+      // First, update any changed variant names
+      const variantNameUpdates: Promise<void>[] = [];
+      const originalMap = new Map(originalMaterials.map((m) => [m.id, m]));
 
-      await api.post("/api/materials/stock/batch", {
+      materials.forEach((m) => {
+        if (m.has_variants && m.variants) {
+          const original = originalMap.get(m.id);
+          if (original?.variants) {
+            m.variants.forEach((v) => {
+              if (v.variant_id) {
+                const ov = original.variants?.find((ov) => ov.variant_id === v.variant_id);
+                if (ov && v.variant_name !== ov.variant_name && v.variant_name?.trim()) {
+                  // Update variant name via API
+                  variantNameUpdates.push(
+                    api.put(`/api/materials/variants/${v.variant_id}`, {
+                      variant_name: v.variant_name.trim(),
+                      default_unit_cost: v.unit_cost,
+                    }).catch((err) => {
+                      console.error(`Failed to update variant ${v.variant_id}:`, err);
+                    })
+                  );
+                }
+              }
+            });
+          }
+        }
+      });
+
+      // Wait for all variant name updates
+      if (variantNameUpdates.length > 0) {
+        await Promise.all(variantNameUpdates);
+      }
+
+      // Build stock entries
+      const entries: MaterialStockEntryInput[] = [];
+
+      materials.forEach((m) => {
+        if (m.has_variants && m.variants && m.variants.length > 0) {
+          // Add entries for each variant
+          m.variants.forEach((v) => {
+            entries.push({
+              material_id: m.id,
+              variant_id: v.variant_id,
+              purchases_quantity: v.purchases_quantity,
+              consumption_quantity: v.consumption_quantity,
+              unit_cost: v.unit_cost,
+              custom_name: null,
+              custom_description: v.variant_id ? null : v.variant_name, // Ad-hoc variants use custom_description
+              notes: v.notes || null,
+            });
+          });
+        } else {
+          // Non-variant material: single entry
+          entries.push({
+            material_id: m.id,
+            variant_id: null,
+            purchases_quantity: m.purchases_quantity,
+            consumption_quantity: m.consumption_quantity,
+            unit_cost: m.unit_cost,
+            custom_name: m.custom_name || null,
+            custom_description: null,
+            notes: m.closing_notes || null,
+          });
+        }
+      });
+
+      // Add new variant rows (will be registered as permanent variants)
+      newVariantRows.forEach((row, materialId) => {
+        if (row.variant_name?.trim() && (row.purchases_quantity > 0 || row.consumption_quantity > 0 || row.unit_cost > 0)) {
+          entries.push({
+            material_id: materialId,
+            variant_id: null,
+            purchases_quantity: row.purchases_quantity,
+            consumption_quantity: row.consumption_quantity,
+            unit_cost: row.unit_cost,
+            custom_name: null,
+            custom_description: row.variant_name.trim(),
+            notes: null,
+            register_variant: true, // Signal to register as permanent variant
+          });
+        }
+      });
+
+      const response = await api.post("/api/materials/stock/batch", {
         year,
         month,
         product_line: activeTab,
         entries,
       });
 
-      toast.success("Stock entries saved successfully");
+      // Build success message
+      const messages: string[] = [];
+      if (variantNameUpdates.length > 0) {
+        messages.push(`${variantNameUpdates.length} variant name(s) updated`);
+      }
+      if (response.registered_variants && response.registered_variants.length > 0) {
+        messages.push(`${response.registered_variants.length} new variant(s) registered`);
+      }
+
+      if (messages.length > 0) {
+        toast.success(`Saved! ${messages.join(", ")}.`, { duration: 4000 });
+      } else {
+        toast.success("Stock entries saved successfully");
+      }
+
       // Refresh to get updated data
       await fetchData();
     } catch (error: any) {
@@ -449,10 +768,19 @@ const MaterialStockEntryPage: React.FC = () => {
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider">
-                  Material
-                </th>
-                <th className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-16">
-                  Unit
+                  <div className="flex items-center gap-2">
+                    <span>Material</span>
+                    {variantMaterialCount > 0 && (
+                      <button
+                        onClick={toggleAllExpansion}
+                        className="text-purple-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-gray-200 text-[10px] font-normal normal-case flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-100 dark:bg-gray-700 rounded"
+                        title={allCollapsed ? "Expand all variants" : "Collapse all variants"}
+                      >
+                        {allCollapsed ? <IconChevronRight size={10} /> : <IconChevronDown size={10} />}
+                        {allCollapsed ? "Expand" : "Collapse"}
+                      </button>
+                    )}
+                  </div>
                 </th>
                 <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-20">
                   Open
@@ -483,7 +811,7 @@ const MaterialStockEntryPage: React.FC = () => {
                   <React.Fragment key={category}>
                     {/* Category Header */}
                     <tr className="bg-default-100 dark:bg-gray-700/50">
-                      <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
+                      <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
                         <div className="flex items-center gap-2">
                           <IconPackage size={14} className="text-default-500" />
                           {categoryLabels[category]}
@@ -505,28 +833,262 @@ const MaterialStockEntryPage: React.FC = () => {
                     {/* Category Items */}
                     {items.map((material) => {
                       const isNegative = material.closing_quantity < 0;
-                      return (
-                        <tr
-                          key={material.id}
-                          className={clsx(
-                            "hover:bg-default-50 dark:hover:bg-gray-700/30",
-                            isNegative && "bg-red-50 dark:bg-red-900/10"
-                          )}
-                        >
-                          <td className="px-3 py-1.5">
-                            <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-default-800 dark:text-gray-200">
-                                  {material.custom_name || material.name}
+                      const hasVariants = material.has_variants && material.variants && material.variants.length > 0;
+                      const isExpanded = expandedMaterials.has(material.id);
+                      const newVariant = newVariantRows.get(material.id);
+
+                      // Material with variants - show header + sub-rows
+                      if (hasVariants) {
+                        return (
+                          <React.Fragment key={material.id}>
+                            {/* Material Header Row (expandable, shows totals) */}
+                            <tr
+                              className={clsx(
+                                "bg-gradient-to-r from-purple-50 to-purple-50/30 dark:from-gray-800 dark:to-gray-800 cursor-pointer hover:from-purple-100 hover:to-purple-50 dark:hover:from-gray-750 dark:hover:to-gray-800 border-l-2 border-purple-400 dark:border-purple-700/60",
+                                isNegative && "from-red-50 to-red-50/30 dark:from-red-900/10 dark:to-gray-800 border-red-400 dark:border-red-700/60"
+                              )}
+                              onClick={() => toggleMaterialExpansion(material.id)}
+                            >
+                              <td className="px-3 py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <div className={clsx(
+                                    "p-0.5 rounded",
+                                    isExpanded ? "bg-purple-200 dark:bg-gray-700" : "bg-purple-100 dark:bg-gray-700/70"
+                                  )}>
+                                    {isExpanded ? (
+                                      <IconChevronDown size={14} className="text-purple-600 dark:text-gray-300" />
+                                    ) : (
+                                      <IconChevronRight size={14} className="text-purple-500 dark:text-gray-400" />
+                                    )}
+                                  </div>
+                                  <Link
+                                    to={`/materials/${material.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-sm font-semibold text-default-800 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
+                                  >
+                                    {material.name}
+                                  </Link>
+                                  <span className="text-xs text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-mono">
+                                    {material.code}
+                                  </span>
+                                  {isNegative && (
+                                    <IconAlertTriangle size={14} className="text-red-500" title="Negative stock" />
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
+                                {formatQty(material.opening_quantity)}
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">
+                                {formatQty(material.purchases_quantity)}
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm font-medium text-orange-600 dark:text-orange-400 bg-orange-50/50 dark:bg-orange-900/10">
+                                {formatQty(material.consumption_quantity)}
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-default-700 dark:text-gray-200">
+                                {formatQty(material.closing_quantity)}
+                              </td>
+                              <td className="px-2 py-1.5 text-center text-xs text-default-400 dark:text-gray-500">—</td>
+                              <td className="px-2 py-1.5 text-right">
+                                <span className="font-mono text-sm font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">
+                                  {formatNumber(material.closing_value)}
                                 </span>
-                                <span className="text-xs text-default-400 dark:text-gray-500 font-mono">
+                              </td>
+                            </tr>
+
+                            {/* Variant Sub-rows (when expanded) */}
+                            {isExpanded && material.variants!.map((variant, idx) => {
+                              const variantNegative = variant.closing_quantity < 0;
+                              const isLastVariant = idx === material.variants!.length - 1;
+                              return (
+                                <tr
+                                  key={`${material.id}-${variant.variant_id || variant.variant_name}`}
+                                  className={clsx(
+                                    "bg-white dark:bg-gray-800 hover:bg-purple-50/50 dark:hover:bg-gray-750 border-l-2 border-purple-200 dark:border-purple-900/60",
+                                    variantNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/60",
+                                    !isLastVariant && "border-b border-dashed border-default-100 dark:border-gray-700"
+                                  )}
+                                >
+                                  <td className="px-3 py-1.5 pl-12">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-purple-300 dark:text-gray-600">└</span>
+                                      <input
+                                        type="text"
+                                        value={variant.variant_name || ""}
+                                        onChange={(e) => handleVariantNameChange(material.id, variant.variant_id, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-sm text-default-700 dark:text-gray-300 bg-transparent border-b border-transparent hover:border-dashed hover:border-purple-300 dark:hover:border-gray-500 focus:outline-none focus:border-solid focus:border-purple-500 dark:focus:border-gray-400 px-1 py-0.5 min-w-[120px]"
+                                        placeholder="Variant name..."
+                                      />
+                                      {variantNegative && (
+                                        <IconAlertTriangle size={12} className="text-red-500" />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">
+                                    {formatQty(variant.opening_quantity)}
+                                  </td>
+                                  <td className="px-1 py-1 bg-blue-50/20 dark:bg-blue-900/5">
+                                    <input
+                                      type="number"
+                                      value={variant.purchases_quantity || ""}
+                                      onChange={(e) => handleInputChange(material.id, "purchases_quantity", e.target.value, variant.variant_id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-blue-200 dark:border-blue-700 rounded bg-blue-50/50 dark:bg-blue-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700"
+                                      min="0"
+                                      step="1"
+                                      placeholder="0"
+                                    />
+                                  </td>
+                                  <td className="px-1 py-1 bg-orange-50/20 dark:bg-orange-900/5">
+                                    <input
+                                      type="number"
+                                      value={variant.consumption_quantity || ""}
+                                      onChange={(e) => handleInputChange(material.id, "consumption_quantity", e.target.value, variant.variant_id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-orange-200 dark:border-orange-700 rounded bg-orange-50/50 dark:bg-orange-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:bg-white dark:focus:bg-gray-700"
+                                      min="0"
+                                      step="1"
+                                      placeholder="0"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right">
+                                    <span className={clsx(
+                                      "font-mono text-sm",
+                                      variantNegative ? "text-red-600 dark:text-red-400 font-medium" : "text-default-600 dark:text-gray-400"
+                                    )}>
+                                      {formatQty(variant.closing_quantity)}
+                                    </span>
+                                  </td>
+                                  <td className="px-1 py-1">
+                                    <input
+                                      type="number"
+                                      value={variant.unit_cost || ""}
+                                      onChange={(e) => handleInputChange(material.id, "unit_cost", e.target.value, variant.variant_id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-default-200 dark:border-gray-600 rounded bg-default-50 dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white"
+                                      step="0.01"
+                                      min="0"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right">
+                                    <span className={clsx(
+                                      "font-mono text-sm",
+                                      variantNegative ? "text-red-600 dark:text-red-400" : variant.closing_value > 0 ? "text-green-600 dark:text-green-400" : "text-default-400 dark:text-gray-500"
+                                    )}>
+                                      {formatNumber(variant.closing_value)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+
+                            {/* New Variant Row (when adding) */}
+                            {isExpanded && newVariant && (
+                              <tr className="bg-gradient-to-r from-sky-50 to-sky-50/30 dark:from-gray-800 dark:to-gray-800 border-l-2 border-sky-400 dark:border-sky-700/60">
+                                <td className="px-3 py-1.5 pl-12">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sky-400 dark:text-gray-500">+</span>
+                                    <input
+                                      type="text"
+                                      value={newVariant.variant_name || ""}
+                                      onChange={(e) => handleNewVariantChange(material.id, "variant_name", e.target.value)}
+                                      className="flex-1 px-2 py-0.5 text-sm border border-sky-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-700"
+                                      placeholder="Enter variant name..."
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleCancelNewVariant(material.id)}
+                                      className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                      title="Cancel"
+                                    >
+                                      <IconX size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">0</td>
+                                <td className="px-1 py-1 bg-blue-50/30 dark:bg-blue-900/5">
+                                  <input
+                                    type="number"
+                                    value={newVariant.purchases_quantity || ""}
+                                    onChange={(e) => handleNewVariantChange(material.id, "purchases_quantity", e.target.value)}
+                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-blue-200 dark:border-blue-700 rounded bg-blue-50/50 dark:bg-blue-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700"
+                                    min="0"
+                                    step="1"
+                                    placeholder="0"
+                                  />
+                                </td>
+                                <td className="px-1 py-1 bg-orange-50/30 dark:bg-orange-900/5">
+                                  <input
+                                    type="number"
+                                    value={newVariant.consumption_quantity || ""}
+                                    onChange={(e) => handleNewVariantChange(material.id, "consumption_quantity", e.target.value)}
+                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-orange-200 dark:border-orange-700 rounded bg-orange-50/50 dark:bg-orange-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:bg-white dark:focus:bg-gray-700"
+                                    min="0"
+                                    step="1"
+                                    placeholder="0"
+                                  />
+                                </td>
+                                <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
+                                  {formatQty(newVariant.closing_quantity)}
+                                </td>
+                                <td className="px-1 py-1">
+                                  <input
+                                    type="number"
+                                    value={newVariant.unit_cost || ""}
+                                    onChange={(e) => handleNewVariantChange(material.id, "unit_cost", e.target.value)}
+                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-default-200 dark:border-gray-600 rounded bg-default-50 dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white"
+                                    step="0.01"
+                                    min="0"
+                                  />
+                                </td>
+                                <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
+                                  {formatNumber(newVariant.closing_value)}
+                                </td>
+                              </tr>
+                            )}
+
+                            {/* Add Variant Button (when expanded and not already adding) */}
+                            {isExpanded && !newVariant && (
+                              <tr className="bg-white dark:bg-gray-800 border-l-2 border-purple-100 dark:border-gray-700 hover:border-purple-300 dark:hover:border-gray-500 transition-colors">
+                                <td colSpan={7} className="px-3 py-1.5 pl-12">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddVariantRow(material.id, material.default_unit_cost);
+                                    }}
+                                    className="text-xs text-purple-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-gray-200 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-purple-50 dark:hover:bg-gray-700 transition-colors"
+                                  >
+                                    <IconPlus size={12} />
+                                    Add new variant
+                                  </button>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      }
+
+                      // Material without variants - single editable row
+                      return (
+                        <React.Fragment key={material.id}>
+                          <tr
+                            className={clsx(
+                              "group hover:bg-default-50 dark:hover:bg-gray-700/30 transition-colors",
+                              isNegative && "bg-red-50/50 dark:bg-red-900/10"
+                            )}
+                          >
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  to={`/materials/${material.id}`}
+                                  className="text-sm font-medium text-default-800 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
+                                >
+                                  {material.custom_name || material.name}
+                                </Link>
+                                <span className="text-xs text-default-500 dark:text-gray-500 bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-mono">
                                   {material.code}
                                 </span>
-                                {material.unit_size && (
-                                  <span className="text-xs text-default-400 dark:text-gray-500">
-                                    • {material.unit_size}
-                                  </span>
-                                )}
                                 {isNegative && (
                                   <IconAlertTriangle
                                     size={14}
@@ -534,97 +1096,159 @@ const MaterialStockEntryPage: React.FC = () => {
                                     title="Negative stock"
                                   />
                                 )}
+                                {/* Add variant button for non-variant materials */}
+                                {!newVariant && (
+                                  <button
+                                    onClick={() => handleAddVariantRow(material.id, material.default_unit_cost)}
+                                    className="text-xs text-default-400 hover:text-purple-500 dark:text-gray-500 dark:hover:text-purple-400 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+                                    title="Add variant"
+                                  >
+                                    <IconPlus size={14} />
+                                  </button>
+                                )}
                               </div>
-                              {/* Editable supplier note - pre-filled with default if no custom value */}
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <span className="font-mono text-sm text-default-600 dark:text-gray-400">
+                                {formatQty(material.opening_quantity)}
+                              </span>
+                            </td>
+                            {/* Purchases input */}
+                            <td className="px-1 py-1 bg-blue-50/50 dark:bg-blue-900/10">
                               <input
-                                type="text"
-                                placeholder="Add note..."
-                                value={material.custom_description ?? material.default_description ?? ""}
+                                type="number"
+                                value={material.purchases_quantity || ""}
                                 onChange={(e) =>
-                                  handleInputChange(material.id, "custom_description", e.target.value)
+                                  handleInputChange(material.id, "purchases_quantity", e.target.value)
                                 }
-                                className="text-xs text-amber-600 dark:text-amber-400 bg-transparent border-b border-transparent hover:border-dashed hover:border-amber-300 dark:hover:border-amber-700 focus:outline-none focus:border-solid focus:border-amber-500 px-0 py-0.5 w-48"
+                                className="w-full px-2 py-1 text-right font-mono text-sm border border-blue-200 dark:border-blue-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                min="0"
+                                step="1"
+                                placeholder="0"
                               />
-                            </div>
-                          </td>
-                          <td className="px-2 py-1.5 text-center text-sm text-default-600 dark:text-gray-400">
-                            {material.unit}
-                          </td>
-                          <td className="px-2 py-1.5 text-right">
-                            <span className="font-mono text-sm text-default-600 dark:text-gray-400">
-                              {formatQty(material.opening_quantity)}
-                            </span>
-                          </td>
-                          {/* Purchases input */}
-                          <td className="px-1 py-1 bg-blue-50/50 dark:bg-blue-900/10">
-                            <input
-                              type="number"
-                              value={material.purchases_quantity || ""}
-                              onChange={(e) =>
-                                handleInputChange(material.id, "purchases_quantity", e.target.value)
-                              }
-                              className="w-full px-2 py-1 text-right font-mono text-sm border border-blue-200 dark:border-blue-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                              min="0"
-                              step="1"
-                              placeholder="0"
-                            />
-                          </td>
-                          {/* Consumption input */}
-                          <td className="px-1 py-1 bg-orange-50/50 dark:bg-orange-900/10">
-                            <input
-                              type="number"
-                              value={material.consumption_quantity || ""}
-                              onChange={(e) =>
-                                handleInputChange(material.id, "consumption_quantity", e.target.value)
-                              }
-                              className="w-full px-2 py-1 text-right font-mono text-sm border border-orange-200 dark:border-orange-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
-                              min="0"
-                              step="1"
-                              placeholder="0"
-                            />
-                          </td>
-                          {/* Closing qty (calculated, readonly) */}
-                          <td className="px-2 py-1.5 text-right">
-                            <span
-                              className={clsx(
-                                "font-mono text-sm font-medium",
-                                isNegative
-                                  ? "text-red-600 dark:text-red-400"
-                                  : "text-default-700 dark:text-gray-300"
-                              )}
-                            >
-                              {formatQty(material.closing_quantity)}
-                            </span>
-                          </td>
-                          {/* Unit cost input */}
-                          <td className="px-1 py-1">
-                            <input
-                              type="number"
-                              value={material.unit_cost || ""}
-                              onChange={(e) =>
-                                handleInputChange(material.id, "unit_cost", e.target.value)
-                              }
-                              className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-                              step="0.05"
-                              min="0"
-                            />
-                          </td>
-                          {/* Closing value (calculated) */}
-                          <td className="px-2 py-1.5 text-right">
-                            <span
-                              className={clsx(
-                                "font-mono text-sm font-medium",
-                                isNegative
-                                  ? "text-red-600 dark:text-red-400"
-                                  : material.closing_value > 0
-                                    ? "text-green-600 dark:text-green-400"
-                                    : "text-default-400 dark:text-gray-500"
-                              )}
-                            >
-                              {formatNumber(material.closing_value)}
-                            </span>
-                          </td>
-                        </tr>
+                            </td>
+                            {/* Consumption input */}
+                            <td className="px-1 py-1 bg-orange-50/50 dark:bg-orange-900/10">
+                              <input
+                                type="number"
+                                value={material.consumption_quantity || ""}
+                                onChange={(e) =>
+                                  handleInputChange(material.id, "consumption_quantity", e.target.value)
+                                }
+                                className="w-full px-2 py-1 text-right font-mono text-sm border border-orange-200 dark:border-orange-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
+                                min="0"
+                                step="1"
+                                placeholder="0"
+                              />
+                            </td>
+                            {/* Closing qty (calculated, readonly) */}
+                            <td className="px-2 py-1.5 text-right">
+                              <span
+                                className={clsx(
+                                  "font-mono text-sm font-medium",
+                                  isNegative
+                                    ? "text-red-600 dark:text-red-400"
+                                    : "text-default-700 dark:text-gray-300"
+                                )}
+                              >
+                                {formatQty(material.closing_quantity)}
+                              </span>
+                            </td>
+                            {/* Unit cost input */}
+                            <td className="px-1 py-1">
+                              <input
+                                type="number"
+                                value={material.unit_cost || ""}
+                                onChange={(e) =>
+                                  handleInputChange(material.id, "unit_cost", e.target.value)
+                                }
+                                className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+                                step="0.05"
+                                min="0"
+                              />
+                            </td>
+                            {/* Closing value (calculated) */}
+                            <td className="px-2 py-1.5 text-right">
+                              <span
+                                className={clsx(
+                                  "font-mono text-sm font-medium",
+                                  isNegative
+                                    ? "text-red-600 dark:text-red-400"
+                                    : material.closing_value > 0
+                                      ? "text-green-600 dark:text-green-400"
+                                      : "text-default-400 dark:text-gray-500"
+                                )}
+                              >
+                                {formatNumber(material.closing_value)}
+                              </span>
+                            </td>
+                          </tr>
+
+                          {/* New Variant Row for non-variant materials (when adding) */}
+                          {newVariant && (
+                            <tr className="bg-gradient-to-r from-sky-50 to-sky-50/30 dark:from-gray-800 dark:to-gray-800 border-l-2 border-sky-400 dark:border-sky-700/60">
+                              <td className="px-3 py-1.5 pl-8">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sky-400 dark:text-gray-500">+</span>
+                                  <input
+                                    type="text"
+                                    value={newVariant.variant_name || ""}
+                                    onChange={(e) => handleNewVariantChange(material.id, "variant_name", e.target.value)}
+                                    className="flex-1 px-2 py-0.5 text-sm border border-sky-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-700"
+                                    placeholder="Enter variant name..."
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleCancelNewVariant(material.id)}
+                                    className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                    title="Cancel"
+                                  >
+                                    <IconX size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">0</td>
+                              <td className="px-1 py-1 bg-blue-50/30 dark:bg-blue-900/5">
+                                <input
+                                  type="number"
+                                  value={newVariant.purchases_quantity || ""}
+                                  onChange={(e) => handleNewVariantChange(material.id, "purchases_quantity", e.target.value)}
+                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-blue-200 dark:border-blue-700 rounded bg-blue-50/50 dark:bg-blue-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700"
+                                  min="0"
+                                  step="1"
+                                  placeholder="0"
+                                />
+                              </td>
+                              <td className="px-1 py-1 bg-orange-50/30 dark:bg-orange-900/5">
+                                <input
+                                  type="number"
+                                  value={newVariant.consumption_quantity || ""}
+                                  onChange={(e) => handleNewVariantChange(material.id, "consumption_quantity", e.target.value)}
+                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-orange-200 dark:border-orange-700 rounded bg-orange-50/50 dark:bg-orange-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:bg-white dark:focus:bg-gray-700"
+                                  min="0"
+                                  step="1"
+                                  placeholder="0"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
+                                {formatQty(newVariant.closing_quantity)}
+                              </td>
+                              <td className="px-1 py-1">
+                                <input
+                                  type="number"
+                                  value={newVariant.unit_cost || ""}
+                                  onChange={(e) => handleNewVariantChange(material.id, "unit_cost", e.target.value)}
+                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-default-200 dark:border-gray-600 rounded bg-default-50 dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white"
+                                  step="0.01"
+                                  min="0"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
+                                {formatNumber(newVariant.closing_value)}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </React.Fragment>
@@ -636,7 +1260,7 @@ const MaterialStockEntryPage: React.FC = () => {
                 <React.Fragment>
                   {/* Stock Kilang Header */}
                   <tr className="bg-emerald-100 dark:bg-emerald-900/30">
-                    <td colSpan={3} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                       <div className="flex items-center gap-2">
                         <IconBuildingFactory2 size={14} className="text-emerald-600 dark:text-emerald-400" />
                         Stock Kilang (Finished Goods)
@@ -664,9 +1288,6 @@ const MaterialStockEntryPage: React.FC = () => {
                         <span className="text-sm text-default-700 dark:text-gray-300">
                           {item.name}
                         </span>
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-sm text-default-500 dark:text-gray-400">
-                        unit
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
                         -
@@ -698,7 +1319,7 @@ const MaterialStockEntryPage: React.FC = () => {
               {/* Loading Stock Kilang */}
               {isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
+                  <td colSpan={7} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
                     Loading finished goods stock...
                   </td>
                 </tr>
@@ -706,7 +1327,7 @@ const MaterialStockEntryPage: React.FC = () => {
 
               {materials.length === 0 && stockKilang.length === 0 && !isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                     <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
                     <p>No materials found for {activeTab.toUpperCase()} production</p>
                   </td>
@@ -720,7 +1341,7 @@ const MaterialStockEntryPage: React.FC = () => {
                 {/* Materials subtotal */}
                 {materials.length > 0 && (
                   <tr>
-                    <td colSpan={2} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Materials:
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-500">
@@ -740,7 +1361,7 @@ const MaterialStockEntryPage: React.FC = () => {
                 {/* Stock Kilang subtotal */}
                 {stockKilang.length > 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td colSpan={4} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Stock Kilang:
                     </td>
                     <td></td>
@@ -752,7 +1373,7 @@ const MaterialStockEntryPage: React.FC = () => {
                 )}
                 {/* Grand Total */}
                 <tr className="font-semibold border-t border-default-200 dark:border-gray-600">
-                  <td colSpan={5} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
+                  <td colSpan={4} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
                     Grand Total:
                   </td>
                   <td></td>
