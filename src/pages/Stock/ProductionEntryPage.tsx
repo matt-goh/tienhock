@@ -107,6 +107,20 @@ const ProductionEntryPage: React.FC = () => {
     ) as StockProduct[];
   }, [products, favorites]);
 
+  // Get non-favorite products grouped by type
+  const nonFavoriteProducts = useMemo(() => {
+    const filtered = products.filter(
+      (product) =>
+        !favorites.has(product.id) &&
+        (product.type === "BH" || product.type === "MEE")
+    ) as StockProduct[];
+
+    return {
+      MEE: filtered.filter((p) => p.type === "MEE"),
+      BH: filtered.filter((p) => p.type === "BH"),
+    };
+  }, [products, favorites]);
+
   // Get selected product details
   const selectedProduct = useMemo(() => {
     if (!selectedProductId) return null;
@@ -373,10 +387,139 @@ const ProductionEntryPage: React.FC = () => {
 
       {/* Workers entry grid */}
       {!selectedProductId ? (
-        <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-8 text-center">
-          <p className="text-default-500 dark:text-gray-400">
-            Please select a product to view workers
-          </p>
+        <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+          <div className="space-y-4">
+            {/* Starred Products */}
+            {favoriteProducts.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <IconStarFilled size={14} className="text-amber-500" />
+                  <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                    Starred
+                  </span>
+                  <span className="text-xs text-default-400 dark:text-gray-500">
+                    ({favoriteProducts.length})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {favoriteProducts.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => setSelectedProductId(product.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1.5 text-sm transition-colors hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                    >
+                      <IconStarFilled size={12} className="text-amber-500 flex-shrink-0" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-default-900 dark:text-gray-100">
+                          {product.id}
+                        </span>
+                        {product.description && (
+                          <>
+                            <span className="text-default-400 dark:text-gray-500">·</span>
+                            <span className="text-default-700 dark:text-gray-300">
+                              {product.description}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                          product.type === "MEE"
+                            ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                            : "bg-blue-500/20 text-blue-700 dark:text-blue-400"
+                        }`}
+                      >
+                        {product.type === "MEE" ? "M" : "B"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mee Products */}
+            {nonFavoriteProducts.MEE.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                    Mee
+                  </span>
+                  <span className="text-xs text-default-400 dark:text-gray-500">
+                    ({nonFavoriteProducts.MEE.length})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nonFavoriteProducts.MEE.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => setSelectedProductId(product.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 px-2.5 py-1.5 text-sm transition-colors hover:border-green-400 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20"
+                    >
+                      <span className="font-semibold text-default-900 dark:text-gray-100">
+                        {product.id}
+                      </span>
+                      {product.description && (
+                        <>
+                          <span className="text-default-400 dark:text-gray-500">·</span>
+                          <span className="text-default-700 dark:text-gray-300">
+                            {product.description}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bihun Products */}
+            {nonFavoriteProducts.BH.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                  <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                    Bihun
+                  </span>
+                  <span className="text-xs text-default-400 dark:text-gray-500">
+                    ({nonFavoriteProducts.BH.length})
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nonFavoriteProducts.BH.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => setSelectedProductId(product.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 px-2.5 py-1.5 text-sm transition-colors hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    >
+                      <span className="font-semibold text-default-900 dark:text-gray-100">
+                        {product.id}
+                      </span>
+                      {product.description && (
+                        <>
+                          <span className="text-default-400 dark:text-gray-500">·</span>
+                          <span className="text-default-700 dark:text-gray-300">
+                            {product.description}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state if no products */}
+            {favoriteProducts.length === 0 &&
+              nonFavoriteProducts.MEE.length === 0 &&
+              nonFavoriteProducts.BH.length === 0 && (
+                <div className="text-center py-6">
+                  <p className="text-sm text-default-500 dark:text-gray-400">
+                    No products available
+                  </p>
+                </div>
+              )}
+          </div>
         </div>
       ) : (
         <WorkerEntryGrid
