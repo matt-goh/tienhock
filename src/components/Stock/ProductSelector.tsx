@@ -13,6 +13,7 @@ import {
   IconSearch,
   IconStar,
   IconStarFilled,
+  IconX,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
@@ -176,10 +177,10 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
   // Category colors
   const categoryColors: Record<string, string> = {
-    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50",
-    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50",
-    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/50",
-    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/50",
+    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900",
+    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900",
+    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900",
+    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900",
   };
 
   return (
@@ -195,7 +196,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
         disabled={disabled || isLoading}
       >
         <div className="relative">
-          <ComboboxButton as="div" className="relative w-full cursor-pointer">
+          <ComboboxButton as="div" className={clsx("relative w-full", value ? "" : "cursor-pointer")}>
             <ComboboxInput
               className={clsx(
                 "w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-2 pl-10 pr-10",
@@ -214,12 +215,30 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <IconSearch className="h-4 w-4 text-default-400 dark:text-gray-400" />
             </div>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <IconChevronDown
-                className="h-5 w-5 text-default-400 dark:text-gray-400"
-                aria-hidden="true"
-              />
-            </div>
+            {value ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onChange(null);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200 z-10"
+              >
+                <IconX className="h-5 w-5" aria-hidden="true" />
+              </button>
+            ) : (
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <IconChevronDown
+                  className="h-5 w-5 text-default-400 dark:text-gray-400"
+                  aria-hidden="true"
+                />
+              </div>
+            )}
           </ComboboxButton>
 
           <ComboboxOptions
@@ -255,7 +274,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 {/* Favorites category */}
                 {showCategories && filteredFavorites.length > 0 && (
                   <div>
-                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50">
+                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900">
                       Favorites ({filteredFavorites.length})
                     </div>
                     {filteredFavorites.map((product) => (
@@ -328,7 +347,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                           <div
                             className={clsx(
                               "sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider",
-                              categoryColors[type] || "text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900/50"
+                              categoryColors[type] || "text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900"
                             )}
                           >
                             {categoryLabels[type]} ({prods.length})

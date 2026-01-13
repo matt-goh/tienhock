@@ -1,9 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Payment } from "../../types/types";
 import { GreenTargetPayment } from "../../types/greenTargetTypes";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
-import { IconCircleCheck, IconBan } from "@tabler/icons-react";
+import { FormListbox } from "../FormComponents";
+import { IconCircleCheck, IconBan, IconReceipt } from "@tabler/icons-react";
 import { greenTargetApi } from "../../routes/greentarget/api";
 import toast from "react-hot-toast";
 
@@ -18,6 +20,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   onViewPayment,
   onRefresh,
 }) => {
+  const navigate = useNavigate();
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
     null
   );
@@ -27,6 +30,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<GreenTargetPayment | null>(null);
+  const [selectedBankAccount, setSelectedBankAccount] = useState<string>("BANK_PBB"); // Default to Public Bank
 
   const formatCurrency = (amount: number | string): string => {
     const num = Number(amount);
@@ -54,7 +58,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     const toastId = toast.loading("Confirming payment(s)...");
 
     try {
-      await greenTargetApi.confirmPayment(selectedPayment.payment_id);
+      await greenTargetApi.confirmPayment(selectedPayment.payment_id, selectedBankAccount);
       toast.success("Payment confirmed successfully", { id: toastId });
       onRefresh(); // This will refetch all payments and update the table
     } catch (error) {
@@ -64,6 +68,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
     } finally {
       setConfirmingPaymentId(null);
       setSelectedPayment(null);
+      setSelectedBankAccount("BANK_PBB"); // Reset to default
     }
   };
 
@@ -179,6 +184,9 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Status
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Journal Entry
+              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Amount
               </th>
@@ -227,6 +235,9 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                         <td className="px-6 py-3 whitespace-nowrap">
                           {getStatusBadge(firstPayment.status)}
                         </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          -
+                        </td>
                         <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                           {formatCurrency(totalAmount)}
                         </td>
@@ -265,6 +276,20 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                           <td className="px-6 py-3 whitespace-nowrap">
                             {getStatusBadge(payment.status)}
                           </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            {payment.journal_entry_id ? (
+                              <button
+                                onClick={() => navigate(`/greentarget/accounting/journal-entries/${payment.journal_entry_id}`)}
+                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                                title="View journal entry"
+                              >
+                                <IconReceipt size={14} />
+                                <span className="font-mono">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+                            )}
+                          </td>
                           <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(payment.amount_paid)}
                           </td>
@@ -277,6 +302,7 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                                   color="sky"
                                   onClick={() => {
                                     setSelectedPayment(payment);
+                                    setSelectedBankAccount(payment.bank_account || "BANK_PBB");
                                     setShowConfirmDialog(true);
                                   }}
                                   disabled={
@@ -350,6 +376,20 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
                       <td className="px-6 py-3 whitespace-nowrap">
                         {getStatusBadge(payment.status)}
                       </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        {payment.journal_entry_id ? (
+                          <button
+                            onClick={() => navigate(`/greentarget/accounting/journal-entries/${payment.journal_entry_id}`)}
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            title="View journal entry"
+                          >
+                            <IconReceipt size={14} />
+                            <span className="font-mono">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
                       <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(payment.amount_paid)}
                       </td>
@@ -400,21 +440,59 @@ const GreenTargetPaymentTable: React.FC<GreenTargetPaymentTableProps> = ({
         </table>
       </div>
 
-      {/* Confirmation Dialogs */}
-      <ConfirmationDialog
-        isOpen={showConfirmDialog}
-        onClose={() => {
-          setShowConfirmDialog(false);
-          setSelectedPayment(null);
-        }}
-        onConfirm={handleConfirmPayment}
-        title="Confirm Payment"
-        message={`Are you sure you want to confirm this ${
-          selectedPayment?.payment_method
-        } payment of ${formatCurrency(selectedPayment?.amount_paid || 0)}?`}
-        confirmButtonText="Confirm Payment"
-        variant="success"
-      />
+      {/* Confirm Payment Dialog with Bank Account Selection */}
+      {showConfirmDialog && selectedPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md shadow-xl">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Confirm Payment
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                Are you sure you want to confirm this {selectedPayment.payment_method} payment of {formatCurrency(selectedPayment.amount_paid)}?
+              </p>
+
+              <div className="mb-4">
+                <FormListbox
+                  name="bank_account"
+                  label="Deposit To"
+                  value={selectedBankAccount}
+                  onChange={(value) => setSelectedBankAccount(value)}
+                  options={[
+                    { id: "BANK_PBB", name: "Public Bank" },
+                    { id: "BANK_ABB", name: "Alliance Bank" },
+                  ]}
+                  disabled={confirmingPaymentId !== null}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Select which bank account will receive this payment
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowConfirmDialog(false);
+                    setSelectedPayment(null);
+                    setSelectedBankAccount("BANK_PBB");
+                  }}
+                  disabled={confirmingPaymentId !== null}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="green"
+                  onClick={handleConfirmPayment}
+                  disabled={confirmingPaymentId !== null}
+                >
+                  Confirm Payment
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmationDialog
         isOpen={showCancelDialog}

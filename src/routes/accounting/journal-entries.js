@@ -592,7 +592,7 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      const checkQuery = "SELECT status FROM journal_entries WHERE id = $1";
+      const checkQuery = "SELECT status, entry_type, reference_no FROM journal_entries WHERE id = $1";
       const checkResult = await client.query(checkQuery, [id]);
 
       if (checkResult.rows.length === 0) {
@@ -600,11 +600,37 @@ export default function (pool) {
         return res.status(404).json({ message: "Journal entry not found" });
       }
 
-      const status = checkResult.rows[0].status;
+      const { status, entry_type, reference_no } = checkResult.rows[0];
+
+      // Special handling for auto-generated receipt (REC) entries
+      if (entry_type === "REC" && status === "posted") {
+        // Check if this is linked to a payment
+        const paymentQuery = `
+          SELECT payment_id, invoice_id, payment_date, amount_paid
+          FROM payments
+          WHERE journal_entry_id = $1
+        `;
+        const paymentResult = await client.query(paymentQuery, [id]);
+
+        if (paymentResult.rows.length > 0) {
+          const payment = paymentResult.rows[0];
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: "Cannot delete auto-generated receipt journal",
+            detail: `This journal entry (${reference_no}) was auto-generated from a customer payment. To remove it, cancel the originating payment instead.`,
+            payment_id: payment.payment_id,
+            invoice_id: payment.invoice_id,
+            suggestion: "Go to the invoice and cancel the payment to cancel this journal entry",
+          });
+        }
+      }
+
+      // General check for posted entries
       if (status === "posted") {
         await client.query("ROLLBACK");
         return res.status(400).json({
           message: "Cannot delete posted entries",
+          detail: "Posted journal entries cannot be deleted. Use the Cancel option instead to maintain audit trail.",
         });
       }
 
