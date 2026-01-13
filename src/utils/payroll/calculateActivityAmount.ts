@@ -40,11 +40,11 @@ export function calculateActivityAmount(
           calculatedAmount = multiplyMoney(activity.rate, activity.hoursApplied);
         } else {
           // Daily entry: calculate overtime based on day-specific threshold
-          // Only apply forceOTHours to BH_OT_STIM paycode (JAGA STIM forced OT)
+          // BH_OT_STIM uses ONLY forceOTHours (JAGA STIM column), excluding natural OT
           const overtimeThreshold = getOvertimeThreshold(logDate);
           const naturalOvertimeHours = Math.max(0, hours - overtimeThreshold);
           const totalOvertimeHours = activity.payCodeId === "BH_OT_STIM"
-            ? naturalOvertimeHours + forceOTHours
+            ? forceOTHours
             : naturalOvertimeHours;
           calculatedAmount = multiplyMoney(activity.rate, totalOvertimeHours);
         }
