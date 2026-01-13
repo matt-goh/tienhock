@@ -58,6 +58,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     payment_date: new Date().toISOString().split("T")[0],
     payment_method: "cheque" as Payment["payment_method"],
     payment_reference: "",
+    bank_account: "BANK_PBB", // Default to Public Bank
     notes: "",
   });
 
@@ -66,6 +67,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     { id: "cheque", name: "Cheque" },
     { id: "bank_transfer", name: "Bank Transfer" },
     { id: "online", name: "Online" },
+  ];
+
+  const bankAccountOptions = [
+    { id: "BANK_PBB", name: "Public Bank" },
+    { id: "BANK_ABB", name: "Alliance Bank" },
   ];
 
   const fetchUnpaidInvoices = useCallback(async () => {
@@ -178,6 +184,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             amount_paid: amountToPay,
             payment_method: formData.payment_method,
             payment_reference: formData.payment_reference || undefined,
+            bank_account: formData.payment_method === 'cash' ? 'CASH' : formData.bank_account,
             notes: formData.notes || undefined,
           });
           results.push(result);
@@ -331,6 +338,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   options={paymentMethodOptions}
                   disabled={isSubmitting}
                 />
+                {formData.payment_method !== 'cash' && (
+                  <FormListbox
+                    name="bank_account"
+                    label="Deposit To"
+                    value={formData.bank_account}
+                    onChange={(value) =>
+                      setFormData({ ...formData, bank_account: value })
+                    }
+                    options={bankAccountOptions}
+                    disabled={isSubmitting}
+                  />
+                )}
                 <FormInput
                   name="payment_reference"
                   label={`Payment Reference ${

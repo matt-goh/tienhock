@@ -35,6 +35,7 @@ import {
   IconPrinter,
   IconPencil,
   IconX,
+  IconReceipt,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import { api } from "../../routes/utils/api";
@@ -193,6 +194,7 @@ const InvoiceDetailsPage: React.FC = () => {
     payment_date: new Date().toISOString().split("T")[0], // Default to today
     payment_method: "cheque", // Default method
     payment_reference: undefined,
+    bank_account: "BANK_PBB", // Default to Public Bank
     notes: undefined,
     internal_reference: undefined, // Not managed by frontend
   });
@@ -214,6 +216,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showClearEInvoiceConfirm, setShowClearEInvoiceConfirm] =
     useState(false);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const [selectedBankAccountForConfirm, setSelectedBankAccountForConfirm] = useState<string>("BANK_PBB"); // Default to Public Bank for payment confirmation
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<{
     id: string;
@@ -1015,6 +1018,14 @@ const InvoiceDetailsPage: React.FC = () => {
       ...prev,
       payment_method: value as Payment["payment_method"],
       payment_reference: value === "cash" ? undefined : prev.payment_reference, // Clear ref if not needed
+      bank_account: value === "cash" ? undefined : prev.bank_account || "BANK_PBB", // Set bank account for non-cash
+    }));
+  };
+
+  const handleBankAccountChange = (value: string) => {
+    setPaymentFormData((prev) => ({
+      ...prev,
+      bank_account: value as Payment["bank_account"],
     }));
   };
 
@@ -1107,6 +1118,7 @@ const InvoiceDetailsPage: React.FC = () => {
         paymentFormData.payment_method === "cash"
           ? undefined
           : paymentFormData.payment_reference?.trim() || undefined,
+      bank_account: paymentFormData.bank_account, // Include bank account
       notes: paymentFormData.notes?.trim() || undefined,
     };
 
@@ -1155,6 +1167,8 @@ const InvoiceDetailsPage: React.FC = () => {
     }
 
     setPaymentToConfirm(payment);
+    // Pre-populate with existing bank account or default to BANK_PBB
+    setSelectedBankAccountForConfirm(payment.bank_account || "BANK_PBB");
     setShowConfirmPaymentDialog(true);
   };
 
@@ -1167,7 +1181,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
     try {
       const confirmedPayments = await confirmPayment(
-        paymentToConfirm.payment_id
+        paymentToConfirm.payment_id,
+        selectedBankAccountForConfirm
       );
       const successMessage =
         confirmedPayments.length > 1
@@ -1181,6 +1196,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } finally {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
+      setSelectedBankAccountForConfirm("BANK_PBB"); // Reset to default
     }
   };
 
@@ -1667,20 +1683,27 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Payment Form Section (collapsible) */}
         {showPaymentForm && !isCancelled && !isPaid && (
           <>
-            <div className="p-4 bg-sky-50/50 dark:bg-sky-900/20">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-sky-800 dark:text-sky-300">Record Payment</h2>
+            <div className="p-6 bg-sky-50/50 dark:bg-sky-900/20">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-sky-900 dark:text-sky-200">Record Payment</h2>
+                  <p className="text-sm text-sky-700 dark:text-sky-400 mt-0.5">
+                    Outstanding Balance: {formatCurrency(invoiceData.balance_due)}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowPaymentForm(false)}
-                  className="p-1 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded text-sky-600 dark:text-sky-400"
+                  className="p-1.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded text-sky-600 dark:text-sky-400 transition-colors"
                   title="Close payment form"
                 >
-                  <IconX size={18} />
+                  <IconX size={20} />
                 </button>
               </div>
-              <form onSubmit={handleSubmitPayment}>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
+
+              <form onSubmit={handleSubmitPayment} className="space-y-4">
+                {/* Row 1: Date and Amount */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormInput
                     name="payment_date"
                     label="Payment Date"
@@ -1699,16 +1722,45 @@ const InvoiceDetailsPage: React.FC = () => {
                     min={0.01}
                     disabled={isProcessingPayment}
                   />
+                </div>
+
+                {/* Row 2: Payment Method and Bank Account */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormListbox
                     name="payment_method"
                     label="Payment Method"
                     value={paymentFormData.payment_method}
                     onChange={handlePaymentMethodChange}
                     options={paymentMethodOptions}
+                    disabled={isProcessingPayment}
                   />
-                  {(paymentFormData.payment_method === "cheque" ||
-                    paymentFormData.payment_method === "bank_transfer" ||
-                    paymentFormData.payment_method === "online") && (
+
+                  {paymentFormData.payment_method !== "cash" ? (
+                    <FormListbox
+                      name="bank_account"
+                      label="Deposit To"
+                      value={paymentFormData.bank_account || "BANK_PBB"}
+                      onChange={handleBankAccountChange}
+                      options={[
+                        { id: "BANK_PBB", name: "Public Bank" },
+                        { id: "BANK_ABB", name: "Alliance Bank" },
+                      ]}
+                      disabled={isProcessingPayment}
+                    />
+                  ) : (
+                    <div className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        Cash payments are deposited to cash account
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Row 3: Payment Reference (conditional) */}
+                {(paymentFormData.payment_method === "cheque" ||
+                  paymentFormData.payment_method === "bank_transfer" ||
+                  paymentFormData.payment_method === "online") && (
+                  <div className="animate-in fade-in duration-200">
                     <FormInput
                       name="payment_reference"
                       label={
@@ -1716,24 +1768,45 @@ const InvoiceDetailsPage: React.FC = () => {
                           ? "Cheque Number"
                           : paymentFormData.payment_method === "online"
                           ? "Transaction ID"
-                          : "Transaction Ref"
+                          : "Transaction Reference"
                       }
                       value={paymentFormData.payment_reference || ""}
                       onChange={handlePaymentFormChange}
                       disabled={isProcessingPayment}
+                      placeholder={
+                        paymentFormData.payment_method === "cheque"
+                          ? "Enter cheque number"
+                          : paymentFormData.payment_method === "online"
+                          ? "Enter transaction ID"
+                          : "Enter reference number"
+                      }
                     />
-                  )}
-                </div>
-                <div className="mt-3">
+                  </div>
+                )}
+
+                {/* Row 4: Notes */}
+                <div>
                   <FormInput
                     name="notes"
                     label="Notes (Optional)"
                     value={paymentFormData.notes || ""}
                     onChange={handlePaymentFormChange}
                     disabled={isProcessingPayment}
+                    placeholder="Add any additional notes about this payment"
                   />
                 </div>
-                <div className="mt-3 flex justify-end">
+
+                {/* Row 5: Action Buttons */}
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    color="default"
+                    onClick={() => setShowPaymentForm(false)}
+                    disabled={isProcessingPayment}
+                  >
+                    Cancel
+                  </Button>
                   <Button
                     type="submit"
                     variant="filled"
@@ -1952,6 +2025,9 @@ const InvoiceDetailsPage: React.FC = () => {
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
                       Status
                     </th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
+                      Journal Entry
+                    </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Notes
                     </th>
@@ -2014,6 +2090,20 @@ const InvoiceDetailsPage: React.FC = () => {
                             ? "Overpaid"
                             : "Paid"}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {p.journal_entry_id ? (
+                          <button
+                            onClick={() => navigate(`/accounting/journal-entries/${p.journal_entry_id}`)}
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            title="View journal entry"
+                          >
+                            <IconReceipt size={14} />
+                            <span className="font-mono">{p.journal_reference_no || `#${p.journal_entry_id}`}</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                         {p.notes || "-"}
@@ -2114,21 +2204,59 @@ const InvoiceDetailsPage: React.FC = () => {
         confirmButtonText="Confirm Cancellation"
         variant="danger"
       />
-      <ConfirmationDialog
-        isOpen={showConfirmPaymentDialog}
-        onClose={() => setShowConfirmPaymentDialog(false)}
-        onConfirm={handleConfirmPaymentConfirm}
-        title="Confirm Payment"
-        message={`Are you sure you want to confirm this ${
-          paymentToConfirm?.payment_method
-        } payment of ${formatCurrency(
-          paymentToConfirm?.amount_paid
-        )}? This will mark the payment as paid and update the invoice balance.`}
-        confirmButtonText={
-          isConfirmingPayment ? "Confirming..." : "Confirm Payment"
-        }
-        variant="success"
-      />
+      {/* Confirm Payment Dialog with Bank Account Selection */}
+      {showConfirmPaymentDialog && paymentToConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md shadow-xl">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                Confirm Payment
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                Are you sure you want to confirm this {paymentToConfirm.payment_method} payment of {formatCurrency(paymentToConfirm.amount_paid)}?
+              </p>
+
+              <div className="mb-4">
+                <FormListbox
+                  name="bank_account"
+                  label="Deposit To"
+                  value={selectedBankAccountForConfirm}
+                  onChange={(value) => setSelectedBankAccountForConfirm(value)}
+                  options={[
+                    { id: "BANK_PBB", name: "Public Bank" },
+                    { id: "BANK_ABB", name: "Alliance Bank" },
+                  ]}
+                  disabled={isConfirmingPayment}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Select which bank account will receive this payment
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowConfirmPaymentDialog(false);
+                    setPaymentToConfirm(null);
+                    setSelectedBankAccountForConfirm("BANK_PBB");
+                  }}
+                  disabled={isConfirmingPayment}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="green"
+                  onClick={handleConfirmPaymentConfirm}
+                  disabled={isConfirmingPayment}
+                >
+                  {isConfirmingPayment ? "Confirming..." : "Confirm Payment"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <ConfirmationDialog
         isOpen={showCancelPaymentConfirm}
         onClose={() => setShowCancelPaymentConfirm(false)}

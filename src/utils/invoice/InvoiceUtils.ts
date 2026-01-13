@@ -358,9 +358,14 @@ export const createPayment = async (
 };
 
 // CONFIRM Payment (mark pending payment as paid)
-export const confirmPayment = async (paymentId: number): Promise<Payment[]> => {
+export const confirmPayment = async (
+  paymentId: number,
+  bank_account?: string
+): Promise<Payment[]> => {
   try {
-    const response = await api.put(`/api/payments/${paymentId}/confirm`);
+    const response = await api.put(`/api/payments/${paymentId}/confirm`, {
+      bank_account,
+    });
     // The backend now returns { message: string, payments: Payment[] }
     if (!response || !response.payments || !Array.isArray(response.payments)) {
       throw new Error("Invalid response received after confirming payment(s).");
