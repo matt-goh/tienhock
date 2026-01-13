@@ -1040,6 +1040,7 @@ export interface SpecialItemConfig {
     defaultWorkerId: string;
     allowChange: boolean;
   };
+  hiddenFromUI?: boolean; // If true, item is internal and not shown in product selectors
 }
 
 // Stock Movement (single day)
@@ -1301,4 +1302,43 @@ export interface MaterialFilters {
   category?: MaterialCategory | null;
   is_active?: boolean | null;
   applies_to?: MaterialAppliesTo | "all" | null;
+}
+
+// ==================== CASH RECEIPT VOUCHER TYPES ====================
+
+// Cash Receipt Voucher data for PDF generation
+export interface CashReceiptVoucherData {
+  // Voucher identification
+  voucher_number: string; // REC reference (e.g., "REC001/01")
+  voucher_date: string; // Payment date
+
+  // Payment info
+  payment_id: number;
+  amount: number;
+  payment_method: "cash" | "cheque" | "bank_transfer" | "online";
+  payment_reference: string | null;
+  bank_account: string;
+  bank_account_description: string;
+
+  // Customer/Invoice info
+  customer_name: string;
+  invoice_id: string;
+
+  // Journal entry info
+  journal_entry_id: number;
+  description: string | null;
+
+  // Journal entry lines for display
+  lines: CashReceiptVoucherLine[];
+
+  // Metadata
+  created_at: string | null;
+  created_by: string | null;
+}
+
+export interface CashReceiptVoucherLine {
+  account_code: string;
+  account_description: string;
+  debit_amount: number;
+  credit_amount: number;
 }

@@ -218,6 +218,113 @@ export default function (pool) {
     }
   });
 
+  // GET /:id/receipt-voucher - Get receipt voucher data for REC journal entries
+  router.get("/:id/receipt-voucher", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // First, get the journal entry and verify it's a REC type
+      const entryQuery = `
+        SELECT
+          je.id, je.reference_no, je.entry_type, je.entry_date,
+          je.description, je.status, je.created_at, je.created_by
+        FROM journal_entries je
+        WHERE je.id = $1
+      `;
+      const entryResult = await pool.query(entryQuery, [id]);
+
+      if (entryResult.rows.length === 0) {
+        return res.status(404).json({ message: "Journal entry not found" });
+      }
+
+      const entry = entryResult.rows[0];
+
+      // Only allow REC type entries
+      if (entry.entry_type !== "REC") {
+        return res.status(400).json({
+          message: "Receipt voucher is only available for REC (Receipt) journal entries",
+        });
+      }
+
+      // Check if entry is cancelled
+      if (entry.status === "cancelled") {
+        return res.status(400).json({
+          message: "Cannot generate voucher for cancelled journal entry",
+        });
+      }
+
+      // Get the linked payment
+      const paymentQuery = `
+        SELECT
+          p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
+          p.payment_method, p.payment_reference, p.bank_account,
+          p.created_at,
+          c.name as customer_name,
+          ac.description as bank_account_description
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        LEFT JOIN customers c ON i.customerid = c.id
+        LEFT JOIN account_codes ac ON p.bank_account = ac.code
+        WHERE p.journal_entry_id = $1
+      `;
+      const paymentResult = await pool.query(paymentQuery, [id]);
+
+      if (paymentResult.rows.length === 0) {
+        return res.status(404).json({
+          message: "No payment found linked to this journal entry",
+        });
+      }
+
+      const payment = paymentResult.rows[0];
+
+      // Get journal entry lines with account descriptions
+      const linesQuery = `
+        SELECT
+          jel.account_code,
+          COALESCE(ac.description, jel.account_code) as account_description,
+          jel.debit_amount,
+          jel.credit_amount
+        FROM journal_entry_lines jel
+        LEFT JOIN account_codes ac ON jel.account_code = ac.code
+        WHERE jel.journal_entry_id = $1
+        ORDER BY jel.line_number
+      `;
+      const linesResult = await pool.query(linesQuery, [id]);
+
+      // Construct the voucher data
+      const voucherData = {
+        voucher_number: entry.reference_no,
+        voucher_date: payment.payment_date,
+        payment_id: payment.payment_id,
+        amount: parseFloat(payment.amount_paid),
+        payment_method: payment.payment_method,
+        payment_reference: payment.payment_reference || null,
+        bank_account: payment.bank_account,
+        bank_account_description: payment.bank_account_description || payment.bank_account,
+        customer_name: payment.customer_name || "Unknown Customer",
+        invoice_id: payment.invoice_id,
+        journal_entry_id: parseInt(id),
+        description: entry.description,
+        lines: linesResult.rows.map((line) => ({
+          account_code: line.account_code,
+          account_description: line.account_description,
+          debit_amount: parseFloat(line.debit_amount) || 0,
+          credit_amount: parseFloat(line.credit_amount) || 0,
+        })),
+        created_at: payment.created_at,
+        created_by: null,
+      };
+
+      res.json(voucherData);
+    } catch (error) {
+      console.error("Error fetching receipt voucher data:", error);
+      res.status(500).json({
+        message: "Error fetching receipt voucher data",
+        error: error.message,
+      });
+    }
+  });
+
   // POST / - Create new journal entry
   router.post("/", async (req, res) => {
     const { reference_no, entry_type, entry_date, description, lines } =
