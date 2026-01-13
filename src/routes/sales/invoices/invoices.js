@@ -9,6 +9,7 @@ import {
   sumMoneyBy,
   roundMoney,
 } from "../../utils/moneyUtils.js";
+import { createPaymentJournalEntry, cancelPaymentJournalEntry } from "../../accounting/payment-journal.js";
 
 // Map to track pending invoices with their timeout handlers
 const pendingInvoiceTimeouts = new Map();
@@ -2387,21 +2388,43 @@ export default function (pool, config) {
         const paymentReference = invoice.payment_reference || null;
         const paymentNotes =
           invoice.payment_notes || "Automatic payment for CASH invoice";
+        const bankAccountCode = paymentMethod === "cash" ? "CASH" : (invoice.bank_account || "BANK_PBB");
 
         const paymentQuery = `
           INSERT INTO payments (
             invoice_id, payment_date, amount_paid, payment_method,
-            payment_reference, notes
-          ) VALUES ($1, $2, $3, $4, $5, $6)
+            payment_reference, bank_account, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING payment_id
         `;
-        await client.query(paymentQuery, [
+        const paymentResult = await client.query(paymentQuery, [
           createdInvoice.id,
           paymentDate,
           totalPayable,
-          paymentMethod, // Use provided payment method
-          paymentReference, // Use provided reference
-          paymentNotes, // Use provided notes or default
+          paymentMethod,
+          paymentReference,
+          bankAccountCode,
+          paymentNotes,
         ]);
+        const createdPayment = paymentResult.rows[0];
+
+        // Create journal entry for the payment (DR Bank/Cash, CR Trade Receivables)
+        const journalEntryId = await createPaymentJournalEntry(client, {
+          payment_id: createdPayment.payment_id,
+          invoice_id: createdInvoice.id,
+          payment_date: paymentDate,
+          amount_paid: totalPayable,
+          payment_method: paymentMethod,
+          bank_account: bankAccountCode,
+          payment_reference: paymentReference,
+          created_by: req.user?.id || null
+        });
+
+        // Update payment with journal_entry_id
+        await client.query(
+          'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
+          [journalEntryId, createdPayment.payment_id]
+        );
       }
 
       // Update customer credit if INVOICE type - NO CHANGE HERE
@@ -2599,23 +2622,45 @@ export default function (pool, config) {
           // If it's a CASH invoice, create automatic payment record
           if (isCash && totalPayable > 0) {
             try {
+              const paymentDate = new Date().toISOString();
               const paymentQuery = `
                 INSERT INTO payments (
                   invoice_id, payment_date, amount_paid, payment_method,
-                  payment_reference, notes
-                ) VALUES ($1, $2, $3, $4, $5, $6)
+                  payment_reference, bank_account, notes
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING payment_id
               `;
-              await client.query(paymentQuery, [
+              const paymentResult = await client.query(paymentQuery, [
                 savedInvoice.id,
-                new Date().toISOString(),
+                paymentDate,
                 totalPayable,
-                "cash", // Default payment method for CASH invoices
+                "cash",
                 null,
+                "CASH",
                 "Automatic payment for CASH invoice",
               ]);
+              const createdPayment = paymentResult.rows[0];
+
+              // Create journal entry for the payment (DR Cash, CR Trade Receivables)
+              const journalEntryId = await createPaymentJournalEntry(client, {
+                payment_id: createdPayment.payment_id,
+                invoice_id: savedInvoice.id,
+                payment_date: paymentDate,
+                amount_paid: totalPayable,
+                payment_method: "cash",
+                bank_account: "CASH",
+                payment_reference: null,
+                created_by: null // No user context in batch submission
+              });
+
+              // Update payment with journal_entry_id
+              await client.query(
+                'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
+                [journalEntryId, createdPayment.payment_id]
+              );
             } catch (paymentError) {
               console.error(
-                `Failed to create automatic payment for CASH invoice ${savedInvoice.id}:`,
+                `Failed to create automatic payment/journal for CASH invoice ${savedInvoice.id}:`,
                 paymentError
               );
               // Continue processing - the invoice is still marked as paid even if payment record fails
@@ -3105,8 +3150,8 @@ export default function (pool, config) {
 
       // 2. Find and cancel ACTIVE payments associated with this invoice
       const activePaymentsQuery = `
-        SELECT payment_id, amount_paid
-        FROM payments 
+        SELECT payment_id, amount_paid, journal_entry_id
+        FROM payments
         WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')
         FOR UPDATE -- Lock payment rows as well
       `;
@@ -3117,10 +3162,10 @@ export default function (pool, config) {
 
       if (activePayments.length > 0) {
         const cancelPaymentQuery = `
-          UPDATE payments 
-          SET status = 'cancelled', 
+          UPDATE payments
+          SET status = 'cancelled',
               cancellation_date = NOW(),
-              cancellation_reason = $1 
+              cancellation_reason = $1
           WHERE payment_id = $2
         `;
         const cancellationReason = `Invoice ${id} cancelled`;
@@ -3133,6 +3178,11 @@ export default function (pool, config) {
             cancellationReason,
             payment.payment_id,
           ]);
+
+          // Cancel the associated journal entry if it exists
+          if (payment.journal_entry_id) {
+            await cancelPaymentJournalEntry(client, payment.journal_entry_id);
+          }
 
           // Reverse customer credit adjustment ONLY if the original invoice was an INVOICE type
           if (invoice.paymenttype === "INVOICE" && paidAmount !== 0) {
