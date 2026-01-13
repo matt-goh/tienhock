@@ -981,7 +981,7 @@ export interface AccountCodeFilters {
 export interface StockProduct {
   id: string;
   description: string;
-  type: "BH" | "MEE" | "JP" | "OTH" | "TAX";
+  type: "BH" | "MEE" | "JP" | "OTH" | "TAX" | "BUNDLE";
   price_per_unit?: number;
   is_active?: boolean;
 }
@@ -1017,6 +1017,29 @@ export interface ProductionWorker {
   id: string;
   name: string;
   job: string[];
+}
+
+// Special Item Configuration (for Hancur, Bundle entries)
+export type SpecialItemCategory = "HANCUR" | "KARUNG_HANCUR" | "BUNDLE";
+export type SpecialItemUnit = "kg" | "bags" | "pcs" | "sack";
+
+export interface SpecialItemConfig {
+  id: string;
+  name: string;
+  nameBM: string;
+  description: string;
+  descriptionBM: string;
+  category: SpecialItemCategory;
+  productType: "BH" | "MEE" | "BUNDLE";
+  workerJob: "BH_PACKING" | "MEE_PACKING";
+  payCodeId: string;
+  unit: SpecialItemUnit;
+  inputStep: number; // 1 for integer, 0.01 for decimal
+  defaultValue?: number;
+  singleWorkerEntry?: {
+    defaultWorkerId: string;
+    allowChange: boolean;
+  };
 }
 
 // Stock Movement (single day)

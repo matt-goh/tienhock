@@ -14,7 +14,7 @@ import Button from "../Button";
 
 interface WorkerEntryGridProps {
   workers: ProductionWorker[];
-  entries: Record<string, number>; // workerId -> bags_packed
+  entries: Record<string, number>; // workerId -> bags_packed (or kg for decimal)
   onEntryChange: (workerId: string, value: number) => void;
   disabled?: boolean;
   isLoading?: boolean;
@@ -23,6 +23,13 @@ interface WorkerEntryGridProps {
   onReset?: () => void;
   hasUnsavedChanges?: boolean;
   isSaving?: boolean;
+  // Extended props for special items
+  inputStep?: number; // 1 for integer, 0.01 for decimal (default: 1)
+  unitLabel?: string; // "bags", "kg", "pcs", "sack" (default: "bags")
+  defaultValue?: number; // Pre-fill inputs with this value
+  // External search control (optional - if not provided, shows internal search)
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
@@ -35,8 +42,18 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   onReset,
   hasUnsavedChanges = false,
   isSaving = false,
+  inputStep = 1,
+  unitLabel = "bags",
+  defaultValue,
+  searchQuery: externalSearchQuery,
+  onSearchChange,
 }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+  // Use internal state only if no external control is provided
+  const [internalSearchQuery, setInternalSearchQuery] = useState("");
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const setSearchQuery = onSearchChange || setInternalSearchQuery;
+  const useExternalSearch = externalSearchQuery !== undefined;
+
   const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Ref to store the frozen sort order while editing
@@ -93,6 +110,9 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
     return sortedWorkers;
   }, [isInputFocused, filteredWorkers, sortedWorkers]);
 
+  // Check if we're using decimal mode
+  const isDecimalMode = inputStep < 1;
+
   // Handle input change with validation
   const handleInputChange = (
     workerId: string,
@@ -106,11 +126,36 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       return;
     }
 
-    // Parse as integer, ignore invalid input
-    const numValue = parseInt(value, 10);
+    // Parse based on inputStep - float for decimals, integer for whole numbers
+    const numValue = isDecimalMode
+      ? parseFloat(value)
+      : parseInt(value, 10);
+
     if (!isNaN(numValue) && numValue >= 0) {
       onEntryChange(workerId, numValue);
     }
+  };
+
+  // Format value for display (handle decimals)
+  const formatValue = (value: number): string => {
+    if (value === 0) return "";
+    if (isDecimalMode) {
+      // Show up to 2 decimal places, trim trailing zeros
+      return value.toFixed(2).replace(/\.?0+$/, "");
+    }
+    return value.toString();
+  };
+
+  // Get display value - use default if no entry exists
+  const getDisplayValue = (workerId: string): string => {
+    const entryValue = entries[workerId];
+    if (entryValue !== undefined && entryValue !== 0) {
+      return formatValue(entryValue);
+    }
+    if (defaultValue !== undefined && defaultValue > 0) {
+      return formatValue(defaultValue);
+    }
+    return "";
   };
 
   // Handle keyboard navigation
@@ -167,33 +212,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-default-200 dark:border-gray-700">
-      {/* Search Input */}
-      <div className="border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
-        <div className="relative">
-          <IconSearch
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
-          />
-          <input
-            type="text"
-            placeholder="Search worker name or ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-10 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
-            >
-              <IconX size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-
+    <div className="overflow-hidden">
       {/* Worker rows - 3 column grid */}
       <div className="p-4 bg-white dark:bg-gray-800">
         {filteredAndSortedWorkers.length === 0 ? (
@@ -240,7 +259,8 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   id={`worker-input-${worker.id}`}
                   type="number"
                   min="0"
-                  value={entries[worker.id] || ""}
+                  step={inputStep}
+                  value={getDisplayValue(worker.id)}
                   onChange={(e) => handleInputChange(worker.id, e)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   onFocus={(e) => {
@@ -251,7 +271,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   disabled={disabled}
                   placeholder="0"
                   className={clsx(
-                    "w-24 rounded-lg border border-default-300 dark:border-gray-600 pl-5 px-2 py-1.5 text-center text-sm flex-shrink-0 text-default-900 dark:text-gray-100",
+                    "w-24 rounded-lg border border-default-300 dark:border-gray-600 pl-6 px-2 py-1.5 text-center text-sm flex-shrink-0 text-default-900 dark:text-gray-100",
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500",
                     "disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed",
                     entries[worker.id] && entries[worker.id] > 0
@@ -273,7 +293,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
           </div>
           <div>
             <div className="font-semibold text-default-900 dark:text-gray-100">
-              Total Bags Packed
+              Total {unitLabel === "kg" ? "Weight" : unitLabel === "sack" ? "Sacks" : "Packed"}
             </div>
             <div className="text-xs text-default-500 dark:text-gray-400">
               {new Date().toLocaleDateString("en-MY", {
@@ -286,9 +306,9 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
           </div>
           <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
             <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
-              {totalBags.toLocaleString()}{" "}
+              {isDecimalMode ? totalBags.toFixed(2) : totalBags.toLocaleString()}{" "}
               <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                bags
+                {unitLabel}
               </span>
             </p>
           </div>

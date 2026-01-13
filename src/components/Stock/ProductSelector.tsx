@@ -18,13 +18,14 @@ import {
 import clsx from "clsx";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { StockProduct } from "../../types/types";
+import { isHiddenSpecialItem } from "../../config/specialItems";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
 interface ProductSelectorProps {
   value: string | null;
   onChange: (productId: string | null) => void;
-  productTypes?: ("BH" | "MEE" | "JP" | "OTH")[];
+  productTypes?: ("BH" | "MEE" | "JP" | "OTH" | "BUNDLE")[];
   placeholder?: string;
   showCategories?: boolean;
   disabled?: boolean;
@@ -37,6 +38,7 @@ interface GroupedProducts {
   MEE: StockProduct[];
   JP: StockProduct[];
   OTH: StockProduct[];
+  BUNDLE: StockProduct[];
 }
 
 const ProductSelector: React.FC<ProductSelectorProps> = ({
@@ -86,10 +88,12 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     []
   );
 
-  // Filter and group products by type
+  // Filter and group products by type (excluding hidden special items)
   const groupedProducts = useMemo(() => {
-    const filtered = products.filter((product) =>
-      productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH")
+    const filtered = products.filter(
+      (product) =>
+        productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH" | "BUNDLE") &&
+        !isHiddenSpecialItem(product.id)
     );
 
     const grouped: GroupedProducts = {
@@ -97,6 +101,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       MEE: [],
       JP: [],
       OTH: [],
+      BUNDLE: [],
     };
 
     filtered.forEach((product) => {
@@ -109,12 +114,13 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     return grouped;
   }, [products, productTypes]);
 
-  // Get favorite products
+  // Get favorite products (excluding hidden special items)
   const favoriteProducts = useMemo(() => {
     return products.filter(
       (product) =>
         favorites.has(product.id) &&
-        productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH")
+        productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH" | "BUNDLE") &&
+        !isHiddenSpecialItem(product.id)
     ) as StockProduct[];
   }, [products, favorites, productTypes]);
 
@@ -128,6 +134,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       MEE: [],
       JP: [],
       OTH: [],
+      BUNDLE: [],
     };
 
     Object.entries(groupedProducts).forEach(([type, prods]) => {
@@ -173,14 +180,16 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     MEE: "Mee Products",
     JP: "JellyPolly Products",
     OTH: "Other Products",
+    BUNDLE: "Bundle Products",
   };
 
   // Category colors
   const categoryColors: Record<string, string> = {
-    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900",
-    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900",
-    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900",
-    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900",
+    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-gray-900",
+    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-gray-900",
+    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-gray-900",
+    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-gray-900",
+    BUNDLE: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-gray-900",
   };
 
   return (
@@ -274,7 +283,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 {/* Favorites category */}
                 {showCategories && filteredFavorites.length > 0 && (
                   <div>
-                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900">
+                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-gray-900">
                       Favorites ({filteredFavorites.length})
                     </div>
                     {filteredFavorites.map((product) => (
