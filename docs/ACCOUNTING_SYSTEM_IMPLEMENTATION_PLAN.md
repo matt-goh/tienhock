@@ -553,6 +553,56 @@ Lines:
 
 ---
 
+#### Phase 2.1: Cash Receipt Voucher PDF System (January 13, 2026)
+
+**Problem Solved:** Staff had to double-key cash payments - once in the payment system, then manually create a voucher document elsewhere.
+
+**What Was Implemented:**
+
+1. **Backend Endpoint** - `GET /api/journal-entries/:id/receipt-voucher`
+   - Location: `src/routes/accounting/journal-entries.js`
+   - Fetches payment + customer + invoice details for REC journal entries
+   - Validates entry is type 'REC' and not cancelled
+   - Returns complete voucher data including journal lines
+
+2. **PDF Component** - `src/utils/accounting/CashReceiptVoucherPDF.tsx`
+   - Professional voucher layout using @react-pdf/renderer
+   - Company header with logo
+   - Amount displayed with "amount in words" conversion
+   - Payment details (customer, invoice, method, reference, bank account)
+   - Journal entry lines table (DR/CR)
+   - Signature lines for "Received By" and "Approved By"
+
+3. **Preview Modal** - `src/components/Accounting/CashReceiptVoucherModal.tsx`
+   - PDF preview in iframe
+   - Print button (opens browser print dialog)
+   - Download PDF button
+   - Loading states
+
+4. **UI Integration** - `src/pages/Accounting/JournalDetailsPage.tsx`
+   - "Print Voucher" button (only shows for REC entries that aren't cancelled)
+   - Fetches voucher data and opens modal
+
+5. **Types** - `src/types/types.ts`
+   - Added `CashReceiptVoucherData` interface
+   - Added `CashReceiptVoucherLine` interface
+
+**How to Use:**
+1. Record a payment (cash, bank transfer, or confirm a cheque)
+2. Navigate to **Accounting → Journal Entries**
+3. Find the auto-generated REC entry for that payment
+4. Click "Print Voucher" button
+5. Preview, print, or download the PDF voucher
+
+**Voucher Contains:**
+- Voucher number (REC reference)
+- Date, Customer name, Amount (numeric + words)
+- Invoice reference, Payment method, Bank account
+- Journal entry lines showing DR/CR accounts
+- Signature lines
+
+---
+
 ### Phase 3: Stock Valuation Journals
 
 **Why Third:** Depends on purchases system; needed for accurate COGS.

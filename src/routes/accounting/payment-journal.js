@@ -5,7 +5,7 @@ import { determineBankAccount } from '../../utils/payment-helpers.js';
 
 /**
  * Generates the next reference number for receipts
- * Format: REC{seq}/{month} (e.g., REC001/01, REC002/01)
+ * Format: REC-YYYYMM-XXXX (e.g., REC-202601-0001)
  */
 export async function generateReceiptReference(client, paymentDate) {
   try {
@@ -13,8 +13,10 @@ export async function generateReceiptReference(client, paymentDate) {
     if (isNaN(date.getTime())) {
       throw new Error(`Invalid payment date: ${paymentDate}`);
     }
+    const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
-    const pattern = `REC%/${month}`;
+    const yearMonth = `${year}${month}`;
+    const pattern = `REC-${yearMonth}-%`;
 
     const query = `
       SELECT reference_no
@@ -30,15 +32,15 @@ export async function generateReceiptReference(client, paymentDate) {
 
     let nextNumber = 1;
     if (result.rows.length > 0) {
-      // Extract number from reference like "REC001/01"
+      // Extract number from reference like "REC-202601-0001"
       const lastRef = result.rows[0].reference_no;
-      const match = lastRef.match(/^REC(\d+)\//);
+      const match = lastRef.match(/^REC-\d{6}-(\d+)$/);
       if (match) {
         nextNumber = parseInt(match[1]) + 1;
       }
     }
 
-    const nextReference = `REC${String(nextNumber).padStart(3, "0")}/${month}`;
+    const nextReference = `REC-${yearMonth}-${String(nextNumber).padStart(4, "0")}`;
     return nextReference;
   } catch (error) {
     console.error("Error generating receipt reference:", error);

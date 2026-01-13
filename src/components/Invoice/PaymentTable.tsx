@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Payment } from "../../types/types";
+import { Payment, CashReceiptVoucherData } from "../../types/types";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import CashReceiptVoucherModal from "../../components/Accounting/CashReceiptVoucherModal";
 import { FormListbox } from "../../components/FormComponents";
-import { IconCircleCheck, IconBan, IconReceipt } from "@tabler/icons-react";
+import { IconCircleCheck, IconBan, IconReceipt, IconPrinter } from "@tabler/icons-react";
 import {
   confirmPayment,
   cancelPayment,
 } from "../../utils/invoice/InvoiceUtils";
+import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 
@@ -34,6 +36,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>("BANK_PBB"); // Default to Public Bank
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [voucherData, setVoucherData] = useState<CashReceiptVoucherData | null>(null);
+  const [loadingVoucherId, setLoadingVoucherId] = useState<number | null>(null);
   const { customers } = useCustomersCache();
 
   const formatCurrency = (amount: number | string): string => {
@@ -98,6 +103,25 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     } finally {
       setCancellingPaymentId(null);
       setSelectedPayment(null);
+    }
+  };
+
+  const handlePrintVoucher = async (payment: Payment) => {
+    if (!payment.journal_entry_id) {
+      toast.error("No journal entry linked to this payment");
+      return;
+    }
+
+    setLoadingVoucherId(payment.journal_entry_id);
+    try {
+      const data = await api.get(`/api/journal-entries/${payment.journal_entry_id}/receipt-voucher`);
+      setVoucherData(data);
+      setShowVoucherModal(true);
+    } catch (error) {
+      console.error("Error fetching voucher data:", error);
+      toast.error("Failed to load voucher data");
+    } finally {
+      setLoadingVoucherId(null);
     }
   };
 
@@ -169,7 +193,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
@@ -197,7 +221,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Amount
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900/50">
                 Actions
               </th>
             </tr>
@@ -248,7 +272,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                           {formatCurrency(totalAmount)}
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-center">
+                        <td className="px-6 py-3 whitespace-nowrap text-center sticky right-0 bg-gray-50 dark:bg-gray-900/50">
                           -
                         </td>
                       </tr>
@@ -297,8 +321,20 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                           <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(payment.amount_paid)}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center">
+                          <td className="px-6 py-3 whitespace-nowrap text-center sticky right-0 bg-white dark:bg-gray-800">
                             <div className="flex justify-center gap-1">
+                              {payment.journal_entry_id && payment.status !== "cancelled" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  color="default"
+                                  onClick={() => handlePrintVoucher(payment)}
+                                  disabled={loadingVoucherId === payment.journal_entry_id}
+                                  title="Print Voucher"
+                                >
+                                  <IconPrinter size={16} />
+                                </Button>
+                              )}
                               {payment.status === "pending" && (
                                 <Button
                                   size="sm"
@@ -394,8 +430,20 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                       <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(payment.amount_paid)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-center">
+                      <td className="px-6 py-3 whitespace-nowrap text-center sticky right-0 bg-white dark:bg-gray-800">
                         <div className="flex justify-center gap-1">
+                          {payment.journal_entry_id && payment.status !== "cancelled" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              color="default"
+                              onClick={() => handlePrintVoucher(payment)}
+                              disabled={loadingVoucherId === payment.journal_entry_id}
+                              title="Print Voucher"
+                            >
+                              <IconPrinter size={16} />
+                            </Button>
+                          )}
                           {payment.status === "pending" && (
                             <Button
                               size="sm"
@@ -509,6 +557,16 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         )}?`}
         confirmButtonText="Cancel Payment"
         variant="danger"
+      />
+
+      {/* Cash Receipt Voucher Modal */}
+      <CashReceiptVoucherModal
+        isOpen={showVoucherModal}
+        onClose={() => {
+          setShowVoucherModal(false);
+          setVoucherData(null);
+        }}
+        voucherData={voucherData}
       />
     </>
   );

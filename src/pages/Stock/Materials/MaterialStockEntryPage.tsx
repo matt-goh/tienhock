@@ -185,7 +185,7 @@ const MaterialStockEntryPage: React.FC = () => {
     // Check if there are new variant rows with data
     if (newVariantRows.size > 0) {
       for (const row of newVariantRows.values()) {
-        if (row.variant_name?.trim() || row.purchases_quantity > 0 || row.consumption_quantity > 0 || row.unit_cost > 0) {
+        if (row.variant_name?.trim() || row.quantity > 0 || row.unit_cost > 0) {
           return true;
         }
       }
@@ -206,8 +206,7 @@ const MaterialStockEntryPage: React.FC = () => {
 
       // Check non-variant material fields
       if (
-        current.purchases_quantity !== original.purchases_quantity ||
-        current.consumption_quantity !== original.consumption_quantity ||
+        current.quantity !== original.quantity ||
         current.unit_cost !== original.unit_cost
       ) {
         return true;
@@ -219,8 +218,7 @@ const MaterialStockEntryPage: React.FC = () => {
           const ov = original.variants.find((v) => v.variant_id === cv.variant_id);
           if (!ov) return true;
           if (
-            cv.purchases_quantity !== ov.purchases_quantity ||
-            cv.consumption_quantity !== ov.consumption_quantity ||
+            cv.quantity !== ov.quantity ||
             cv.unit_cost !== ov.unit_cost ||
             cv.variant_name !== ov.variant_name
           ) {
@@ -276,12 +274,8 @@ const MaterialStockEntryPage: React.FC = () => {
       variant_name: "",
       is_new_variant: true,
       opening_quantity: 0,
-      opening_value: 0,
-      purchases_quantity: 0,
-      purchases_value: 0,
-      consumption_quantity: 0,
-      closing_quantity: 0,
-      closing_value: 0,
+      quantity: 0,
+      value: 0,
       unit_cost: defaultUnitCost,
       notes: null,
     };
@@ -334,13 +328,11 @@ const MaterialStockEntryPage: React.FC = () => {
         const updated = { ...row };
         if (field === "variant_name") {
           updated.variant_name = String(value);
-        } else if (field === "unit_cost" || field === "purchases_quantity" || field === "consumption_quantity") {
+        } else if (field === "unit_cost" || field === "quantity") {
           const numValue = parseFloat(String(value)) || 0;
           (updated as any)[field] = numValue;
-          // Recalculate
-          updated.closing_quantity = updated.opening_quantity + updated.purchases_quantity - updated.consumption_quantity;
-          updated.purchases_value = updated.purchases_quantity * updated.unit_cost;
-          updated.closing_value = updated.closing_quantity * updated.unit_cost;
+          // Recalculate value
+          updated.value = updated.quantity * updated.unit_cost;
         }
         next.set(materialId, updated);
       }
@@ -348,11 +340,11 @@ const MaterialStockEntryPage: React.FC = () => {
     });
   };
 
-  // Handle input change for purchases, consumption, unit_cost, or custom_description
-  // Now supports both material-level and variant-level changes
+  // Handle input change for quantity, unit_cost, or custom_description
+  // Supports both material-level and variant-level changes
   const handleInputChange = (
     materialId: number,
-    field: "purchases_quantity" | "consumption_quantity" | "unit_cost" | "custom_description",
+    field: "quantity" | "unit_cost" | "custom_description",
     value: string,
     variantId?: number | null
   ) => {
@@ -371,10 +363,8 @@ const MaterialStockEntryPage: React.FC = () => {
                   const numValue = parseFloat(value) || 0;
                   (updated as any)[field] = numValue;
                 }
-                // Recalculate variant closing
-                updated.closing_quantity = updated.opening_quantity + updated.purchases_quantity - updated.consumption_quantity;
-                updated.purchases_value = updated.purchases_quantity * updated.unit_cost;
-                updated.closing_value = updated.closing_quantity * updated.unit_cost;
+                // Recalculate value
+                updated.value = updated.quantity * updated.unit_cost;
                 return updated;
               }
               return v;
@@ -382,23 +372,15 @@ const MaterialStockEntryPage: React.FC = () => {
 
             // Recalculate material totals from variants
             const totalOpening = updatedVariants.reduce((sum, v) => sum + v.opening_quantity, 0);
-            const totalOpeningValue = updatedVariants.reduce((sum, v) => sum + v.opening_value, 0);
-            const totalPurchases = updatedVariants.reduce((sum, v) => sum + v.purchases_quantity, 0);
-            const totalPurchasesValue = updatedVariants.reduce((sum, v) => sum + v.purchases_value, 0);
-            const totalConsumption = updatedVariants.reduce((sum, v) => sum + v.consumption_quantity, 0);
-            const totalClosing = updatedVariants.reduce((sum, v) => sum + v.closing_quantity, 0);
-            const totalClosingValue = updatedVariants.reduce((sum, v) => sum + v.closing_value, 0);
+            const totalQty = updatedVariants.reduce((sum, v) => sum + v.quantity, 0);
+            const totalValue = updatedVariants.reduce((sum, v) => sum + v.value, 0);
 
             return {
               ...m,
               variants: updatedVariants,
               opening_quantity: totalOpening,
-              opening_value: totalOpeningValue,
-              purchases_quantity: totalPurchases,
-              purchases_value: totalPurchasesValue,
-              consumption_quantity: totalConsumption,
-              closing_quantity: totalClosing,
-              closing_value: totalClosingValue,
+              quantity: totalQty,
+              value: totalValue,
             };
           }
 
@@ -412,11 +394,8 @@ const MaterialStockEntryPage: React.FC = () => {
             updated[field] = numValue;
           }
 
-          // Recalculate closing quantity and values
-          updated.closing_quantity =
-            updated.opening_quantity + updated.purchases_quantity - updated.consumption_quantity;
-          updated.purchases_value = updated.purchases_quantity * updated.unit_cost;
-          updated.closing_value = updated.closing_quantity * updated.unit_cost;
+          // Recalculate value
+          updated.value = updated.quantity * updated.unit_cost;
 
           return updated;
         }
@@ -447,19 +426,19 @@ const MaterialStockEntryPage: React.FC = () => {
 
   // Save entries
   const handleSave = async () => {
-    // Check for negative closing quantities (including variants)
+    // Check for negative quantities (including variants)
     let negativeCount = 0;
     materials.forEach((m) => {
       if (m.has_variants && m.variants) {
-        negativeCount += m.variants.filter((v) => v.closing_quantity < 0).length;
-      } else if (m.closing_quantity < 0) {
+        negativeCount += m.variants.filter((v) => v.quantity < 0).length;
+      } else if (m.quantity < 0) {
         negativeCount++;
       }
     });
 
     if (negativeCount > 0) {
       const confirmed = window.confirm(
-        `Warning: ${negativeCount} item(s) have negative closing stock. Do you want to save anyway?`
+        `Warning: ${negativeCount} item(s) have negative stock. Do you want to save anyway?`
       );
       if (!confirmed) return;
     }
@@ -467,7 +446,7 @@ const MaterialStockEntryPage: React.FC = () => {
     // Check for new variants that need names
     const incompleteNewVariants: string[] = [];
     newVariantRows.forEach((row, materialId) => {
-      if ((row.purchases_quantity > 0 || row.consumption_quantity > 0) && !row.variant_name?.trim()) {
+      if (row.quantity > 0 && !row.variant_name?.trim()) {
         const material = materials.find((m) => m.id === materialId);
         incompleteNewVariants.push(material?.name || `Material ${materialId}`);
       }
@@ -523,8 +502,7 @@ const MaterialStockEntryPage: React.FC = () => {
             entries.push({
               material_id: m.id,
               variant_id: v.variant_id,
-              purchases_quantity: v.purchases_quantity,
-              consumption_quantity: v.consumption_quantity,
+              quantity: v.quantity,
               unit_cost: v.unit_cost,
               custom_name: null,
               custom_description: v.variant_id ? null : v.variant_name, // Ad-hoc variants use custom_description
@@ -536,24 +514,22 @@ const MaterialStockEntryPage: React.FC = () => {
           entries.push({
             material_id: m.id,
             variant_id: null,
-            purchases_quantity: m.purchases_quantity,
-            consumption_quantity: m.consumption_quantity,
+            quantity: m.quantity,
             unit_cost: m.unit_cost,
             custom_name: m.custom_name || null,
             custom_description: null,
-            notes: m.closing_notes || null,
+            notes: m.notes || null,
           });
         }
       });
 
       // Add new variant rows (will be registered as permanent variants)
       newVariantRows.forEach((row, materialId) => {
-        if (row.variant_name?.trim() && (row.purchases_quantity > 0 || row.consumption_quantity > 0 || row.unit_cost > 0)) {
+        if (row.variant_name?.trim() && (row.quantity > 0 || row.unit_cost > 0)) {
           entries.push({
             material_id: materialId,
             variant_id: null,
-            purchases_quantity: row.purchases_quantity,
-            consumption_quantity: row.consumption_quantity,
+            quantity: row.quantity,
             unit_cost: row.unit_cost,
             custom_name: null,
             custom_description: row.variant_name.trim(),
@@ -613,17 +589,17 @@ const MaterialStockEntryPage: React.FC = () => {
 
   // Calculate category totals
   const categoryTotals = useMemo(() => {
-    const totals: Record<MaterialCategory, { opening: number; purchases: number; closing: number }> = {
-      ingredient: { opening: 0, purchases: 0, closing: 0 },
-      raw_material: { opening: 0, purchases: 0, closing: 0 },
-      packing_material: { opening: 0, purchases: 0, closing: 0 },
+    const totals: Record<MaterialCategory, { opening: number; closing: number; value: number }> = {
+      ingredient: { opening: 0, closing: 0, value: 0 },
+      raw_material: { opening: 0, closing: 0, value: 0 },
+      packing_material: { opening: 0, closing: 0, value: 0 },
     };
 
     materials.forEach((m) => {
       if (totals[m.category]) {
-        totals[m.category].opening += m.opening_value;
-        totals[m.category].purchases += m.purchases_value;
-        totals[m.category].closing += m.closing_value;
+        totals[m.category].opening += m.opening_quantity * m.unit_cost;
+        totals[m.category].closing += m.quantity;
+        totals[m.category].value += m.value;
       }
     });
 
@@ -633,9 +609,8 @@ const MaterialStockEntryPage: React.FC = () => {
   // Grand total (materials only)
   const grandTotal = useMemo(() => {
     return {
-      opening: materials.reduce((sum, m) => sum + m.opening_value, 0),
-      purchases: materials.reduce((sum, m) => sum + m.purchases_value, 0),
-      closing: materials.reduce((sum, m) => sum + m.closing_value, 0),
+      opening: materials.reduce((sum, m) => sum + (m.opening_quantity * m.unit_cost), 0),
+      value: materials.reduce((sum, m) => sum + m.value, 0),
     };
   }, [materials]);
 
@@ -646,7 +621,7 @@ const MaterialStockEntryPage: React.FC = () => {
 
   // Count negative items
   const negativeCount = useMemo(() => {
-    return materials.filter((m) => m.closing_quantity < 0).length;
+    return materials.filter((m) => m.quantity < 0).length;
   }, [materials]);
 
   return (
@@ -670,7 +645,7 @@ const MaterialStockEntryPage: React.FC = () => {
               </span>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <span className="text-default-500 dark:text-gray-400">
-                Mat: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
+                Mat: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.value)}</span>
               </span>
               {stockKilang.length > 0 && (
                 <>
@@ -682,7 +657,7 @@ const MaterialStockEntryPage: React.FC = () => {
               )}
               <span className="text-default-300 dark:text-gray-600">•</span>
               <span className="text-default-500 dark:text-gray-400">
-                Total: <span className="font-medium text-sky-600 dark:text-sky-400">RM {formatNumber(grandTotal.closing + stockKilangTotal)}</span>
+                Total: <span className="font-medium text-sky-600 dark:text-sky-400">RM {formatNumber(grandTotal.value + stockKilangTotal)}</span>
               </span>
               {negativeCount > 0 && (
                 <>
@@ -782,23 +757,17 @@ const MaterialStockEntryPage: React.FC = () => {
                     )}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-20">
-                  Open
+                <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
+                  Opening
                 </th>
-                <th className="px-2 py-2 text-center text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider w-24 bg-blue-50 dark:bg-blue-900/20">
-                  Purchase
-                </th>
-                <th className="px-2 py-2 text-center text-xs font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wider w-24 bg-orange-50 dark:bg-orange-900/20">
-                  Consume
-                </th>
-                <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-20">
-                  Close
+                <th className="px-2 py-2 text-center text-xs font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wider w-28 bg-sky-50 dark:bg-sky-900/20">
+                  Closing
                 </th>
                 <th className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
                   Unit Cost
                 </th>
                 <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-28">
-                  Close Value
+                  Value
                 </th>
               </tr>
             </thead>
@@ -811,28 +780,27 @@ const MaterialStockEntryPage: React.FC = () => {
                   <React.Fragment key={category}>
                     {/* Category Header */}
                     <tr className="bg-default-100 dark:bg-gray-700/50">
-                      <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
+                      <td className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
                         <div className="flex items-center gap-2">
                           <IconPackage size={14} className="text-default-500" />
                           {categoryLabels[category]}
                           <span className="text-default-400 font-normal">({items.length})</span>
                         </div>
                       </td>
-                      <td colSpan={2} className="px-2 py-1.5 text-xs text-center text-default-500 dark:text-gray-400">
-                        +{formatNumber(categoryTotals[category].purchases)}
+                      <td className="px-2 py-1.5 text-xs text-right text-default-500 dark:text-gray-400">
+                        {formatNumber(categoryTotals[category].opening)}
                       </td>
-                      <td colSpan={3} className="px-2 py-1.5 text-xs text-right">
-                        <span className="text-default-500 dark:text-gray-400">
-                          {formatNumber(categoryTotals[category].opening)} →{" "}
-                          <span className="text-green-600 dark:text-green-400 font-medium">
-                            {formatNumber(categoryTotals[category].closing)}
-                          </span>
+                      <td></td>
+                      <td></td>
+                      <td className="px-2 py-1.5 text-xs text-right">
+                        <span className="text-green-600 dark:text-green-400 font-medium">
+                          {formatNumber(categoryTotals[category].value)}
                         </span>
                       </td>
                     </tr>
                     {/* Category Items */}
                     {items.map((material) => {
-                      const isNegative = material.closing_quantity < 0;
+                      const isNegative = material.quantity < 0;
                       const hasVariants = material.has_variants && material.variants && material.variants.length > 0;
                       const isExpanded = expandedMaterials.has(material.id);
                       const newVariant = newVariantRows.get(material.id);
@@ -879,26 +847,20 @@ const MaterialStockEntryPage: React.FC = () => {
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
                                 {formatQty(material.opening_quantity)}
                               </td>
-                              <td className="px-2 py-1.5 text-right font-mono text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">
-                                {formatQty(material.purchases_quantity)}
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-mono text-sm font-medium text-orange-600 dark:text-orange-400 bg-orange-50/50 dark:bg-orange-900/10">
-                                {formatQty(material.consumption_quantity)}
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-default-700 dark:text-gray-200">
-                                {formatQty(material.closing_quantity)}
+                              <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-default-700 dark:text-gray-200 bg-sky-50/50 dark:bg-sky-900/10">
+                                {formatQty(material.quantity)}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs text-default-400 dark:text-gray-500">—</td>
                               <td className="px-2 py-1.5 text-right">
                                 <span className="font-mono text-sm font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">
-                                  {formatNumber(material.closing_value)}
+                                  {formatNumber(material.value)}
                                 </span>
                               </td>
                             </tr>
 
                             {/* Variant Sub-rows (when expanded) */}
                             {isExpanded && material.variants!.map((variant, idx) => {
-                              const variantNegative = variant.closing_quantity < 0;
+                              const variantNegative = variant.quantity < 0;
                               const isLastVariant = idx === material.variants!.length - 1;
                               return (
                                 <tr
@@ -928,37 +890,17 @@ const MaterialStockEntryPage: React.FC = () => {
                                   <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">
                                     {formatQty(variant.opening_quantity)}
                                   </td>
-                                  <td className="px-1 py-1 bg-blue-50/20 dark:bg-blue-900/5">
+                                  <td className="px-1 py-1 bg-sky-50/20 dark:bg-sky-900/5">
                                     <input
                                       type="number"
-                                      value={variant.purchases_quantity || ""}
-                                      onChange={(e) => handleInputChange(material.id, "purchases_quantity", e.target.value, variant.variant_id)}
+                                      value={variant.quantity || ""}
+                                      onChange={(e) => handleInputChange(material.id, "quantity", e.target.value, variant.variant_id)}
                                       onClick={(e) => e.stopPropagation()}
-                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-blue-200 dark:border-blue-700 rounded bg-blue-50/50 dark:bg-blue-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700"
+                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-sky-200 dark:border-sky-700 rounded bg-sky-50/50 dark:bg-sky-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700"
                                       min="0"
                                       step="1"
                                       placeholder="0"
                                     />
-                                  </td>
-                                  <td className="px-1 py-1 bg-orange-50/20 dark:bg-orange-900/5">
-                                    <input
-                                      type="number"
-                                      value={variant.consumption_quantity || ""}
-                                      onChange={(e) => handleInputChange(material.id, "consumption_quantity", e.target.value, variant.variant_id)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-orange-200 dark:border-orange-700 rounded bg-orange-50/50 dark:bg-orange-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:bg-white dark:focus:bg-gray-700"
-                                      min="0"
-                                      step="1"
-                                      placeholder="0"
-                                    />
-                                  </td>
-                                  <td className="px-2 py-1.5 text-right">
-                                    <span className={clsx(
-                                      "font-mono text-sm",
-                                      variantNegative ? "text-red-600 dark:text-red-400 font-medium" : "text-default-600 dark:text-gray-400"
-                                    )}>
-                                      {formatQty(variant.closing_quantity)}
-                                    </span>
                                   </td>
                                   <td className="px-1 py-1">
                                     <input
@@ -974,9 +916,9 @@ const MaterialStockEntryPage: React.FC = () => {
                                   <td className="px-2 py-1.5 text-right">
                                     <span className={clsx(
                                       "font-mono text-sm",
-                                      variantNegative ? "text-red-600 dark:text-red-400" : variant.closing_value > 0 ? "text-green-600 dark:text-green-400" : "text-default-400 dark:text-gray-500"
+                                      variantNegative ? "text-red-600 dark:text-red-400" : variant.value > 0 ? "text-green-600 dark:text-green-400" : "text-default-400 dark:text-gray-500"
                                     )}>
-                                      {formatNumber(variant.closing_value)}
+                                      {formatNumber(variant.value)}
                                     </span>
                                   </td>
                                 </tr>
@@ -1007,30 +949,16 @@ const MaterialStockEntryPage: React.FC = () => {
                                   </div>
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">0</td>
-                                <td className="px-1 py-1 bg-blue-50/30 dark:bg-blue-900/5">
+                                <td className="px-1 py-1 bg-sky-50/30 dark:bg-sky-900/5">
                                   <input
                                     type="number"
-                                    value={newVariant.purchases_quantity || ""}
-                                    onChange={(e) => handleNewVariantChange(material.id, "purchases_quantity", e.target.value)}
-                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-blue-200 dark:border-blue-700 rounded bg-blue-50/50 dark:bg-blue-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700"
+                                    value={newVariant.quantity || ""}
+                                    onChange={(e) => handleNewVariantChange(material.id, "quantity", e.target.value)}
+                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-sky-200 dark:border-sky-700 rounded bg-sky-50/50 dark:bg-sky-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700"
                                     min="0"
                                     step="1"
                                     placeholder="0"
                                   />
-                                </td>
-                                <td className="px-1 py-1 bg-orange-50/30 dark:bg-orange-900/5">
-                                  <input
-                                    type="number"
-                                    value={newVariant.consumption_quantity || ""}
-                                    onChange={(e) => handleNewVariantChange(material.id, "consumption_quantity", e.target.value)}
-                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-orange-200 dark:border-orange-700 rounded bg-orange-50/50 dark:bg-orange-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:bg-white dark:focus:bg-gray-700"
-                                    min="0"
-                                    step="1"
-                                    placeholder="0"
-                                  />
-                                </td>
-                                <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
-                                  {formatQty(newVariant.closing_quantity)}
                                 </td>
                                 <td className="px-1 py-1">
                                   <input
@@ -1043,7 +971,7 @@ const MaterialStockEntryPage: React.FC = () => {
                                   />
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
-                                  {formatNumber(newVariant.closing_value)}
+                                  {formatNumber(newVariant.value)}
                                 </td>
                               </tr>
                             )}
@@ -1051,7 +979,7 @@ const MaterialStockEntryPage: React.FC = () => {
                             {/* Add Variant Button (when expanded and not already adding) */}
                             {isExpanded && !newVariant && (
                               <tr className="bg-white dark:bg-gray-800 border-l-2 border-purple-100 dark:border-gray-700 hover:border-purple-300 dark:hover:border-gray-500 transition-colors">
-                                <td colSpan={7} className="px-3 py-1.5 pl-12">
+                                <td colSpan={5} className="px-3 py-1.5 pl-12">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1113,46 +1041,19 @@ const MaterialStockEntryPage: React.FC = () => {
                                 {formatQty(material.opening_quantity)}
                               </span>
                             </td>
-                            {/* Purchases input */}
-                            <td className="px-1 py-1 bg-blue-50/50 dark:bg-blue-900/10">
+                            {/* Closing qty input */}
+                            <td className="px-1 py-1 bg-sky-50/50 dark:bg-sky-900/10">
                               <input
                                 type="number"
-                                value={material.purchases_quantity || ""}
+                                value={material.quantity || ""}
                                 onChange={(e) =>
-                                  handleInputChange(material.id, "purchases_quantity", e.target.value)
+                                  handleInputChange(material.id, "quantity", e.target.value)
                                 }
-                                className="w-full px-2 py-1 text-right font-mono text-sm border border-blue-200 dark:border-blue-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                className="w-full px-2 py-1 text-right font-mono text-sm border border-sky-200 dark:border-sky-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
                                 min="0"
                                 step="1"
                                 placeholder="0"
                               />
-                            </td>
-                            {/* Consumption input */}
-                            <td className="px-1 py-1 bg-orange-50/50 dark:bg-orange-900/10">
-                              <input
-                                type="number"
-                                value={material.consumption_quantity || ""}
-                                onChange={(e) =>
-                                  handleInputChange(material.id, "consumption_quantity", e.target.value)
-                                }
-                                className="w-full px-2 py-1 text-right font-mono text-sm border border-orange-200 dark:border-orange-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
-                                min="0"
-                                step="1"
-                                placeholder="0"
-                              />
-                            </td>
-                            {/* Closing qty (calculated, readonly) */}
-                            <td className="px-2 py-1.5 text-right">
-                              <span
-                                className={clsx(
-                                  "font-mono text-sm font-medium",
-                                  isNegative
-                                    ? "text-red-600 dark:text-red-400"
-                                    : "text-default-700 dark:text-gray-300"
-                                )}
-                              >
-                                {formatQty(material.closing_quantity)}
-                              </span>
                             </td>
                             {/* Unit cost input */}
                             <td className="px-1 py-1">
@@ -1167,19 +1068,19 @@ const MaterialStockEntryPage: React.FC = () => {
                                 min="0"
                               />
                             </td>
-                            {/* Closing value (calculated) */}
+                            {/* Value (calculated) */}
                             <td className="px-2 py-1.5 text-right">
                               <span
                                 className={clsx(
                                   "font-mono text-sm font-medium",
                                   isNegative
                                     ? "text-red-600 dark:text-red-400"
-                                    : material.closing_value > 0
+                                    : material.value > 0
                                       ? "text-green-600 dark:text-green-400"
                                       : "text-default-400 dark:text-gray-500"
                                 )}
                               >
-                                {formatNumber(material.closing_value)}
+                                {formatNumber(material.value)}
                               </span>
                             </td>
                           </tr>
@@ -1208,30 +1109,16 @@ const MaterialStockEntryPage: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">0</td>
-                              <td className="px-1 py-1 bg-blue-50/30 dark:bg-blue-900/5">
+                              <td className="px-1 py-1 bg-sky-50/30 dark:bg-sky-900/5">
                                 <input
                                   type="number"
-                                  value={newVariant.purchases_quantity || ""}
-                                  onChange={(e) => handleNewVariantChange(material.id, "purchases_quantity", e.target.value)}
-                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-blue-200 dark:border-blue-700 rounded bg-blue-50/50 dark:bg-blue-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-gray-700"
+                                  value={newVariant.quantity || ""}
+                                  onChange={(e) => handleNewVariantChange(material.id, "quantity", e.target.value)}
+                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-sky-200 dark:border-sky-700 rounded bg-sky-50/50 dark:bg-sky-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700"
                                   min="0"
                                   step="1"
                                   placeholder="0"
                                 />
-                              </td>
-                              <td className="px-1 py-1 bg-orange-50/30 dark:bg-orange-900/5">
-                                <input
-                                  type="number"
-                                  value={newVariant.consumption_quantity || ""}
-                                  onChange={(e) => handleNewVariantChange(material.id, "consumption_quantity", e.target.value)}
-                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-orange-200 dark:border-orange-700 rounded bg-orange-50/50 dark:bg-orange-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:bg-white dark:focus:bg-gray-700"
-                                  min="0"
-                                  step="1"
-                                  placeholder="0"
-                                />
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
-                                {formatQty(newVariant.closing_quantity)}
                               </td>
                               <td className="px-1 py-1">
                                 <input
@@ -1244,7 +1131,7 @@ const MaterialStockEntryPage: React.FC = () => {
                                 />
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
-                                {formatNumber(newVariant.closing_value)}
+                                {formatNumber(newVariant.value)}
                               </td>
                             </tr>
                           )}
@@ -1269,10 +1156,11 @@ const MaterialStockEntryPage: React.FC = () => {
                         </span>
                       </div>
                     </td>
-                    <td colSpan={2} className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
+                    <td className="px-2 py-1.5 text-xs text-center text-emerald-600 dark:text-emerald-400">
                       Read-only
                     </td>
-                    <td colSpan={3} className="px-2 py-1.5 text-xs text-right">
+                    <td></td>
+                    <td className="px-2 py-1.5 text-xs text-right">
                       <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                         {formatNumber(stockKilangTotal)}
                       </span>
@@ -1290,12 +1178,6 @@ const MaterialStockEntryPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
-                        -
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-default-300 dark:text-gray-600 bg-blue-50/30 dark:bg-blue-900/5">
-                        -
-                      </td>
-                      <td className="px-2 py-1.5 text-center text-default-300 dark:text-gray-600 bg-orange-50/30 dark:bg-orange-900/5">
                         -
                       </td>
                       <td className="px-2 py-1.5 text-right">
@@ -1319,7 +1201,7 @@ const MaterialStockEntryPage: React.FC = () => {
               {/* Loading Stock Kilang */}
               {isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
+                  <td colSpan={5} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
                     Loading finished goods stock...
                   </td>
                 </tr>
@@ -1327,7 +1209,7 @@ const MaterialStockEntryPage: React.FC = () => {
 
               {materials.length === 0 && stockKilang.length === 0 && !isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
+                  <td colSpan={5} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                     <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
                     <p>No materials found for {activeTab.toUpperCase()} production</p>
                   </td>
@@ -1341,27 +1223,20 @@ const MaterialStockEntryPage: React.FC = () => {
                 {/* Materials subtotal */}
                 {materials.length > 0 && (
                   <tr>
-                    <td className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Materials:
                     </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-500">
-                      {formatNumber(grandTotal.opening)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-sm text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">
-                      +{formatNumber(grandTotal.purchases)}
-                    </td>
-                    <td className="px-2 py-1.5 bg-orange-50 dark:bg-orange-900/20"></td>
                     <td></td>
                     <td></td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-green-600 dark:text-green-400">
-                      {formatNumber(grandTotal.closing)}
+                      {formatNumber(grandTotal.value)}
                     </td>
                   </tr>
                 )}
                 {/* Stock Kilang subtotal */}
                 {stockKilang.length > 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Stock Kilang:
                     </td>
                     <td></td>
@@ -1373,13 +1248,13 @@ const MaterialStockEntryPage: React.FC = () => {
                 )}
                 {/* Grand Total */}
                 <tr className="font-semibold border-t border-default-200 dark:border-gray-600">
-                  <td colSpan={4} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
+                  <td colSpan={2} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
                     Grand Total:
                   </td>
                   <td></td>
                   <td></td>
                   <td className="px-2 py-2 text-right font-mono text-sm text-sky-600 dark:text-sky-400">
-                    RM {formatNumber(grandTotal.closing + stockKilangTotal)}
+                    RM {formatNumber(grandTotal.value + stockKilangTotal)}
                   </td>
                 </tr>
               </tfoot>
