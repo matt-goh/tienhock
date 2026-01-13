@@ -769,3 +769,55 @@ LEFT JOIN material_variants v ON v.material_id = m.id
 WHERE v.id IS NOT NULL
 GROUP BY m.code, m.name
 ORDER BY m.code;
+
+-- =============================================================================
+-- Add variant_id column to material_stock_entries table
+-- =============================================================================
+-- This migration adds the variant_id column if it doesn't exist
+-- Run this on the server database if you're getting "column variant_id does not exist" errors
+-- Date: 2026-01-13
+-- =============================================================================
+
+-- Add variant_id column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'material_stock_entries'
+        AND column_name = 'variant_id'
+    ) THEN
+        -- Add the variant_id column
+        ALTER TABLE material_stock_entries
+        ADD COLUMN variant_id INTEGER REFERENCES material_variants(id) ON DELETE SET NULL;
+
+        -- Add index
+        CREATE INDEX idx_mse_variant ON material_stock_entries(variant_id);
+
+        -- Add comment
+        COMMENT ON COLUMN material_stock_entries.variant_id IS 'Links to material_variants for multi-variant materials';
+
+        RAISE NOTICE 'Added variant_id column to material_stock_entries';
+    ELSE
+        RAISE NOTICE 'variant_id column already exists in material_stock_entries';
+    END IF;
+END $$;
+
+-- Update the unique index to support variants (drop old, create new)
+DROP INDEX IF EXISTS idx_mse_unique;
+DROP INDEX IF EXISTS idx_mse_unique_variant;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mse_unique_variant ON material_stock_entries (
+  year, month, material_id, product_line,
+  COALESCE(variant_id::text, custom_description, 'default')
+);
+
+-- Verification
+SELECT
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_name = 'material_stock_entries'
+AND column_name IN ('variant_id', 'custom_name', 'custom_description')
+ORDER BY ordinal_position;
