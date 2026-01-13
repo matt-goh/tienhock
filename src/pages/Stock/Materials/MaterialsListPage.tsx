@@ -78,18 +78,22 @@ const MaterialsListPage: React.FC = () => {
       const response = await api.get(`/api/materials?${params.toString()}`);
       const materialsData = response || [];
 
-      // Fetch variant counts for all materials
+      // Fetch variants for all materials in a single batch request
       const materialIds = materialsData.map((m: Material) => m.id);
-      const variantPromises = materialIds.map((id: number) =>
-        api.get(`/api/materials/${id}/variants?is_active=true`).catch(() => [])
-      );
-      const variantsResponses = await Promise.all(variantPromises);
+      let variantsByMaterial: Record<number, MaterialVariant[]> = {};
+
+      if (materialIds.length > 0) {
+        variantsByMaterial = await api.post(`/api/materials/batch/variants`, {
+          material_ids: materialIds,
+          is_active: true,
+        });
+      }
 
       // Attach variant counts and variants to materials
-      const materialsWithVariants = materialsData.map((m: Material, idx: number) => ({
+      const materialsWithVariants = materialsData.map((m: Material) => ({
         ...m,
-        variants: variantsResponses[idx] || [],
-        variantCount: (variantsResponses[idx] || []).length,
+        variants: variantsByMaterial[m.id] || [],
+        variantCount: (variantsByMaterial[m.id] || []).length,
       }));
 
       setMaterials(materialsWithVariants);

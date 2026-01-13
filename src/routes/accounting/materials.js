@@ -699,6 +699,56 @@ export default function (pool) {
 
   // ==================== MATERIAL VARIANTS CRUD ====================
 
+  // POST /batch/variants - Get variants for multiple materials (batch request)
+  router.post("/batch/variants", async (req, res) => {
+    try {
+      const { material_ids, is_active } = req.body;
+
+      if (!material_ids || !Array.isArray(material_ids) || material_ids.length === 0) {
+        return res.status(400).json({
+          message: "material_ids array is required",
+        });
+      }
+
+      let query = `
+        SELECT id, material_id, variant_name, default_unit_cost,
+               sort_order, is_active, created_at, updated_at
+        FROM material_variants
+        WHERE material_id = ANY($1)
+      `;
+      const params = [material_ids];
+
+      if (is_active !== undefined && is_active !== "") {
+        query += ` AND is_active = $2`;
+        params.push(is_active === "true" || is_active === true);
+      }
+
+      query += ` ORDER BY material_id, sort_order, variant_name`;
+
+      const result = await pool.query(query, params);
+
+      // Group variants by material_id
+      const variantsByMaterial = {};
+      material_ids.forEach(id => {
+        variantsByMaterial[id] = [];
+      });
+
+      result.rows.forEach(variant => {
+        if (variantsByMaterial[variant.material_id]) {
+          variantsByMaterial[variant.material_id].push(variant);
+        }
+      });
+
+      res.json(variantsByMaterial);
+    } catch (error) {
+      console.error("Error fetching material variants (batch):", error);
+      res.status(500).json({
+        message: "Error fetching material variants",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /:id/variants - Get all variants for a material
   router.get("/:id/variants", async (req, res) => {
     try {
