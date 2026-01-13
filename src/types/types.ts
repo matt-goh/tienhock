@@ -1114,10 +1114,7 @@ export interface Material {
   code: string;
   name: string;
   category: MaterialCategory;
-  unit: string;
-  unit_size?: string | null;
   default_unit_cost: number;
-  default_description?: string | null; // Default supplier/pricing note from PDF
   applies_to: MaterialAppliesTo;
   sort_order: number;
   is_active: boolean;
@@ -1132,13 +1129,31 @@ export interface MaterialInput {
   code: string;
   name: string;
   category: MaterialCategory;
-  unit: string;
-  unit_size?: string | null;
   default_unit_cost: number;
   applies_to?: MaterialAppliesTo;
   sort_order?: number;
   is_active?: boolean;
   notes?: string | null;
+}
+
+// Material Variant (for materials with multiple supplier/price options)
+export interface MaterialVariant {
+  id: number;
+  material_id: number;
+  variant_name: string;  // e.g., "Vietnam (Coklat)", "RM 14.25 / 25Kg"
+  default_unit_cost: number;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// For creating/updating variants
+export interface MaterialVariantInput {
+  variant_name: string;
+  default_unit_cost?: number;
+  sort_order?: number;
+  is_active?: boolean;
 }
 
 // Material Stock Entry (monthly stock with purchases/consumption)
@@ -1148,10 +1163,11 @@ export interface MaterialStockEntry {
   month: number;
   material_id: number;
   product_line: ProductLine;
+  variant_id?: number | null;  // Reference to material_variants (null for single-entry or ad-hoc)
 
   // Per-entry customization
   custom_name?: string | null;
-  custom_description?: string | null;
+  custom_description?: string | null;  // Used for ad-hoc variants (when variant_id is null)
 
   // Stock quantities (REDESIGNED)
   opening_quantity: number;
@@ -1174,13 +1190,37 @@ export interface MaterialStockEntry {
   material_code?: string;
   material_name?: string;
   material_category?: MaterialCategory;
-  material_unit?: string;
-  material_unit_size?: string | null;
   default_unit_cost?: number;
 }
 
+// Single stock entry row (either a variant or the main material entry)
+export interface StockEntryRow {
+  // Entry identification
+  entry_id: number | null;  // null for new entries
+  variant_id: number | null;  // null for single-entry materials or ad-hoc variants
+  variant_name: string | null;  // From variant table or custom_description for ad-hoc
+  is_new_variant: boolean;  // True if this is a newly added ad-hoc variant
+
+  // Stock quantities
+  opening_quantity: number;
+  opening_value: number;
+  purchases_quantity: number;
+  purchases_value: number;
+  consumption_quantity: number;
+  closing_quantity: number;
+  closing_value: number;
+
+  // Pricing
+  unit_cost: number;
+
+  // Notes
+  notes?: string | null;
+}
+
 // Material with opening and closing balances (for stock entry page)
+// Now supports multiple variant rows per material
 export interface MaterialWithStock extends Material {
+  // For materials WITHOUT variants: single entry data
   // Opening (from previous month's closing)
   opening_quantity: number;
   opening_value: number;
@@ -1194,7 +1234,7 @@ export interface MaterialWithStock extends Material {
   closing_quantity: number;  // Auto-calculated: opening + purchases - consumption
   closing_value: number;
 
-  // Per-entry customization
+  // Per-entry customization (for single-entry materials)
   custom_name?: string | null;
   custom_description?: string | null;
 
@@ -1204,17 +1244,25 @@ export interface MaterialWithStock extends Material {
   // Entry metadata
   closing_id: number | null;
   closing_notes?: string | null;
+
+  // Variant support
+  variant_id?: number | null;  // For single-entry or when representing a specific variant
+  variant_name?: string | null;  // From variant table
+  has_variants: boolean;  // True if this material has defined variants
+  variants?: StockEntryRow[];  // Array of variant entries (for materials with variants)
 }
 
 // Stock entry input for batch save
 export interface MaterialStockEntryInput {
   material_id: number;
+  variant_id?: number | null;  // Reference to registered variant (null for ad-hoc or single-entry)
   purchases_quantity: number;
   consumption_quantity: number;
   unit_cost: number;
   custom_name?: string | null;
-  custom_description?: string | null;
+  custom_description?: string | null;  // Used for ad-hoc variants when variant_id is null
   notes?: string | null;
+  register_variant?: boolean;  // If true and variant_id is null, create new variant from custom_description
 }
 
 // Stock data response from API
