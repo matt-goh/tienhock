@@ -249,7 +249,7 @@ const JournalDetailsPage: React.FC = () => {
   const canEdit = entry.status !== "cancelled";
   const canCancel = entry.status !== "cancelled";
   const canDelete = true;
-  const canPrintVoucher = entry.entry_type === "REC" && entry.status !== "cancelled";
+  const canPrintVoucher = (entry.entry_type as string) === "REC" && entry.status !== "cancelled";
 
   return (
     <div className="space-y-3">
