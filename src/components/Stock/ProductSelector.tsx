@@ -176,10 +176,10 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 
   // Category colors
   const categoryColors: Record<string, string> = {
-    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50",
-    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/50",
-    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/50",
-    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/50",
+    BH: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900",
+    MEE: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900",
+    JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900",
+    OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900",
   };
 
   return (
@@ -255,7 +255,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 {/* Favorites category */}
                 {showCategories && filteredFavorites.length > 0 && (
                   <div>
-                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/50">
+                    <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900">
                       Favorites ({filteredFavorites.length})
                     </div>
                     {filteredFavorites.map((product) => (
@@ -328,7 +328,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                           <div
                             className={clsx(
                               "sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider",
-                              categoryColors[type] || "text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900/50"
+                              categoryColors[type] || "text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900"
                             )}
                           >
                             {categoryLabels[type]} ({prods.length})
