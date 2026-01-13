@@ -1,5 +1,10 @@
 // src/routes/sales/invoices/payments.js
 import { Router } from "express";
+import {
+  createPaymentJournalEntry,
+  cancelPaymentJournalEntry,
+} from "../../accounting/payment-journal.js";
+import { determineBankAccount } from "../../../utils/payment-helpers.js";
 
 // Helper function (can be moved to a shared util if used elsewhere)
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -34,8 +39,11 @@ export default function (pool) {
         SELECT
           p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
           p.payment_method, p.payment_reference, p.internal_reference,
-          p.notes, p.created_at, p.status, p.cancellation_date
+          p.bank_account, p.journal_entry_id,
+          p.notes, p.created_at, p.status, p.cancellation_date,
+          je.reference_no as journal_reference_no
         FROM payments p
+        LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
         WHERE 1=1
       `;
       const queryParams = [];
@@ -86,11 +94,14 @@ export default function (pool) {
       SELECT
         p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
         p.payment_method, p.payment_reference, p.internal_reference,
+        p.bank_account, p.journal_entry_id,
         p.notes, p.created_at, p.status, p.cancellation_date,
-        i.customerid, i.salespersonid, c.name as customer_name
+        i.customerid, i.salespersonid, c.name as customer_name,
+        je.reference_no as journal_reference_no
       FROM payments p
       JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN customers c ON i.customerid = c.id
+      LEFT JOIN journal_entries je ON p.journal_entry_id = je.id
       WHERE 1=1
     `;
 
@@ -202,6 +213,7 @@ export default function (pool) {
       amount_paid,
       payment_method,
       payment_reference,
+      bank_account,
       notes,
     } = req.body;
 
@@ -272,11 +284,14 @@ export default function (pool) {
         const initialStatus =
           payment_method === "cheque" ? "pending" : "active";
 
+        // Determine bank account (cash payments go to CASH, others to selected bank)
+        const bankAccountCode = determineBankAccount(payment_method, bank_account);
+
         const insertPaymentQuery = `
         INSERT INTO payments (
           invoice_id, payment_date, amount_paid, payment_method,
-          payment_reference, notes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          payment_reference, bank_account, notes, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `;
 
@@ -286,6 +301,7 @@ export default function (pool) {
           regularAmount,
           payment_method,
           payment_reference || null,
+          bankAccountCode,
           notes || null,
           initialStatus,
         ];
@@ -293,7 +309,31 @@ export default function (pool) {
           insertPaymentQuery,
           paymentValues
         );
-        createdPayments.push(paymentResult.rows[0]);
+        const createdPayment = paymentResult.rows[0];
+
+        // Create journal entry for active payments (not for pending cheques)
+        if (initialStatus === "active") {
+          const journalEntryId = await createPaymentJournalEntry(client, {
+            payment_id: createdPayment.payment_id,
+            invoice_id: invoice_id,
+            payment_date: payment_date,
+            amount_paid: regularAmount,
+            payment_method: payment_method,
+            bank_account: bankAccountCode,
+            payment_reference: payment_reference,
+            created_by: req.user?.id || null
+          });
+
+          // Update payment with journal_entry_id
+          await client.query(
+            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
+            [journalEntryId, createdPayment.payment_id]
+          );
+
+          createdPayment.journal_entry_id = journalEntryId;
+        }
+
+        createdPayments.push(createdPayment);
 
         // Update invoice balance and status only for active payments
         if (initialStatus === "active") {
@@ -338,11 +378,14 @@ export default function (pool) {
         const overpaidStatus =
           payment_method === "cheque" ? "pending" : "overpaid";
 
+        // Use same bank account as regular payment
+        const bankAccountCode = determineBankAccount(payment_method, bank_account);
+
         const insertOverpaidQuery = `
         INSERT INTO payments (
           invoice_id, payment_date, amount_paid, payment_method,
-          payment_reference, notes, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          payment_reference, bank_account, notes, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
       `;
 
@@ -352,6 +395,7 @@ export default function (pool) {
           overpaidAmount,
           payment_method,
           payment_reference || null,
+          bankAccountCode,
           (notes || "") + (notes ? " - " : "") + "Overpaid amount",
           overpaidStatus,
         ];
@@ -393,10 +437,16 @@ export default function (pool) {
   // --- PUT /api/payments/:payment_id/confirm - Mark pending payment as paid ---
   router.put("/:payment_id/confirm", async (req, res) => {
     const { payment_id } = req.params;
+    const { bank_account } = req.body; // Accept bank_account from request body
     const paymentIdNum = parseInt(payment_id);
 
     if (isNaN(paymentIdNum)) {
       return res.status(400).json({ message: "Invalid payment ID." });
+    }
+
+    // Validate bank_account if provided
+    if (bank_account && !['CASH', 'BANK_PBB', 'BANK_ABB'].includes(bank_account)) {
+      return res.status(400).json({ message: "Invalid bank account. Must be one of: CASH, BANK_PBB, BANK_ABB" });
     }
 
     const client = await pool.connect();
@@ -488,18 +538,41 @@ export default function (pool) {
         const isOverpaidPayment = notes && notes.includes("Overpaid amount");
         const newStatus = isOverpaidPayment ? "overpaid" : "active";
 
-        // 5. Update payment status
+        // 5. Update payment status and bank_account
         const updatePaymentQuery = `
         UPDATE payments
-        SET status = $1
-        WHERE payment_id = $2
+        SET status = $1, bank_account = COALESCE($2, bank_account, 'BANK_PBB')
+        WHERE payment_id = $3
         RETURNING *
       `;
         const updateResult = await client.query(updatePaymentQuery, [
           newStatus,
+          bank_account || null, // Use provided bank_account or fall back to existing or default
           currentPaymentId,
         ]);
         const confirmedPaymentData = updateResult.rows[0];
+
+        // 5a. Create journal entry for confirmed payments (cheques that were pending)
+        if (newStatus === "active" && !confirmedPaymentData.journal_entry_id) {
+          const journalEntryId = await createPaymentJournalEntry(client, {
+            payment_id: confirmedPaymentData.payment_id,
+            invoice_id: invoice_id,
+            payment_date: confirmedPaymentData.payment_date,
+            amount_paid: paidAmount,
+            payment_method: confirmedPaymentData.payment_method,
+            bank_account: confirmedPaymentData.bank_account || 'BANK_PBB',
+            payment_reference: confirmedPaymentData.payment_reference,
+            created_by: req.user?.id || null
+          });
+
+          // Update payment with journal_entry_id
+          await client.query(
+            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
+            [journalEntryId, confirmedPaymentData.payment_id]
+          );
+
+          confirmedPaymentData.journal_entry_id = journalEntryId;
+        }
 
         // 6. Update Invoice balance and status (only for non-overpaid payments)
         if (newStatus === "active") {
@@ -628,8 +701,8 @@ export default function (pool) {
 
       // 2. Update payment status to cancelled
       const updateQuery = `
-        UPDATE payments 
-        SET status = 'cancelled', 
+        UPDATE payments
+        SET status = 'cancelled',
             cancellation_date = NOW(),
             cancellation_reason = $1
         WHERE payment_id = $2
@@ -640,6 +713,11 @@ export default function (pool) {
         paymentIdNum,
       ]);
       const cancelledPayment = updateResult.rows[0];
+
+      // 2a. Cancel the associated journal entry if it exists
+      if (cancelledPayment.journal_entry_id) {
+        await cancelPaymentJournalEntry(client, cancelledPayment.journal_entry_id);
+      }
 
       // 3. Update Invoice balance and status (only for active payments)
       // Pending payments never affected the balance, so don't adjust it when cancelling

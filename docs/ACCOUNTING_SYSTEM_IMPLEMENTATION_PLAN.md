@@ -8,6 +8,15 @@ The journal entry system is the correct foundation for a double-entry accounting
 
 **Strategy:** Build specialized transaction entry screens (invoices, payments, purchases, stock) that automatically generate journal entries, similar to how payroll currently works with JVDR/JVSL.
 
+**Implementation Progress:**
+- ✅ **Phase 2: Customer Payment Journals** - Completed January 13, 2026
+  - Auto-generates journal entries (type REC) for customer payments
+  - Bank account selection (CASH, BANK_PBB, BANK_ABB)
+  - Pending cheque handling with deferred journal creation
+  - Full payment-to-journal audit trail established
+- 🔜 **Phase 1: Purchases & Payables** - Next priority
+- ⏳ **Phase 3-6** - Pending
+
 ---
 
 ## First Principles: Why Keep Journals
@@ -311,9 +320,11 @@ These over-granular codes should map to single accounts:
 
 ---
 
-### Phase 2: Payment System (Auto-Journal on Payment)
+### Phase 2: Payment System (Auto-Journal on Payment) ✅ COMPLETED
 
 **Why Second:** Completes the purchase-to-payment cycle; critical for cash flow tracking.
+
+**Status:** ✅ Implemented January 13, 2026
 
 **What to Build:**
 
@@ -457,6 +468,88 @@ Migration:
      journal_entry_id?: number;
    }
    ```
+
+---
+
+#### Phase 2 Implementation Summary (January 13, 2026)
+
+**What Was Actually Implemented:**
+
+1. **Database Migration** - `migrations/add_payment_journals.sql`
+   - Added `bank_account` and `journal_entry_id` columns to `payments` table
+   - Created account codes: CASH, BANK_PBB, BANK_ABB, TR
+   - Added journal entry type: REC (Receipt)
+   - Backfilled 2,516 existing payments with bank_account based on payment_method
+
+2. **Backend Implementation**
+   - **NEW:** `src/routes/accounting/payment-journal.js`
+     - `generateReceiptReference()` - Generates REC{seq}/{month} reference numbers
+     - `createPaymentJournalEntry()` - Auto-generates journal entries for payments
+     - `cancelPaymentJournalEntry()` - Cancels journal when payment is cancelled
+   - **Enhanced:** `src/routes/sales/invoices/payments.js`
+     - POST `/api/payments` - Now accepts `bank_account` and auto-creates journal for active payments
+     - PUT `/api/payments/:id/confirm` - Creates journal when pending cheque is confirmed
+     - PUT `/api/payments/:id/cancel` - Cancels associated journal entry
+   - **Helper:** `src/utils/payment-helpers.js`
+     - `determineBankAccount()` - Maps payment method to correct account (CASH/BANK_PBB/BANK_ABB)
+
+3. **Frontend Implementation**
+   - **Enhanced:** `src/components/Invoice/PaymentForm.tsx`
+     - Added "Deposit To" bank account dropdown (Public Bank/Alliance Bank)
+     - Conditional rendering: only shows for non-cash payments
+     - Default: BANK_PBB (Public Bank)
+   - **Enhanced:** `src/pages/Invoice/InvoiceDetailsPage.tsx`
+     - Complete UI/UX overhaul of payment form with better layout
+     - Added bank account selection to payment form
+     - Added bank account selection to payment confirmation dialog
+     - Added "Journal Entry" column to payment history table with clickable links
+     - Pre-populates confirmation dialog with payment's existing bank account
+   - **Enhanced:** `src/components/Invoice/PaymentTable.tsx`
+     - Added bank account selection to confirmation dialog
+     - Pre-populates with existing bank account to preserve user selection
+   - **Enhanced:** `src/components/GreenTarget/GreenTargetPaymentTable.tsx`
+     - Added bank account selection to confirmation dialog
+     - Pre-populates with existing bank account to preserve user selection
+   - **Updated:** `src/types/types.ts`
+     - Added `bank_account` and `journal_entry_id` fields to Payment interface
+
+4. **Business Logic Implemented**
+   - Cash payments → automatically use CASH account
+   - Non-cash payments → user selects Public Bank or Alliance Bank
+   - Active payments → journal entry created immediately
+   - Pending cheques → journal entry deferred until confirmation
+   - Cancelled payments → journal entry marked as cancelled (not deleted)
+   - Bank account selection preserved throughout payment confirmation flow
+
+5. **Bug Fixes**
+   - Fixed issue where Alliance Bank selection was being overwritten during payment confirmation
+   - Solution: Pre-populate confirmation dialog with payment's existing bank_account value
+
+**Journal Entry Structure Created:**
+```
+Reference: REC001/01 (sequential per month)
+Type: REC (Receipt)
+Status: posted (immediately posted)
+
+Lines:
+  DR BANK_PBB/BANK_ABB/CASH (increase asset)
+  CR TR (Trade Receivables - decrease asset)
+```
+
+**Testing Status:**
+- Manual testing guide provided in `docs/PAYMENT_JOURNAL_IMPLEMENTATION_SUMMARY.md`
+- Ready for production use
+- Currently: 2,529 active/pending payments, 2,516 with bank_account assigned
+
+**Known Limitations:**
+- Supplier payments not yet implemented (planned for future)
+- Bank reconciliation page not yet implemented (planned for future)
+- Historical payments do not have journal entries (pre-dates feature)
+
+**Next Steps:**
+- Test manually with different payment scenarios (see testing guide)
+- Monitor production for any issues
+- Proceed to Phase 1: Purchases & Payables System (highest remaining priority)
 
 ---
 
@@ -867,22 +960,23 @@ The existing system uses numeric codes ('6', '7', '19', '22') which are not self
 
 ## Next Steps
 
-1. **User confirms approach** ✓
-2. **Implement Phase 1: Purchases & Payables System** (highest priority)
-3. **Test with real supplier invoices**
-4. **Implement Phase 2: Payment journals**
+1. **User confirms approach** ✅
+2. **Implement Phase 2: Payment journals** ✅ COMPLETED (January 13, 2026)
+3. **Implement Phase 1: Purchases & Payables System** (highest priority - NEXT)
+4. **Test with real supplier invoices**
 5. **Continue through phases based on business priority**
 
 **Estimated Complexity:**
-- Phase 1 (Purchases): ~3-4 days (tables, backend, frontend forms)
-- Phase 2 (Payments): ~2-3 days (enhance existing, add journals)
+- Phase 1 (Purchases): ~3-4 days (tables, backend, frontend forms) - NEXT
+- Phase 2 (Payments): ✅ COMPLETED
 - Phase 3 (Stock journals): ~1-2 days (integrate with existing stock system)
 - Phase 4 (Expenses): ~2-3 days (quick entry forms)
 
-**Total core system: ~10-14 days development time**
+**Remaining development time: ~6-9 days for core system**
 
 ---
 
 *Plan created: January 2026*
 *Updated: January 13, 2026 - Migrated to semantic note codes (BS_CA_CASH, IS_REV_SALES) and integrated with BANK_CASH_SYSTEM_PLAN.md*
-*Status: Ready for implementation*
+*Updated: January 13, 2026 - Phase 2 (Payment journals) completed and documented*
+*Status: Phase 2 complete, Phase 1 (Purchases) is next priority*

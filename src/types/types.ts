@@ -402,6 +402,9 @@ export interface Payment {
   payment_method: "cash" | "cheque" | "bank_transfer" | "online";
   payment_reference?: string;
   internal_reference?: string;
+  bank_account?: "CASH" | "BANK_PBB" | "BANK_ABB";
+  journal_entry_id?: number;
+  journal_reference_no?: string; // Reference number from associated journal entry (e.g., REC001/01)
   notes?: string;
   created_at?: string;
   status?: "active" | "cancelled" | "pending" | "overpaid";
