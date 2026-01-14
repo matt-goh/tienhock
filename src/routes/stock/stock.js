@@ -1,6 +1,10 @@
 // src/routes/stock/stock.js
 import { Router } from "express";
 
+// Stock system start date - data before this date is ignored in B/F calculations
+// Initial balance represents stock as of this date
+const STOCK_SYSTEM_START_DATE = "2026-01-01";
+
 export default function (pool) {
   const router = Router();
 
@@ -114,23 +118,27 @@ export default function (pool) {
       const initialBalance =
         initialResult.rows.length > 0 ? initialResult.rows[0].balance : 0;
 
-      // Calculate brought forward (B/F) by summing all movements BEFORE start date
-      // B/F = Initial Balance + (production + returns + adj_in) - (sold + foc + adj_out) before start_date
+      // Calculate brought forward (B/F) by summing movements from STOCK_SYSTEM_START_DATE to before start date
+      // B/F = Initial Balance + (production + returns + adj_in) - (sold + foc + adj_out)
+      // Data before STOCK_SYSTEM_START_DATE is ignored - initial balance represents stock as of that date
       // Use DATE comparison for consistency (not timestamp)
 
-      // Get prior production total
+      // Get prior production total (only from system start date onwards)
       const priorProductionQuery = `
         SELECT COALESCE(SUM(bags_packed), 0) as total
         FROM production_entries
-        WHERE product_id = $1 AND entry_date < $2::date
+        WHERE product_id = $1
+          AND entry_date >= $2::date
+          AND entry_date < $3::date
       `;
       const priorProductionResult = await pool.query(priorProductionQuery, [
         product_id,
+        STOCK_SYSTEM_START_DATE,
         startDate,
       ]);
       const priorProduction = parseInt(priorProductionResult.rows[0]?.total || 0);
 
-      // Get prior sales totals (sold, foc, returns)
+      // Get prior sales totals (sold, foc, returns) - only from system start date onwards
       // Use DATE extraction to match the period query's date grouping logic
       const priorSalesQuery = `
         SELECT
@@ -143,26 +151,31 @@ export default function (pool) {
           AND i.invoice_status != 'cancelled'
           AND od.issubtotal IS NOT TRUE
           AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) < $2::date
+          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) >= $2::date
+          AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) < $3::date
       `;
       const priorSalesResult = await pool.query(priorSalesQuery, [
         product_id,
+        STOCK_SYSTEM_START_DATE,
         startDate,
       ]);
       const priorSold = parseInt(priorSalesResult.rows[0]?.sold || 0);
       const priorFoc = parseInt(priorSalesResult.rows[0]?.foc || 0);
       const priorReturns = parseInt(priorSalesResult.rows[0]?.returns || 0);
 
-      // Get prior adjustments totals
+      // Get prior adjustments totals (only from system start date onwards)
       const priorAdjustmentsQuery = `
         SELECT
           COALESCE(SUM(CASE WHEN adjustment_type = 'ADJ_IN' THEN quantity ELSE 0 END), 0) as adj_in,
           COALESCE(SUM(CASE WHEN adjustment_type IN ('ADJ_OUT', 'DEFECT') THEN quantity ELSE 0 END), 0) as adj_out
         FROM stock_adjustments
-        WHERE product_id = $1 AND entry_date < $2
+        WHERE product_id = $1
+          AND entry_date >= $2
+          AND entry_date < $3
       `;
       const priorAdjustmentsResult = await pool.query(priorAdjustmentsQuery, [
         product_id,
+        STOCK_SYSTEM_START_DATE,
         startDate,
       ]);
       const priorAdjIn = parseInt(priorAdjustmentsResult.rows[0]?.adj_in || 0);
@@ -406,16 +419,18 @@ export default function (pool) {
               ? parseInt(initialResult.rows[0].balance) || 0
               : 0;
 
-            // Get all production up to and including end date
+            // Get all production from system start date up to and including end date
             const productionResult = await pool.query(
               `SELECT COALESCE(SUM(bags_packed), 0) as total
                FROM production_entries
-               WHERE product_id = $1 AND entry_date <= $2::date`,
-              [product_id, endDateStr]
+               WHERE product_id = $1
+                 AND entry_date >= $2::date
+                 AND entry_date <= $3::date`,
+              [product_id, STOCK_SYSTEM_START_DATE, endDateStr]
             );
             const totalProduction = parseInt(productionResult.rows[0]?.total) || 0;
 
-            // Get all sales up to and including end date
+            // Get all sales from system start date up to and including end date
             const salesResult = await pool.query(
               `SELECT
                  COALESCE(SUM(od.quantity), 0) as sold,
@@ -427,21 +442,24 @@ export default function (pool) {
                  AND i.invoice_status != 'cancelled'
                  AND od.issubtotal IS NOT TRUE
                  AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
-                 AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) <= $2::date`,
-              [product_id, endDateStr]
+                 AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) >= $2::date
+                 AND DATE(TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) <= $3::date`,
+              [product_id, STOCK_SYSTEM_START_DATE, endDateStr]
             );
             const totalSold = parseInt(salesResult.rows[0]?.sold) || 0;
             const totalFoc = parseInt(salesResult.rows[0]?.foc) || 0;
             const totalReturns = parseInt(salesResult.rows[0]?.returns) || 0;
 
-            // Get all adjustments up to and including end date
+            // Get all adjustments from system start date up to and including end date
             const adjustmentsResult = await pool.query(
               `SELECT
                  COALESCE(SUM(CASE WHEN adjustment_type = 'ADJ_IN' THEN quantity ELSE 0 END), 0) as adj_in,
                  COALESCE(SUM(CASE WHEN adjustment_type IN ('ADJ_OUT', 'DEFECT') THEN quantity ELSE 0 END), 0) as adj_out
                FROM stock_adjustments
-               WHERE product_id = $1 AND entry_date <= $2`,
-              [product_id, endDateStr]
+               WHERE product_id = $1
+                 AND entry_date >= $2
+                 AND entry_date <= $3`,
+              [product_id, STOCK_SYSTEM_START_DATE, endDateStr]
             );
             const totalAdjIn = parseInt(adjustmentsResult.rows[0]?.adj_in) || 0;
             const totalAdjOut = parseInt(adjustmentsResult.rows[0]?.adj_out) || 0;

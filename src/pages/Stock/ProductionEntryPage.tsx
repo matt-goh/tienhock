@@ -231,7 +231,7 @@ const ProductionEntryPage: React.FC = () => {
 
         const entriesMap: Record<string, number> = {};
         (response || []).forEach((entry: ProductionEntry) => {
-          entriesMap[entry.worker_id] = entry.bags_packed;
+          entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
         });
 
         setEntries(entriesMap);
