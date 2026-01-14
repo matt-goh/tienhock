@@ -28,6 +28,12 @@ import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
 import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
 import CogmPage from "./Accounting/Reports/CogmPage";
 
+// Accounting - Purchases
+import SuppliersListPage from "./Accounting/Purchases/SuppliersListPage";
+import SupplierFormPage from "./Accounting/Purchases/SupplierFormPage";
+import MaterialPurchaseListPage from "./Accounting/Purchases/MaterialPurchaseListPage";
+import MaterialPurchaseFormPage from "./Accounting/Purchases/MaterialPurchaseFormPage";
+
 // Stock - Materials
 import MaterialsListPage from "./Stock/Materials/MaterialsListPage";
 import MaterialFormPage from "./Stock/Materials/MaterialFormPage";
@@ -400,6 +406,24 @@ export const TienHockNavData: SidebarItem[] = [
     icon: IconPackage,
     subItems: [
       {
+        name: "Material Purchases",
+        path: "/stock/material-purchases",
+        component: MaterialPurchaseListPage,
+        subItems: [
+          {
+            name: "New Purchase",
+            path: "/stock/material-purchases/new",
+            component: MaterialPurchaseFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Purchase",
+            path: "/stock/material-purchases/:id",
+            component: MaterialPurchaseFormPage,
+          },
+        ],
+      },
+      {
         name: "Stock Entry",
         path: "/stock/entry",
         component: MaterialStockEntryPage,
@@ -418,24 +442,6 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Product Adjustments",
         path: "/stock/adjustments",
         component: StockAdjustmentEntryPage,
-      },
-      {
-        name: "Materials",
-        path: "/materials",
-        component: MaterialsListPage,
-        subItems: [
-          {
-            name: "New Material",
-            path: "/materials/new",
-            component: MaterialFormPage,
-            showInPopover: true,
-          },
-          {
-            name: "Edit Material",
-            path: "/materials/:id",
-            component: MaterialFormPage,
-          },
-        ],
       },
     ],
   },
@@ -508,6 +514,42 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Contribution Rates",
         path: "/catalogue/contribution-rates",
         component: ContributionRatesPage,
+      },
+      {
+        name: "Materials",
+        path: "/materials",
+        component: MaterialsListPage,
+        subItems: [
+          {
+            name: "New Material",
+            path: "/materials/new",
+            component: MaterialFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Material",
+            path: "/materials/:id",
+            component: MaterialFormPage,
+          },
+        ],
+      },
+      {
+        name: "Suppliers",
+        path: "/accounting/suppliers",
+        component: SuppliersListPage,
+        subItems: [
+          {
+            name: "New Supplier",
+            path: "/accounting/suppliers/new",
+            component: SupplierFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Supplier",
+            path: "/accounting/suppliers/:id",
+            component: SupplierFormPage,
+          },
+        ],
       },
       {
         name: "Job Category",
