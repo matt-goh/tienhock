@@ -652,24 +652,26 @@ export default function (pool) {
       };
 
       // Helper to find the Base production pay code (PBH_*, PM_*, PWE_*, WE_*, WE-* prefixes)
+      // Production-based rate units: Bag, Kg, Karung, Bundle
+      const productionRateUnits = ['Bag', 'Kg', 'Karung', 'Bundle'];
       const findBasePayCode = (payCodesForProduct) => {
         // First, try to find a Base pay code with production prefix
         // Note: WE codes use both underscore (WE_) and dash (WE-)
         const productionPrefixes = ['PBH_', 'PM_', 'PWE_', 'WE_', 'WE-'];
         const baseProductionCode = payCodesForProduct.find(
-          pc => pc.pay_type === 'Base' && pc.rate_unit === 'Bag' &&
+          pc => pc.pay_type === 'Base' && productionRateUnits.includes(pc.rate_unit) &&
                 productionPrefixes.some(prefix => pc.pay_code_id.startsWith(prefix))
         );
         if (baseProductionCode) return baseProductionCode;
 
-        // Fallback to any Base pay code with Bag rate_unit
+        // Fallback to any Base pay code with production rate_unit
         const anyBaseCode = payCodesForProduct.find(
-          pc => pc.pay_type === 'Base' && pc.rate_unit === 'Bag'
+          pc => pc.pay_type === 'Base' && productionRateUnits.includes(pc.rate_unit)
         );
         if (anyBaseCode) return anyBaseCode;
 
-        // Last resort: any pay code with Bag rate_unit
-        return payCodesForProduct.find(pc => pc.rate_unit === 'Bag');
+        // Last resort: any pay code with production rate_unit
+        return payCodesForProduct.find(pc => productionRateUnits.includes(pc.rate_unit));
       };
 
       // Helper to find threshold bonus pay codes
@@ -681,13 +683,13 @@ export default function (pool) {
           : ['FULL_'];
 
         const bonus70Code = payCodesForProduct.find(
-          pc => pc.pay_type === 'Tambahan' && pc.rate_unit === 'Bag' &&
+          pc => pc.pay_type === 'Tambahan' && productionRateUnits.includes(pc.rate_unit) &&
                 (pc.description.includes('>70') || pc.description.includes('>100')) &&
                 !pc.description.includes('>140')
         );
 
         const bonus140Code = payCodesForProduct.find(
-          pc => pc.pay_type === 'Tambahan' && pc.rate_unit === 'Bag' &&
+          pc => pc.pay_type === 'Tambahan' && productionRateUnits.includes(pc.rate_unit) &&
                 pc.description.includes('>140')
         );
 
@@ -759,7 +761,7 @@ export default function (pool) {
               description: `${basePayCode.description} - ${entry.product_id}`,
               pay_type: basePayCode.pay_type || 'Base',
               rate: rate,
-              rate_unit: 'Bag',
+              rate_unit: basePayCode.rate_unit,
               quantity: entry.bags_packed,
               amount: amount,
               source_date: dateStr,
@@ -798,7 +800,7 @@ export default function (pool) {
                 description: `${bonus70Code.description} (${totalBags} bags)`,
                 pay_type: 'Tambahan',
                 rate: bonusRate,
-                rate_unit: 'Bag',
+                rate_unit: bonus70Code.rate_unit,
                 quantity: totalBags,
                 amount: bonusAmount,
                 source_date: date,
@@ -818,7 +820,7 @@ export default function (pool) {
                 description: `${bonus140Code.description} (${totalBags} bags)`,
                 pay_type: 'Tambahan',
                 rate: bonusRate,
-                rate_unit: 'Bag',
+                rate_unit: bonus140Code.rate_unit,
                 quantity: totalBags,
                 amount: bonusAmount,
                 source_date: date,

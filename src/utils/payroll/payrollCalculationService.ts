@@ -133,6 +133,9 @@ export class PayrollCalculationService {
             quantity = activity.hours_applied;
           } else if (
             (activity.rate_unit === "Bag" ||
+              activity.rate_unit === "Kg" ||
+              activity.rate_unit === "Karung" ||
+              activity.rate_unit === "Bundle" ||
               activity.rate_unit === "Trip" ||
               activity.rate_unit === "Day" ||
               activity.rate_unit === "Percent") &&
@@ -196,6 +199,9 @@ export class PayrollCalculationService {
       case "Bill":
       case "Day":
       case "Bag":
+      case "Kg":
+      case "Karung":
+      case "Bundle":
       case "Trip":
         amount = multiplyMoney(rate, quantity);
         break;
