@@ -30,6 +30,8 @@ interface WorkerEntryGridProps {
   // External search control (optional - if not provided, shows internal search)
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  // Hide footer (for components that have their own footer)
+  hideFooter?: boolean;
 }
 
 const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
@@ -47,6 +49,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   defaultValue,
   searchQuery: externalSearchQuery,
   onSearchChange,
+  hideFooter = false,
 }) => {
   // Use internal state only if no external control is provided
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
@@ -286,65 +289,67 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       </div>
 
       {/* Total row with actions */}
-      <div className="flex items-center justify-between border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
-        <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
-            <IconPackage className="text-green-600 dark:text-green-400" size={20} />
-          </div>
-          <div>
-            <div className="font-semibold text-default-900 dark:text-gray-100">
-              Total {unitLabel === "kg" ? "Weight" : unitLabel === "sack" ? "Sacks" : "Packed"}
+      {!hideFooter && (
+        <div className="flex items-center justify-between border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+              <IconPackage className="text-green-600 dark:text-green-400" size={20} />
             </div>
-            <div className="text-xs text-default-500 dark:text-gray-400">
-              {new Date().toLocaleDateString("en-MY", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
+            <div>
+              <div className="font-semibold text-default-900 dark:text-gray-100">
+                Total {unitLabel === "kg" ? "Weight" : unitLabel === "sack" ? "Sacks" : "Packed"}
+              </div>
+              <div className="text-xs text-default-500 dark:text-gray-400">
+                {new Date().toLocaleDateString("en-MY", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </div>
+            </div>
+            <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
+              <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
+                {isDecimalMode ? totalBags.toFixed(2) : totalBags.toLocaleString()}{" "}
+                <span className="text-base font-normal text-default-500 dark:text-gray-400">
+                  {unitLabel}
+                </span>
+              </p>
+            </div>
+            <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
+              <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
+                {workingWorkersCount}{" "}
+                <span className="text-base font-normal text-default-500 dark:text-gray-400">
+                  perkerja
+                </span>
+              </p>
             </div>
           </div>
-          <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
-            <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
-              {isDecimalMode ? totalBags.toFixed(2) : totalBags.toLocaleString()}{" "}
-              <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                {unitLabel}
-              </span>
-            </p>
-          </div>
-          <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
-            <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
-              {workingWorkersCount}{" "}
-              <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                perkerja
-              </span>
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          {onSave && onReset && (
-            <div className="flex gap-3">
-              <Button
-                onClick={onReset}
-                disabled={!hasUnsavedChanges || isSaving}
-                color="default"
-                icon={IconRefresh}
-              >
-                Reset
-              </Button>
-              <Button
-                onClick={onSave}
-                disabled={!hasUnsavedChanges || isSaving}
-                color="sky"
-                icon={IconDeviceFloppy}
-              >
-                {isSaving ? "Saving..." : "Save Production"}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {onSave && onReset && (
+              <div className="flex gap-3">
+                <Button
+                  onClick={onReset}
+                  disabled={!hasUnsavedChanges || isSaving}
+                  color="default"
+                  icon={IconRefresh}
+                >
+                  Reset
+                </Button>
+                <Button
+                  onClick={onSave}
+                  disabled={!hasUnsavedChanges || isSaving}
+                  color="sky"
+                  icon={IconDeviceFloppy}
+                >
+                  {isSaving ? "Saving..." : "Save Production"}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
