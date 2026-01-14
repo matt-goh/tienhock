@@ -242,55 +242,65 @@ These over-granular codes should map to single accounts:
 
 ### Phase 1: Purchases & Payables System (FIRST PRIORITY)
 
-**Why First:** Largest untracked transaction volume; materials stock system needs purchase data.
+**Why First:** Largest untracked transaction volume; completes the purchase-to-payment cycle.
 
-**What to Build:**
+#### Current Workflow Analysis (Old System)
 
-1. **Purchase Invoice Entry Screen**
-   - Form fields: Supplier, date, invoice number, items (material/expense), amounts, tax
-   - Save to new `purchase_invoices` table
-   - Button: "Post to GL"
+**Reference Screenshots:** `SUPPLIER_LAHAD_DATU.jpg`, `SUPPLIER_NITSEI_SAGO.jpg`
 
-2. **Auto-Journal Generation**
+The old system records supplier invoices as manual journal entries:
+- **Reference No**: Supplier's invoice number (e.g., 5050049176, 5062)
+- **Type**: S (Supplier Invoice)
+- **Lines**: Manual double-entry with separate debit and credit lines
+  - DR PU_MTEP (Purchase - Tepung) 32,500.00
+  - CR CR_LD (Creditor - Lahad Datu) 32,500.00
+- **Particulars**: User types supplier name manually each time
+
+**Current Pain Points:**
+1. **Per-supplier creditor codes**: CR_LD, CR_NS, CR_xxx creates 50+ creditor codes
+2. **Manual supplier name entry**: User types "LAHAD DATU FLOUR MILL SDN BHD" every time
+3. **Redundant data entry**: Same amount entered twice (debit line + credit line)
+4. **No supplier master**: No centralized supplier list to select from
+
+**Stock Entry Note:** Staff already record closing stock quantities via `MaterialStockEntryPage.tsx`. The purchases system should NOT disrupt this workflow - stock quantities are handled separately.
+
+#### Modernization Strategy
+
+1. **Supplier Master CRUD** - Store suppliers once, select from dropdown
+2. **Single Trade Payables Account** - Replace CR_LD, CR_NS, etc. with one `TP` account
+3. **Simplified Entry Form** - Enter purchase lines only, system auto-generates credit to Trade Payables
+4. **Purchase Code Mapping** - Map materials to purchase expense accounts
+
+#### What to Build
+
+1. **Supplier Master (CRUD)**
+   - Supplier list page with search
+   - Add/Edit supplier form
+   - Fields: Code, Name, Contact, Phone, Address, Payment Terms
+
+2. **Purchase Invoice Entry Screen**
+   - Header: Supplier (dropdown), Invoice Number, Invoice Date
+   - Lines: Account Code (or Material), Description, Amount
+   - System auto-creates balancing credit to Trade Payables
+   - One-click "Save & Post" (creates journal entry automatically)
+
+3. **Auto-Journal Generation**
    ```
-   On Post:
-   DR 5100 - Purchases - Raw Materials (IS_COGS_PURCH_RM)     RM 10,000
-   DR 2010 - Trade Payables Input Tax (BS_CL_TP)              RM 600 (SST)
-       CR 2010 - Trade Payables (BS_CL_TP)                    RM 10,600
+   On Save:
+   DR PU_MTEP - Purchase Tepung (linked account)     RM 32,500.00
+   DR PU_MTEP - Purchase PPI & Loyalty               RM 7,100.00
+       CR TP - Trade Payables                        RM 39,600.00
 
-   Reference: Purchase Invoice #INV123
+   Reference: Supplier Invoice #5050049176
+   Entry Type: PUR (Purchase)
+   Description: LAHAD DATU FLOUR MILL SDN BHD (auto from supplier)
    ```
 
-3. **Database Tables:**
+4. **Database Tables:**
    ```sql
-   CREATE TABLE purchase_invoices (
-     id SERIAL PRIMARY KEY,
-     supplier_id INTEGER REFERENCES suppliers(id),
-     invoice_number VARCHAR(50) UNIQUE NOT NULL,
-     invoice_date DATE NOT NULL,
-     total_amount DECIMAL(15,2),
-     tax_amount DECIMAL(15,2),
-     total_payable DECIMAL(15,2),
-     payment_status VARCHAR(20) DEFAULT 'unpaid',
-     journal_entry_id INTEGER REFERENCES journal_entries(id),
-     created_at TIMESTAMP DEFAULT NOW(),
-     created_by INTEGER REFERENCES staffs(id)
-   );
-
-   CREATE TABLE purchase_invoice_lines (
-     id SERIAL PRIMARY KEY,
-     purchase_invoice_id INTEGER REFERENCES purchase_invoices(id),
-     material_id INTEGER REFERENCES materials(id),
-     account_code VARCHAR(20) REFERENCES account_codes(code),
-     description TEXT,
-     quantity DECIMAL(15,2),
-     unit_cost DECIMAL(15,2),
-     amount DECIMAL(15,2)
-   );
-
    CREATE TABLE suppliers (
      id SERIAL PRIMARY KEY,
-     code VARCHAR(20) UNIQUE,
+     code VARCHAR(20) UNIQUE NOT NULL,
      name VARCHAR(200) NOT NULL,
      contact_person VARCHAR(100),
      phone VARCHAR(50),
@@ -298,24 +308,62 @@ These over-granular codes should map to single accounts:
      address TEXT,
      payment_terms INTEGER DEFAULT 30,
      is_active BOOLEAN DEFAULT true,
+     created_at TIMESTAMP DEFAULT NOW(),
+     updated_at TIMESTAMP DEFAULT NOW()
+   );
+
+   CREATE TABLE purchase_invoices (
+     id SERIAL PRIMARY KEY,
+     supplier_id INTEGER REFERENCES suppliers(id) NOT NULL,
+     invoice_number VARCHAR(50) NOT NULL,
+     invoice_date DATE NOT NULL,
+     total_amount DECIMAL(15,2) NOT NULL,
+     payment_status VARCHAR(20) DEFAULT 'unpaid',
+     journal_entry_id INTEGER REFERENCES journal_entries(id),
+     notes TEXT,
+     created_at TIMESTAMP DEFAULT NOW(),
+     created_by INTEGER REFERENCES staffs(id),
+     UNIQUE(supplier_id, invoice_number)
+   );
+
+   CREATE TABLE purchase_invoice_lines (
+     id SERIAL PRIMARY KEY,
+     purchase_invoice_id INTEGER REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+     line_number INTEGER NOT NULL,
+     account_code VARCHAR(20) REFERENCES account_codes(code) NOT NULL,
+     description TEXT,
+     amount DECIMAL(15,2) NOT NULL,
      created_at TIMESTAMP DEFAULT NOW()
    );
+
+   -- Add journal entry type for purchases
+   INSERT INTO journal_entry_types (code, name, description, is_active)
+   VALUES ('PUR', 'Purchase Invoice', 'Auto-generated from supplier purchase invoices', true);
+
+   -- Add Trade Payables account if not exists
+   INSERT INTO account_codes (code, description, ledger_type, is_active)
+   VALUES ('TP', 'Trade Payables', 'GL', true)
+   ON CONFLICT (code) DO NOTHING;
    ```
 
-4. **Supplier Subledger**
-   - Track balances per supplier (similar to customer invoices)
-   - Reconcile to GL account 2010 (Trade Payables)
+5. **Purchase Account Codes** (existing codes to use)
+   - `PU_MTEP` - Purchase Tepung (flour)
+   - `PU_BSAG` - Purchase Sago
+   - `PU_xxx` - Other purchase codes as needed
+   - All DR to purchase account, CR to single `TP` account
 
-5. **Integration with Materials Stock**
-   - Purchase entries for materials → auto-update `material_stock_entries.purchases_quantity`
-   - Link: purchase_invoice_lines.material_id → materials.id
+6. **Supplier Subledger**
+   - Track balances per supplier via `purchase_invoices` table
+   - Outstanding = SUM(total_amount) - SUM(payments)
+   - Reconcile total to GL account `TP` (Trade Payables)
 
 **Files to Create/Modify:**
-- Backend: `src/routes/accounting/purchases.js`
-- Backend: `src/routes/accounting/suppliers.js`
-- Frontend: `src/pages/Accounting/Purchases/PurchaseInvoiceEntryPage.tsx`
-- Frontend: `src/pages/Accounting/Purchases/PurchaseInvoicesListPage.tsx`
-- Frontend: `src/pages/Accounting/Purchases/SuppliersPage.tsx`
+- Backend: `src/routes/accounting/suppliers.js` - Supplier CRUD
+- Backend: `src/routes/accounting/purchases.js` - Purchase invoice CRUD + auto-journal
+- Frontend: `src/pages/Accounting/Suppliers/SuppliersPage.tsx` - Supplier list
+- Frontend: `src/pages/Accounting/Suppliers/SupplierFormPage.tsx` - Add/Edit supplier
+- Frontend: `src/pages/Accounting/Purchases/PurchaseInvoicesPage.tsx` - Invoice list
+- Frontend: `src/pages/Accounting/Purchases/PurchaseInvoiceFormPage.tsx` - Invoice entry
 - Migration: `migrations/add_purchases_system.sql`
 
 ---
@@ -391,8 +439,8 @@ These over-granular codes should map to single accounts:
    ```
 
 4. **Bank Reconciliation Helper**
-   - Simple page showing: Opening balance + Receipts - Payments = Closing balance
-   - Compare with bank statement
+   - See **Phase 2.2: Bank Statement from Journal Report** for full implementation
+   - Generates statement from journal entries for comparison with actual bank statement
 
 **Files to Create/Modify:**
 
@@ -406,8 +454,10 @@ Supplier Payments (future):
 - Backend: `src/routes/accounting/supplier-payments.js`
 - Frontend: `src/pages/Accounting/Payments/SupplierPaymentEntryPage.tsx`
 
-Bank Reconciliation:
-- Frontend: `src/pages/Accounting/BankReconciliationPage.tsx`
+Bank Statement from Journal (Phase 2.2):
+- Backend: `src/routes/accounting/bank-statement.js`
+- Frontend: `src/pages/Accounting/BankStatementPage.tsx`
+- PDF: `src/utils/accounting/BankStatementPDF.tsx`
 
 Migration:
 - `migrations/add_payment_journals.sql`
@@ -600,6 +650,74 @@ Lines:
 - Invoice reference, Payment method, Bank account
 - Journal entry lines showing DR/CR accounts
 - Signature lines
+
+---
+
+### Phase 2.2: Bank Statement from Journal Report
+
+**Why Critical:** This is the primary reconciliation tool - staff generate this report and compare the closing balance against the actual bank statement. If they match, all bank transactions are correctly recorded.
+
+**Reference:** See `bank_statement_from_journal.pdf` for the old system's output format.
+
+**What to Build:**
+
+1. **Bank Statement Report Page**
+   - Filter by: Bank Account (BANK_PBB / BANK_ABB / CASH), Date Range
+   - Shows all journal entry lines affecting the selected account
+   - Calculates running balance
+
+2. **Report Columns** (matching old system):
+   | Column | Description |
+   |--------|-------------|
+   | Date | Journal entry date |
+   | Journal | Reference number (REC001/01, PV005/12, JVSL/01/26) |
+   | Particulars | Journal description |
+   | Cheque | Payment reference (cheque number, transfer ref) |
+   | Debit | Money OUT (payments) |
+   | Credit | Money IN (receipts) |
+   | Balance | Running balance |
+
+3. **Balance Calculation:**
+   - Bank accounts are DEBIT balance (Assets)
+   - Credit to bank = money IN (increases balance)
+   - Debit to bank = money OUT (decreases balance)
+   - Running Balance = Opening + Credits - Debits
+
+4. **Reconciliation Helper:**
+   - Input: "Bank Statement Balance" (from actual bank)
+   - Shows: Difference = Journal Balance - Bank Statement Balance
+   - Visual indicator: Green if matched, Red if unreconciled
+
+5. **PDF Export:**
+   - Match old system format for familiarity
+   - Header: Company name, Bank account, Date range
+   - Summary: Opening, Total Debits, Total Credits, Closing
+
+**Backend Query:**
+```sql
+SELECT
+  je.entry_date,
+  je.reference_no,
+  je.description,
+  jel.reference as cheque_ref,
+  CASE WHEN jel.debit_amount > 0 THEN jel.debit_amount ELSE NULL END as debit,
+  CASE WHEN jel.credit_amount > 0 THEN jel.credit_amount ELSE NULL END as credit
+FROM journal_entries je
+JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+WHERE jel.account_code = :bank_account
+  AND je.entry_date BETWEEN :from_date AND :to_date
+  AND je.status != 'cancelled'
+ORDER BY je.entry_date, je.id
+```
+
+**Files to Create:**
+- Backend: `src/routes/accounting/bank-statement.js`
+- Frontend: `src/pages/Accounting/BankStatementPage.tsx`
+- PDF: `src/utils/accounting/BankStatementPDF.tsx`
+
+**API Endpoints:**
+- `GET /api/accounting/bank-statement?account=BANK_PBB&from=2025-12-01&to=2025-12-31`
+- `GET /api/accounting/bank-statement/opening-balance?account=BANK_PBB&date=2025-12-01`
 
 ---
 
@@ -1200,17 +1318,20 @@ The `location_account_mappings` table supports these mapping types:
 
 1. **User confirms approach** ✅
 2. **Implement Phase 2: Payment journals** ✅ COMPLETED (January 13, 2026)
-3. **Implement Phase 1: Purchases & Payables System** (highest priority - NEXT)
-4. **Test with real supplier invoices**
-5. **Continue through phases based on business priority**
+3. **Implement Phase 2.1: Cash Receipt Voucher PDF** ✅ COMPLETED (January 13, 2026)
+4. **Implement Phase 2.2: Bank Statement from Journal Report** (HIGH PRIORITY - enables bank reconciliation)
+5. **Implement Phase 1: Purchases & Payables System** (next after bank statement)
+6. **Test with real supplier invoices**
+7. **Continue through phases based on business priority**
 
 **Estimated Complexity:**
-- Phase 1 (Purchases): ~3-4 days (tables, backend, frontend forms) - NEXT
+- Phase 2.2 (Bank Statement): ~1-2 days (backend query, frontend table, PDF export)
+- Phase 1 (Purchases): ~3-4 days (tables, backend, frontend forms)
 - Phase 2 (Payments): ✅ COMPLETED
 - Phase 3 (Stock journals): ~1-2 days (integrate with existing stock system)
 - Phase 4 (Expenses): ~2-3 days (quick entry forms)
 
-**Remaining development time: ~6-9 days for core system**
+**Remaining development time: ~7-11 days for core system**
 
 ---
 
@@ -1219,4 +1340,5 @@ The `location_account_mappings` table supports these mapping types:
 *Updated: January 13, 2026 - Phase 2 (Payment journals) completed and documented*
 *Updated: January 14, 2026 - Added comprehensive Account Mappings Reference section*
 *Updated: January 14, 2026 - Added CUST_DEP account and journal entries for overpaid payments*
-*Status: Phase 2 complete, Phase 1 (Purchases) is next priority*
+*Updated: January 14, 2026 - Added Phase 2.2: Bank Statement from Journal Report (enables bank reconciliation)*
+*Status: Phase 2.2 (Bank Statement) is next priority, then Phase 1 (Purchases)*

@@ -1827,6 +1827,60 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     if (jobTypes.length === 0) return;
 
+    // Helper function to enrich cleaning mode paycodes with employee/job-specific override rates
+    const enrichCleaningPayCode = (
+      basePayCode: {
+        id: string;
+        description: string;
+        pay_type: string;
+        rate_unit: string;
+        rate_biasa: number;
+        rate_ahad: number;
+        rate_umum: number;
+      },
+      employeeId: string,
+      jobType: string,
+      employeeMappings: Record<string, any[]>,
+      jobPayCodeDetails: Record<string, any[]>
+    ) => {
+      // Check employee-specific overrides first (highest priority)
+      const employeePayCodes = employeeMappings[employeeId] || [];
+      const employeeOverride = employeePayCodes.find((pc) => pc.id === basePayCode.id);
+
+      if (employeeOverride) {
+        return {
+          ...basePayCode,
+          override_rate_biasa: employeeOverride.override_rate_biasa,
+          override_rate_ahad: employeeOverride.override_rate_ahad,
+          override_rate_umum: employeeOverride.override_rate_umum,
+          source: "employee",
+        };
+      }
+
+      // Check job-specific overrides second (medium priority)
+      const jobPayCodes = jobPayCodeDetails[jobType] || [];
+      const jobOverride = jobPayCodes.find((pc) => pc.id === basePayCode.id);
+
+      if (jobOverride) {
+        return {
+          ...basePayCode,
+          override_rate_biasa: jobOverride.override_rate_biasa,
+          override_rate_ahad: jobOverride.override_rate_ahad,
+          override_rate_umum: jobOverride.override_rate_umum,
+          source: "job",
+        };
+      }
+
+      // Return base paycode with null overrides (fallback to default rates)
+      return {
+        ...basePayCode,
+        override_rate_biasa: null,
+        override_rate_ahad: null,
+        override_rate_umum: null,
+        source: "default",
+      };
+    };
+
     // Apply activities for each employee/job combination using cached data
     const newEmployeeActivities: Record<string, any[]> = {};
 
@@ -1867,51 +1921,86 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
             if (formData.dayType === "Ahad" && cleaningPayCode) {
               // Ahad: split into base + OT
+              // Enrich with employee/job-specific override rates
+              const enrichedCleaningPayCode = enrichCleaningPayCode(
+                cleaningPayCode,
+                employeeId,
+                empJobType,
+                employeeMappings,
+                jobPayCodeDetails
+              );
+
               const baseHours = Math.min(hours, 8);
               mergedPayCodes.push({
-                id: cleaningPayCode.id,
-                description: cleaningPayCode.description,
-                pay_type: cleaningPayCode.pay_type,
-                rate_unit: cleaningPayCode.rate_unit,
-                rate_biasa: cleaningPayCode.rate_biasa,
-                rate_ahad: cleaningPayCode.rate_ahad,
-                rate_umum: cleaningPayCode.rate_umum,
+                id: enrichedCleaningPayCode.id,
+                description: enrichedCleaningPayCode.description,
+                pay_type: enrichedCleaningPayCode.pay_type,
+                rate_unit: enrichedCleaningPayCode.rate_unit,
+                rate_biasa: enrichedCleaningPayCode.rate_biasa,
+                rate_ahad: enrichedCleaningPayCode.rate_ahad,
+                rate_umum: enrichedCleaningPayCode.rate_umum,
+                override_rate_biasa: enrichedCleaningPayCode.override_rate_biasa,
+                override_rate_ahad: enrichedCleaningPayCode.override_rate_ahad,
+                override_rate_umum: enrichedCleaningPayCode.override_rate_umum,
                 is_default_setting: true,
                 requires_units_input: false,
-                source: "cleaning_mode",
+                source: enrichedCleaningPayCode.source,
                 hoursApplied: baseHours,
               });
 
               // Add OT_A for overtime hours (hours > 8) - only if OT hours exist
               const otHours = Math.max(0, hours - 8);
               if (otHours > 0 && cleaningOTPayCode) {
+                const enrichedOTPayCode = enrichCleaningPayCode(
+                  cleaningOTPayCode,
+                  employeeId,
+                  empJobType,
+                  employeeMappings,
+                  jobPayCodeDetails
+                );
+
                 mergedPayCodes.push({
-                  id: cleaningOTPayCode.id,
-                  description: cleaningOTPayCode.description,
-                  pay_type: cleaningOTPayCode.pay_type,
-                  rate_unit: cleaningOTPayCode.rate_unit,
-                  rate_biasa: cleaningOTPayCode.rate_biasa,
-                  rate_ahad: cleaningOTPayCode.rate_ahad,
-                  rate_umum: cleaningOTPayCode.rate_umum,
+                  id: enrichedOTPayCode.id,
+                  description: enrichedOTPayCode.description,
+                  pay_type: enrichedOTPayCode.pay_type,
+                  rate_unit: enrichedOTPayCode.rate_unit,
+                  rate_biasa: enrichedOTPayCode.rate_biasa,
+                  rate_ahad: enrichedOTPayCode.rate_ahad,
+                  rate_umum: enrichedOTPayCode.rate_umum,
+                  override_rate_biasa: enrichedOTPayCode.override_rate_biasa,
+                  override_rate_ahad: enrichedOTPayCode.override_rate_ahad,
+                  override_rate_umum: enrichedOTPayCode.override_rate_umum,
                   is_default_setting: true,
                   requires_units_input: false,
-                  source: "cleaning_mode",
+                  source: enrichedOTPayCode.source,
                   hoursApplied: otHours,
                 });
               }
             } else if (formData.dayType === "Biasa" && cleaningPayCodeBiasa) {
               // Biasa: single paycode for all hours (same rate for all)
+              // Enrich with employee/job-specific override rates
+              const enrichedCleaningPayCodeBiasa = enrichCleaningPayCode(
+                cleaningPayCodeBiasa,
+                employeeId,
+                empJobType,
+                employeeMappings,
+                jobPayCodeDetails
+              );
+
               mergedPayCodes.push({
-                id: cleaningPayCodeBiasa.id,
-                description: cleaningPayCodeBiasa.description,
-                pay_type: cleaningPayCodeBiasa.pay_type,
-                rate_unit: cleaningPayCodeBiasa.rate_unit,
-                rate_biasa: cleaningPayCodeBiasa.rate_biasa,
-                rate_ahad: cleaningPayCodeBiasa.rate_ahad,
-                rate_umum: cleaningPayCodeBiasa.rate_umum,
+                id: enrichedCleaningPayCodeBiasa.id,
+                description: enrichedCleaningPayCodeBiasa.description,
+                pay_type: enrichedCleaningPayCodeBiasa.pay_type,
+                rate_unit: enrichedCleaningPayCodeBiasa.rate_unit,
+                rate_biasa: enrichedCleaningPayCodeBiasa.rate_biasa,
+                rate_ahad: enrichedCleaningPayCodeBiasa.rate_ahad,
+                rate_umum: enrichedCleaningPayCodeBiasa.rate_umum,
+                override_rate_biasa: enrichedCleaningPayCodeBiasa.override_rate_biasa,
+                override_rate_ahad: enrichedCleaningPayCodeBiasa.override_rate_ahad,
+                override_rate_umum: enrichedCleaningPayCodeBiasa.override_rate_umum,
                 is_default_setting: true,
                 requires_units_input: false,
-                source: "cleaning_mode",
+                source: enrichedCleaningPayCodeBiasa.source,
                 hoursApplied: hours,
               });
             }

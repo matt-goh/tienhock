@@ -1342,3 +1342,124 @@ export interface CashReceiptVoucherLine {
   debit_amount: number;
   credit_amount: number;
 }
+
+// ==================== PURCHASES SYSTEM TYPES ====================
+
+// Supplier Master Data
+export interface Supplier {
+  id: number;
+  code: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Supplier with summary (from GET /suppliers/:id)
+export interface SupplierWithSummary extends Supplier {
+  summary: {
+    total_invoices: number;
+    total_purchased: number;
+    total_paid: number;
+    outstanding_balance: number;
+    unpaid_count: number;
+    partial_count: number;
+    paid_count: number;
+  };
+}
+
+// Supplier for dropdown
+export interface SupplierDropdown {
+  id: number;
+  code: string;
+  name: string;
+}
+
+// Supplier input for create/update
+export interface SupplierInput {
+  code: string;
+  name: string;
+  contact_person?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_active?: boolean;
+}
+
+// Purchase Invoice Payment Status
+export type PurchasePaymentStatus = "unpaid" | "partial" | "paid";
+
+// Purchase Invoice
+export interface PurchaseInvoice {
+  id: number;
+  supplier_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  total_amount: number;
+  payment_status: PurchasePaymentStatus;
+  amount_paid: number;
+  journal_entry_id: number | null;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string | null;
+  // Joined fields
+  supplier_code?: string;
+  supplier_name?: string;
+  journal_reference?: string;
+}
+
+// Material Purchase Line (renamed from Purchase Invoice Line)
+export interface PurchaseInvoiceLine {
+  id?: number;
+  purchase_invoice_id?: number;
+  line_number: number;
+  material_id: number;
+  quantity?: number | null;
+  unit_cost?: number | null;
+  amount: number;
+  notes?: string | null;
+  // Joined fields from materials table
+  material_code?: string;
+  material_name?: string;
+  material_category?: MaterialCategory;
+}
+
+// Material Purchase Input for create/update
+export interface PurchaseInvoiceInput {
+  supplier_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  notes?: string | null;
+  lines: PurchaseInvoiceLineInput[];
+}
+
+// Material Purchase Line Input
+export interface PurchaseInvoiceLineInput {
+  line_number: number;
+  material_id: number;
+  quantity?: number | null;
+  unit_cost?: number | null;
+  amount: number;
+  notes?: string | null;
+}
+
+// Material dropdown option (for material purchase form)
+export interface MaterialDropdown {
+  id: number | string; // number for regular materials, "materialId-variantId" for variants
+  code: string;
+  name: string;
+  category: MaterialCategory;
+  default_unit_cost: number;
+  is_variant?: boolean;
+  material_id?: number; // Parent material ID for variants
+  variant_id?: number; // Variant ID
+  variant_name?: string; // Variant name
+}
+
+// Purchase Invoice with lines (from GET /purchase-invoices/:id)
+export interface PurchaseInvoiceWithLines extends PurchaseInvoice {
+  lines: PurchaseInvoiceLine[];
+}
