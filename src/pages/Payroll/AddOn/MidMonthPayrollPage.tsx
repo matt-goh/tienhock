@@ -130,7 +130,7 @@ const MidMonthPayrollPage: React.FC = () => {
 
   // Calculate total amount
   const totalAmount = payrolls.reduce(
-    (sum, payroll) => sum + payroll.amount,
+    (sum, payroll) => sum + (Number(payroll.amount) || 0),
     0
   );
 
