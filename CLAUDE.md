@@ -60,6 +60,10 @@ This is a comprehensive ERP system supporting three companies:
 - `journal_entry_types` - code, name, description, is_active
 - `ledger_types` - code, name, description, is_system, is_active, created_at, updated_at
 - `location_account_mappings` - id, location_id, location_name, mapping_type, account_code, voucher_type, is_active, created_at, updated_at, created_by, updated_by
+- `suppliers` - id, code (unique), name, contact_person, phone, email, is_active, created_at, updated_at
+- `purchase_invoices` - id, supplier_id (FK suppliers), invoice_number, invoice_date, total_amount, payment_status (unpaid/partial/paid), amount_paid, journal_entry_id (FK journal_entries), notes, created_at, updated_at, created_by (unique: supplier_id, invoice_number)
+- `purchase_invoice_lines` - id, purchase_invoice_id (FK purchase_invoices CASCADE), line_number, material_id (FK materials), quantity, unit_cost, amount, notes, created_at (material purchase lines for tracking raw material/ingredient/packing purchases)
+- `material_purchase_account_mappings` - id, material_category (unique), purchase_account_code (FK account_codes), description, is_active, created_at (maps material categories to GL purchase accounts for auto-journaling: ingredient→PUR, raw_material→PUR, packing_material→PM)
 
 **Customers & Sales:**
 - `customers` - id, name, closeness, salesman, tin_number, id_type, state, email, address, city, id_number, phone_number, credit_limit, credit_used, updated_at
