@@ -1022,11 +1022,19 @@ This section documents all account code mappings used throughout the ERP system 
 
 **Reference Format:** `REC-YYYYMM-XXXX` (e.g., REC-202601-0001)
 
+**Regular Payments (reduces Trade Receivables):**
 | Payment Method | Debit Account | Credit Account | Description |
 |----------------|---------------|----------------|-------------|
 | Cash | `CASH` | `TR` | Cash in Hand → Trade Receivables |
 | Cheque/Transfer (Public Bank) | `BANK_PBB` | `TR` | Public Bank → Trade Receivables |
 | Cheque/Transfer (Alliance Bank) | `BANK_ABB` | `TR` | Alliance Bank → Trade Receivables |
+
+**Overpaid Payments (excess amount → Customer Deposits liability):**
+| Payment Method | Debit Account | Credit Account | Description |
+|----------------|---------------|----------------|-------------|
+| Cash | `CASH` | `CUST_DEP` | Cash in Hand → Customer Deposits |
+| Cheque/Transfer (Public Bank) | `BANK_PBB` | `CUST_DEP` | Public Bank → Customer Deposits |
+| Cheque/Transfer (Alliance Bank) | `BANK_ABB` | `CUST_DEP` | Alliance Bank → Customer Deposits |
 
 **Account Details:**
 | Code | Description | Ledger Type | Parent |
@@ -1035,6 +1043,7 @@ This section documents all account code mappings used throughout the ERP system 
 | `BANK_PBB` | Public Bank Berhad | BK | - |
 | `BANK_ABB` | Alliance Bank Berhad | BK | - |
 | `TR` | Trade Receivables | TD | - |
+| `CUST_DEP` | Customer Deposits/Advances | GL | CL |
 
 **Logic in `determineBankAccount()`:**
 ```javascript
@@ -1138,8 +1147,8 @@ The `location_account_mappings` table supports these mapping types:
 
 ### 5. Unique Account Codes Summary
 
-**Payment System (4 codes):**
-- `CASH`, `BANK_PBB`, `BANK_ABB`, `TR`
+**Payment System (5 codes):**
+- `CASH`, `BANK_PBB`, `BANK_ABB`, `TR`, `CUST_DEP`
 
 **Director's Remuneration (9 codes):**
 - Debits: `MBDRS`, `MBDRE`, `MBDRSC`, `MBDRSIP`
@@ -1209,4 +1218,5 @@ The `location_account_mappings` table supports these mapping types:
 *Updated: January 13, 2026 - Migrated to semantic note codes (BS_CA_CASH, IS_REV_SALES) and integrated with BANK_CASH_SYSTEM_PLAN.md*
 *Updated: January 13, 2026 - Phase 2 (Payment journals) completed and documented*
 *Updated: January 14, 2026 - Added comprehensive Account Mappings Reference section*
+*Updated: January 14, 2026 - Added CUST_DEP account and journal entries for overpaid payments*
 *Status: Phase 2 complete, Phase 1 (Purchases) is next priority*
