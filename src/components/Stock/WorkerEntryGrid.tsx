@@ -297,7 +297,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
             </div>
             <div>
               <div className="font-semibold text-default-900 dark:text-gray-100">
-                Total {unitLabel === "kg" ? "Weight" : unitLabel === "sack" ? "Sacks" : "Packed"}
+                Total {unitLabel === "kg" ? "Weight" : unitLabel === "sack" ? "Sacks" : unitLabel === "bundle" ? "Bundles" : "Packed"}
               </div>
               <div className="text-xs text-default-500 dark:text-gray-400">
                 {new Date().toLocaleDateString("en-MY", {
