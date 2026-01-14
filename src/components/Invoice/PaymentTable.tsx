@@ -193,35 +193,35 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Reference
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Invoice(s)
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Customer
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Method
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Journal Entry
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                Journal
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Amount
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900/50">
+              <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                 Actions
               </th>
             </tr>
@@ -241,50 +241,50 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                   return (
                     <React.Fragment key={reference}>
                       <tr className="bg-gray-50 dark:bg-gray-900/50">
-                        <td className="px-6 py-3 whitespace-nowrap text-sm">
+                        <td className="px-3 py-3 text-sm">
                           {formatDate(firstPayment.payment_date)}
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                        <td className="px-3 py-3 max-w-[150px]">
+                          <div className="font-medium text-gray-900 dark:text-gray-100 truncate" title={firstPayment.payment_reference || ''}>
                             {firstPayment.payment_reference}
-                          </span>
-                          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             ({paymentGroup.length} invoices)
-                          </span>
+                          </div>
                         </td>
                         <td
-                          className="px-6 py-3 text-sm text-gray-500"
+                          className="px-3 py-3 text-sm text-gray-500"
                           colSpan={2}
                         >
                           Multiple invoices
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
+                        <td className="px-3 py-3">
                           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
                             {firstPayment.payment_method.replace("_", " ")}
                           </span>
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
+                        <td className="px-3 py-3">
                           {getStatusBadge(firstPayment.status)}
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
                           -
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
+                        <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                           {formatCurrency(totalAmount)}
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-center sticky right-0 bg-gray-50 dark:bg-gray-900/50">
+                        <td className="px-3 py-3 text-center">
                           -
                         </td>
                       </tr>
                       {paymentGroup.map((payment) => (
                         <tr key={payment.payment_id} className="bg-white dark:bg-gray-800">
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 pl-12">
+                          <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400 pl-6">
                             └
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
                             -
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap">
+                          <td className="px-3 py-3">
                             <button
                               onClick={() => onViewPayment(payment)}
                               className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
@@ -293,35 +293,35 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                             </button>
                           </td>
                           <td
-                            className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
+                            className="px-3 py-3 text-sm text-gray-900 dark:text-gray-100"
                             title={payment.customerid}
                           >
-                            <div className="truncate max-w-60">
+                            <div className="truncate">
                               {payment.customer_name}
                             </div>
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap">-</td>
-                          <td className="px-6 py-3 whitespace-nowrap">
+                          <td className="px-3 py-3">-</td>
+                          <td className="px-3 py-3">
                             {getStatusBadge(payment.status)}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap">
+                          <td className="px-3 py-3">
                             {payment.journal_entry_id ? (
                               <button
                                 onClick={() => navigate(`/accounting/journal-entries/${payment.journal_entry_id}`)}
-                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                                className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline truncate"
                                 title="View journal entry"
                               >
-                                <IconReceipt size={14} />
-                                <span className="font-mono">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
+                                <IconReceipt size={14} className="flex-shrink-0" />
+                                <span className="font-mono truncate">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
                               </button>
                             ) : (
                               <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
                             )}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
+                          <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                             {formatCurrency(payment.amount_paid)}
                           </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-center sticky right-0 bg-white dark:bg-gray-800">
+                          <td className="px-3 py-3 text-center">
                             <div className="flex justify-center gap-1">
                               {payment.journal_entry_id && payment.status !== "cancelled" && (
                                 <Button
@@ -381,15 +381,15 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                   const payment = paymentGroup[0];
                   return (
                     <tr key={payment.payment_id}>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm">
+                      <td className="px-3 py-3 text-sm">
                         {formatDate(payment.payment_date)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
-                        <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-3 py-3 max-w-[150px]">
+                        <span className="font-mono text-sm text-gray-600 dark:text-gray-400 truncate block" title={payment.payment_reference || ''}>
                           {payment.payment_reference || "-"}
                         </span>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <button
                           onClick={() => onViewPayment(payment)}
                           className="text-sky-600 dark:text-sky-400 text-sm hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
@@ -398,39 +398,39 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         </button>
                       </td>
                       <td
-                        className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100"
+                        className="px-3 py-3 text-sm text-gray-900 dark:text-gray-100"
                         title={payment.customerid}
                       >
-                        <div className="truncate max-w-60">
+                        <div className="truncate">
                           {payment.customer_name}
                         </div>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
                           {payment.payment_method.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         {getStatusBadge(payment.status)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         {payment.journal_entry_id ? (
                           <button
                             onClick={() => navigate(`/accounting/journal-entries/${payment.journal_entry_id}`)}
-                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline truncate"
                             title="View journal entry"
                           >
-                            <IconReceipt size={14} />
-                            <span className="font-mono">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
+                            <IconReceipt size={14} className="flex-shrink-0" />
+                            <span className="font-mono truncate">{payment.journal_reference_no || `#${payment.journal_entry_id}`}</span>
                           </button>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
+                      <td className="px-3 py-3 text-right font-medium text-green-600 dark:text-green-400">
                         {formatCurrency(payment.amount_paid)}
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-center sticky right-0 bg-white dark:bg-gray-800">
+                      <td className="px-3 py-3 text-center">
                         <div className="flex justify-center gap-1">
                           {payment.journal_entry_id && payment.status !== "cancelled" && (
                             <Button
