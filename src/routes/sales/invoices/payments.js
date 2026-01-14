@@ -2,6 +2,7 @@
 import { Router } from "express";
 import {
   createPaymentJournalEntry,
+  createOverpaidJournalEntry,
   cancelPaymentJournalEntry,
 } from "../../accounting/payment-journal.js";
 import { determineBankAccount } from "../../../utils/payment-helpers.js";
@@ -403,7 +404,31 @@ export default function (pool) {
           insertOverpaidQuery,
           overpaidValues
         );
-        createdPayments.push(overpaidResult.rows[0]);
+        const overpaidPayment = overpaidResult.rows[0];
+
+        // Create journal entry for overpaid payments (not for pending cheques)
+        if (overpaidStatus === "overpaid") {
+          const overpaidJournalId = await createOverpaidJournalEntry(client, {
+            payment_id: overpaidPayment.payment_id,
+            invoice_id: invoice_id,
+            payment_date: payment_date,
+            amount_paid: overpaidAmount,
+            payment_method: payment_method,
+            bank_account: bankAccountCode,
+            payment_reference: payment_reference,
+            created_by: req.user?.id || null
+          });
+
+          // Update payment with journal_entry_id
+          await client.query(
+            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
+            [overpaidJournalId, overpaidPayment.payment_id]
+          );
+
+          overpaidPayment.journal_entry_id = overpaidJournalId;
+        }
+
+        createdPayments.push(overpaidPayment);
       }
 
       await client.query("COMMIT");
@@ -555,6 +580,28 @@ export default function (pool) {
         // 5a. Create journal entry for confirmed payments (cheques that were pending)
         if (newStatus === "active" && !confirmedPaymentData.journal_entry_id) {
           const journalEntryId = await createPaymentJournalEntry(client, {
+            payment_id: confirmedPaymentData.payment_id,
+            invoice_id: invoice_id,
+            payment_date: confirmedPaymentData.payment_date,
+            amount_paid: paidAmount,
+            payment_method: confirmedPaymentData.payment_method,
+            bank_account: confirmedPaymentData.bank_account || 'BANK_PBB',
+            payment_reference: confirmedPaymentData.payment_reference,
+            created_by: req.user?.id || null
+          });
+
+          // Update payment with journal_entry_id
+          await client.query(
+            'UPDATE payments SET journal_entry_id = $1 WHERE payment_id = $2',
+            [journalEntryId, confirmedPaymentData.payment_id]
+          );
+
+          confirmedPaymentData.journal_entry_id = journalEntryId;
+        }
+
+        // 5b. Create journal entry for confirmed overpaid payments
+        if (newStatus === "overpaid" && !confirmedPaymentData.journal_entry_id) {
+          const journalEntryId = await createOverpaidJournalEntry(client, {
             payment_id: confirmedPaymentData.payment_id,
             invoice_id: invoice_id,
             payment_date: confirmedPaymentData.payment_date,
