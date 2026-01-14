@@ -61,6 +61,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Bill", name: "Bill" },
     { id: "Day", name: "Day" },
     { id: "Bag", name: "Bag" },
+    { id: "Kg", name: "Kilogram" },
+    { id: "Karung", name: "Karung" },
+    { id: "Bundle", name: "Bundle" },
     { id: "Trip", name: "Trip" },
     { id: "Tray", name: "Tray" },
     { id: "Percent", name: "Percent" },
@@ -135,9 +138,9 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     (name: keyof Omit<PayCode, "code">) => (value: string) => {
       if (
         name === "rate_unit" &&
-        ["Percent", "Trip", "Day", "Bag", "Fixed", "Tray"].includes(value)
+        ["Percent", "Trip", "Day", "Bag", "Kg", "Karung", "Bundle", "Fixed", "Tray"].includes(value)
       ) {
-        // When rate unit is Percent, Trip, Day, Bag, or Fixed, automatically set requires_units_input to true
+        // When rate unit is production-based, automatically set requires_units_input to true
         setFormData((prev) => ({
           ...prev,
           [name]: value as RateUnit,
@@ -147,7 +150,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
         setFormData((prev) => ({
           ...prev,
           [name]: value as PayType | RateUnit,
-          // Reset requires_units_input to false for Hour and Fixed
+          // Reset requires_units_input to false for Hour and Bill
           ...(name === "rate_unit" ? { requires_units_input: false } : {}),
         }));
       }
@@ -432,11 +435,14 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       size={20}
                       checkedColor="text-sky-600"
                       uncheckedColor="text-default-400"
-                      // Disable for Percent, Bag, Day, Trip, Hour, and Fixed (auto-managed)
+                      // Disable for production-based units (auto-managed)
                       disabled={
                         isSaving ||
                         formData.rate_unit === "Percent" ||
                         formData.rate_unit === "Bag" ||
+                        formData.rate_unit === "Kg" ||
+                        formData.rate_unit === "Karung" ||
+                        formData.rate_unit === "Bundle" ||
                         formData.rate_unit === "Hour" ||
                         formData.rate_unit === "Fixed" ||
                         formData.rate_unit === "Day" ||
@@ -448,6 +454,12 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         ? "Requires Units Input (Required for Percentage)"
                         : formData.rate_unit === "Bag"
                         ? "Requires Units Input (Required for Bag)"
+                        : formData.rate_unit === "Kg"
+                        ? "Requires Units Input (Required for Kilogram)"
+                        : formData.rate_unit === "Karung"
+                        ? "Requires Units Input (Required for Karung)"
+                        : formData.rate_unit === "Bundle"
+                        ? "Requires Units Input (Required for Bundle)"
                         : formData.rate_unit === "Day"
                         ? "Requires Units Input (Required for Day)"
                         : formData.rate_unit === "Trip"

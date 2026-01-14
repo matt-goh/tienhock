@@ -164,6 +164,106 @@ export async function createPaymentJournalEntry(client, payment) {
 }
 
 /**
+ * Creates a journal entry for an overpaid payment (excess amount)
+ *
+ * Journal Structure:
+ *   DR Bank/Cash (increase asset - money received)
+ *   CR Customer Deposits (increase liability - owed to customer)
+ *
+ * @param {Object} client - PostgreSQL client (for transaction support)
+ * @param {Object} payment - Payment data (same structure as createPaymentJournalEntry)
+ * @returns {number} journal_entry_id
+ */
+export async function createOverpaidJournalEntry(client, payment) {
+  try {
+    // Determine debit account (which company bank/cash receives the money)
+    const debitAccount = getDebitAccount(payment);
+    const creditAccount = 'CUST_DEP'; // Customer Deposits (liability)
+
+    // Validate that required account codes exist and are active
+    const validateQuery = `
+      SELECT code FROM account_codes
+      WHERE code IN ($1, $2) AND is_active = true
+    `;
+    const validateResult = await client.query(validateQuery, [debitAccount, creditAccount]);
+
+    if (validateResult.rows.length !== 2) {
+      const foundCodes = validateResult.rows.map(r => r.code);
+      const missing = [debitAccount, creditAccount].filter(code => !foundCodes.includes(code));
+      throw new Error(`Required account codes not found or inactive: ${missing.join(', ')}`);
+    }
+
+    // Generate reference number (uses same REC sequence)
+    const reference_no = await generateReceiptReference(client, payment.payment_date);
+
+    // Round amount to 2 decimal places
+    const amount = Math.round(parseFloat(payment.amount_paid) * 100) / 100;
+
+    // Build description
+    let description = `Customer overpayment - Invoice #${payment.invoice_id}`;
+    if (payment.payment_reference) {
+      description += ` (Ref: ${payment.payment_reference})`;
+    }
+
+    // Insert journal entry header
+    const entryQuery = `
+      INSERT INTO journal_entries (
+        reference_no, entry_type, entry_date, description,
+        total_debit, total_credit, status,
+        created_at, created_by
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+      RETURNING id
+    `;
+
+    const entryValues = [
+      reference_no,
+      'REC', // Receipt type
+      payment.payment_date,
+      description,
+      amount, // total_debit
+      amount, // total_credit
+      'posted', // Auto-post immediately
+      payment.created_by || null
+    ];
+
+    const entryResult = await client.query(entryQuery, entryValues);
+    const journalEntryId = entryResult.rows[0].id;
+
+    // Insert journal entry lines
+    const linesQuery = `
+      INSERT INTO journal_entry_lines (
+        journal_entry_id, line_number, account_code,
+        debit_amount, credit_amount, reference, particulars, created_at
+      )
+      VALUES
+        ($1, 1, $2, $3, 0, $4, $5, NOW()),
+        ($1, 2, $6, 0, $7, $4, $8, NOW())
+    `;
+
+    const linesValues = [
+      journalEntryId,
+      debitAccount, // Line 1: DR Bank/Cash
+      amount,
+      reference_no,
+      `Overpayment received - Invoice #${payment.invoice_id}`,
+      creditAccount, // Line 2: CR Customer Deposits
+      amount,
+      `Customer deposit from overpayment - Invoice #${payment.invoice_id}`
+    ];
+
+    await client.query(linesQuery, linesValues);
+
+    console.log(`✓ Created overpaid journal entry ${reference_no} for payment ${payment.payment_id}`);
+    return journalEntryId;
+
+  } catch (error) {
+    console.error("Error creating overpaid journal entry:", error);
+    throw error;
+  }
+}
+
+/**
  * Cancels a journal entry (sets status to 'cancelled')
  * Used when a payment is cancelled/reversed
  *

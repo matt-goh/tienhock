@@ -29,8 +29,8 @@ import {
   IconStarFilled,
   IconSettings,
   IconHelpCircle,
-  IconScale,
   IconPackages,
+  IconBox,
   IconSearch,
   IconX,
 } from "@tabler/icons-react";
@@ -174,18 +174,17 @@ const ProductionEntryPage: React.FC = () => {
       bhProducts.push(hancurBH);
     }
 
+    // Get non-favorited bundle products
+    const bundleProducts = products.filter(
+      (p) => p.type === "BUNDLE" && !favorites.has(p.id)
+    ) as StockProduct[];
+
     return {
       MEE: filtered.filter((p) => p.type === "MEE"),
       BH: bhProducts,
+      BUNDLE: bundleProducts,
     };
   }, [regularProducts, favorites, products]);
-
-  // Get non-favorite bundle products
-  const nonFavoriteBundleProducts = useMemo(() => {
-    return products.filter(
-      (product) => product.type === "BUNDLE" && !favorites.has(product.id)
-    ) as StockProduct[];
-  }, [products, favorites]);
 
   // Get selected product details
   const selectedProduct = useMemo(() => {
@@ -232,7 +231,7 @@ const ProductionEntryPage: React.FC = () => {
 
         const entriesMap: Record<string, number> = {};
         (response || []).forEach((entry: ProductionEntry) => {
-          entriesMap[entry.worker_id] = entry.bags_packed;
+          entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
         });
 
         setEntries(entriesMap);
@@ -588,8 +587,8 @@ const ProductionEntryPage: React.FC = () => {
               )}
             </div>
 
-            {/* Bundle Products Section - only show non-favorited bundles */}
-            {nonFavoriteBundleProducts.length > 0 && (
+            {/* Bundle Products Section */}
+            {nonFavoriteProducts.BUNDLE.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                   <IconPackages size={14} className="text-amber-500" />
@@ -598,14 +597,14 @@ const ProductionEntryPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {nonFavoriteBundleProducts.map((product) => (
+                  {nonFavoriteProducts.BUNDLE.map((product) => (
                     <button
                       key={product.id}
                       onClick={() => handleProductSelect(product.id)}
                       className="inline-flex items-center gap-1.5 rounded-md border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 px-2.5 py-1.5 text-sm transition-colors hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                     >
                       <span className="font-semibold text-default-900 dark:text-gray-100">
-                        {product.id.replace("BUNDLE_", "Bundle ")}
+                        {product.id}
                       </span>
                       {product.description && (
                         <>
@@ -746,7 +745,7 @@ const ProductionEntryPage: React.FC = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <IconScale size={16} className="text-purple-500" />
+                  <IconBox size={16} className="text-purple-500" />
                   <span className="font-medium text-sm text-default-900 dark:text-gray-100">
                     Bihun Hancur
                   </span>
@@ -836,11 +835,38 @@ const ProductionEntryPage: React.FC = () => {
           <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-700/50">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <IconPackages size={16} className="text-amber-500" />
-                  <span className="font-medium text-sm text-default-900 dark:text-gray-100">
-                    Bundle
-                  </span>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <IconPackages size={14} className="text-amber-500" />
+                  <button
+                    onClick={() => setSpecialSelection("BUNDLE_BP")}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      specialSelection === "BUNDLE_BP"
+                        ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-inset ring-emerald-500"
+                        : "text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Best Partner
+                  </button>
+                  <button
+                    onClick={() => setSpecialSelection("BUNDLE_BH")}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      specialSelection === "BUNDLE_BH"
+                        ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-500"
+                        : "text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Bihun
+                  </button>
+                  <button
+                    onClick={() => setSpecialSelection("BUNDLE_MEE")}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      specialSelection === "BUNDLE_MEE"
+                        ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-500"
+                        : "text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    Mee
+                  </button>
                 </div>
 
                 {/* Starred products mini pills for quick navigation */}
@@ -912,15 +938,13 @@ const ProductionEntryPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="p-4">
-            <BundleEntrySection
-              ref={bundleSectionRef}
-              selectedDate={selectedDate}
-              initialTab={
-                specialSelection as "BUNDLE_BP" | "BUNDLE_BH" | "BUNDLE_MEE"
-              }
-            />
-          </div>
+          <BundleEntrySection
+            ref={bundleSectionRef}
+            selectedDate={selectedDate}
+            initialTab={
+              specialSelection as "BUNDLE_BP" | "BUNDLE_BH" | "BUNDLE_MEE"
+            }
+          />
         </>
       )}
 

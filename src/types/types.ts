@@ -601,7 +601,7 @@ export interface SelectOption {
 }
 
 export type PayType = "Base" | "Tambahan" | "Overtime";
-export type RateUnit = "Hour" | "Bill" | "Bag" | "Percent" | "Fixed" | "Day" | "Trip" | "Tray";
+export type RateUnit = "Hour" | "Bill" | "Bag" | "Percent" | "Fixed" | "Day" | "Trip" | "Tray" | "Kg" | "Karung" | "Bundle";
 
 export interface PayCode {
   id: string;
@@ -1021,7 +1021,7 @@ export interface ProductionWorker {
 
 // Special Item Configuration (for Hancur, Bundle entries)
 export type SpecialItemCategory = "HANCUR" | "KARUNG_HANCUR" | "BUNDLE";
-export type SpecialItemUnit = "kg" | "bags" | "pcs" | "sack";
+export type SpecialItemUnit = "kg" | "bags" | "pcs" | "sack" | "bundle";
 
 export interface SpecialItemConfig {
   id: string;
