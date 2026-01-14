@@ -391,8 +391,8 @@ These over-granular codes should map to single accounts:
    ```
 
 4. **Bank Reconciliation Helper**
-   - Simple page showing: Opening balance + Receipts - Payments = Closing balance
-   - Compare with bank statement
+   - See **Phase 2.2: Bank Statement from Journal Report** for full implementation
+   - Generates statement from journal entries for comparison with actual bank statement
 
 **Files to Create/Modify:**
 
@@ -406,8 +406,10 @@ Supplier Payments (future):
 - Backend: `src/routes/accounting/supplier-payments.js`
 - Frontend: `src/pages/Accounting/Payments/SupplierPaymentEntryPage.tsx`
 
-Bank Reconciliation:
-- Frontend: `src/pages/Accounting/BankReconciliationPage.tsx`
+Bank Statement from Journal (Phase 2.2):
+- Backend: `src/routes/accounting/bank-statement.js`
+- Frontend: `src/pages/Accounting/BankStatementPage.tsx`
+- PDF: `src/utils/accounting/BankStatementPDF.tsx`
 
 Migration:
 - `migrations/add_payment_journals.sql`
@@ -600,6 +602,74 @@ Lines:
 - Invoice reference, Payment method, Bank account
 - Journal entry lines showing DR/CR accounts
 - Signature lines
+
+---
+
+### Phase 2.2: Bank Statement from Journal Report
+
+**Why Critical:** This is the primary reconciliation tool - staff generate this report and compare the closing balance against the actual bank statement. If they match, all bank transactions are correctly recorded.
+
+**Reference:** See `bank_statement_from_journal.pdf` for the old system's output format.
+
+**What to Build:**
+
+1. **Bank Statement Report Page**
+   - Filter by: Bank Account (BANK_PBB / BANK_ABB / CASH), Date Range
+   - Shows all journal entry lines affecting the selected account
+   - Calculates running balance
+
+2. **Report Columns** (matching old system):
+   | Column | Description |
+   |--------|-------------|
+   | Date | Journal entry date |
+   | Journal | Reference number (REC001/01, PV005/12, JVSL/01/26) |
+   | Particulars | Journal description |
+   | Cheque | Payment reference (cheque number, transfer ref) |
+   | Debit | Money OUT (payments) |
+   | Credit | Money IN (receipts) |
+   | Balance | Running balance |
+
+3. **Balance Calculation:**
+   - Bank accounts are DEBIT balance (Assets)
+   - Credit to bank = money IN (increases balance)
+   - Debit to bank = money OUT (decreases balance)
+   - Running Balance = Opening + Credits - Debits
+
+4. **Reconciliation Helper:**
+   - Input: "Bank Statement Balance" (from actual bank)
+   - Shows: Difference = Journal Balance - Bank Statement Balance
+   - Visual indicator: Green if matched, Red if unreconciled
+
+5. **PDF Export:**
+   - Match old system format for familiarity
+   - Header: Company name, Bank account, Date range
+   - Summary: Opening, Total Debits, Total Credits, Closing
+
+**Backend Query:**
+```sql
+SELECT
+  je.entry_date,
+  je.reference_no,
+  je.description,
+  jel.reference as cheque_ref,
+  CASE WHEN jel.debit_amount > 0 THEN jel.debit_amount ELSE NULL END as debit,
+  CASE WHEN jel.credit_amount > 0 THEN jel.credit_amount ELSE NULL END as credit
+FROM journal_entries je
+JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+WHERE jel.account_code = :bank_account
+  AND je.entry_date BETWEEN :from_date AND :to_date
+  AND je.status != 'cancelled'
+ORDER BY je.entry_date, je.id
+```
+
+**Files to Create:**
+- Backend: `src/routes/accounting/bank-statement.js`
+- Frontend: `src/pages/Accounting/BankStatementPage.tsx`
+- PDF: `src/utils/accounting/BankStatementPDF.tsx`
+
+**API Endpoints:**
+- `GET /api/accounting/bank-statement?account=BANK_PBB&from=2025-12-01&to=2025-12-31`
+- `GET /api/accounting/bank-statement/opening-balance?account=BANK_PBB&date=2025-12-01`
 
 ---
 
@@ -1200,17 +1270,20 @@ The `location_account_mappings` table supports these mapping types:
 
 1. **User confirms approach** ✅
 2. **Implement Phase 2: Payment journals** ✅ COMPLETED (January 13, 2026)
-3. **Implement Phase 1: Purchases & Payables System** (highest priority - NEXT)
-4. **Test with real supplier invoices**
-5. **Continue through phases based on business priority**
+3. **Implement Phase 2.1: Cash Receipt Voucher PDF** ✅ COMPLETED (January 13, 2026)
+4. **Implement Phase 2.2: Bank Statement from Journal Report** (HIGH PRIORITY - enables bank reconciliation)
+5. **Implement Phase 1: Purchases & Payables System** (next after bank statement)
+6. **Test with real supplier invoices**
+7. **Continue through phases based on business priority**
 
 **Estimated Complexity:**
-- Phase 1 (Purchases): ~3-4 days (tables, backend, frontend forms) - NEXT
+- Phase 2.2 (Bank Statement): ~1-2 days (backend query, frontend table, PDF export)
+- Phase 1 (Purchases): ~3-4 days (tables, backend, frontend forms)
 - Phase 2 (Payments): ✅ COMPLETED
 - Phase 3 (Stock journals): ~1-2 days (integrate with existing stock system)
 - Phase 4 (Expenses): ~2-3 days (quick entry forms)
 
-**Remaining development time: ~6-9 days for core system**
+**Remaining development time: ~7-11 days for core system**
 
 ---
 
@@ -1219,4 +1292,5 @@ The `location_account_mappings` table supports these mapping types:
 *Updated: January 13, 2026 - Phase 2 (Payment journals) completed and documented*
 *Updated: January 14, 2026 - Added comprehensive Account Mappings Reference section*
 *Updated: January 14, 2026 - Added CUST_DEP account and journal entries for overpaid payments*
-*Status: Phase 2 complete, Phase 1 (Purchases) is next priority*
+*Updated: January 14, 2026 - Added Phase 2.2: Bank Statement from Journal Report (enables bank reconciliation)*
+*Status: Phase 2.2 (Bank Statement) is next priority, then Phase 1 (Purchases)*
