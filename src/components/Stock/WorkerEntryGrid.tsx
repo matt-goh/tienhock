@@ -64,7 +64,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
 
   // Calculate total bags
   const totalBags = useMemo(() => {
-    return Object.values(entries).reduce((sum, bags) => sum + (bags || 0), 0);
+    return Object.values(entries).reduce((sum, bags) => sum + (Number(bags) || 0), 0);
   }, [entries]);
 
   // Calculate number of working workers (workers with bags > 0)
