@@ -1008,6 +1008,185 @@ The existing system uses numeric codes ('6', '7', '19', '22') which are not self
 
 ---
 
+## Account Mappings Reference
+
+This section documents all account code mappings used throughout the ERP system for auto-journal generation.
+
+### 1. Customer Payment Journal Mappings (REC)
+
+**Trigger:** Customer payment creation/confirmation
+**Files:**
+- `src/routes/accounting/payment-journal.js`
+- `src/routes/sales/invoices/payments.js`
+- `src/utils/payment-helpers.js`
+
+**Reference Format:** `REC-YYYYMM-XXXX` (e.g., REC-202601-0001)
+
+| Payment Method | Debit Account | Credit Account | Description |
+|----------------|---------------|----------------|-------------|
+| Cash | `CASH` | `TR` | Cash in Hand → Trade Receivables |
+| Cheque/Transfer (Public Bank) | `BANK_PBB` | `TR` | Public Bank → Trade Receivables |
+| Cheque/Transfer (Alliance Bank) | `BANK_ABB` | `TR` | Alliance Bank → Trade Receivables |
+
+**Account Details:**
+| Code | Description | Ledger Type | Parent |
+|------|-------------|-------------|--------|
+| `CASH` | CASH IN HAND | GL | CA |
+| `BANK_PBB` | Public Bank Berhad | BK | - |
+| `BANK_ABB` | Alliance Bank Berhad | BK | - |
+| `TR` | Trade Receivables | TD | - |
+
+**Logic in `determineBankAccount()`:**
+```javascript
+if (paymentMethod === 'cash') return 'CASH';
+return bankAccount || 'BANK_PBB'; // Default to Public Bank
+```
+
+---
+
+### 2. Payroll Journal Voucher Mappings
+
+#### 2.1 Director's Remuneration (JVDR) - Location 01
+
+**Reference Format:** `JVDR/MM/YY` (e.g., JVDR/01/26)
+
+**Debit Accounts (Expenses):**
+| Mapping Type | Account Code | Description |
+|--------------|--------------|-------------|
+| `salary` | `MBDRS` | Director's Salary |
+| `epf_employer` | `MBDRE` | Director's EPF Employer |
+| `socso_employer` | `MBDRSC` | Director's SOCSO Employer |
+| `sip_employer` | `MBDRSIP` | Director's SIP Employer |
+
+**Credit Accounts (Accruals):**
+| Mapping Type | Account Code | Description |
+|--------------|--------------|-------------|
+| `accrual_salary` | `ACD_SAL` | Accrual Directors Salary |
+| `accrual_epf` | `ACD_EPF` | Accrual Directors EPF |
+| `accrual_socso` | `ACD_SC` | Accrual Directors SOCSO |
+| `accrual_sip` | `ACD_SIP` | Accrual Directors SIP |
+| `accrual_pcb` | `ACD_PCB` | Accrual Directors PCB |
+
+#### 2.2 Staff Salary (JVSL) - Locations 00-24
+
+**Reference Format:** `JVSL/MM/YY` (e.g., JVSL/01/26)
+
+**Credit Accounts - Location 00 (Accruals):**
+| Mapping Type | Account Code | Description |
+|--------------|--------------|-------------|
+| `accrual_salary` | `ACW_SAL` | Accrual Salary Payables |
+| `accrual_epf` | `ACW_EPF` | Accrual EPF |
+| `accrual_socso` | `ACW_SC` | Accrual SOCSO |
+| `accrual_sip` | `ACW_SIP` | Accrual SIP |
+| `accrual_pcb` | `ACW_PCB` | Accrual PCB Payables |
+
+**Debit Accounts by Location:**
+
+| Loc | Location Name | Salary/OT/Bonus | EPF | SOCSO | SIP |
+|-----|---------------|-----------------|-----|-------|-----|
+| 02 | OFFICE | `MBS_O` | `MBE_O` | `MBSC_O` | `MBSIP_O` |
+| 03 | SALESMAN | `MBS_SMO`, `MS_SM`¹ | `MBE_SM` | `MBSC_SM` | `MBSIP_SM` |
+| 04 | IKUT LORI | `MBS_ILO`, `MS_IL`² | `MBE_IL` | `MBSC_IL` | `MBSIP_IL` |
+| 06 | JAGA BOILER | `MBS_JB` | `MBE_JB` | `MBSC_JB` | `MBSIP_JB` |
+| 07 | MESIN & SANGKUT MEE | `MS_MM` | `ME_MM` | `MSC_MM` | `MBSIP_MM` |
+| 08 | PACKING MEE | `MS_PM` | `ME_PM` | `MSC_PM` | `MBSIP_PM` |
+| 09 | MESIN & SANGKUT BIHUN | `BS_MB` | `BE_MB` | `BSC_MB` | `BSIP_MB` |
+| 10 | SANGKUT BIHUN | `BS_MB` | `BE_MB` | `BSC_MB` | `BSIP_MB` |
+| 11 | PACKING BIHUN | `BS_PB` | `BE_PB` | `BSC_PB` | `BSIP_PB` |
+| 13 | TUKANG SAPU | `MBS_TS` | `MBE_TS` | `MBSC_TS` | `MBSIP_TS` |
+| 14 | MAINTENANCE | `MBS_M` | `MBE_M` | `MBSC_M` | `MBSIP_M` |
+| 16-24 | COMMISSION/BONUS/SPECIAL³ | `MBS_M` | `MBE_M` | `MBSC_M` | `MBSIP_M` |
+
+**Notes:**
+- ¹ `MS_SM` used for bonus/commission
+- ² `MS_IL` used for commission
+- ³ Locations 16-24 (Commission Mesin Mee, Commission Mesin Bihun, Commission Kilang, Commission Lori, Commission Boiler, Commission Forklift/Case, Bonus, Cuti Tahunan, Special OT) all map to Maintenance accounts
+
+---
+
+### 3. Account Mapping Types
+
+The `location_account_mappings` table supports these mapping types:
+
+| Mapping Type | Description | Used In |
+|--------------|-------------|---------|
+| `salary` | Base salary expense | JVDR, JVSL |
+| `overtime` | Overtime pay | JVSL |
+| `bonus` | Bonus payments | JVSL |
+| `commission` | Sales commission | JVSL |
+| `epf_employer` | EPF employer contribution | JVDR, JVSL |
+| `socso_employer` | SOCSO employer contribution | JVDR, JVSL |
+| `sip_employer` | SIP employer contribution | JVDR, JVSL |
+| `accrual_salary` | Salary accrual (credit) | JVDR, JVSL |
+| `accrual_epf` | EPF accrual (credit) | JVDR, JVSL |
+| `accrual_socso` | SOCSO accrual (credit) | JVDR, JVSL |
+| `accrual_sip` | SIP accrual (credit) | JVDR, JVSL |
+| `accrual_pcb` | PCB/Tax accrual (credit) | JVDR, JVSL |
+
+---
+
+### 4. Journal Entry Types
+
+| Type Code | Description | Auto-Generated By |
+|-----------|-------------|-------------------|
+| `REC` | Receipt (Customer Payment) | Payment creation/confirmation |
+| `JVDR` | Director's Remuneration | Monthly payroll processing |
+| `JVSL` | Staff Salary | Monthly payroll processing |
+| `JV` | General Journal | Manual entry |
+
+---
+
+### 5. Unique Account Codes Summary
+
+**Payment System (4 codes):**
+- `CASH`, `BANK_PBB`, `BANK_ABB`, `TR`
+
+**Director's Remuneration (9 codes):**
+- Debits: `MBDRS`, `MBDRE`, `MBDRSC`, `MBDRSIP`
+- Credits: `ACD_SAL`, `ACD_EPF`, `ACD_SC`, `ACD_SIP`, `ACD_PCB`
+
+**Staff Salary Accruals (5 codes):**
+- `ACW_SAL`, `ACW_EPF`, `ACW_SC`, `ACW_SIP`, `ACW_PCB`
+
+**Staff Salary by Department (~40 codes):**
+- Office: `MBS_O`, `MBE_O`, `MBSC_O`, `MBSIP_O`
+- Salesman: `MBS_SMO`, `MS_SM`, `MBE_SM`, `MBSC_SM`, `MBSIP_SM`
+- Ikut Lori: `MBS_ILO`, `MS_IL`, `MBE_IL`, `MBSC_IL`, `MBSIP_IL`
+- Boiler: `MBS_JB`, `MBE_JB`, `MBSC_JB`, `MBSIP_JB`
+- Mesin Mee: `MS_MM`, `ME_MM`, `MSC_MM`, `MBSIP_MM`
+- Packing Mee: `MS_PM`, `ME_PM`, `MSC_PM`, `MBSIP_PM`
+- Mesin Bihun: `BS_MB`, `BE_MB`, `BSC_MB`, `BSIP_MB`
+- Packing Bihun: `BS_PB`, `BE_PB`, `BSC_PB`, `BSIP_PB`
+- Tukang Sapu: `MBS_TS`, `MBE_TS`, `MBSC_TS`, `MBSIP_TS`
+- Maintenance/Commission: `MBS_M`, `MBE_M`, `MBSC_M`, `MBSIP_M`
+
+**Total Unique Codes Used in Auto-Journals: ~60 codes**
+
+---
+
+### 6. Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `src/configs/journalVoucherMappings.ts` | Hardcoded location-to-account mappings (legacy) |
+| `src/routes/accounting/journal-vouchers.js` | Dynamic CRUD for `location_account_mappings` |
+| `src/utils/payment-helpers.js` | Payment method → bank account mapping |
+| `src/routes/accounting/payment-journal.js` | REC journal generation logic |
+
+---
+
+### 7. Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `location_account_mappings` | Location → Account code mappings for payroll |
+| `account_codes` | Master list of all GL account codes |
+| `journal_entries` | Journal entry headers |
+| `journal_entry_lines` | Journal entry line items with DR/CR |
+| `journal_entry_types` | Valid entry types (REC, JVDR, JVSL, JV, etc.) |
+
+---
+
 ## Next Steps
 
 1. **User confirms approach** ✅
@@ -1029,4 +1208,5 @@ The existing system uses numeric codes ('6', '7', '19', '22') which are not self
 *Plan created: January 2026*
 *Updated: January 13, 2026 - Migrated to semantic note codes (BS_CA_CASH, IS_REV_SALES) and integrated with BANK_CASH_SYSTEM_PLAN.md*
 *Updated: January 13, 2026 - Phase 2 (Payment journals) completed and documented*
+*Updated: January 14, 2026 - Added comprehensive Account Mappings Reference section*
 *Status: Phase 2 complete, Phase 1 (Purchases) is next priority*
