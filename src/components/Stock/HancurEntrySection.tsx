@@ -119,7 +119,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
         );
         const hancurMap: Record<string, number> = {};
         (hancurResponse || []).forEach((entry: ProductionEntry) => {
-          hancurMap[entry.worker_id] = entry.bags_packed;
+          hancurMap[entry.worker_id] = Number(entry.bags_packed) || 0;
         });
         setHancurEntries(hancurMap);
         setOriginalHancurEntries(hancurMap);
@@ -132,9 +132,9 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           // Take the first entry (there should only be one per day)
           const karungEntry = karungResponse[0] as ProductionEntry;
           setKarungWorkerId(karungEntry.worker_id);
-          setKarungValue(karungEntry.bags_packed);
+          setKarungValue(Number(karungEntry.bags_packed) || 0);
           setOriginalKarungWorkerId(karungEntry.worker_id);
-          setOriginalKarungValue(karungEntry.bags_packed);
+          setOriginalKarungValue(Number(karungEntry.bags_packed) || 0);
         } else {
           // Reset to defaults
           setKarungWorkerId(
@@ -362,7 +362,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             Total Hancur:{" "}
             <span className="font-semibold text-default-900 dark:text-gray-100">
               {Object.values(hancurEntries)
-                .reduce((sum, val) => sum + val, 0)
+                .reduce((sum, val) => sum + (Number(val) || 0), 0)
                 .toFixed(2)}{" "}
               kg
             </span>

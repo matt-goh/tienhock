@@ -50,8 +50,8 @@ export const SPECIAL_ITEMS: SpecialItemConfig[] = [
     productType: "BUNDLE",
     workerJob: "BH_PACKING",
     payCodeId: "PB_KG",
-    unit: "pcs",
-    inputStep: 1,
+    unit: "kg",
+    inputStep: 0.01,
   },
   {
     id: "BUNDLE_BH",
@@ -63,8 +63,8 @@ export const SPECIAL_ITEMS: SpecialItemConfig[] = [
     productType: "BUNDLE",
     workerJob: "BH_PACKING",
     payCodeId: "BH_PB",
-    unit: "bags",
-    inputStep: 1,
+    unit: "kg",
+    inputStep: 0.01,
   },
   {
     id: "BUNDLE_MEE",
@@ -76,8 +76,8 @@ export const SPECIAL_ITEMS: SpecialItemConfig[] = [
     productType: "BUNDLE",
     workerJob: "MEE_PACKING",
     payCodeId: "MEE_PB",
-    unit: "bags",
-    inputStep: 1,
+    unit: "kg",
+    inputStep: 0.01,
   },
 ];
 
