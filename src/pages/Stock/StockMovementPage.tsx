@@ -23,6 +23,10 @@ import clsx from "clsx";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
+// Stock system start date - initial balance represents stock as of this date
+const STOCK_SYSTEM_START_DATE = new Date(2026, 0, 1); // January 1, 2026
+const STOCK_SYSTEM_START_DATE_STRING = "2026-01-01";
+
 type ViewType = "month" | "rolling" | "custom";
 
 const StockMovementPage: React.FC = () => {
@@ -281,6 +285,7 @@ const StockMovementPage: React.FC = () => {
                 onChange={setSelectedMonth}
                 showGoToCurrentButton={false}
                 fixedHeight={false}
+                minDate={STOCK_SYSTEM_START_DATE}
               />
             ) : viewType === "rolling" ? (
               <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-4 py-2 text-center text-sm text-default-600 dark:text-gray-300">
@@ -292,6 +297,7 @@ const StockMovementPage: React.FC = () => {
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
+                  min={STOCK_SYSTEM_START_DATE_STRING}
                   max={customEndDate || new Date().toISOString().split("T")[0]}
                   className="flex-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
@@ -300,7 +306,7 @@ const StockMovementPage: React.FC = () => {
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  min={customStartDate}
+                  min={customStartDate || STOCK_SYSTEM_START_DATE_STRING}
                   max={new Date().toISOString().split("T")[0]}
                   className="flex-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />

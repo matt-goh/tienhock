@@ -88,7 +88,10 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
       payCodeDescription:
         "Each product type maps to a specific pay code for payroll calculation:",
       payCodeTable: [
-        { product: "Regular Products", payCode: "Configure in Manage Mappings" },
+        {
+          product: "Regular Products",
+          payCode: "Configure in Manage Mappings",
+        },
         { product: "Bihun Hancur", payCode: "BH_HANCUR" },
         { product: "Karung Hancur", payCode: "TIMBANG_HANCUR" },
         { product: "Bundle BP", payCode: "PB_KG" },
@@ -199,7 +202,10 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900/30">
-                      <IconInfoCircle className="text-sky-600 dark:text-sky-400" size={24} />
+                      <IconInfoCircle
+                        className="text-sky-600 dark:text-sky-400"
+                        size={24}
+                      />
                     </div>
                     <div>
                       <DialogTitle
@@ -250,36 +256,6 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
 
                 {/* Sections */}
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                  {c.sections.map((section, index) => (
-                    <div
-                      key={index}
-                      className={clsx(
-                        "rounded-lg p-4",
-                        section.bgColor
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <section.icon className={section.color} size={20} />
-                        <h4 className={clsx("font-semibold", section.color)}>
-                          {section.title}
-                        </h4>
-                      </div>
-                      <ul className="space-y-1">
-                        {section.items.map((item, itemIndex) => (
-                          <li
-                            key={itemIndex}
-                            className="text-sm text-default-700 dark:text-gray-300 flex items-start gap-2"
-                          >
-                            <span className="text-default-400 dark:text-gray-500 mt-1">
-                              •
-                            </span>
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-
                   {/* Pay Code Table */}
                   <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-700/50 p-4">
                     <h4 className="font-semibold text-default-900 dark:text-gray-100 mb-2">
@@ -317,6 +293,33 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
                       </table>
                     </div>
                   </div>
+
+                  {c.sections.map((section, index) => (
+                    <div
+                      key={index}
+                      className={clsx("rounded-lg p-4", section.bgColor)}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <section.icon className={section.color} size={20} />
+                        <h4 className={clsx("font-semibold", section.color)}>
+                          {section.title}
+                        </h4>
+                      </div>
+                      <ul className="space-y-1">
+                        {section.items.map((item, itemIndex) => (
+                          <li
+                            key={itemIndex}
+                            className="text-sm text-default-700 dark:text-gray-300 flex items-start gap-2"
+                          >
+                            <span className="text-default-400 dark:text-gray-500 mt-1">
+                              •
+                            </span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Footer */}

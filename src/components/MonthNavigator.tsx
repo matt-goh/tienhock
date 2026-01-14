@@ -30,6 +30,8 @@ interface MonthNavigatorProps {
   dateRange?: { start: Date; end: Date };
   /** Whether to use fixed height (default: true) */
   fixedHeight?: boolean;
+  /** Optional minimum navigable date (prevents navigation before this month) */
+  minDate?: Date;
 }
 
 const MonthNavigator: React.FC<MonthNavigatorProps> = ({
@@ -44,6 +46,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
   beforeChange,
   dateRange,
   fixedHeight = true,
+  minDate,
 }) => {
   // Check if current month is the current calendar month
   const isCurrentMonth = useMemo(() => {
@@ -53,6 +56,15 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
       selectedMonth.getMonth() === now.getMonth()
     );
   }, [selectedMonth]);
+
+  // Check if selected month is at the minimum date
+  const isAtMinDate = useMemo(() => {
+    if (!minDate) return false;
+    return (
+      selectedMonth.getFullYear() === minDate.getFullYear() &&
+      selectedMonth.getMonth() === minDate.getMonth()
+    );
+  }, [selectedMonth, minDate]);
 
   // Check if the full month is selected (dateRange covers entire month)
   const isFullMonthSelected = useMemo(() => {
@@ -171,7 +183,13 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
         {/* Previous Month Button */}
         <button
           onClick={() => navigateMonth("prev")}
-          className={clsx(buttonClasses, "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700")}
+          disabled={isAtMinDate}
+          className={clsx(
+            buttonClasses,
+            isAtMinDate
+              ? "cursor-not-allowed text-default-300 dark:text-gray-600"
+              : "text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
+          )}
           title="Previous month"
           aria-label="Previous month"
         >

@@ -1,5 +1,5 @@
 // src/components/Stock/HancurEntrySection.tsx
-import React, { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import WorkerEntryGrid from "./WorkerEntryGrid";
@@ -14,7 +14,6 @@ import {
 import {
   IconDeviceFloppy,
   IconRefresh,
-  IconScale,
   IconPackage,
 } from "@tabler/icons-react";
 
@@ -120,7 +119,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
         );
         const hancurMap: Record<string, number> = {};
         (hancurResponse || []).forEach((entry: ProductionEntry) => {
-          hancurMap[entry.worker_id] = entry.bags_packed;
+          hancurMap[entry.worker_id] = Number(entry.bags_packed) || 0;
         });
         setHancurEntries(hancurMap);
         setOriginalHancurEntries(hancurMap);
@@ -133,9 +132,9 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           // Take the first entry (there should only be one per day)
           const karungEntry = karungResponse[0] as ProductionEntry;
           setKarungWorkerId(karungEntry.worker_id);
-          setKarungValue(karungEntry.bags_packed);
+          setKarungValue(Number(karungEntry.bags_packed) || 0);
           setOriginalKarungWorkerId(karungEntry.worker_id);
-          setOriginalKarungValue(karungEntry.bags_packed);
+          setOriginalKarungValue(Number(karungEntry.bags_packed) || 0);
         } else {
           // Reset to defaults
           setKarungWorkerId(
@@ -265,7 +264,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
   }
 
   return (<>
-    <div className="space-y-3">
+    <div>
       {/* Bihun Hancur Section */}
         <WorkerEntryGrid
           workers={workers}
@@ -277,10 +276,11 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           unitLabel="kg"
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
+          hideFooter
         />
 
       {/* Karung Hancur Section */}
-      <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+      <div className="border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2">
           <div className="flex items-center gap-2">
             <IconPackage size={16} className="text-amber-600 dark:text-amber-400" />
@@ -306,6 +306,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
                 options={workerOptions}
                 placeholder="Select worker..."
                 rounded="lg"
+                anchor="top"
                 className="w-full"
               />
             </div>
@@ -350,7 +351,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+      <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-4 py-3">
         <div className="flex items-center gap-3">
           {hasUnsavedChanges && (
             <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-sm font-medium text-amber-700 dark:text-amber-300">
@@ -361,7 +362,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             Total Hancur:{" "}
             <span className="font-semibold text-default-900 dark:text-gray-100">
               {Object.values(hancurEntries)
-                .reduce((sum, val) => sum + val, 0)
+                .reduce((sum, val) => sum + (Number(val) || 0), 0)
                 .toFixed(2)}{" "}
               kg
             </span>
