@@ -130,7 +130,7 @@ This is a comprehensive ERP system supporting three companies:
 **Work Logs (Monthly):**
 - `monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at
 - `monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
-- `monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, rate_used, calculated_amount, is_manually_added, created_at
+- `monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added, created_at
 
 **Leave Management:**
 - `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at
@@ -151,7 +151,7 @@ This is a comprehensive ERP system supporting three companies:
 - `greentarget.payroll_deductions` - id, employee_payroll_id, deduction_type, employee_amount, employer_amount, wage_amount, rate_info, created_at
 - `greentarget.monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at
 - `greentarget.monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
-- `greentarget.monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, rate_used, calculated_amount, is_manually_added, created_at
+- `greentarget.monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added, created_at
 - `greentarget.driver_trips` - id, driver_id, year, month, trip_count, completed_rental_ids, auto_calculated, notes, created_at, updated_at
 - `greentarget.pickup_destinations` - id, code (unique), name, is_default, sort_order, is_active, created_at, updated_at (configurable pickup destination options: KILANG, MD, MENGGATAL)
 - `greentarget.payroll_rules` - id, rule_type (PLACEMENT/PICKUP), condition_field, condition_operator, condition_value, secondary_condition_field, secondary_condition_operator, secondary_condition_value, pay_code_id, priority, is_active, description, created_at, updated_at
