@@ -279,27 +279,6 @@ export interface Data {
   [key: string]: any;
 }
 
-// Props for the Table component
-export interface TableProps<T> {
-  ref?: React.RefObject<any>;
-  initialData: T[];
-  columns: ColumnConfig[];
-  onShowDeleteButton?: (show: boolean) => void;
-  onSelectionChange?: (
-    count: number,
-    allSelected: boolean,
-    selectedData: T[]
-  ) => void;
-  onClearSelection?: (fn: () => void) => void;
-  onDelete?: (selectedIds: number[]) => Promise<void>;
-  onChange?: (changedData: T[]) => void;
-  isEditing?: boolean;
-  onToggleEditing?: () => void;
-  onSave?: () => void;
-  onCancel?: () => void;
-  tableKey?: string;
-}
-
 export type InvoiceStatus =
   | "active"
   | "paid"
