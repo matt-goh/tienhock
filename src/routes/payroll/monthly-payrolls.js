@@ -408,7 +408,7 @@ export default function (pool) {
       let dailyLogsResult, monthlyLogsResult, manualItemsResult, staffsResult,
           jobsResult, epfRatesResult, socsoRatesResult, sipRatesResult,
           incomeTaxRatesResult, holidaysResult, productionEntriesResult,
-          productPayCodeMappingsResult;
+          productPayCodeMappingsResult, machineStatusResult;
 
       try {
         [
@@ -424,6 +424,7 @@ export default function (pool) {
           holidaysResult,
           productionEntriesResult,
           productPayCodeMappingsResult,
+          machineStatusResult,
         ] = await Promise.all([
         // Daily work logs with activities
         client.query(`
@@ -528,6 +529,14 @@ export default function (pool) {
           JOIN pay_codes pc ON ppc.pay_code_id = pc.id
           WHERE pc.is_active = true
         `),
+
+        // Machine broken status for production threshold bonus override
+        client.query(`
+          SELECT entry_date, product_id, machine_broken
+          FROM production_machine_status
+          WHERE entry_date BETWEEN $1 AND $2
+            AND machine_broken = true
+        `, [startDate, endDate]),
         ]);
       } catch (fetchError) {
         console.error("Error fetching payroll data:", fetchError);
@@ -636,6 +645,13 @@ export default function (pool) {
         holidaysResult.rows.map(h => formatDateToYMD(h.holiday_date))
       );
 
+      // Build machine broken lookup Set for fast checking (date-productId format)
+      const machineBrokenLookup = new Set();
+      machineStatusResult.rows.forEach(row => {
+        const dateStr = formatDateToYMD(row.entry_date);
+        machineBrokenLookup.add(`${dateStr}-${row.product_id}`);
+      });
+
       // Helper to determine day type (biasa, ahad, umum)
       const getDayType = (dateStr) => {
         const formattedDate = formatDateToYMD(dateStr);
@@ -720,10 +736,17 @@ export default function (pool) {
             jobType: jobType,
             totalBags: 0,
             productIds: new Set(),
+            hasMachineBroken: false,
           };
         }
-        dailyTotalsPerWorker[dailyKey].totalBags += entry.bags_packed;
+        dailyTotalsPerWorker[dailyKey].totalBags += parseInt(entry.bags_packed) || 0;
         dailyTotalsPerWorker[dailyKey].productIds.add(entry.product_id);
+
+        // Check if this product was marked as machine broken on this date
+        const machineKey = `${dateStr}-${entry.product_id}`;
+        if (machineBrokenLookup.has(machineKey)) {
+          dailyTotalsPerWorker[dailyKey].hasMachineBroken = true;
+        }
 
         // Get pay codes for this product
         const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
@@ -775,29 +798,43 @@ export default function (pool) {
       // Apply threshold bonuses based on daily totals
       // Threshold for BH: >70 bags/day for first bonus, >140 for second
       // Threshold for MEE: >100 bags/day for first bonus (based on pay code descriptions)
+      // Exception: If machine_broken is true, apply first tier bonus even if below threshold
       Object.values(dailyTotalsPerWorker).forEach(dailyData => {
-        const { workerId, date, productType, jobType, totalBags, productIds } = dailyData;
+        const { workerId, date, productType, jobType, totalBags, productIds, hasMachineBroken } = dailyData;
         const key = `${workerId}-${jobType}`;
 
         // Get threshold based on product type
         const threshold1 = productType === 'BH' ? 70 : 100;
         const threshold2 = 140;
 
-        // Only apply bonus if threshold is met
-        if (totalBags > threshold1) {
+        // Check if qualifies for first tier bonus:
+        // - Normal case: totalBags > threshold1
+        // - Machine broken case: any bags packed (even < threshold)
+        const meetsThreshold1 = totalBags > threshold1;
+        const qualifiesForFirstTierBonus = meetsThreshold1 || (hasMachineBroken && totalBags > 0);
+
+        if (qualifiesForFirstTierBonus) {
           // Get pay codes from the first product to find bonus codes
           const firstProductId = productIds.values().next().value;
           const payCodesForProduct = productPayCodeMap[firstProductId] || [];
           const { bonus70Code, bonus140Code } = findThresholdBonusCodes(payCodesForProduct, productType);
 
-          // Apply first tier bonus (>70 for BH, >100 for MEE)
-          if (bonus70Code && totalBags > threshold1 && totalBags <= threshold2) {
+          // Apply first tier bonus (>70 for BH, >100 for MEE, or machine broken with any bags)
+          // Only apply if NOT in second tier (>140) - second tier has its own bonus
+          if (bonus70Code && (meetsThreshold1 || hasMachineBroken) && totalBags <= threshold2) {
             const bonusRate = bonus70Code.rate_biasa;
             if (bonusRate > 0) {
               const bonusAmount = totalBags * bonusRate;
+              // Add indicator if bonus was applied due to machine broken
+              const isMachineBrokenBonus = hasMachineBroken && !meetsThreshold1;
+              const bagsDisplay = Math.round(totalBags);
+              const description = isMachineBrokenBonus
+                ? `${bonus70Code.description} (${bagsDisplay} bags, mesin rosak)`
+                : `${bonus70Code.description} (${bagsDisplay} bags)`;
+
               workLogsByEmployeeJob[key].items.push({
                 pay_code_id: bonus70Code.pay_code_id,
-                description: `${bonus70Code.description} (${totalBags} bags)`,
+                description: description,
                 pay_type: 'Tambahan',
                 rate: bonusRate,
                 rate_unit: bonus70Code.rate_unit,
@@ -805,12 +842,12 @@ export default function (pool) {
                 amount: bonusAmount,
                 source_date: date,
                 work_log_id: null,
-                work_log_type: 'production_bonus',
+                work_log_type: isMachineBrokenBonus ? 'prod_bonus_rosak' : 'production_bonus',
               });
             }
           }
 
-          // Apply second tier bonus (>140)
+          // Apply second tier bonus (>140) - only when actually exceeds threshold, NOT for machine broken
           if (bonus140Code && totalBags > threshold2) {
             const bonusRate = bonus140Code.rate_biasa;
             if (bonusRate > 0) {

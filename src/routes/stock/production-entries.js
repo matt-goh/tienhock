@@ -195,6 +195,75 @@ export default function (pool) {
     }
   });
 
+  // GET /api/production-entries/machine-status - Get machine broken status for a date/product
+  router.get("/machine-status", async (req, res) => {
+    try {
+      const { date, product_id } = req.query;
+
+      if (!date || !product_id) {
+        return res.status(400).json({
+          message: "date and product_id are required",
+        });
+      }
+
+      const result = await pool.query(
+        `SELECT machine_broken, notes, updated_at
+         FROM production_machine_status
+         WHERE entry_date = $1 AND product_id = $2`,
+        [date, product_id]
+      );
+
+      // Return false if no record exists (default is machine working)
+      if (result.rows.length === 0) {
+        return res.json({ machine_broken: false, notes: null });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error fetching machine status:", error);
+      res.status(500).json({
+        message: "Error fetching machine status",
+        error: error.message,
+      });
+    }
+  });
+
+  // PUT /api/production-entries/machine-status - Toggle machine broken status
+  router.put("/machine-status", async (req, res) => {
+    try {
+      const { date, product_id, machine_broken, notes, created_by } = req.body;
+
+      if (!date || !product_id || machine_broken === undefined) {
+        return res.status(400).json({
+          message: "date, product_id, and machine_broken are required",
+        });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO production_machine_status (entry_date, product_id, machine_broken, notes, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (entry_date, product_id)
+         DO UPDATE SET
+           machine_broken = EXCLUDED.machine_broken,
+           notes = EXCLUDED.notes,
+           updated_at = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [date, product_id, machine_broken, notes || null, created_by || null]
+      );
+
+      res.json({
+        message: "Machine status updated",
+        status: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Error updating machine status:", error);
+      res.status(500).json({
+        message: "Error updating machine status",
+        error: error.message,
+      });
+    }
+  });
+
   // POST /api/production-entries - Create single entry
   router.post("/", async (req, res) => {
     try {
