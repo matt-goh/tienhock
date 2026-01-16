@@ -79,6 +79,7 @@ This is a comprehensive ERP system supporting three companies:
 **Products & Inventory:**
 - `products` - id, description, price_per_unit, type, tax, is_active
 - `production_entries` - id, entry_date, product_id, worker_id, bags_packed, created_at, updated_at, created_by
+- `production_machine_status` - id, entry_date, product_id (FK products), machine_broken, notes, created_at, updated_at, created_by (tracks machine broken status per date/product for production bonus threshold override - when machine_broken=true, workers below threshold still receive bonus pay codes)
 - `product_pay_codes` - id, product_id, pay_code_id, created_at, updated_at
 - `stock_adjustments` - id, entry_date, product_id, adjustment_type, quantity, reason, created_at, created_by, reference
 - `stock_opening_balances` - id, product_id, balance, effective_date, created_at, updated_at, created_by, notes
