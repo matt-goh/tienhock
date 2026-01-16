@@ -53,6 +53,9 @@ jobs:
           ssh -i ~/.ssh/deploy_key ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }} << 'EOF'
             cd ~/tienhock-app
 
+            # Stash any local changes (package-lock.json, etc.) to prevent pull conflicts
+            git stash --include-untracked
+
             # Pull latest changes
             git checkout production
             git pull origin production
@@ -61,7 +64,7 @@ jobs:
             npm install --legacy-peer-deps
 
             # Build frontend
-            npm run build
+            NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
             # Restart application with PM2
             pm2 restart tienhock-server || pm2 start ecosystem.config.cjs
