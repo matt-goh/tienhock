@@ -103,8 +103,7 @@ import PayCodePage from "./Catalogue/PayCodePage";
 import ProductPage from "./Catalogue/ProductPage";
 import JobPage from "./Catalogue/JobPage";
 import JobCategoryPage from "./Catalogue/JobCategoryPage";
-import TaxPage from "./Catalogue/TaxPage";
-import BasicPage from "./Catalogue/BasicPage";
+import OthersPage from "./Catalogue/OthersPage";
 import LocationPage from "./Catalogue/LocationPage";
 
 // Function to generate payroll subitems for each job type
@@ -557,69 +556,14 @@ export const TienHockNavData: SidebarItem[] = [
         component: JobCategoryPage,
       },
       {
-        name: "Section",
-        path: "/catalogue/section",
-        component: () => (
-          <BasicPage
-            title="Section Catalogue"
-            apiEndpoint="sections"
-            tableKey="catalogueSection"
-          />
-        ),
-      },
-      {
         name: "Location",
         path: "/catalogue/location",
         component: LocationPage,
       },
       {
-        name: "Bank",
-        path: "/catalogue/bank",
-        component: () => (
-          <BasicPage
-            title="Bank Catalogue"
-            apiEndpoint="banks"
-            tableKey="catalogueBank"
-          />
-        ),
-      },
-      {
-        name: "Tax",
-        path: "/catalogue/tax",
-        component: TaxPage,
-      },
-      {
-        name: "Nationality",
-        path: "/catalogue/nationality",
-        component: () => (
-          <BasicPage
-            title="Nationality Catalogue"
-            apiEndpoint="nationalities"
-            tableKey="catalogueNationality"
-          />
-        ),
-      },
-      {
-        name: "Race",
-        path: "/catalogue/race",
-        component: () => (
-          <BasicPage
-            title="Race Catalogue"
-            apiEndpoint="races"
-            tableKey="catalogueRace"
-          />
-        ),
-      },
-      {
-        name: "Agama",
-        path: "/catalogue/agama",
-        component: () => (
-          <BasicPage
-            title="Agama Catalogue"
-            apiEndpoint="agama"
-            tableKey="catalogueAgama"
-          />
-        ),
+        name: "Others",
+        path: "/catalogue/others",
+        component: OthersPage,
       },
     ],
   },
