@@ -349,6 +349,49 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     return activities.findIndex(a => a.payCodeId === payCodeId);
   };
 
+  // Select all unselected activities (move all from right to left panel)
+  const handleSelectAll = () => {
+    if (unselectedActivities.length === 0) return;
+
+    const newActivities = activities.map(activity => ({
+      ...activity,
+      isSelected: true,
+      calculatedAmount: calculateActivityAmount(
+        { ...activity, isSelected: true },
+        activity.hoursApplied || employeeHours,
+        contextData,
+        locationType,
+        logDate,
+        forceOTHours
+      )
+    }));
+
+    const finalActivities = isSalesmanIkut
+      ? applyDoubling(newActivities, isDoubled)
+      : newActivities;
+    setActivities(finalActivities);
+  };
+
+  // Deselect all selected activities (move all from left to right panel)
+  const handleDeselectAll = () => {
+    if (selectedActivities.length === 0) return;
+
+    const newActivities = activities.map(activity => ({
+      ...activity,
+      isSelected: false,
+      calculatedAmount: calculateActivityAmount(
+        { ...activity, isSelected: false },
+        activity.hoursApplied || employeeHours,
+        contextData,
+        locationType,
+        logDate,
+        forceOTHours
+      )
+    }));
+
+    setActivities(newActivities);
+  };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={handleClose}>
@@ -465,8 +508,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Left Panel: Selected Activities */}
                       <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
-                        {/* Left Panel Header */}
-                        <div className="flex-shrink-0 px-4 py-2 bg-sky-50 dark:bg-sky-900/30 border-b border-sky-200 dark:border-sky-800">
+                        {/* Left Panel Header - Click to deselect all */}
+                        <div
+                          className={`flex-shrink-0 px-4 py-2 bg-sky-50 dark:bg-sky-900/30 border-b border-sky-200 dark:border-sky-800 ${
+                            selectedActivities.length > 0 ? "cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors" : ""
+                          }`}
+                          onClick={handleDeselectAll}
+                          title={selectedActivities.length > 0 ? "Click to deselect all activities" : undefined}
+                        >
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                               <IconCheck size={16} className="text-sky-600 dark:text-sky-400" />
@@ -474,6 +523,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                               <span className="px-2 py-0.5 bg-sky-100 dark:bg-sky-800 text-sky-700 dark:text-sky-300 rounded-full text-xs font-medium">
                                 {selectedActivities.length}
                               </span>
+                              {selectedActivities.length > 0 && (
+                                <span className="text-xs text-sky-600 dark:text-sky-400 opacity-60">
+                                  (click to clear all)
+                                </span>
+                              )}
                             </div>
                             <span className="text-sm font-semibold text-sky-700 dark:text-sky-300">
                               RM{totalAmount.toFixed(2)}
@@ -633,14 +687,25 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
 
                       {/* Right Panel: Unselected Activities */}
                       <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
-                        {/* Right Panel Header */}
-                        <div className="flex-shrink-0 px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                        {/* Right Panel Header - Click to select all */}
+                        <div
+                          className={`flex-shrink-0 px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 ${
+                            unselectedActivities.length > 0 ? "cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors" : ""
+                          }`}
+                          onClick={handleSelectAll}
+                          title={unselectedActivities.length > 0 ? "Click to select all activities" : undefined}
+                        >
                           <div className="flex items-center gap-2">
                             <IconPlus size={16} className="text-gray-500 dark:text-gray-400" />
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Available</span>
                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium">
                               {unselectedActivities.length}
                             </span>
+                            {unselectedActivities.length > 0 && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 opacity-60">
+                                (click to add all)
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex-1 overflow-y-auto max-h-[20rem] lg:max-h-[26rem]">
