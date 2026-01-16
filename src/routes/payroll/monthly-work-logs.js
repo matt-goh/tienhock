@@ -139,6 +139,7 @@ export default function (pool) {
             SELECT
               mwla.*,
               CAST(mwla.hours_applied AS NUMERIC(10, 2)) as hours_applied,
+              CAST(mwla.units_produced AS NUMERIC(10, 2)) as units_produced,
               CAST(mwla.rate_used AS NUMERIC(10, 2)) as rate_used,
               CAST(mwla.calculated_amount AS NUMERIC(10, 2)) as calculated_amount,
               pc.description,
@@ -158,6 +159,9 @@ export default function (pool) {
               ...activity,
               hours_applied: activity.hours_applied
                 ? parseFloat(activity.hours_applied)
+                : null,
+              units_produced: activity.units_produced
+                ? parseFloat(activity.units_produced)
                 : null,
               rate_used: parseFloat(activity.rate_used),
               calculated_amount: parseFloat(activity.calculated_amount),
@@ -290,14 +294,15 @@ export default function (pool) {
               const activityQuery = `
                 INSERT INTO monthly_work_log_activities (
                   monthly_entry_id, pay_code_id, hours_applied,
-                  rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6)
+                  units_produced, rate_used, calculated_amount, is_manually_added
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
               await pool.query(activityQuery, [
                 entryId,
                 activity.payCodeId,
                 activity.hoursApplied || null,
+                activity.unitsProduced || null,
                 parseFloat(activity.rate),
                 parseFloat(activity.calculatedAmount),
                 activity.isManuallyAdded || false,
@@ -443,14 +448,15 @@ export default function (pool) {
               const activityQuery = `
                 INSERT INTO monthly_work_log_activities (
                   monthly_entry_id, pay_code_id, hours_applied,
-                  rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6)
+                  units_produced, rate_used, calculated_amount, is_manually_added
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
               `;
 
               await pool.query(activityQuery, [
                 entryId,
                 activity.payCodeId,
                 activity.hoursApplied || null,
+                activity.unitsProduced || null,
                 parseFloat(activity.rate),
                 parseFloat(activity.calculatedAmount),
                 activity.isManuallyAdded || false,

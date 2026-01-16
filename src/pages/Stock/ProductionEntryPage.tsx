@@ -33,7 +33,9 @@ import {
   IconBox,
   IconSearch,
   IconX,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
+import { Switch } from "@headlessui/react";
 import Button from "../../components/Button";
 import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
 import { isSpecialItem } from "../../config/specialItems";
@@ -84,6 +86,8 @@ const ProductionEntryPage: React.FC = () => {
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const [hancurSearchQuery, setHancurSearchQuery] = useState("");
   const [bundleSearchQuery, setBundleSearchQuery] = useState("");
+  const [isMachineBroken, setIsMachineBroken] = useState(false);
+  const [isLoadingMachineStatus, setIsLoadingMachineStatus] = useState(false);
 
   // Refs for checking unsaved changes in HANCUR and BUNDLE sections
   const hancurSectionRef = useRef<HancurEntrySectionHandle>(null);
@@ -245,6 +249,56 @@ const ProductionEntryPage: React.FC = () => {
 
     fetchExistingEntries();
   }, [selectedDate, selectedProductId]);
+
+  // Fetch machine broken status when date or product changes
+  useEffect(() => {
+    const fetchMachineStatus = async () => {
+      // Only fetch for regular BH/MEE products (not BUNDLE, HANCUR, etc.)
+      if (!selectedDate || !selectedProductId || specialSelection !== null) {
+        setIsMachineBroken(false);
+        return;
+      }
+
+      // Only fetch for BH and MEE product types
+      if (!selectedProduct || (selectedProduct.type !== "BH" && selectedProduct.type !== "MEE")) {
+        setIsMachineBroken(false);
+        return;
+      }
+
+      setIsLoadingMachineStatus(true);
+      try {
+        const response = await api.get(
+          `/api/production-entries/machine-status?date=${selectedDate}&product_id=${selectedProductId}`
+        );
+        setIsMachineBroken(response.machine_broken || false);
+      } catch (error) {
+        console.error("Error fetching machine status:", error);
+        setIsMachineBroken(false);
+      } finally {
+        setIsLoadingMachineStatus(false);
+      }
+    };
+
+    fetchMachineStatus();
+  }, [selectedDate, selectedProductId, specialSelection, selectedProduct]);
+
+  // Handle machine broken toggle
+  const handleMachineBrokenToggle = async (newValue: boolean) => {
+    if (!selectedDate || !selectedProductId) return;
+
+    try {
+      await api.put("/api/production-entries/machine-status", {
+        date: selectedDate,
+        product_id: selectedProductId,
+        machine_broken: newValue,
+      });
+      setIsMachineBroken(newValue);
+      toast.success(newValue ? "Mesin rosak ditanda" : "Mesin rosak dibuang");
+    } catch (error) {
+      console.error("Error updating machine status:", error);
+      toast.error("Gagal kemaskini status mesin");
+    }
+  };
 
   // Handle entry change
   const handleEntryChange = useCallback((workerId: string, value: number) => {
@@ -428,6 +482,39 @@ const ProductionEntryPage: React.FC = () => {
                 {formatDateDisplay(selectedDate).malay}
               </span>
             </div>
+            {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
+            {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
+              <>
+                <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs font-medium ${
+                      isMachineBroken
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-default-500 dark:text-gray-400"
+                    }`}
+                  >
+                    Mesin Rosak
+                  </span>
+                  <Switch
+                    checked={isMachineBroken}
+                    onChange={handleMachineBrokenToggle}
+                    disabled={isLoadingMachineStatus}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${
+                      isMachineBroken
+                        ? "bg-red-500"
+                        : "bg-default-200 dark:bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
+                        isMachineBroken ? "translate-x-5" : "translate-x-1"
+                      }`}
+                    />
+                  </Switch>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right: Buttons */}
@@ -650,6 +737,14 @@ const ProductionEntryPage: React.FC = () => {
                     </span>
                   )}
                 </div>
+
+                {/* Machine Rosak Badge */}
+                {isMachineBroken && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-400 flex-shrink-0">
+                    <IconAlertTriangle size={12} />
+                    Mesin Rosak
+                  </span>
+                )}
 
                 {/* Starred products mini pills for quick navigation */}
                 {favoriteProducts.length > 0 && (

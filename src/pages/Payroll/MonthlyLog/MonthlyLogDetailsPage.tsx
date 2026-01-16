@@ -462,13 +462,20 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                       <span className="text-default-500 dark:text-gray-400 ml-2">
                                         ({activity.pay_type})
                                       </span>
-                                      <span className="text-default-500 dark:text-gray-400 ml-2">
-                                        •{" "}
-                                        {activity.rate_unit === "Percent"
-                                          ? `${activity.rate_used}%`
-                                          : `RM${activity.rate_used}`}
-                                      </span>
-                                      {activity.hours_applied !== null && (
+                                      {activity.rate_unit !== "Fixed" && (
+                                        <span className="text-default-500 dark:text-gray-400 ml-2">
+                                          •{" "}
+                                          {activity.rate_unit === "Percent"
+                                            ? `${activity.rate_used}%`
+                                            : `RM${activity.rate_used}`}
+                                        </span>
+                                      )}
+                                      {activity.rate_unit === "Fixed" && (
+                                        <span className="text-default-500 dark:text-gray-400 ml-2">
+                                          • Fixed
+                                        </span>
+                                      )}
+                                      {activity.hours_applied !== null && activity.rate_unit !== "Fixed" && (
                                         <span className="text-default-500 dark:text-gray-400 ml-2">
                                           • {activity.hours_applied} hrs
                                         </span>
@@ -513,13 +520,20 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                           Job
                                         </span>
                                       )}
-                                      <span className="text-default-500 dark:text-gray-400 ml-2">
-                                        •{" "}
-                                        {activity.rate_unit === "Percent"
-                                          ? `${activity.rate_used}%`
-                                          : `RM${activity.rate_used}`}
-                                      </span>
-                                      {activity.hours_applied !== null && (
+                                      {activity.rate_unit !== "Fixed" && (
+                                        <span className="text-default-500 dark:text-gray-400 ml-2">
+                                          •{" "}
+                                          {activity.rate_unit === "Percent"
+                                            ? `${activity.rate_used}%`
+                                            : `RM${activity.rate_used}`}
+                                        </span>
+                                      )}
+                                      {activity.rate_unit === "Fixed" && (
+                                        <span className="text-default-500 dark:text-gray-400 ml-2">
+                                          • Fixed
+                                        </span>
+                                      )}
+                                      {activity.hours_applied !== null && activity.rate_unit !== "Fixed" && (
                                         <span className="text-default-500 dark:text-gray-400 ml-2">
                                           • {activity.hours_applied} hrs
                                         </span>

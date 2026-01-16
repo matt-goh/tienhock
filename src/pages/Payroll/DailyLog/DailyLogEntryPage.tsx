@@ -1421,6 +1421,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
 
     // Validate that all selected employees have hours (or tray for BIHUN_SANGKUT)
+    // OR have selected activities with amounts (e.g., transportation-only workers)
     const invalidEmployees = allSelectedEmployees.filter(
       ([employeeId, jobTypes]) => {
         return jobTypes.some((jobType) => {
@@ -1434,13 +1435,27 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             return trayCount <= 0;
           }
 
-          return hours <= 0;
+          // If hours > 0, it's valid
+          if (hours > 0) {
+            return false;
+          }
+
+          // If hours = 0, check if employee has selected activities with amounts
+          // This allows transportation-only workers (e.g., L_BERAS per trip)
+          const rowKey = `${employeeId}-${jobType}`;
+          const activities = employeeActivities[rowKey] || [];
+          const hasActivityWithAmount = activities.some(
+            (activity: ActivityItem) => activity.isSelected && activity.calculatedAmount > 0
+          );
+
+          // Invalid only if 0 hours AND no activities with amounts
+          return !hasActivityWithAmount;
         });
       }
     );
 
     if (invalidEmployees.length > 0) {
-      toast.error("All selected employees must have hours or tray greater than 0");
+      toast.error("All selected employees must have hours > 0 or activities with amounts");
       return;
     }
 
