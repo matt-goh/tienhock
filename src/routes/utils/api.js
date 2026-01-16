@@ -20,6 +20,7 @@ const handleResponse = async (response) => {
 // Mapping of route path to the payload key expected by backend
 const IRREGULAR_PLURALS = {
   nationalities: "nationalitys", // Match backend expectation of ${entityName}s
+  agama: "agamas", // agama -> agamas for delete endpoint
 };
 
 export const api = {
