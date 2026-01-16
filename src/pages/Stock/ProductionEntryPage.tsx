@@ -268,7 +268,7 @@ const ProductionEntryPage: React.FC = () => {
       setIsLoadingMachineStatus(true);
       try {
         const response = await api.get(
-          `/api/production-entries/machine-status?date=${selectedDate}&product_id=${selectedProductId}`
+          `/api/production-entries/machine-broken?date=${selectedDate}&product_id=${selectedProductId}`
         );
         setIsMachineBroken(response.machine_broken || false);
       } catch (error) {
@@ -287,7 +287,7 @@ const ProductionEntryPage: React.FC = () => {
     if (!selectedDate || !selectedProductId) return;
 
     try {
-      await api.put("/api/production-entries/machine-status", {
+      await api.put("/api/production-entries/machine-broken", {
         date: selectedDate,
         product_id: selectedProductId,
         machine_broken: newValue,

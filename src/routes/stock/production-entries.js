@@ -6,8 +6,8 @@ export default function (pool) {
 
   // ========== MACHINE STATUS ROUTES (must be before /:id routes) ==========
 
-  // GET /api/production-entries/machine-status - Get machine broken status for a date/product
-  router.get("/machine-status", async (req, res) => {
+  // GET /api/production-entries/machine-broken - Get machine broken status for a date/product
+  router.get("/machine-broken", async (req, res) => {
     try {
       const { date, product_id } = req.query;
 
@@ -39,8 +39,8 @@ export default function (pool) {
     }
   });
 
-  // PUT /api/production-entries/machine-status - Toggle machine broken status
-  router.put("/machine-status", async (req, res) => {
+  // PUT /api/production-entries/machine-broken - Toggle machine broken status
+  router.put("/machine-broken", async (req, res) => {
     try {
       const { date, product_id, machine_broken, notes, created_by } = req.body;
 
