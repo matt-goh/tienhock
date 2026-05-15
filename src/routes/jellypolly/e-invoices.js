@@ -50,6 +50,7 @@ const getInvoices = async (pool, invoiceId) => {
           i.createddate,
           i.paymenttype,
           i.total_excluding_tax,
+          i.tax_amount,
           i.rounding,
           i.totalamountpayable
         FROM 
@@ -708,6 +709,85 @@ export default function (pool, config) {
       res.status(500).json({
         success: false,
         message: "Failed to fetch consolidated invoice history",
+        error: error.message,
+      });
+    }
+  });
+
+  // Get source invoice details for consolidated PDF line grouping in one request
+  router.post("/consolidated-source-invoices", async (req, res) => {
+    try {
+      const { invoiceIds } = req.body;
+
+      if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "invoiceIds array is required",
+        });
+      }
+
+      const query = `
+        SELECT
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+          i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', od.id,
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+              ORDER BY od.id
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
+          ) as products
+        FROM jellypolly.invoices i
+        LEFT JOIN jellypolly.order_details od ON i.id = od.invoiceid
+        WHERE i.id = ANY($1::text[])
+        GROUP BY i.id
+      `;
+
+      const result = await pool.query(query, [invoiceIds.map(String)]);
+      const invoiceById = new Map(result.rows.map((row) => [row.id, row]));
+
+      const sourceInvoices = invoiceIds
+        .map((invoiceId) => invoiceById.get(String(invoiceId)))
+        .filter(Boolean)
+        .map((invoice) => ({
+          id: invoice.id,
+          salespersonid: invoice.salespersonid,
+          customerid: invoice.customerid,
+          createddate: invoice.createddate,
+          paymenttype: invoice.paymenttype,
+          total_excluding_tax: parseFloat(invoice.total_excluding_tax || 0),
+          tax_amount: parseFloat(invoice.tax_amount || 0),
+          rounding: parseFloat(invoice.rounding || 0),
+          totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
+          products: (invoice.products || []).map((product) => ({
+            ...product,
+            price: parseFloat(product.price || 0),
+            quantity: parseInt(product.quantity || 0),
+            freeProduct: parseInt(product.freeProduct || 0),
+            returnProduct: parseInt(product.returnProduct || 0),
+            tax: parseFloat(product.tax || 0),
+            total: String(product.total || "0.00"),
+            issubtotal: Boolean(product.issubtotal),
+          })),
+        }));
+
+      return res.json(sourceInvoices);
+    } catch (error) {
+      console.error("Error fetching consolidated source invoices:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch consolidated source invoices",
         error: error.message,
       });
     }

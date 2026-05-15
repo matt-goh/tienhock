@@ -68,7 +68,10 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
         }
 
         // Now process with complete data
-        const preparedData = await prepareBatchPDFData(processedInvoices);
+        const preparedData = await prepareBatchPDFData(
+          processedInvoices,
+          isJellyPolly ? "jellypolly" : "tienhock"
+        );
         if (preparedData.length === 0) {
           throw new Error("No valid invoices could be processed");
         }
@@ -141,7 +144,10 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
           einvoice.uuid,
           einvoice.long_id
         );
-        const pdfData = await preparePDFData(einvoice);
+        const pdfData = await preparePDFData(
+          einvoice,
+          isJellyPolly ? "jellypolly" : "tienhock"
+        );
         const pdfComponent = (
           <Document
             title={`${isJellyPolly ? "JP" : "TH"}_einvoice-${

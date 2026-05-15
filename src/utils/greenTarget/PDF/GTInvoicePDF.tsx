@@ -3,6 +3,10 @@ import React from "react";
 import { Page, StyleSheet, View, Text, Image } from "@react-pdf/renderer";
 import { InvoiceGT } from "../../../types/types";
 import { GREENTARGET_INFO } from "../../invoice/einvoice/companyInfo";
+import {
+  createConsolidatedReceiptGroups,
+  toAmount,
+} from "../../invoice/einvoice/consolidatedReceiptGrouping";
 import GreenTargetLogo from "../../GreenTargetLogo.png";
 
 // Define styles
@@ -289,7 +293,41 @@ const generateLineItems = (invoice: InvoiceGT): LineItem[] => {
       invoice.consolidated_invoices.length > 0) ||
     (invoice.invoice_number && invoice.invoice_number.startsWith("CON-"));
 
-  // For consolidated invoices and statements, show as single line item
+  if (
+    isConsolidated &&
+    Array.isArray(invoice.consolidated_source_invoices) &&
+    invoice.consolidated_source_invoices.length > 0
+  ) {
+    const receiptGroups = createConsolidatedReceiptGroups(
+      invoice.consolidated_source_invoices,
+      (
+        sourceInvoice: NonNullable<
+          InvoiceGT["consolidated_source_invoices"]
+        >[number]
+      ) => {
+        const subtotal: number = toAmount(sourceInvoice.amount_before_tax);
+        const total: number = toAmount(sourceInvoice.total_amount);
+        const storedTax: number = toAmount(sourceInvoice.tax_amount);
+
+        return {
+          subtotal,
+          tax: storedTax || Math.max(total - subtotal, 0),
+          rounding: 0,
+          total,
+        };
+      }
+    );
+
+    return receiptGroups.map((group: any) => ({
+      description: group.description,
+      qty: 1,
+      price: group.amounts.subtotal,
+      total: group.amounts.subtotal,
+      tax: group.amounts.tax,
+    }));
+  }
+
+  // For consolidated invoices without source details and statements, show as single line item
   if (isConsolidated || invoice.type === "statement") {
     return [{
       description: generateSingleDescription(invoice),

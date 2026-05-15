@@ -547,6 +547,13 @@ export interface InvoiceGT {
   datetime_validated: string | null; // ISO timestamp string or null
   is_consolidated: boolean;
   consolidated_invoices: string[] | null; // Array of invoice IDs or null
+  consolidated_source_invoices?: Array<{
+    invoice_id: number;
+    invoice_number: string;
+    amount_before_tax: number;
+    tax_amount: number;
+    total_amount: number;
+  }>;
   cancellation_date?: string | null;
   cancellation_reason?: string;
 }
