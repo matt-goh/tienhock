@@ -351,7 +351,7 @@ async function getEligibleTienhockInvoices(client, month, year) {
   const invoiceQuery = `
     SELECT 
       i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-      i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.total_excluding_tax, i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
       i.balance_due, i.invoice_status,
       c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
     FROM invoices i
@@ -419,7 +419,7 @@ async function getEligibleJellypollyInvoices(client, month, year) {
   const invoiceQuery = `
     SELECT 
       i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-      i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.total_excluding_tax, i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
       i.balance_due, i.invoice_status,
       c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
     FROM jellypolly.invoices i
