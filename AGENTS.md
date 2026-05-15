@@ -50,7 +50,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (71 tables)
+#### Database Schema (74 tables)
 
 **Accounting & Finance:**
 - `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
@@ -65,6 +65,9 @@ This is a comprehensive ERP system supporting three companies:
 - `purchase_invoices` - id, supplier_id (FK suppliers), invoice_number, invoice_date, total_amount, payment_status (unpaid/partial/paid), amount_paid, journal_entry_id (FK journal_entries), notes, created_at, updated_at, created_by (unique: supplier_id, invoice_number)
 - `purchase_invoice_lines` - id, purchase_invoice_id (FK purchase_invoices CASCADE), line_number, material_id (FK materials), quantity, unit_cost, amount, notes, created_at (material purchase lines for tracking raw material/ingredient/packing purchases)
 - `material_purchase_account_mappings` - id, material_category (unique), purchase_account_code (FK account_codes), description, is_active, created_at (maps material categories to GL purchase accounts for auto-journaling: ingredient→PUR, raw_material→PUR, packing_material→PM)
+- `self_billed_foreign_suppliers` - id, supplier_name (unique), tin_number (default EI00000000030), id_type, id_number, sst_number, ttx_number, msic_code, business_activity_description, address_line_0-2, city, postcode, state_code, country_code, contact_number, email, notes, is_active, created_at, updated_at (foreign seller profiles for manual self-billed e-invoices)
+- `self_billed_invoices` - id, foreign_supplier_id (FK self_billed_foreign_suppliers), self_billed_no (unique), purchase_date, transaction_type, platform, order_no, payment_reference, shipping_method, shipping_number, has_supporting_document, supporting_document_notes, currency_code, fx_rate, total_foreign_amount, total_excluding_tax_myr, tax_amount_myr, total_including_tax_myr, payable_amount_myr, uuid, submission_uid, long_id, datetime_validated, invoice_status, einvoice_status, cancellation_reason, notes, created_at, updated_at, created_by
+- `self_billed_invoice_lines` - id, self_billed_invoice_id (FK self_billed_invoices CASCADE), line_number, description, quantity, unit_price_foreign, amount_foreign, amount_myr, classification_code, tax_type, tax_rate, tax_amount_myr, tax_exemption_reason, customs_form_reference, notes, created_at
 
 **Customers & Sales:**
 - `customers` - id, name, closeness, salesman, tin_number, id_type, state, email, address, city, id_number, phone_number, credit_limit, credit_used, updated_at
