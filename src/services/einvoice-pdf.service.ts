@@ -113,6 +113,43 @@ const getCompanyInfo = (context: "tienhock" | "greentarget" | "jellypolly") => {
   }
 };
 
+const resolveConsolidatedAmounts = (
+  einvoiceData: any
+): {
+  subtotal: number;
+  total: number;
+  rounding: number;
+  tax: number;
+} => {
+  const storedSubtotal: number = Number(einvoiceData.total_excluding_tax || 0);
+  const total: number = Number(
+    einvoiceData.total_payable_amount || einvoiceData.totalamountpayable || 0
+  );
+  const rounding: number = Number(
+    einvoiceData.total_rounding || einvoiceData.rounding || 0
+  );
+  const storedTax: number = Number(einvoiceData.tax_amount || 0);
+
+  if (storedSubtotal > 0) {
+    return {
+      subtotal: storedSubtotal,
+      total,
+      rounding,
+      tax:
+        storedTax !== 0
+          ? storedTax
+          : Math.max(total - storedSubtotal - rounding, 0),
+    };
+  }
+
+  return {
+    subtotal: Math.max(total - storedTax - rounding, 0),
+    total,
+    rounding,
+    tax: storedTax,
+  };
+};
+
 // Helper function to create consolidated order details
 const createConsolidatedOrderDetails = async (einvoiceData: any) => {
   try {
@@ -128,28 +165,16 @@ const createConsolidatedOrderDetails = async (einvoiceData: any) => {
     const month = datePart.substring(4, 6);
     const formattedDate = `${month}/${year}`;
 
-    // Convert values to numbers to ensure accurate calculation
-    const totalExcludingTax = Number(einvoiceData.total_excluding_tax || 0);
-    const totalPayableAmount = Number(
-      einvoiceData.total_payable_amount || einvoiceData.totalamountpayable || 0
-    );
-    const rounding = Number(
-      einvoiceData.total_rounding || einvoiceData.rounding || 0
-    );
-
-    // Check if a specific tax amount is provided
-    let taxAmount;
-    // Calculate tax accounting for rounding
-    taxAmount = totalPayableAmount - totalExcludingTax - rounding;
+    const amounts = resolveConsolidatedAmounts(einvoiceData);
 
     return [
       {
         productname: `Consolidated Invoice for ${formattedDate}`,
         description: `Consolidated Invoice for ${formattedDate}`,
         qty: 1,
-        price: totalExcludingTax.toString(),
-        total: totalPayableAmount.toString(),
-        tax: taxAmount,
+        price: amounts.subtotal.toString(),
+        total: amounts.total.toString(),
+        tax: amounts.tax,
       },
     ];
   } catch (error) {
@@ -196,14 +221,24 @@ export const preparePDFData = async (
     }
 
     // Calculate totals
-    const subtotal = Number(einvoiceData.total_excluding_tax || 0);
-    const total = Number(
-      einvoiceData.total_payable_amount || einvoiceData.totalamountpayable || 0
-    );
-    const rounding = Number(
-      einvoiceData.total_rounding || einvoiceData.rounding || 0
-    );
-    let tax = einvoiceData.tax_amount || 0;
+    const consolidatedAmounts = isConsolidated
+      ? resolveConsolidatedAmounts(einvoiceData)
+      : null;
+    const subtotal: number =
+      consolidatedAmounts?.subtotal ??
+      Number(einvoiceData.total_excluding_tax || 0);
+    const total: number =
+      consolidatedAmounts?.total ??
+      Number(
+        einvoiceData.total_payable_amount ||
+          einvoiceData.totalamountpayable ||
+          0
+      );
+    const rounding: number =
+      consolidatedAmounts?.rounding ??
+      Number(einvoiceData.total_rounding || einvoiceData.rounding || 0);
+    let tax: number =
+      consolidatedAmounts?.tax ?? Number(einvoiceData.tax_amount || 0);
 
     // If product-level tax calculation is zero or unavailable, use total-based calculation
     if (tax === 0 && orderDetails.length > 0) {
