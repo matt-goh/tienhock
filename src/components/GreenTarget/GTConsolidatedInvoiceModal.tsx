@@ -64,6 +64,13 @@ interface ConsolidationHistory {
   total_amount: number;
   created_at: string;
   consolidated_invoices: string[];
+  consolidated_source_invoices?: Array<{
+    invoice_id: number;
+    invoice_number: string;
+    amount_before_tax: number;
+    tax_amount: number;
+    total_amount: number;
+  }>;
 }
 
 const GTConsolidatedInvoiceModal: React.FC<GTConsolidatedInvoiceModalProps> = ({
