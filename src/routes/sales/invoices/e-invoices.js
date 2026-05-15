@@ -1200,6 +1200,7 @@ export default function (pool, config) {
         FROM invoices i
         LEFT JOIN order_details od ON i.id = od.invoiceid
         WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+        AND LOWER(i.id) NOT LIKE 'f%'
         AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
         AND (i.invoice_status != 'cancelled')
         AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
