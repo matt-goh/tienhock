@@ -458,6 +458,7 @@ export default function (pool, defaultConfig) {
         i.status, i.einvoice_status
       FROM greentarget.invoices i
       WHERE i.date_issued >= $1 AND i.date_issued < $2
+      AND LOWER(i.invoice_number) NOT LIKE 'f%'
       AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
       AND (i.status != 'cancelled')
       AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
