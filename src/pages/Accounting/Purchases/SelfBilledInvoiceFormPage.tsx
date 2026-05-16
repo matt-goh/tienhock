@@ -202,6 +202,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     useState<File | null>(null);
   const [supportingDocumentUploading, setSupportingDocumentUploading] =
     useState<boolean>(false);
+  const [s3Enabled, setS3Enabled] = useState<boolean>(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [showCancelDialog, setShowCancelDialog] = useState<boolean>(false);
 
@@ -268,6 +269,13 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   useEffect(() => {
     loadInvoice();
   }, [loadInvoice]);
+
+  useEffect(() => {
+    api
+      .get<{ s3Enabled: boolean }>("/api/self-billed-invoices/features")
+      .then((data) => setS3Enabled(data.s3Enabled))
+      .catch(() => setS3Enabled(false));
+  }, []);
 
   useEffect(() => {
     const search = supplier.supplier_name.trim();
@@ -480,7 +488,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const uploadSupportingDocument = async (
     invoiceId: number
   ): Promise<boolean> => {
-    if (!supportingDocumentFile) return true;
+    if (!supportingDocumentFile || !s3Enabled) return true;
 
     setSupportingDocumentUploading(true);
     try {
@@ -1195,10 +1203,15 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                   </div>
                 )}
 
+                {!s3Enabled && (
+                  <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
+                    Document upload unavailable — S3 storage not configured.
+                  </p>
+                )}
                 <div className="mt-auto flex flex-wrap gap-2 pt-3">
                   <label
                     className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-default-300 px-3 text-sm font-medium text-default-700 hover:bg-default-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600 ${
-                      !canEditRecords ? "pointer-events-none opacity-60" : ""
+                      !canEditRecords || !s3Enabled ? "pointer-events-none opacity-60" : ""
                     }`}
                   >
                     <IconUpload size={16} />
@@ -1207,7 +1220,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                       type="file"
                       accept=".pdf,.doc,.docx,image/*"
                       className="hidden"
-                      disabled={!canEditRecords}
+                      disabled={!canEditRecords || !s3Enabled}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                         setSupportingDocumentFile(event.target.files?.[0] || null);
                         event.target.value = "";
@@ -1354,6 +1367,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                 type="button"
                 color="rose"
                 variant="outline"
+                size="sm"
                 additionalClasses="w-full"
                 className="h-8 rounded-lg"
                 onClick={() => setShowDeleteDialog(true)}

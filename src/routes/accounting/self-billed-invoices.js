@@ -524,6 +524,10 @@ export default function (pool, config) {
   const apiClient = EInvoiceApiClientFactory.getInstance(config);
   const submissionHandler = new EInvoiceSubmissionHandler(apiClient);
 
+  router.get("/features", (req, res) => {
+    res.json({ s3Enabled: isS3ObjectStorageEnabled() });
+  });
+
   router.get("/foreign-suppliers", async (req, res) => {
     try {
       const { search = "", limit = 20 } = req.query;
