@@ -4,6 +4,10 @@ import {
   TIENHOCK_INFO,
   JELLYPOLLY_INFO,
 } from "../utils/invoice/einvoice/companyInfo";
+import {
+  createConsolidatedReceiptGroups,
+  toAmount,
+} from "../utils/invoice/einvoice/consolidatedReceiptGrouping";
 import { ExtendedInvoiceData } from "../types/types";
 
 // Interface for PDF data structure
@@ -45,10 +49,26 @@ export interface EInvoicePDFData {
   }>;
 }
 
+type CompanyContext = "tienhock" | "jellypolly";
+
+interface ConsolidatedSourceInvoice {
+  id?: string | number;
+  invoice_number?: string;
+  internal_id?: string;
+  total_excluding_tax?: number | string;
+  amount?: number | string;
+  tax_amount?: number | string;
+  rounding?: number | string;
+  totalamountpayable?: number | string;
+  total_payable_amount?: number | string;
+  products?: Array<any>;
+  orderDetails?: Array<any>;
+}
+
 // Fetch customer data from cache or API
 const fetchCustomerData = async (
   customerId: string,
-  context: "tienhock" | "jellypolly" = "tienhock"
+  context: CompanyContext = "tienhock"
 ): Promise<any> => {
   try {
     // Check if customer ID is valid
@@ -104,7 +124,7 @@ const fetchCustomerData = async (
   }
 };
 
-const getCompanyInfo = (context: "tienhock" | "greentarget" | "jellypolly") => {
+const getCompanyInfo = (context: CompanyContext | "greentarget") => {
   switch (context) {
     case "jellypolly":
       return JELLYPOLLY_INFO;
@@ -113,8 +133,217 @@ const getCompanyInfo = (context: "tienhock" | "greentarget" | "jellypolly") => {
   }
 };
 
+const parseConsolidatedInvoiceReferences = (value: any): string[] => {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item: unknown) => String(item)).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: unknown) => String(item)).filter(Boolean);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+const calculateSourceInvoiceAmounts = (
+  invoice: ConsolidatedSourceInvoice
+): {
+  subtotal: number;
+  tax: number;
+  rounding: number;
+  total: number;
+} => {
+  const productData: Array<any> | undefined =
+    invoice.products || invoice.orderDetails;
+  let subtotal: number = 0;
+  let tax: number = 0;
+
+  if (productData && Array.isArray(productData) && productData.length > 0) {
+    productData.forEach((product: any): void => {
+      if (!product.issubtotal) {
+        const quantity: number = toAmount(product.quantity);
+        const price: number = toAmount(product.price);
+
+        if (quantity === 0 && product.total) {
+          subtotal += toAmount(product.total);
+        } else {
+          subtotal += price * quantity;
+        }
+
+        tax += toAmount(product.tax);
+      }
+    });
+  } else {
+    subtotal = toAmount(invoice.amount || invoice.total_excluding_tax);
+  }
+
+  if (tax === 0 && toAmount(invoice.tax_amount) > 0) {
+    tax = toAmount(invoice.tax_amount);
+  }
+
+  if (tax === 0) {
+    tax = Math.max(
+      toAmount(invoice.totalamountpayable || invoice.total_payable_amount) -
+        subtotal -
+        toAmount(invoice.rounding),
+      0
+    );
+  }
+
+  return {
+    subtotal,
+    tax,
+    rounding: toAmount(invoice.rounding),
+    total: toAmount(invoice.totalamountpayable || invoice.total_payable_amount),
+  };
+};
+
+const fetchConsolidatedSourceInvoices = async (
+  einvoiceData: any,
+  companyContext: CompanyContext
+): Promise<ConsolidatedSourceInvoice[]> => {
+  if (
+    Array.isArray(einvoiceData.consolidated_source_invoices) &&
+    einvoiceData.consolidated_source_invoices.length > 0
+  ) {
+    return einvoiceData.consolidated_source_invoices;
+  }
+
+  const invoiceReferences: string[] = parseConsolidatedInvoiceReferences(
+    einvoiceData.consolidated_invoices
+  );
+
+  if (invoiceReferences.length === 0) {
+    return [];
+  }
+
+  const baseEndpoint: string =
+    companyContext === "jellypolly"
+      ? "/jellypolly/api/einvoice"
+      : "/api/einvoice";
+
+  try {
+    const batchInvoices: any = await api.post(
+      `${baseEndpoint}/consolidated-source-invoices`,
+      { invoiceIds: invoiceReferences }
+    );
+
+    if (Array.isArray(batchInvoices)) {
+      const invoiceByReference: Map<string, ConsolidatedSourceInvoice> =
+        new Map(
+          batchInvoices.map((invoice: any): [string, ConsolidatedSourceInvoice] => [
+            String(invoice.id || invoice.invoice_number),
+            invoice,
+          ])
+        );
+
+      return invoiceReferences
+        .map((invoiceReference: string): ConsolidatedSourceInvoice | null => {
+          const invoice: ConsolidatedSourceInvoice | undefined =
+            invoiceByReference.get(invoiceReference);
+
+          if (!invoice) {
+            return null;
+          }
+
+          return {
+            ...invoice,
+            id: invoice.id || invoiceReference,
+            internal_id:
+              invoice.internal_id || String(invoice.id || invoiceReference),
+          };
+        })
+        .filter(
+          (invoice): invoice is ConsolidatedSourceInvoice => invoice !== null
+        );
+    }
+  } catch (error) {
+    console.warn(
+      "Failed to fetch consolidated source invoices in batch:",
+      error
+    );
+  }
+
+  const sourceInvoices: ConsolidatedSourceInvoice[] = [];
+  const fallbackBaseEndpoint: string =
+    companyContext === "jellypolly"
+      ? "/jellypolly/api/invoices"
+      : "/api/invoices";
+
+  for (const invoiceReference of invoiceReferences) {
+    try {
+      const invoiceData: any = await api.get(
+        `${fallbackBaseEndpoint}/${encodeURIComponent(invoiceReference)}`
+      );
+      sourceInvoices.push({
+        ...invoiceData,
+        id: invoiceData.id || invoiceReference,
+        internal_id: invoiceData.internal_id || invoiceReference,
+      });
+    } catch (error) {
+      console.warn(
+        `Failed to fetch consolidated source invoice ${invoiceReference}:`,
+        error
+      );
+    }
+  }
+
+  return sourceInvoices;
+};
+
+const resolveConsolidatedAmounts = (
+  einvoiceData: any
+): {
+  subtotal: number;
+  total: number;
+  rounding: number;
+  tax: number;
+} => {
+  const storedSubtotal: number = Number(einvoiceData.total_excluding_tax || 0);
+  const total: number = Number(
+    einvoiceData.total_payable_amount || einvoiceData.totalamountpayable || 0
+  );
+  const rounding: number = Number(
+    einvoiceData.total_rounding || einvoiceData.rounding || 0
+  );
+  const storedTax: number = Number(einvoiceData.tax_amount || 0);
+
+  if (storedSubtotal > 0) {
+    return {
+      subtotal: storedSubtotal,
+      total,
+      rounding,
+      tax:
+        storedTax !== 0
+          ? storedTax
+          : Math.max(total - storedSubtotal - rounding, 0),
+    };
+  }
+
+  return {
+    subtotal: Math.max(total - storedTax - rounding, 0),
+    total,
+    rounding,
+    tax: storedTax,
+  };
+};
+
 // Helper function to create consolidated order details
-const createConsolidatedOrderDetails = async (einvoiceData: any) => {
+const createConsolidatedOrderDetails = async (
+  einvoiceData: any,
+  companyContext: CompanyContext
+) => {
   try {
     // Extract date part from the invoice ID (e.g., "202503" from "CON-202503")
     const datePart = einvoiceData.internal_id
@@ -128,28 +357,34 @@ const createConsolidatedOrderDetails = async (einvoiceData: any) => {
     const month = datePart.substring(4, 6);
     const formattedDate = `${month}/${year}`;
 
-    // Convert values to numbers to ensure accurate calculation
-    const totalExcludingTax = Number(einvoiceData.total_excluding_tax || 0);
-    const totalPayableAmount = Number(
-      einvoiceData.total_payable_amount || einvoiceData.totalamountpayable || 0
-    );
-    const rounding = Number(
-      einvoiceData.total_rounding || einvoiceData.rounding || 0
-    );
+    const amounts = resolveConsolidatedAmounts(einvoiceData);
+    const sourceInvoices: ConsolidatedSourceInvoice[] =
+      await fetchConsolidatedSourceInvoices(einvoiceData, companyContext);
 
-    // Check if a specific tax amount is provided
-    let taxAmount;
-    // Calculate tax accounting for rounding
-    taxAmount = totalPayableAmount - totalExcludingTax - rounding;
+    if (sourceInvoices.length > 0) {
+      const receiptGroups = createConsolidatedReceiptGroups(
+        sourceInvoices,
+        calculateSourceInvoiceAmounts
+      );
+
+      return receiptGroups.map((group: any) => ({
+        productname: group.description,
+        description: group.description,
+        qty: 1,
+        price: group.amounts.subtotal.toString(),
+        total: group.amounts.total.toString(),
+        tax: group.amounts.tax,
+      }));
+    }
 
     return [
       {
         productname: `Consolidated Invoice for ${formattedDate}`,
         description: `Consolidated Invoice for ${formattedDate}`,
         qty: 1,
-        price: totalExcludingTax.toString(),
-        total: totalPayableAmount.toString(),
-        tax: taxAmount,
+        price: amounts.subtotal.toString(),
+        total: amounts.total.toString(),
+        tax: amounts.tax,
       },
     ];
   } catch (error) {
@@ -161,7 +396,7 @@ const createConsolidatedOrderDetails = async (einvoiceData: any) => {
 // Original function to prepare PDF data from standard e-invoice format
 export const preparePDFData = async (
   einvoiceData: any,
-  companyContext: "tienhock" | "jellypolly" = "tienhock"
+  companyContext: CompanyContext = "tienhock"
 ): Promise<EInvoicePDFData> => {
   const isConsolidated =
     einvoiceData.is_consolidated ||
@@ -190,20 +425,33 @@ export const preparePDFData = async (
     // Get order details
     let orderDetails;
     if (isConsolidated) {
-      orderDetails = await createConsolidatedOrderDetails(einvoiceData);
+      orderDetails = await createConsolidatedOrderDetails(
+        einvoiceData,
+        companyContext
+      );
     } else {
       orderDetails = einvoiceData.orderDetails || [];
     }
 
     // Calculate totals
-    const subtotal = Number(einvoiceData.total_excluding_tax || 0);
-    const total = Number(
-      einvoiceData.total_payable_amount || einvoiceData.totalamountpayable || 0
-    );
-    const rounding = Number(
-      einvoiceData.total_rounding || einvoiceData.rounding || 0
-    );
-    let tax = einvoiceData.tax_amount || 0;
+    const consolidatedAmounts = isConsolidated
+      ? resolveConsolidatedAmounts(einvoiceData)
+      : null;
+    const subtotal: number =
+      consolidatedAmounts?.subtotal ??
+      Number(einvoiceData.total_excluding_tax || 0);
+    const total: number =
+      consolidatedAmounts?.total ??
+      Number(
+        einvoiceData.total_payable_amount ||
+          einvoiceData.totalamountpayable ||
+          0
+      );
+    const rounding: number =
+      consolidatedAmounts?.rounding ??
+      Number(einvoiceData.total_rounding || einvoiceData.rounding || 0);
+    let tax: number =
+      consolidatedAmounts?.tax ?? Number(einvoiceData.tax_amount || 0);
 
     // If product-level tax calculation is zero or unavailable, use total-based calculation
     if (tax === 0 && orderDetails.length > 0) {
@@ -269,7 +517,7 @@ export const preparePDFData = async (
 // Function to prepare PDF data from ExtendedInvoiceData
 export const preparePDFDataFromInvoice = async (
   invoice: ExtendedInvoiceData,
-  companyContext: "tienhock" | "jellypolly" = "tienhock"
+  companyContext: CompanyContext = "tienhock"
 ): Promise<EInvoicePDFData> => {
   // If we already have extended invoice data, just use the existing preparePDFData function
   // with required property mapping
@@ -287,6 +535,9 @@ export const preparePDFDataFromInvoice = async (
       submission_uid: invoice.submission_uid,
       datetime_validated: invoice.datetime_validated,
       is_consolidated: invoice.is_consolidated,
+      consolidated_invoices: invoice.consolidated_invoices,
+      consolidated_source_invoices: (invoice as any)
+        .consolidated_source_invoices,
       orderDetails: invoice.products,
       type_name: invoice.paymenttype,
     },
@@ -297,7 +548,7 @@ export const preparePDFDataFromInvoice = async (
 // Function to handle batch preparation of PDF data
 export const prepareBatchPDFData = async (
   invoices: ExtendedInvoiceData[],
-  companyContext: "tienhock" | "jellypolly" = "tienhock"
+  companyContext: CompanyContext = "tienhock"
 ): Promise<
   Array<{
     pdfData: EInvoicePDFData;

@@ -1,5 +1,11 @@
 // src/utils/invoice/einvoice/EInvoiceConsolidatedTemplate.js
 import { TIENHOCK_INFO } from "./companyInfo.js";
+import {
+  createConsolidatedReceiptGroups,
+  escapeXmlText,
+  formatAmount,
+  toAmount,
+} from "./consolidatedReceiptGrouping.js";
 
 // Helper function to format ISO date (YYYY-MM-DD)
 const formatDate = (date) => {
@@ -18,6 +24,99 @@ const formatTime = () => {
   return `${hours}:${minutes}:00Z`;
 };
 
+const calculateInvoiceAmounts = (invoice) => {
+  let subtotal = 0;
+  let tax = 0;
+
+  if (invoice.orderDetails && Array.isArray(invoice.orderDetails)) {
+    subtotal = invoice.orderDetails.reduce((sum, product) => {
+      if (!product.issubtotal) {
+        const quantity = toAmount(product.quantity);
+        const price = toAmount(product.price);
+
+        if (quantity === 0 && product.total) {
+          return sum + toAmount(product.total);
+        }
+
+        return sum + price * quantity;
+      }
+      return sum;
+    }, 0);
+
+    tax = invoice.orderDetails.reduce((sum, product) => {
+      if (!product.issubtotal) {
+        return sum + toAmount(product.tax);
+      }
+      return sum;
+    }, 0);
+  } else {
+    subtotal = toAmount(invoice.amount || invoice.total_excluding_tax);
+  }
+
+  if (tax === 0 && toAmount(invoice.tax_amount) > 0) {
+    tax = toAmount(invoice.tax_amount);
+  }
+
+  if (tax === 0) {
+    tax = Math.max(
+      toAmount(invoice.totalamountpayable) - subtotal - toAmount(invoice.rounding),
+      0
+    );
+  }
+
+  return {
+    subtotal,
+    tax,
+    rounding: toAmount(invoice.rounding),
+    total: toAmount(invoice.totalamountpayable),
+  };
+};
+
+const createInvoiceLineXml = (group, index) => `
+  <cac:InvoiceLine>
+    <cbc:ID>${index + 1}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="MYR">${formatAmount(
+      group.amounts.subtotal
+    )}</cbc:LineExtensionAmount>
+    <cac:TaxTotal>
+      <cbc:TaxAmount currencyID="MYR">${formatAmount(group.amounts.tax)}</cbc:TaxAmount>
+      <cac:TaxSubtotal>
+        <cbc:TaxableAmount currencyID="MYR">${formatAmount(
+          group.amounts.subtotal
+        )}</cbc:TaxableAmount>
+        <cbc:TaxAmount currencyID="MYR">${formatAmount(group.amounts.tax)}</cbc:TaxAmount>
+        <cbc:Percent>0</cbc:Percent>
+        <cac:TaxCategory>
+          <cbc:ID>01</cbc:ID>
+          <cac:TaxScheme>
+            <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">OTH</cbc:ID>
+          </cac:TaxScheme>
+        </cac:TaxCategory>
+      </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:Item>
+      <cbc:Description>${escapeXmlText(group.description)}</cbc:Description>
+      <cac:OriginCountry>
+        <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
+      </cac:OriginCountry>
+      <cac:CommodityClassification>
+        <cbc:ItemClassificationCode listID="PTC"/>
+      </cac:CommodityClassification>
+      <cac:CommodityClassification>
+        <cbc:ItemClassificationCode listID="CLASS">004</cbc:ItemClassificationCode>
+      </cac:CommodityClassification>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="MYR">${formatAmount(
+        group.amounts.subtotal
+      )}</cbc:PriceAmount>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="MYR">${formatAmount(group.amounts.subtotal)}</cbc:Amount>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>`;
+
 export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   try {
     if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
@@ -28,69 +127,26 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
       };
     }
 
-    // Calculate totals from all invoices
-    let totalExcludingTax = 0;
-    let totalInclusiveTax = 0;
-    let totalPayableAmount = 0;
-    let totalRounding = 0;
-    let totalProductTax = 0;
-
-    invoices.forEach((invoice) => {
-      // Calculate true tax-exclusive amount using product data if available
-      if (invoice.orderDetails && Array.isArray(invoice.orderDetails)) {
-        // Sum product price * quantity for true tax-exclusive amount
-        // Handle different product types: regular products, OTH (Other), LESS (Discount)
-        const invoiceSubtotal = invoice.orderDetails.reduce((sum, product) => {
-          if (!product.issubtotal) {
-            const quantity = Number(product.quantity) || 0;
-            const price = Number(product.price) || 0;
-            
-            // For products with no quantity (like OTH, LESS), use the total field directly
-            if (quantity === 0 && product.total) {
-              return sum + (Number(product.total) || 0);
-            }
-            
-            // For regular products, use price * quantity
-            return sum + (price * quantity);
-          }
-          return sum;
-        }, 0);
-        totalExcludingTax += invoiceSubtotal;
-
-        // Sum product taxes
-        invoice.orderDetails.forEach((product) => {
-          if (!product.issubtotal) {
-            totalProductTax += Number(product.tax) || 0;
-          }
-        });
-      } else {
-        // Fallback: Use amount directly if specified as tax-exclusive
-        // If it's tax-inclusive and we don't have product data, this will be inaccurate
-        totalExcludingTax += Number(invoice.amount) || 0;
-      }
-
-      totalPayableAmount += Number(invoice.totalamountpayable) || 0;
-      totalRounding += Number(invoice.rounding) || 0;
-    });
-
-    // Calculate tax amount - prefer product-level calculation
-    let taxAmount = totalProductTax;
-    
-    // Only use fallback calculation if we have a meaningful difference that suggests tax
-    if (taxAmount === 0 && invoices.some(inv => inv.tax_amount && Number(inv.tax_amount) > 0)) {
-      // If no product-level taxes found but invoice has tax_amount field, use that
-      taxAmount = invoices.reduce((sum, inv) => sum + (Number(inv.tax_amount) || 0), 0);
-    }
-    
-    // If still no tax found, it's likely tax-exempt - keep taxAmount as 0
-
-    totalInclusiveTax = totalExcludingTax + taxAmount;
+    const receiptGroups = createConsolidatedReceiptGroups(
+      invoices,
+      calculateInvoiceAmounts
+    );
+    const totals = receiptGroups.reduce(
+      (sum, group) => ({
+        subtotal: sum.subtotal + group.amounts.subtotal,
+        tax: sum.tax + group.amounts.tax,
+        rounding: sum.rounding + group.amounts.rounding,
+        total: sum.total + group.amounts.total,
+      }),
+      { subtotal: 0, tax: 0, rounding: 0, total: 0 }
+    );
+    const totalInclusiveTax = totals.subtotal + totals.tax;
 
     // Format amounts to 2 decimal places
-    totalExcludingTax = totalExcludingTax.toFixed(2);
-    totalPayableAmount = totalPayableAmount.toFixed(2);
-    totalRounding = totalRounding.toFixed(2);
-    const formattedTaxAmount = taxAmount.toFixed(2);
+    const totalExcludingTax = formatAmount(totals.subtotal);
+    const totalPayableAmount = formatAmount(totals.total);
+    const totalRounding = formatAmount(totals.rounding);
+    const formattedTaxAmount = formatAmount(totals.tax);
 
     // Generate a unique ID for consolidated invoice based on month and year
     const consolidatedId = `CON-${year}${String(month + 1).padStart(2, "0")}`;
@@ -220,7 +276,9 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="MYR">${totalExcludingTax}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="MYR">${totalExcludingTax}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="MYR">${totalInclusiveTax}</cbc:TaxInclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="MYR">${formatAmount(
+      totalInclusiveTax
+    )}</cbc:TaxInclusiveAmount>
     <cbc:AllowanceTotalAmount currencyID="MYR">0</cbc:AllowanceTotalAmount>
     <cbc:ChargeTotalAmount currencyID="MYR">0</cbc:ChargeTotalAmount>
     <cbc:PayableRoundingAmount currencyID="MYR">${
@@ -229,50 +287,8 @@ export async function EInvoiceConsolidatedTemplate(invoices, month, year) {
     <cbc:PayableAmount currencyID="MYR">${totalPayableAmount}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>`;
 
-    // Add single consolidated invoice line
-    const monthYearName = new Date(year, month).toLocaleString("default", {
-      month: "long",
-      year: "numeric",
-    });
-
+    xml += receiptGroups.map(createInvoiceLineXml).join("");
     xml += `
-  <cac:InvoiceLine>
-    <cbc:ID>1</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="MYR">${totalExcludingTax}</cbc:LineExtensionAmount>
-    <cac:TaxTotal>
-      <cbc:TaxAmount currencyID="MYR">${formattedTaxAmount}</cbc:TaxAmount>
-      <cac:TaxSubtotal>
-        <cbc:TaxableAmount currencyID="MYR">${totalExcludingTax}</cbc:TaxableAmount>
-        <cbc:TaxAmount currencyID="MYR">${formattedTaxAmount}</cbc:TaxAmount>
-        <cbc:Percent>0</cbc:Percent>
-        <cac:TaxCategory>
-          <cbc:ID>01</cbc:ID>
-          <cac:TaxScheme>
-            <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">OTH</cbc:ID>
-          </cac:TaxScheme>
-        </cac:TaxCategory>
-      </cac:TaxSubtotal>
-    </cac:TaxTotal>
-    <cac:Item>
-      <cbc:Description>Consolidated Invoices for ${monthYearName} (${invoices.length} invoices)</cbc:Description>
-      <cac:OriginCountry>
-        <cbc:IdentificationCode>MYS</cbc:IdentificationCode>
-      </cac:OriginCountry>
-      <cac:CommodityClassification>
-        <cbc:ItemClassificationCode listID="PTC"/>
-      </cac:CommodityClassification>
-      <cac:CommodityClassification>
-        <cbc:ItemClassificationCode listID="CLASS">004</cbc:ItemClassificationCode>
-      </cac:CommodityClassification>
-    </cac:Item>
-    <cac:Price>
-      <cbc:PriceAmount currencyID="MYR">${totalExcludingTax}</cbc:PriceAmount>
-    </cac:Price>
-    <cac:ItemPriceExtension>
-      <cbc:Amount currencyID="MYR">${totalExcludingTax}</cbc:Amount>
-    </cac:ItemPriceExtension>
-  </cac:InvoiceLine>
 </Invoice>`;
 
     return xml;

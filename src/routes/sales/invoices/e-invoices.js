@@ -50,6 +50,7 @@ const getInvoices = async (pool, invoiceId) => {
           i.createddate,
           i.paymenttype,
           i.total_excluding_tax,
+          i.tax_amount,
           i.rounding,
           i.totalamountpayable
         FROM 
@@ -1017,18 +1018,15 @@ export default function (pool, config) {
           is_consolidated = true
       `;
 
-      // Add year filtering if provided
+      // Add year filtering by consolidated invoice period, not submission date.
+      // A December consolidation can be created in January, but it belongs to CON-YYYY12.
       const queryParams = [];
       if (year) {
-        // Filter where createddate is within the specified year
-        const startDate = new Date(parseInt(year), 0, 1).getTime(); // Jan 1st of year
-        const endDate = new Date(parseInt(year) + 1, 0, 1).getTime(); // Jan 1st of next year
-
-        query += ` AND CAST(createddate AS bigint) >= $1 AND CAST(createddate AS bigint) < $2`;
-        queryParams.push(startDate.toString(), endDate.toString());
+        query += ` AND id LIKE $1`;
+        queryParams.push(`CON-${year}%`);
       }
 
-      query += ` ORDER BY createddate DESC`;
+      query += ` ORDER BY id DESC, createddate DESC`;
 
       const result = await pool.query(query, queryParams);
 
@@ -1058,6 +1056,85 @@ export default function (pool, config) {
       res.status(500).json({
         success: false,
         message: "Failed to fetch consolidated invoice history",
+        error: error.message,
+      });
+    }
+  });
+
+  // Get source invoice details for consolidated PDF line grouping in one request
+  router.post("/consolidated-source-invoices", async (req, res) => {
+    try {
+      const { invoiceIds } = req.body;
+
+      if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "invoiceIds array is required",
+        });
+      }
+
+      const query = `
+        SELECT
+          i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
+          i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', od.id,
+                'code', od.code,
+                'quantity', od.quantity,
+                'price', od.price,
+                'freeProduct', od.freeproduct,
+                'returnProduct', od.returnproduct,
+                'description', od.description,
+                'tax', od.tax,
+                'total', od.total,
+                'issubtotal', od.issubtotal
+              )
+              ORDER BY od.id
+            ) FILTER (WHERE od.id IS NOT NULL),
+            '[]'::json
+          ) as products
+        FROM invoices i
+        LEFT JOIN order_details od ON i.id = od.invoiceid
+        WHERE i.id = ANY($1::text[])
+        GROUP BY i.id
+      `;
+
+      const result = await pool.query(query, [invoiceIds.map(String)]);
+      const invoiceById = new Map(result.rows.map((row) => [row.id, row]));
+
+      const sourceInvoices = invoiceIds
+        .map((invoiceId) => invoiceById.get(String(invoiceId)))
+        .filter(Boolean)
+        .map((invoice) => ({
+          id: invoice.id,
+          salespersonid: invoice.salespersonid,
+          customerid: invoice.customerid,
+          createddate: invoice.createddate,
+          paymenttype: invoice.paymenttype,
+          total_excluding_tax: parseFloat(invoice.total_excluding_tax || 0),
+          tax_amount: parseFloat(invoice.tax_amount || 0),
+          rounding: parseFloat(invoice.rounding || 0),
+          totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
+          products: (invoice.products || []).map((product) => ({
+            ...product,
+            price: parseFloat(product.price || 0),
+            quantity: parseInt(product.quantity || 0),
+            freeProduct: parseInt(product.freeProduct || 0),
+            returnProduct: parseInt(product.returnProduct || 0),
+            tax: parseFloat(product.tax || 0),
+            total: String(product.total || "0.00"),
+            issubtotal: Boolean(product.issubtotal),
+          })),
+        }));
+
+      return res.json(sourceInvoices);
+    } catch (error) {
+      console.error("Error fetching consolidated source invoices:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch consolidated source invoices",
         error: error.message,
       });
     }
@@ -1200,6 +1277,7 @@ export default function (pool, config) {
         FROM invoices i
         LEFT JOIN order_details od ON i.id = od.invoiceid
         WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+        AND LOWER(i.id) NOT LIKE 'f%'
         AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
         AND (i.invoice_status != 'cancelled')
         AND (i.is_consolidated = false OR i.is_consolidated IS NULL)

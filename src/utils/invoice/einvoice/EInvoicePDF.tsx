@@ -408,7 +408,7 @@ const EInvoicePDF: React.FC<Props> = ({
         {data.orderDetails && data.orderDetails.length > 0 ? (
           data.orderDetails.map((item, index) => (
             <View key={index} style={styles.tableRow}>
-              <Text style={[styles.classCol, styles.cellText]}>022</Text>
+              <Text style={[styles.classCol, styles.cellText]}>{isConsolidated ? "004" : "022"}</Text>
               <Text style={[styles.itemNameCol, styles.cellText]}>
                 {item.description}
               </Text>

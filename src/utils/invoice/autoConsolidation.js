@@ -351,12 +351,13 @@ async function getEligibleTienhockInvoices(client, month, year) {
   const invoiceQuery = `
     SELECT 
       i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-      i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.total_excluding_tax, i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
       i.balance_due, i.invoice_status,
       c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
     FROM invoices i
     JOIN customers c ON i.customerid = c.id
     WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+    AND LOWER(i.id) NOT LIKE 'f%'
     AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
     AND (i.invoice_status != 'cancelled')
     AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
@@ -418,12 +419,13 @@ async function getEligibleJellypollyInvoices(client, month, year) {
   const invoiceQuery = `
     SELECT 
       i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype, 
-      i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
+      i.total_excluding_tax, i.total_excluding_tax as amount, i.tax_amount, i.rounding, i.totalamountpayable,
       i.balance_due, i.invoice_status,
       c.name, c.tin_number, c.id_number, c.phone_number, c.address, c.state, c.city
     FROM jellypolly.invoices i
     JOIN customers c ON i.customerid = c.id
     WHERE (CAST(i.createddate AS bigint) >= $1 AND CAST(i.createddate AS bigint) < $2)
+    AND LOWER(i.id) NOT LIKE 'f%'
     AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
     AND (i.invoice_status != 'cancelled')
     AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
@@ -474,6 +476,7 @@ async function getEligibleGreentargetInvoices(client, month, year) {
     JOIN greentarget.customers c ON i.customer_id = c.customer_id
     WHERE EXTRACT(MONTH FROM i.date_issued) = $1 + 1
     AND EXTRACT(YEAR FROM i.date_issued) = $2
+    AND LOWER(i.invoice_number) NOT LIKE 'f%'
     AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid' OR i.einvoice_status = 'pending')
     AND i.status != 'cancelled'
     AND (i.is_consolidated = false OR i.is_consolidated IS NULL)

@@ -547,6 +547,13 @@ export interface InvoiceGT {
   datetime_validated: string | null; // ISO timestamp string or null
   is_consolidated: boolean;
   consolidated_invoices: string[] | null; // Array of invoice IDs or null
+  consolidated_source_invoices?: Array<{
+    invoice_id: number;
+    invoice_number: string;
+    amount_before_tax: number;
+    tax_amount: number;
+    total_amount: number;
+  }>;
   cancellation_date?: string | null;
   cancellation_reason?: string;
 }
@@ -1441,4 +1448,127 @@ export interface MaterialDropdown {
 // Purchase Invoice with lines (from GET /purchase-invoices/:id)
 export interface PurchaseInvoiceWithLines extends PurchaseInvoice {
   lines: PurchaseInvoiceLine[];
+}
+
+// ==================== SELF-BILLED E-INVOICE TYPES ====================
+
+export type SelfBilledEInvoiceStatus =
+  | "pending"
+  | "valid"
+  | "invalid"
+  | "cancelled"
+  | null;
+
+export type SelfBilledInvoiceStatus = "active" | "cancelled";
+
+export interface SelfBilledForeignSupplier {
+  id?: number;
+  supplier_name: string;
+  tin_number: string;
+  id_type: string;
+  id_number: string;
+  sst_number: string;
+  ttx_number: string;
+  msic_code: string;
+  business_activity_description: string;
+  address_line_0: string;
+  address_line_1?: string | null;
+  address_line_2?: string | null;
+  city: string;
+  postcode?: string | null;
+  state_code: string;
+  country_code: string;
+  contact_number: string;
+  email?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SelfBilledInvoiceLine {
+  id?: number;
+  self_billed_invoice_id?: number;
+  line_number: number;
+  description: string;
+  quantity: number;
+  balance_quantity?: number | null;
+  unit_price_foreign: number;
+  amount_foreign: number;
+  amount_myr: number;
+  classification_code: string;
+  tax_type: string;
+  tax_rate: number;
+  tax_amount_myr: number;
+  tax_exemption_reason?: string | null;
+  customs_form_reference?: string | null;
+  notes?: string | null;
+}
+
+export interface SelfBilledInvoiceListItem {
+  id: number;
+  self_billed_no: string;
+  purchase_date: string;
+  transaction_type: string;
+  platform: string | null;
+  order_no: string | null;
+  currency_code: string;
+  total_foreign_amount: number;
+  payable_amount_myr: number;
+  uuid: string | null;
+  long_id: string | null;
+  invoice_status: SelfBilledInvoiceStatus;
+  einvoice_status: SelfBilledEInvoiceStatus;
+  has_supporting_document?: boolean;
+  supporting_document_filename?: string | null;
+  supporting_document_content_type?: string | null;
+  supporting_document_size?: number | null;
+  supporting_document_uploaded_at?: string | null;
+  created_at: string;
+  supplier_name: string;
+}
+
+export interface SelfBilledInvoiceInput {
+  foreign_supplier_id?: number | null;
+  supplier: SelfBilledForeignSupplier;
+  self_billed_no?: string;
+  purchase_date: string;
+  transaction_type: string;
+  platform?: string | null;
+  order_no?: string | null;
+  payment_reference?: string | null;
+  shipping_method?: string | null;
+  shipping_number?: string | null;
+  has_supporting_document: boolean;
+  supporting_document_notes?: string | null;
+  supporting_document_s3_key?: string | null;
+  supporting_document_filename?: string | null;
+  supporting_document_content_type?: string | null;
+  supporting_document_size?: number | null;
+  supporting_document_uploaded_at?: string | null;
+  supporting_document_uploaded_by?: string | null;
+  currency_code: string;
+  fx_rate: number;
+  notes?: string | null;
+  lines: SelfBilledInvoiceLine[];
+}
+
+export interface SelfBilledInvoice extends SelfBilledInvoiceInput {
+  id: number;
+  self_billed_no: string;
+  total_foreign_amount: number;
+  total_excluding_tax_myr: number;
+  tax_amount_myr: number;
+  total_including_tax_myr: number;
+  payable_amount_myr: number;
+  uuid: string | null;
+  submission_uid: string | null;
+  long_id: string | null;
+  datetime_validated: string | null;
+  invoice_status: SelfBilledInvoiceStatus;
+  einvoice_status: SelfBilledEInvoiceStatus;
+  cancellation_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
 }
