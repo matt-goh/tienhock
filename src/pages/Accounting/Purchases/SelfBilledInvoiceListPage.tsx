@@ -14,11 +14,11 @@ import {
   IconSquareMinusFilled,
   IconX,
 } from "@tabler/icons-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import DateRangePicker from "../../../components/DateRangePicker";
+import MonthNavigator from "../../../components/MonthNavigator";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { FormListbox } from "../../../components/FormComponents";
@@ -28,11 +28,6 @@ import {
   SelfBilledInvoiceStatus,
   SelfBilledInvoiceListItem,
 } from "../../../types/types";
-
-interface DateRange {
-  start: Date;
-  end: Date;
-}
 
 interface SubmissionDocument {
   internalId: string;
@@ -154,16 +149,6 @@ const formatFileSize = (bytes?: number | null): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const getMonthStart = (): Date => {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-};
-
-const getTodayEnd = (): Date => {
-  const now = new Date();
-  now.setHours(23, 59, 59, 999);
-  return now;
-};
 
 const formatDateForApi = (date: Date): string => {
   const year = date.getFullYear();
@@ -181,6 +166,7 @@ const canSubmitInvoice = (invoice: SelfBilledInvoiceListItem): boolean => {
 
 const SelfBilledInvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<SelfBilledInvoiceListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
@@ -197,10 +183,28 @@ const SelfBilledInvoiceListPage: React.FC = () => {
   const [submissionResults, setSubmissionResults] =
     useState<SelfBilledSubmissionResult | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [dateRange, setDateRange] = useState<DateRange>({
-    start: getMonthStart(),
-    end: getTodayEnd(),
+
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+    const param = searchParams.get("month");
+    if (param) {
+      const [year, month] = param.split("-").map(Number);
+      if (year && month >= 1 && month <= 12) {
+        return new Date(year, month - 1, 1);
+      }
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  const dateRange = useMemo(() => ({
+    start: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1),
+    end: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0, 23, 59, 59, 999),
+  }), [selectedMonth]);
+
+  const handleMonthChange = (date: Date): void => {
+    setSelectedMonth(date);
+    setSearchParams({ month: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` }, { replace: true });
+  };
 
   const fetchInvoices = async (): Promise<void> => {
     setLoading(true);
@@ -431,10 +435,11 @@ const SelfBilledInvoiceListPage: React.FC = () => {
           <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
             |
           </span>
-          <DateRangePicker
-            dateRange={dateRange}
-            onDateChange={setDateRange}
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={handleMonthChange}
             size="sm"
+            fixedHeight={false}
           />
           <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
             |
