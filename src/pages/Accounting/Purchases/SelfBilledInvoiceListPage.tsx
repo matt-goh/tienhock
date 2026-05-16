@@ -231,17 +231,13 @@ const SelfBilledInvoiceListPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchInvoices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedInvoiceStatus, selectedEInvoiceStatus, dateRange]);
-
-  useEffect(() => {
-    const timer: number = window.setTimeout(() => {
-      fetchInvoices();
-    }, 300);
+    const timer: number = window.setTimeout(
+      () => fetchInvoices(),
+      searchTerm ? 300 : 0
+    );
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [selectedInvoiceStatus, selectedEInvoiceStatus, dateRange, searchTerm]);
 
   const totals = useMemo(() => {
     return invoices.reduce(

@@ -1,6 +1,11 @@
--- Migration: Add Self-Billed E-Invoice System
--- Date: May 15, 2026
--- Description: Creates manual-entry self-billed e-invoice tables for foreign suppliers
+-- Migration: Self-Billed E-Invoice System (Complete)
+-- Description: Creates all tables for the manual-entry self-billed e-invoice system
+--              for foreign suppliers. Merged from:
+--                1. add_self_billed_einvoice_system.sql
+--                2. add_self_billed_invoice_status.sql
+--                3. add_self_billed_line_tax_exemption.sql
+--                4. remove_self_billed_source_document_no.sql
+--                5. add_self_billed_record_fields.sql
 
 -- =====================================================
 -- 1. Foreign Supplier Profiles
@@ -50,8 +55,16 @@ CREATE TABLE IF NOT EXISTS self_billed_invoices (
   payment_reference VARCHAR(150),
   shipping_method VARCHAR(100),
   shipping_number VARCHAR(150),
+  -- Supporting document fields
   has_supporting_document BOOLEAN NOT NULL DEFAULT false,
   supporting_document_notes TEXT,
+  supporting_document_s3_key TEXT,
+  supporting_document_filename VARCHAR(255),
+  supporting_document_content_type VARCHAR(100),
+  supporting_document_size BIGINT,
+  supporting_document_uploaded_at TIMESTAMP,
+  supporting_document_uploaded_by VARCHAR(50) REFERENCES staffs(id),
+  -- Currency & amounts
   currency_code VARCHAR(3) NOT NULL DEFAULT 'CNY',
   fx_rate DECIMAL(18,8) NOT NULL DEFAULT 1,
   total_foreign_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
@@ -59,10 +72,12 @@ CREATE TABLE IF NOT EXISTS self_billed_invoices (
   tax_amount_myr DECIMAL(15,2) NOT NULL DEFAULT 0,
   total_including_tax_myr DECIMAL(15,2) NOT NULL DEFAULT 0,
   payable_amount_myr DECIMAL(15,2) NOT NULL DEFAULT 0,
+  -- MyInvois e-invoice fields
   uuid VARCHAR(100),
   submission_uid VARCHAR(100),
   long_id VARCHAR(255),
   datetime_validated TIMESTAMP,
+  -- Status fields (local and e-invoice are separate)
   invoice_status VARCHAR(20) NOT NULL DEFAULT 'active',
   einvoice_status VARCHAR(20),
   cancellation_reason TEXT,
@@ -82,6 +97,9 @@ CREATE INDEX IF NOT EXISTS idx_self_billed_invoices_einvoice_status
   ON self_billed_invoices(einvoice_status);
 CREATE INDEX IF NOT EXISTS idx_self_billed_invoices_uuid
   ON self_billed_invoices(uuid);
+CREATE INDEX IF NOT EXISTS idx_self_billed_invoices_supporting_document
+  ON self_billed_invoices(supporting_document_s3_key)
+  WHERE supporting_document_s3_key IS NOT NULL;
 
 -- =====================================================
 -- 3. Self-Billed Invoice Lines
@@ -92,6 +110,7 @@ CREATE TABLE IF NOT EXISTS self_billed_invoice_lines (
   line_number INTEGER NOT NULL,
   description TEXT NOT NULL,
   quantity DECIMAL(15,3) NOT NULL DEFAULT 1,
+  balance_quantity DECIMAL(15,3),
   unit_price_foreign DECIMAL(15,4) NOT NULL DEFAULT 0,
   amount_foreign DECIMAL(15,2) NOT NULL DEFAULT 0,
   amount_myr DECIMAL(15,2) NOT NULL DEFAULT 0,
@@ -99,6 +118,7 @@ CREATE TABLE IF NOT EXISTS self_billed_invoice_lines (
   tax_type VARCHAR(2) NOT NULL DEFAULT '06',
   tax_rate DECIMAL(8,4) NOT NULL DEFAULT 0,
   tax_amount_myr DECIMAL(15,2) NOT NULL DEFAULT 0,
+  tax_exemption_reason TEXT,
   customs_form_reference VARCHAR(1000),
   notes TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
