@@ -618,28 +618,28 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
           {canEdit && (
             <Button
               type="button"
-              color="sky"
-              variant="filled"
-              size="sm"
-              className="h-8 rounded-lg"
-              disabled={saving}
-              onClick={saveInvoice}
-            >
-              {saving ? "Saving..." : "Save"}
-            </Button>
-          )}
-          {canEdit && (
-            <Button
-              type="button"
               icon={IconSend}
-              color="teal"
-              variant="filled"
+              color="amber"
+              variant="outline"
               size="sm"
               className="h-8 rounded-lg"
               disabled={submitting || saving}
               onClick={submitInvoice}
             >
-              {submitting ? "Submitting..." : "Submit"}
+              {submitting ? "Submitting..." : "Save & Submit"}
+            </Button>
+          )}
+          {canEdit && (
+            <Button
+              type="button"
+              color="sky"
+              variant="filled"
+              size="sm"
+              className="h-8 rounded-lg"
+              disabled={saving || submitting}
+              onClick={saveInvoice}
+            >
+              {saving ? "Saving..." : "Save"}
             </Button>
           )}
         </div>
