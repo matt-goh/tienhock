@@ -458,6 +458,7 @@ export default function (pool, defaultConfig) {
         i.status, i.einvoice_status
       FROM greentarget.invoices i
       WHERE i.date_issued >= $1 AND i.date_issued < $2
+      AND LOWER(i.invoice_number) NOT LIKE 'f%'
       AND (i.einvoice_status IS NULL OR i.einvoice_status = 'invalid')
       AND (i.status != 'cancelled')
       AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
@@ -520,7 +521,24 @@ export default function (pool, defaultConfig) {
       SELECT 
         i.invoice_id, i.invoice_number, i.uuid, i.long_id, i.submission_uid,
         i.datetime_validated, i.einvoice_status, i.amount_before_tax, 
-        i.tax_amount, i.total_amount, i.date_issued, i.consolidated_invoices
+        i.tax_amount, i.total_amount, i.date_issued, i.consolidated_invoices,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'invoice_id', src.invoice_id,
+                'invoice_number', src.invoice_number,
+                'amount_before_tax', src.amount_before_tax,
+                'tax_amount', src.tax_amount,
+                'total_amount', src.total_amount
+              )
+              ORDER BY src.invoice_number
+            )
+            FROM greentarget.invoices src
+            WHERE i.consolidated_invoices ? src.invoice_number
+          ),
+          '[]'::json
+        ) AS consolidated_source_invoices
       FROM greentarget.invoices i
       WHERE i.is_consolidated = true
       AND i.date_issued >= $1 AND i.date_issued < $2

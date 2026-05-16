@@ -96,6 +96,69 @@ export const api = {
     }
   },
 
+  uploadRaw: async (endpoint, file, contentType) => {
+    const sessionId = sessionService.getSessionId();
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": contentType || file.type || "application/octet-stream",
+          "x-session-id": sessionId,
+        },
+        body: file,
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_error) {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const error = new Error(
+          data?.message || response.statusText || "API request failed"
+        );
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  downloadBlob: async (endpoint) => {
+    const sessionId = sessionService.getSessionId();
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        cache: "no-store",
+        headers: {
+          "x-session-id": sessionId,
+        },
+      });
+
+      if (!response.ok) {
+        let message = "API request failed";
+        try {
+          const data = await response.json();
+          message = data.message || message;
+        } catch (_error) {
+          message = response.statusText || message;
+        }
+        const error = new Error(message);
+        error.status = response.status;
+        throw error;
+      }
+
+      return response.blob();
+    } catch (error) {
+      throw error;
+    }
+  },
+
   delete: async (endpoint, payload) => {
     const sessionId = sessionService.getSessionId();
     try {

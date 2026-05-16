@@ -47,6 +47,7 @@ import financialReportsRouter from "./accounting/financial-reports.js";
 import materialsRouter from "./accounting/materials.js";
 import suppliersRouter from "./accounting/suppliers.js";
 import purchaseInvoicesRouter from "./accounting/purchase-invoices.js";
+import selfBilledInvoicesRouter from "./accounting/self-billed-invoices.js";
 
 // Sales routes
 import invoiceRouter from "./sales/invoices/invoices.js";
@@ -171,6 +172,10 @@ export default function setupRoutes(app, pool) {
   app.use("/api/materials", materialsRouter(pool));
   app.use("/api/suppliers", suppliersRouter(pool));
   app.use("/api/purchase-invoices", purchaseInvoicesRouter(pool));
+  app.use(
+    "/api/self-billed-invoices",
+    selfBilledInvoicesRouter(pool, myInvoisConfig)
+  );
 
   // Sales routes
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));

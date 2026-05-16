@@ -1,9 +1,9 @@
 // server.js
+import "dotenv/config";
 import setupRoutes from "./src/routes/index.js";
 import pkgBodyParser from "body-parser";
 import express from "express";
 import cron from "node-cron";
-import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -12,8 +12,6 @@ import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.
 import { checkAndProcessDueConsolidations } from "./src/utils/invoice/autoConsolidation.js";
 import { createAutoBackup, syncLocalToS3, deleteOldS3Backups } from "./src/utils/s3-backup.js";
 import { clearInvalidEInvoicesForNonEligibleCustomers } from "./src/routes/sales/invoices/invoices.js";
-
-dotenv.config();
 
 const { json } = pkgBodyParser;
 const app = express();

@@ -66,7 +66,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
         ref={iconRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`text-default-400 dark:text-gray-500 hover:text-default-600 dark:text-gray-300 cursor-help inline-flex ${className}`}
+        className={`text-default-400 hover:text-default-600 dark:text-gray-500 dark:hover:text-gray-400 cursor-help inline-flex ${className}`}
       >
         <IconInfoCircle size={16} />
       </span>
@@ -96,7 +96,7 @@ const ConsolidatedInfoTooltip: React.FC<ConsolidatedInfoTooltipProps> = ({
               {invoices.map((invoice, index) => (
                 <div
                   key={index}
-                  className={`text-center text-xs py-1 px-2 bg-default-50 dark:bg-gray-800 rounded border border-default-200 ${
+                  className={`text-center text-xs py-1 px-2 bg-default-50 dark:bg-gray-800 rounded border border-default-200 dark:border-gray-700 ${
                     !disableNavigation
                       ? "cursor-pointer hover:bg-default-100"
                       : ""

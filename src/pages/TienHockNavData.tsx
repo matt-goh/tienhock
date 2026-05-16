@@ -33,6 +33,8 @@ import SuppliersListPage from "./Accounting/Purchases/SuppliersListPage";
 import SupplierFormPage from "./Accounting/Purchases/SupplierFormPage";
 import MaterialPurchaseListPage from "./Accounting/Purchases/MaterialPurchaseListPage";
 import MaterialPurchaseFormPage from "./Accounting/Purchases/MaterialPurchaseFormPage";
+import SelfBilledInvoiceListPage from "./Accounting/Purchases/SelfBilledInvoiceListPage";
+import SelfBilledInvoiceFormPage from "./Accounting/Purchases/SelfBilledInvoiceFormPage";
 
 // Stock - Materials
 import MaterialsListPage from "./Stock/Materials/MaterialsListPage";
@@ -331,6 +333,24 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Voucher Generator",
         path: "/accounting/voucher-generator",
         component: VoucherGeneratorPage,
+      },
+      {
+        name: "Self-Billed E-Invoices",
+        path: "/accounting/self-billed-invoices",
+        component: SelfBilledInvoiceListPage,
+        subItems: [
+          {
+            name: "New Self-Billed",
+            path: "/accounting/self-billed-invoices/new",
+            component: SelfBilledInvoiceFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Self-Billed",
+            path: "/accounting/self-billed-invoices/:id",
+            component: SelfBilledInvoiceFormPage,
+          },
+        ],
       },
       {
         name: "Account Mappings",
