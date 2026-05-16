@@ -269,10 +269,7 @@ export default function NavbarDropdown({
     >
       <div
         ref={dropdownRef}
-        className={`
-          fixed z-[100] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-600 rounded-lg shadow-lg -translate-x-1/2
-          ${isMegaMenu ? "p-3" : "p-2"}
-        `}
+        className={`fixed z-[100] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-600 rounded-lg shadow-lg -translate-x-1/2 p-1.5`}
         style={{
           top: position.top,
           left: position.left,

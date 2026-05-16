@@ -1,7 +1,15 @@
-import { Router } from "express";
+import express, { Router } from "express";
+import path from "path";
 import EInvoiceApiClientFactory from "../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
 import EInvoiceSubmissionHandler from "../../utils/invoice/einvoice/EInvoiceSubmissionHandler.js";
 import { SelfBilledInvoiceTemplate } from "../../utils/invoice/einvoice/SelfBilledInvoiceTemplate.js";
+import {
+  deleteObjectFromS3,
+  getObjectFromS3,
+  isS3ObjectStorageEnabled,
+  uploadObjectToS3,
+} from "../../utils/s3-backup.js";
+import { NODE_ENV } from "../../configs/config.js";
 
 const FOREIGN_SUPPLIER_TIN = "EI00000000030";
 const DEFAULT_TRANSACTION_TYPE = "Importation of goods";
@@ -10,6 +18,31 @@ const DEFAULT_CLASSIFICATION = "034";
 const DEFAULT_TAX_TYPE = "06";
 const LOCAL_STATUS_ACTIVE = "active";
 const LOCAL_STATUS_CANCELLED = "cancelled";
+const MAX_SUPPORTING_DOCUMENT_BYTES = 25 * 1024 * 1024;
+const ALLOWED_SUPPORTING_DOCUMENT_EXTENSIONS = new Set([
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tif",
+  ".tiff",
+]);
+const ALLOWED_SUPPORTING_DOCUMENT_CONTENT_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/tiff",
+]);
 
 function normalizeText(value, fallback = null) {
   if (value === undefined || value === null) return fallback;
@@ -27,12 +60,70 @@ function parseDecimal(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseNullableDecimal(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = typeof value === "string" ? Number.parseFloat(value) : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function isLockedInvoice(invoice) {
   return (
     invoice?.invoice_status === LOCAL_STATUS_CANCELLED ||
     invoice?.einvoice_status === "pending" ||
     invoice?.einvoice_status === "valid"
   );
+}
+
+function isCancelledInvoice(invoice) {
+  return invoice?.invoice_status === LOCAL_STATUS_CANCELLED;
+}
+
+function sanitizeFilename(filename) {
+  const basename = path.basename(normalizeText(filename, "supporting-document"));
+  return basename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180);
+}
+
+function isAllowedSupportingDocument(filename, contentType) {
+  const extension = path.extname(filename).toLowerCase();
+  const normalizedContentType = normalizeText(contentType, "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+
+  if (!ALLOWED_SUPPORTING_DOCUMENT_EXTENSIONS.has(extension)) {
+    return false;
+  }
+
+  return (
+    ALLOWED_SUPPORTING_DOCUMENT_CONTENT_TYPES.has(normalizedContentType) ||
+    normalizedContentType === "application/octet-stream"
+  );
+}
+
+function buildSupportingDocumentKey(invoiceId, filename) {
+  const env = NODE_ENV || "development";
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `${env}/self-billed-invoices/${invoiceId}/supporting-document/${timestamp}-${sanitizeFilename(filename)}`;
+}
+
+function setDownloadHeaders(res, invoice, s3Object) {
+  const filename = sanitizeFilename(invoice.supporting_document_filename);
+  const contentType =
+    invoice.supporting_document_content_type ||
+    s3Object.ContentType ||
+    "application/octet-stream";
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${filename.replace(/"/g, "")}"`
+  );
+  if (invoice.supporting_document_size || s3Object.ContentLength) {
+    res.setHeader(
+      "Content-Length",
+      String(invoice.supporting_document_size || s3Object.ContentLength)
+    );
+  }
 }
 
 async function generateSelfBilledNo(client) {
@@ -109,6 +200,7 @@ function sanitizeLines(lines, fxRate) {
       line_number: Number.parseInt(line.line_number || index + 1, 10),
       description: normalizeText(line.description),
       quantity,
+      balance_quantity: parseNullableDecimal(line.balance_quantity),
       unit_price_foreign: unitPriceForeign,
       amount_foreign: amountForeign,
       amount_myr: amountMyr,
@@ -346,8 +438,14 @@ async function getFullInvoice(poolOrClient, id) {
     payment_reference: row.payment_reference,
     shipping_method: row.shipping_method,
     shipping_number: row.shipping_number,
-    has_supporting_document: row.has_supporting_document,
+    has_supporting_document: Boolean(row.supporting_document_s3_key),
     supporting_document_notes: row.supporting_document_notes,
+    supporting_document_s3_key: row.supporting_document_s3_key,
+    supporting_document_filename: row.supporting_document_filename,
+    supporting_document_content_type: row.supporting_document_content_type,
+    supporting_document_size: row.supporting_document_size,
+    supporting_document_uploaded_at: row.supporting_document_uploaded_at,
+    supporting_document_uploaded_by: row.supporting_document_uploaded_by,
     currency_code: row.currency_code,
     fx_rate: row.fx_rate,
     total_foreign_amount: row.total_foreign_amount,
@@ -376,10 +474,10 @@ async function insertLines(client, invoiceId, lines) {
   const insertLineQuery = `
     INSERT INTO self_billed_invoice_lines (
       self_billed_invoice_id, line_number, description, quantity,
-      unit_price_foreign, amount_foreign, amount_myr, classification_code,
+      balance_quantity, unit_price_foreign, amount_foreign, amount_myr, classification_code,
       tax_type, tax_rate, tax_amount_myr, tax_exemption_reason,
       customs_form_reference, notes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
   `;
 
   for (const line of lines) {
@@ -388,6 +486,7 @@ async function insertLines(client, invoiceId, lines) {
       line.line_number,
       line.description,
       line.quantity,
+      line.balance_quantity,
       line.unit_price_foreign,
       line.amount_foreign,
       line.amount_myr,
@@ -516,6 +615,9 @@ export default function (pool, config) {
           sbi.long_id,
           COALESCE(sbi.invoice_status, '${LOCAL_STATUS_ACTIVE}') AS invoice_status,
           sbi.einvoice_status, sbi.created_at,
+          (sbi.supporting_document_s3_key IS NOT NULL) AS has_supporting_document,
+          sbi.supporting_document_filename, sbi.supporting_document_content_type,
+          sbi.supporting_document_size, sbi.supporting_document_uploaded_at,
           fs.supplier_name
         FROM self_billed_invoices sbi
         JOIN self_billed_foreign_suppliers fs ON sbi.foreign_supplier_id = fs.id
@@ -752,6 +854,228 @@ export default function (pool, config) {
     }
   });
 
+  router.patch("/:id/record-fields", async (req, res) => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const existing = await getFullInvoice(client, req.params.id);
+      if (!existing) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Self-billed invoice not found" });
+      }
+      if (isCancelledInvoice(existing)) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Cancelled self-billed invoices cannot be edited",
+        });
+      }
+
+      const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
+      for (const line of lines) {
+        const balanceQuantity = parseNullableDecimal(line.balance_quantity);
+        const lineId = Number.parseInt(line.id, 10);
+        const lineNumber = Number.parseInt(line.line_number, 10);
+
+        if (Number.isInteger(lineId)) {
+          await client.query(
+            `UPDATE self_billed_invoice_lines
+             SET balance_quantity = $1
+             WHERE id = $2 AND self_billed_invoice_id = $3`,
+            [balanceQuantity, lineId, req.params.id]
+          );
+        } else if (Number.isInteger(lineNumber)) {
+          await client.query(
+            `UPDATE self_billed_invoice_lines
+             SET balance_quantity = $1
+             WHERE self_billed_invoice_id = $2 AND line_number = $3`,
+            [balanceQuantity, req.params.id, lineNumber]
+          );
+        }
+      }
+
+      await client.query(
+        "UPDATE self_billed_invoices SET updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+        [req.params.id]
+      );
+      await client.query("COMMIT");
+      res.json({ message: "Self-billed invoice record fields updated" });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error updating self-billed record fields:", error);
+      res.status(error.status || 500).json({
+        message: error.message || "Error updating self-billed record fields",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  router.post(
+    "/:id/supporting-document",
+    express.raw({ type: "*/*", limit: MAX_SUPPORTING_DOCUMENT_BYTES }),
+    async (req, res) => {
+      try {
+        const existing = await getFullInvoice(pool, req.params.id);
+        if (!existing) {
+          return res.status(404).json({ message: "Self-billed invoice not found" });
+        }
+        if (isCancelledInvoice(existing)) {
+          return res.status(400).json({
+            message: "Cancelled self-billed invoices cannot be edited",
+          });
+        }
+        if (!isS3ObjectStorageEnabled()) {
+          return res.status(503).json({ message: "S3 storage is not configured" });
+        }
+        if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+          return res.status(400).json({ message: "Supporting document file is required" });
+        }
+
+        const filename = sanitizeFilename(req.query.filename);
+        const contentType = normalizeText(req.headers["content-type"], "application/octet-stream")
+          .split(";")[0]
+          .trim()
+          .toLowerCase();
+
+        if (!isAllowedSupportingDocument(filename, contentType)) {
+          return res.status(400).json({
+            message: "Only PDF, Word document, and image files are supported",
+          });
+        }
+
+        const s3Key = buildSupportingDocumentKey(req.params.id, filename);
+        await uploadObjectToS3(s3Key, req.body, {
+          contentType,
+          metadata: {
+            "self-billed-invoice-id": String(req.params.id),
+            "original-filename": filename,
+            "uploaded-by": String(req.staffId || ""),
+          },
+        });
+
+        try {
+          const result = await pool.query(
+            `UPDATE self_billed_invoices
+             SET has_supporting_document = true,
+                 supporting_document_s3_key = $1,
+                 supporting_document_filename = $2,
+                 supporting_document_content_type = $3,
+                 supporting_document_size = $4,
+                 supporting_document_uploaded_at = CURRENT_TIMESTAMP,
+                 supporting_document_uploaded_by = $5,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $6
+             RETURNING has_supporting_document, supporting_document_filename,
+               supporting_document_content_type, supporting_document_size,
+               supporting_document_uploaded_at, supporting_document_uploaded_by`,
+            [
+              s3Key,
+              filename,
+              contentType,
+              req.body.length,
+              req.staffId || null,
+              req.params.id,
+            ]
+          );
+
+          if (
+            existing.supporting_document_s3_key &&
+            existing.supporting_document_s3_key !== s3Key
+          ) {
+            deleteObjectFromS3(existing.supporting_document_s3_key).catch((error) => {
+              console.warn(
+                `Failed to delete replaced self-billed supporting document: ${error.message}`
+              );
+            });
+          }
+
+          res.json({
+            message: "Supporting document uploaded",
+            document: result.rows[0],
+          });
+        } catch (error) {
+          await deleteObjectFromS3(s3Key).catch(() => {});
+          throw error;
+        }
+      } catch (error) {
+        console.error("Error uploading self-billed supporting document:", error);
+        res.status(error.status || 500).json({
+          message: error.message || "Error uploading supporting document",
+        });
+      }
+    }
+  );
+
+  router.get("/:id/supporting-document", async (req, res) => {
+    try {
+      const invoice = await getFullInvoice(pool, req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Self-billed invoice not found" });
+      }
+      if (!invoice.supporting_document_s3_key) {
+        return res.status(404).json({ message: "No supporting document uploaded" });
+      }
+
+      const s3Object = await getObjectFromS3(invoice.supporting_document_s3_key);
+      setDownloadHeaders(res, invoice, s3Object);
+
+      if (s3Object.Body?.pipe) {
+        s3Object.Body.pipe(res);
+        return;
+      }
+
+      const chunks = [];
+      for await (const chunk of s3Object.Body) {
+        chunks.push(chunk);
+      }
+      res.end(Buffer.concat(chunks));
+    } catch (error) {
+      console.error("Error downloading self-billed supporting document:", error);
+      res.status(error.status || 500).json({
+        message: error.message || "Error downloading supporting document",
+      });
+    }
+  });
+
+  router.delete("/:id/supporting-document", async (req, res) => {
+    try {
+      const existing = await getFullInvoice(pool, req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: "Self-billed invoice not found" });
+      }
+      if (isCancelledInvoice(existing)) {
+        return res.status(400).json({
+          message: "Cancelled self-billed invoices cannot be edited",
+        });
+      }
+
+      if (existing.supporting_document_s3_key) {
+        await deleteObjectFromS3(existing.supporting_document_s3_key);
+      }
+
+      await pool.query(
+        `UPDATE self_billed_invoices
+         SET has_supporting_document = false,
+             supporting_document_s3_key = NULL,
+             supporting_document_filename = NULL,
+             supporting_document_content_type = NULL,
+             supporting_document_size = NULL,
+             supporting_document_uploaded_at = NULL,
+             supporting_document_uploaded_by = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [req.params.id]
+      );
+
+      res.json({ message: "Supporting document removed" });
+    } catch (error) {
+      console.error("Error deleting self-billed supporting document:", error);
+      res.status(error.status || 500).json({
+        message: error.message || "Error deleting supporting document",
+      });
+    }
+  });
+
   router.get("/:id", async (req, res) => {
     try {
       const invoice = await getFullInvoice(pool, req.params.id);
@@ -826,7 +1150,7 @@ export default function (pool, config) {
           input.payment_reference,
           input.shipping_method,
           input.shipping_number,
-          input.has_supporting_document,
+          false,
           input.supporting_document_notes,
           input.currency_code,
           input.fx_rate,
@@ -911,7 +1235,7 @@ export default function (pool, config) {
           input.payment_reference,
           input.shipping_method,
           input.shipping_number,
-          input.has_supporting_document,
+          Boolean(existing.supporting_document_s3_key),
           input.supporting_document_notes,
           input.currency_code,
           input.fx_rate,
@@ -970,6 +1294,13 @@ export default function (pool, config) {
         req.params.id,
       ]);
       await client.query("COMMIT");
+      if (existing.supporting_document_s3_key) {
+        deleteObjectFromS3(existing.supporting_document_s3_key).catch((error) => {
+          console.warn(
+            `Failed to delete self-billed supporting document after invoice delete: ${error.message}`
+          );
+        });
+      }
       res.json({ message: `Self-billed invoice '${existing.self_billed_no}' deleted` });
     } catch (error) {
       await client.query("ROLLBACK");

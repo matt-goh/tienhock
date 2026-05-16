@@ -1,23 +1,24 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
 
 ## Rules
-1. Implement only what is explicitly requested, Always ask permission before modifying components not specifically mentioned.
-2. Write clean code and use best practice.
-3. Break down large tasks and ask clarifying questions when needed.
-4. Try your best to code your designs in clean and good-looking manner, but still professional, and then adjust the layouts to be symmetrical.
-5. Always add appropriate types to all function parameters, variables, and return types.
-6. Fix all TypeScript errors immediately - don't leave them for the user to fix.
-7. Identify potential edge cases or limitations in your implementation.
-8. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
-9. When it is used, write space-y-3 instead of space-y-6.
-10. Use rm instead of del when deleting files.
-11. If needed during planning, access the dev database to understand the system better, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
-12. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
-13. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
-14. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
-15. Never use the vanilla <Select> for listboxes, use the listbox in @src/components/FormComponents.tsx, @src/components/StyledListbox.tsx, or listbox in similar design.
+1. Think Before Coding. State assumptions explicitly. Ask rather than guess, always ask permission before modifying components not specifically mentioned. Push back when a simpler approach exists. Stop when confused.
+2. Simplicity First. Minimum code that solves the problem. Nothing speculative. No abstractions for single-use code.
+3. Surgical Changes. Touch only what you must. Don't improve adjacent code. Match existing style. Don't refactor what isn't broken.
+4. Goal-Driven Execution. Define success criteria. Loop until verified. Strong success criteria let GPT loop independently
+5. Break down large tasks and ask clarifying questions when needed.
+6. Read before you write. Before adding code, read exports, immediate callers, shared utilities.
+If unsure why existing code is structured a certain way, ask.
+7. Always add appropriate types to all function parameters, variables, and return types.
+8. Fix all TypeScript errors immediately - don't leave them for the user to fix.
+9. Identify potential edge cases or limitations in your implementation.
+10. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
+11. Use rm instead of del when deleting files.
+12. If needed during planning, access the dev database to understand the system better, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
+13. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
+14. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
+15. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
 
 ## Architecture Overview
 
@@ -49,7 +50,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (71 tables)
+#### Database Schema (74 tables)
 
 **Accounting & Finance:**
 - `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
@@ -64,6 +65,9 @@ This is a comprehensive ERP system supporting three companies:
 - `purchase_invoices` - id, supplier_id (FK suppliers), invoice_number, invoice_date, total_amount, payment_status (unpaid/partial/paid), amount_paid, journal_entry_id (FK journal_entries), notes, created_at, updated_at, created_by (unique: supplier_id, invoice_number)
 - `purchase_invoice_lines` - id, purchase_invoice_id (FK purchase_invoices CASCADE), line_number, material_id (FK materials), quantity, unit_cost, amount, notes, created_at (material purchase lines for tracking raw material/ingredient/packing purchases)
 - `material_purchase_account_mappings` - id, material_category (unique), purchase_account_code (FK account_codes), description, is_active, created_at (maps material categories to GL purchase accounts for auto-journaling: ingredient→PUR, raw_material→PUR, packing_material→PM)
+- `self_billed_foreign_suppliers` - id, supplier_name (unique), tin_number (default EI00000000030), id_type, id_number, sst_number, ttx_number, msic_code, business_activity_description, address_line_0-2, city, postcode, state_code, country_code, contact_number, email, notes, is_active, created_at, updated_at (foreign seller profiles for manual self-billed e-invoices)
+- `self_billed_invoices` - id, foreign_supplier_id (FK self_billed_foreign_suppliers), self_billed_no (unique), purchase_date, transaction_type, platform, order_no, payment_reference, shipping_method, shipping_number, has_supporting_document, supporting_document_notes, supporting_document_s3_key, supporting_document_filename, supporting_document_content_type, supporting_document_size, supporting_document_uploaded_at, supporting_document_uploaded_by, currency_code, fx_rate, total_foreign_amount, total_excluding_tax_myr, tax_amount_myr, total_including_tax_myr, payable_amount_myr, uuid, submission_uid, long_id, datetime_validated, invoice_status, einvoice_status, cancellation_reason, notes, created_at, updated_at, created_by
+- `self_billed_invoice_lines` - id, self_billed_invoice_id (FK self_billed_invoices CASCADE), line_number, description, quantity, balance_quantity (local record-only stock balance), unit_price_foreign, amount_foreign, amount_myr, classification_code, tax_type, tax_rate, tax_amount_myr, tax_exemption_reason, customs_form_reference, notes, created_at
 
 **Customers & Sales:**
 - `customers` - id, name, closeness, salesman, tin_number, id_type, state, email, address, city, id_number, phone_number, credit_limit, credit_used, updated_at

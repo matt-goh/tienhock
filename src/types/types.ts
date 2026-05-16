@@ -1492,6 +1492,7 @@ export interface SelfBilledInvoiceLine {
   line_number: number;
   description: string;
   quantity: number;
+  balance_quantity?: number | null;
   unit_price_foreign: number;
   amount_foreign: number;
   amount_myr: number;
@@ -1518,6 +1519,11 @@ export interface SelfBilledInvoiceListItem {
   long_id: string | null;
   invoice_status: SelfBilledInvoiceStatus;
   einvoice_status: SelfBilledEInvoiceStatus;
+  has_supporting_document?: boolean;
+  supporting_document_filename?: string | null;
+  supporting_document_content_type?: string | null;
+  supporting_document_size?: number | null;
+  supporting_document_uploaded_at?: string | null;
   created_at: string;
   supplier_name: string;
 }
@@ -1535,6 +1541,12 @@ export interface SelfBilledInvoiceInput {
   shipping_number?: string | null;
   has_supporting_document: boolean;
   supporting_document_notes?: string | null;
+  supporting_document_s3_key?: string | null;
+  supporting_document_filename?: string | null;
+  supporting_document_content_type?: string | null;
+  supporting_document_size?: number | null;
+  supporting_document_uploaded_at?: string | null;
+  supporting_document_uploaded_by?: string | null;
   currency_code: string;
   fx_rate: number;
   notes?: string | null;
