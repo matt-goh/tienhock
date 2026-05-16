@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
 import { uploadBackupToS3, listS3Backups, deleteS3Backup, downloadS3Backup } from '../../utils/s3-backup.js';
+import { isS3BackupEnabled } from '../../configs/config.js';
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -37,6 +38,28 @@ export default function backupRouter(pool) {
     } else {
       // Running on Linux (production Hetzner or Docker container), execute directly
       return execAsync(command, options);
+    }
+  };
+
+  // List backup files stored locally inside the Docker container (dev fallback)
+  const listLocalBackups = async () => {
+    const envBackupDir = `${backupDir}/${env}`;
+    try {
+      const command = `find "${envBackupDir}" -maxdepth 1 -name "*.gz" -exec stat -c "%n %s %Y" {} \\; 2>/dev/null || echo ""`;
+      const { stdout } = await executeCommand(command);
+      const lines = stdout.trim().split('\n').filter(l => l.trim());
+      return lines.map(line => {
+        const parts = line.trim().split(' ');
+        if (parts.length < 3) return null;
+        const mtime = parseInt(parts[parts.length - 1], 10);
+        const size = parseInt(parts[parts.length - 2], 10);
+        const fullPath = parts.slice(0, parts.length - 2).join(' ');
+        const filename = fullPath.split('/').pop();
+        if (!filename || isNaN(size) || isNaN(mtime)) return null;
+        return { filename, size, lastModified: new Date(mtime * 1000) };
+      }).filter(Boolean);
+    } catch {
+      return [];
     }
   };
 
@@ -374,17 +397,22 @@ export default function backupRouter(pool) {
 
   router.get('/list', async (req, res) => {
     try {
-      // List backups from S3 (primary source)
-      const s3Backups = await listS3Backups(env);
+      let rawBackups;
 
-      const backups = s3Backups.map(backup => ({
+      if (isS3BackupEnabled()) {
+        rawBackups = await listS3Backups(env);
+      } else {
+        // Dev: no S3 configured — list backups stored locally in the Docker container
+        rawBackups = await listLocalBackups();
+      }
+
+      const backups = rawBackups.map(backup => ({
         filename: backup.filename,
         size: backup.size,
         created: backup.lastModified.toISOString(),
         environment: env
       }));
 
-      // Sort by created date descending (newest first)
       backups.sort((a, b) => new Date(b.created) - new Date(a.created));
 
       res.json(backups);
@@ -653,13 +681,7 @@ export default function backupRouter(pool) {
     }
   });
 
-  // Development-only endpoint for uploading raw SQL files
   router.post('/upload-sql', async (req, res) => {
-    // Only allow in development
-    if (env !== 'development') {
-      return res.status(403).json({ error: 'SQL upload only available in development' });
-    }
-
     if (restoreState.status === 'RESTORING') {
       return res.status(503).json({
         error: 'Service unavailable',
@@ -673,42 +695,38 @@ export default function backupRouter(pool) {
     }
 
     try {
-      // Respond immediately like existing restore endpoint
-      res.json({
-        message: 'SQL import initiated',
-        status: 'RESTORING'
-      });
+      res.json({ message: 'SQL import initiated', status: 'RESTORING' });
 
-      // Strip \restrict and \unrestrict lines
       const cleanedSql = sqlContent
         .split('\n')
         .filter(line => !line.startsWith('\\restrict') && !line.startsWith('\\unrestrict'))
         .join('\n');
 
-      // Write to temp file inside Docker container
       const tempFilename = `temp_upload_${Date.now()}.sql`;
       const envBackupDir = `${backupDir}/${env}`;
       const tempPath = `${envBackupDir}/${tempFilename}`;
 
-      // Ensure directory exists
-      await executeCommand(`mkdir -p "${envBackupDir}"`);
+      if (shouldUseDockerExec()) {
+        // Dev (Windows/Mac): write into Docker container via stdin
+        await executeCommand(`mkdir -p "${envBackupDir}"`);
+        const containerName = getContainerName();
+        await new Promise((resolve, reject) => {
+          const proc = exec(
+            `docker exec -i ${containerName} bash -c "cat > ${tempPath}"`,
+            { maxBuffer: 100 * 1024 * 1024 },
+            (error) => error ? reject(error) : resolve()
+          );
+          proc.stdin.write(cleanedSql);
+          proc.stdin.end();
+        });
+      } else {
+        // Prod (Linux): write directly to the local filesystem
+        fs.mkdirSync(envBackupDir, { recursive: true });
+        fs.writeFileSync(tempPath, cleanedSql, 'utf8');
+      }
 
-      // Write SQL content to file via docker exec stdin
-      const containerName = getContainerName();
-      await new Promise((resolve, reject) => {
-        const proc = exec(
-          `docker exec -i ${containerName} bash -c "cat > ${tempPath}"`,
-          { maxBuffer: 100 * 1024 * 1024 },
-          (error) => error ? reject(error) : resolve()
-        );
-        proc.stdin.write(cleanedSql);
-        proc.stdin.end();
-      });
-
-      // Execute SQL file using restoreSqlFile
       await restoreSqlFile(tempPath);
 
-      // Clean up temp file
       try {
         await executeCommand(`rm -f "${tempPath}"`);
         console.log(`[Upload SQL] Cleaned up temp file: ${tempFilename}`);
