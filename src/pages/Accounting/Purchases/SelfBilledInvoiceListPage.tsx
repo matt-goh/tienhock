@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  IconDownload,
   IconFileInvoice,
+  IconPaperclip,
   IconPencil,
   IconPlus,
   IconRefresh,
@@ -143,6 +145,13 @@ const formatAmount = (amount: number | string, currency: string): string => {
     currency,
     minimumFractionDigits: 2,
   }).format(numericAmount);
+};
+
+const formatFileSize = (bytes?: number | null): string => {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const getMonthStart = (): Date => {
@@ -333,6 +342,35 @@ const SelfBilledInvoiceListPage: React.FC = () => {
     }
 
     setShowEInvoiceConfirm(true);
+  };
+
+  const downloadSupportingDocument = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    invoice: SelfBilledInvoiceListItem
+  ): Promise<void> => {
+    event.stopPropagation();
+    if (!invoice.supporting_document_filename) return;
+
+    try {
+      const blob = await api.downloadBlob(
+        `/api/self-billed-invoices/${invoice.id}/supporting-document`
+      );
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = invoice.supporting_document_filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      console.error("Error downloading supporting document:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to download supporting document"
+      );
+    }
   };
 
   const confirmBulkSubmitEInvoice = async (): Promise<void> => {
@@ -596,6 +634,9 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
                     Reference
                   </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
+                    Doc
+                  </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
                     Foreign
                   </th>
@@ -664,6 +705,26 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                           .filter(Boolean)
                           .join(" / ") || "-"}
                       </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                      {invoice.has_supporting_document &&
+                      invoice.supporting_document_filename ? (
+                        <button
+                          type="button"
+                          onClick={(event: React.MouseEvent<HTMLButtonElement>) =>
+                            downloadSupportingDocument(event, invoice)
+                          }
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-sky-700 hover:bg-sky-50 hover:text-sky-900 dark:text-sky-300 dark:hover:bg-sky-900/20 dark:hover:text-sky-200"
+                          title={`${invoice.supporting_document_filename} ${formatFileSize(
+                            invoice.supporting_document_size
+                          )}`}
+                        >
+                          <IconPaperclip size={15} />
+                          <IconDownload size={14} />
+                        </button>
+                      ) : (
+                        <span className="text-default-300 dark:text-gray-600">-</span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-mono text-default-700 dark:text-gray-300">
                       {formatAmount(

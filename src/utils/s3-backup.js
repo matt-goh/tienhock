@@ -38,6 +38,74 @@ const getS3Client = () => {
   return s3Client;
 };
 
+const getRequiredS3Client = () => {
+  const client = getS3Client();
+  if (!client) {
+    const error = new Error('S3 storage is not configured');
+    error.status = 503;
+    throw error;
+  }
+  return client;
+};
+
+/**
+ * Check whether generic S3 object storage can be used.
+ * @returns {boolean}
+ */
+export function isS3ObjectStorageEnabled() {
+  return isS3BackupEnabled();
+}
+
+/**
+ * Upload an in-memory object to S3.
+ * @param {string} s3Key - Object key inside the configured bucket
+ * @param {Buffer|Uint8Array|string} body - Object body
+ * @param {{ contentType?: string, metadata?: Record<string, string> }} options
+ * @returns {Promise<{ bucket: string, key: string }>}
+ */
+export async function uploadObjectToS3(s3Key, body, options = {}) {
+  const client = getRequiredS3Client();
+  await client.send(new PutObjectCommand({
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+    Body: body,
+    ContentType: options.contentType || 'application/octet-stream',
+    Metadata: options.metadata || {},
+  }));
+
+  return {
+    bucket: S3_BUCKET_NAME,
+    key: s3Key,
+  };
+}
+
+/**
+ * Get an object stream and metadata from S3.
+ * @param {string} s3Key - Object key inside the configured bucket
+ * @returns {Promise<import('@aws-sdk/client-s3').GetObjectCommandOutput>}
+ */
+export async function getObjectFromS3(s3Key) {
+  const client = getRequiredS3Client();
+  return client.send(new GetObjectCommand({
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+  }));
+}
+
+/**
+ * Delete a generic object from S3.
+ * @param {string} s3Key - Object key inside the configured bucket
+ * @returns {Promise<boolean>}
+ */
+export async function deleteObjectFromS3(s3Key) {
+  const client = getRequiredS3Client();
+  await client.send(new DeleteObjectCommand({
+    Bucket: S3_BUCKET_NAME,
+    Key: s3Key,
+  }));
+  return true;
+}
+
 // Check if we should use docker exec (only for Windows/Mac development)
 const shouldUseDockerExec = () => {
   // On Windows/Mac, we use docker exec to run commands in the DB container

@@ -13,5 +13,11 @@ export const api: {
   post: <T = any>(endpoint: string, data?: any) => Promise<T>;
   put: <T = any>(endpoint: string, data?: any) => Promise<T>;
   patch: <T = any>(endpoint: string, data?: any) => Promise<T>;
+  uploadRaw: <T = any>(
+    endpoint: string,
+    file: Blob,
+    contentType?: string
+  ) => Promise<T>;
+  downloadBlob: (endpoint: string) => Promise<Blob>;
   delete: <T = any>(endpoint: string, payload?: any) => Promise<T>;
 };
