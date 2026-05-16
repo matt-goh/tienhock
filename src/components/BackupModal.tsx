@@ -437,16 +437,14 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                           >
                             Create New Backup
                           </Button>
-                          {NODE_ENV === "development" && (
-                            <Button
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={loading || restoring || uploading}
-                              variant="outline"
-                              icon={IconUpload}
-                            >
-                              Upload SQL
-                            </Button>
-                          )}
+                          <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={loading || restoring || uploading}
+                            variant="outline"
+                            icon={IconUpload}
+                          >
+                            Upload SQL
+                          </Button>
                         </>
                       ) : (
                         <div className="flex items-center space-x-2">
