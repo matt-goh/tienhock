@@ -411,6 +411,15 @@ function statusFromDocumentDetails(documentDetails, fallbackStatus = "pending") 
   return fallbackStatus;
 }
 
+function getDocumentCode(document) {
+  return (
+    document?.internalId ||
+    document?.invoiceCodeNumber ||
+    document?.codeNumber ||
+    null
+  );
+}
+
 export default function (pool, config) {
   const router = Router();
   const apiClient = EInvoiceApiClientFactory.getInstance(config);
@@ -571,6 +580,174 @@ export default function (pool, config) {
       res.status(500).json({
         message: "Error fetching self-billed invoices",
         error: error.message,
+      });
+    }
+  });
+
+  router.post("/submit", async (req, res) => {
+    const invoiceIds = Array.isArray(req.body?.invoiceIds)
+      ? req.body.invoiceIds
+          .map((invoiceId) => Number.parseInt(invoiceId, 10))
+          .filter((invoiceId) => Number.isInteger(invoiceId))
+      : [];
+
+    if (invoiceIds.length === 0) {
+      return res.status(400).json({ message: "No self-billed invoices selected" });
+    }
+
+    try {
+      const transformedInvoices = [];
+      const validationErrors = [];
+      const invoiceCodeToId = new Map();
+
+      for (const invoiceId of invoiceIds) {
+        const invoice = await getFullInvoice(pool, invoiceId);
+        const internalId = invoice?.self_billed_no || String(invoiceId);
+
+        if (!invoice) {
+          validationErrors.push({
+            internalId,
+            error: {
+              code: "NOT_FOUND",
+              message: `Self-billed invoice ${invoiceId} was not found`,
+            },
+          });
+          continue;
+        }
+
+        if (isLockedInvoice(invoice)) {
+          validationErrors.push({
+            internalId,
+            error: {
+              code: "LOCKED_INVOICE",
+              message: "Cancelled, pending, or valid self-billed invoices cannot be submitted",
+            },
+          });
+          continue;
+        }
+
+        const supplierErrors = validateSupplier(
+          sanitizeSupplierPayload(invoice.supplier)
+        );
+        const invoiceErrors = validateInvoice(
+          sanitizeInvoicePayload({
+            ...invoice,
+            supplier: invoice.supplier,
+            lines: invoice.lines,
+          })
+        );
+
+        if (supplierErrors.length > 0 || invoiceErrors.length > 0) {
+          validationErrors.push({
+            internalId,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: [...supplierErrors, ...invoiceErrors].join("; "),
+            },
+          });
+          continue;
+        }
+
+        const xml = await SelfBilledInvoiceTemplate(invoice);
+        transformedInvoices.push(xml);
+        invoiceCodeToId.set(invoice.self_billed_no, invoice.id);
+      }
+
+      if (transformedInvoices.length === 0) {
+        return res.json({
+          success: false,
+          message: "No eligible self-billed invoices to submit",
+          shouldStopAtValidation: true,
+          acceptedDocuments: [],
+          rejectedDocuments: validationErrors,
+          documentCount: invoiceIds.length,
+          dateTimeReceived: new Date().toISOString(),
+          overallStatus: "Invalid",
+        });
+      }
+
+      const submissionResult = await submissionHandler.submitAndPollDocuments(
+        transformedInvoices
+      );
+
+      if (validationErrors.length > 0) {
+        submissionResult.rejectedDocuments = [
+          ...(submissionResult.rejectedDocuments || []),
+          ...validationErrors,
+        ];
+        submissionResult.overallStatus = "Partial";
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        for (const document of submissionResult.acceptedDocuments || []) {
+          const documentCode = getDocumentCode(document);
+          const invoiceId = invoiceCodeToId.get(documentCode);
+          if (!invoiceId) continue;
+
+          const status = document.longId ? "valid" : "pending";
+          await client.query(
+            `UPDATE self_billed_invoices
+             SET uuid = $1, submission_uid = $2, long_id = $3,
+                 datetime_validated = $4, einvoice_status = $5,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $6`,
+            [
+              document.uuid || null,
+              document.submissionUid || submissionResult.submissionUid || null,
+              document.longId || null,
+              document.dateTimeValidated || null,
+              status,
+              invoiceId,
+            ]
+          );
+        }
+
+        for (const document of submissionResult.rejectedDocuments || []) {
+          const documentCode = getDocumentCode(document);
+          const invoiceId = invoiceCodeToId.get(documentCode);
+          if (!invoiceId) continue;
+
+          await client.query(
+            `UPDATE self_billed_invoices
+             SET einvoice_status = 'invalid', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [invoiceId]
+          );
+        }
+
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      const acceptedCount = submissionResult.acceptedDocuments?.length || 0;
+      const rejectedCount = submissionResult.rejectedDocuments?.length || 0;
+      const statusCode =
+        acceptedCount > 0 && rejectedCount > 0
+          ? 202
+          : acceptedCount > 0
+          ? 201
+          : 200;
+
+      res.status(statusCode).json({
+        ...submissionResult,
+        message:
+          acceptedCount > 0
+            ? `Submitted ${acceptedCount} self-billed invoice(s) to MyInvois`
+            : "Self-billed e-invoice submission failed",
+      });
+    } catch (error) {
+      console.error("Error bulk submitting self-billed invoices:", error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || "Error submitting self-billed invoices",
+        error: error.response || null,
       });
     }
   });

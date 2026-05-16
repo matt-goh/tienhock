@@ -5,12 +5,19 @@ import {
   IconPlus,
   IconRefresh,
   IconSearch,
+  IconSelectAll,
+  IconSend,
+  IconSquare,
+  IconSquareCheckFilled,
+  IconSquareMinusFilled,
   IconX,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import DateRangePicker from "../../../components/DateRangePicker";
+import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { FormListbox } from "../../../components/FormComponents";
 import { api } from "../../../routes/utils/api";
@@ -23,6 +30,55 @@ import {
 interface DateRange {
   start: Date;
   end: Date;
+}
+
+interface SubmissionDocument {
+  internalId: string;
+  uuid: string;
+  longId?: string;
+  status?: string;
+  dateTimeReceived?: string;
+  dateTimeValidated?: string;
+}
+
+interface RejectedSubmissionDocument {
+  internalId: string;
+  error: {
+    code: string;
+    message: string;
+    target?: string;
+    details?: Array<{
+      code?: string;
+      message: string;
+      target?: string;
+    }>;
+  };
+}
+
+interface SelfBilledSubmissionResult {
+  success: boolean;
+  message: string;
+  shouldStopAtValidation?: boolean;
+  acceptedDocuments?: SubmissionDocument[];
+  rejectedDocuments?: RejectedSubmissionDocument[];
+  pendingUpdated?: Array<{
+    id: string;
+    status: string;
+    longId?: string;
+  }>;
+  pendingFailed?: Array<{
+    id: string;
+    error: string;
+  }>;
+  overallStatus: string;
+  submissionUid?: string;
+  documentCount?: number;
+  dateTimeReceived?: string;
+}
+
+interface ApiError extends Error {
+  status?: number;
+  data?: SelfBilledSubmissionResult;
 }
 
 const invoiceStatusOptions = [
@@ -107,6 +163,13 @@ const formatDateForApi = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const canSubmitInvoice = (invoice: SelfBilledInvoiceListItem): boolean => {
+  return (
+    invoice.invoice_status !== "cancelled" &&
+    (invoice.einvoice_status === null || invoice.einvoice_status === "invalid")
+  );
+};
+
 const SelfBilledInvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<SelfBilledInvoiceListItem[]>([]);
@@ -115,6 +178,16 @@ const SelfBilledInvoiceListPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedInvoiceStatus, setSelectedInvoiceStatus] = useState<string>("");
   const [selectedEInvoiceStatus, setSelectedEInvoiceStatus] = useState<string>("");
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<number>>(
+    new Set()
+  );
+  const [showEInvoiceConfirm, setShowEInvoiceConfirm] =
+    useState<boolean>(false);
+  const [showSubmissionResults, setShowSubmissionResults] =
+    useState<boolean>(false);
+  const [submissionResults, setSubmissionResults] =
+    useState<SelfBilledSubmissionResult | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [dateRange, setDateRange] = useState<DateRange>({
     start: getMonthStart(),
     end: getTodayEnd(),
@@ -171,8 +244,147 @@ const SelfBilledInvoiceListPage: React.FC = () => {
     );
   }, [invoices]);
 
+  const selectedInvoices = useMemo(() => {
+    return invoices.filter((invoice: SelfBilledInvoiceListItem) =>
+      selectedInvoiceIds.has(invoice.id)
+    );
+  }, [invoices, selectedInvoiceIds]);
+
+  const eligibleSelectedInvoices = useMemo(() => {
+    return selectedInvoices.filter((invoice: SelfBilledInvoiceListItem) =>
+      canSubmitInvoice(invoice)
+    );
+  }, [selectedInvoices]);
+
+  const selectedTotalMyr = useMemo(() => {
+    return selectedInvoices.reduce(
+      (sum: number, invoice: SelfBilledInvoiceListItem) =>
+        sum + Number(invoice.payable_amount_myr || 0),
+      0
+    );
+  }, [selectedInvoices]);
+
+  const allVisibleSelected =
+    invoices.length > 0 &&
+    invoices.every((invoice: SelfBilledInvoiceListItem) =>
+      selectedInvoiceIds.has(invoice.id)
+    );
+
   const clearSearch = (): void => {
     setSearchTerm("");
+  };
+
+  const toggleInvoiceSelection = (invoiceId: number): void => {
+    setSelectedInvoiceIds((previous: Set<number>) => {
+      const nextSelected = new Set(previous);
+      if (nextSelected.has(invoiceId)) {
+        nextSelected.delete(invoiceId);
+      } else {
+        nextSelected.add(invoiceId);
+      }
+      return nextSelected;
+    });
+  };
+
+  const toggleSelectionBar = (): void => {
+    if (selectedInvoiceIds.size > 0) {
+      setSelectedInvoiceIds(new Set());
+      return;
+    }
+
+    setSelectedInvoiceIds(
+      new Set(invoices.map((invoice: SelfBilledInvoiceListItem) => invoice.id))
+    );
+  };
+
+  const toggleVisibleSelection = (): void => {
+    setSelectedInvoiceIds((previous: Set<number>) => {
+      const nextSelected = new Set(previous);
+      if (allVisibleSelected) {
+        invoices.forEach((invoice: SelfBilledInvoiceListItem) => {
+          nextSelected.delete(invoice.id);
+        });
+      } else {
+        invoices.forEach((invoice: SelfBilledInvoiceListItem) => {
+          nextSelected.add(invoice.id);
+        });
+      }
+      return nextSelected;
+    });
+  };
+
+  const handleBulkSubmitEInvoice = (): void => {
+    if (selectedInvoiceIds.size === 0) return;
+
+    if (eligibleSelectedInvoices.length === 0) {
+      toast.error(
+        "No selected self-billed invoices are eligible for e-invoice submission."
+      );
+      return;
+    }
+
+    if (eligibleSelectedInvoices.length < selectedInvoiceIds.size) {
+      const ineligibleCount =
+        selectedInvoiceIds.size - eligibleSelectedInvoices.length;
+      toast.error(
+        `${ineligibleCount} selected invoice(s) will be skipped because they are cancelled, pending, or valid.`,
+        { duration: 6000 }
+      );
+    }
+
+    setShowEInvoiceConfirm(true);
+  };
+
+  const confirmBulkSubmitEInvoice = async (): Promise<void> => {
+    setShowEInvoiceConfirm(false);
+
+    const invoiceIds = eligibleSelectedInvoices.map(
+      (invoice: SelfBilledInvoiceListItem) => invoice.id
+    );
+
+    if (invoiceIds.length === 0) {
+      toast.error("No eligible self-billed invoices found to submit.");
+      return;
+    }
+
+    setSubmissionResults(null);
+    setSubmitting(true);
+    setShowSubmissionResults(true);
+
+    try {
+      const response = (await api.post("/api/self-billed-invoices/submit", {
+        invoiceIds,
+      })) as SelfBilledSubmissionResult;
+
+      setSubmissionResults(response);
+
+      const acceptedCount = response.acceptedDocuments?.length || 0;
+      const rejectedCount = response.rejectedDocuments?.length || 0;
+
+      if (acceptedCount > 0 && rejectedCount === 0) {
+        toast.success(`Submitted ${acceptedCount} self-billed invoice(s)`);
+      } else if (acceptedCount > 0 && rejectedCount > 0) {
+        toast.success(
+          `Partial success: ${acceptedCount} accepted, ${rejectedCount} rejected`
+        );
+      } else {
+        toast.error(response.message || "Self-billed e-invoice submission failed");
+      }
+
+      setSelectedInvoiceIds(new Set());
+      await fetchInvoices();
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      console.error("Error submitting self-billed invoices:", apiError);
+      if (apiError.data) {
+        setSubmissionResults(apiError.data);
+      } else {
+        setShowSubmissionResults(false);
+      }
+      toast.error(apiError.message || "Failed to submit self-billed invoices");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -276,6 +488,69 @@ const SelfBilledInvoiceListPage: React.FC = () => {
         </div>
       </div>
 
+      {!loading && invoices.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="rounded-full p-1 transition-colors hover:bg-default-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-gray-700"
+              onClick={toggleSelectionBar}
+              title={
+                selectedInvoiceIds.size > 0
+                  ? "Clear selection"
+                  : "Select all visible self-billed invoices"
+              }
+            >
+              {selectedInvoiceIds.size > 0 ? (
+                <IconSquareMinusFilled
+                  className="text-sky-600 dark:text-sky-400"
+                  size={20}
+                />
+              ) : (
+                <IconSelectAll
+                  className="text-default-400 dark:text-gray-500"
+                  size={20}
+                />
+              )}
+            </button>
+            {selectedInvoiceIds.size > 0 ? (
+              <span className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-sky-800 dark:text-sky-300">
+                <span>{selectedInvoiceIds.size} selected</span>
+                <span className="hidden h-4 border-r border-sky-300 dark:border-sky-600 sm:inline" />
+                <span className="font-mono">
+                  {formatAmount(selectedTotalMyr, "MYR")}
+                </span>
+                <span className="hidden h-4 border-r border-sky-300 dark:border-sky-600 sm:inline" />
+                <span>{eligibleSelectedInvoices.length} eligible</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="text-sm text-default-500 hover:text-default-800 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={toggleSelectionBar}
+              >
+                Select invoices to submit
+              </button>
+            )}
+          </div>
+
+          {selectedInvoiceIds.size > 0 && (
+            <Button
+              type="button"
+              icon={IconSend}
+              color="amber"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg"
+              disabled={submitting}
+              onClick={handleBulkSubmitEInvoice}
+            >
+              Submit e-Invoice
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         {loading ? (
           <div className="flex justify-center py-16">
@@ -291,6 +566,24 @@ const SelfBilledInvoiceListPage: React.FC = () => {
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
+                  <th className="w-10 px-3 py-2 text-left">
+                    <button
+                      type="button"
+                      className="rounded p-1 text-default-400 hover:bg-default-100 hover:text-sky-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-sky-400"
+                      onClick={toggleVisibleSelection}
+                      title={
+                        allVisibleSelected
+                          ? "Clear selection"
+                          : "Select all visible self-billed invoices"
+                      }
+                    >
+                      {allVisibleSelected ? (
+                        <IconSquareCheckFilled size={18} />
+                      ) : (
+                        <IconSquare size={18} />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
                     Date
                   </th>
@@ -327,8 +620,35 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                     onClick={() =>
                       navigate(`/accounting/self-billed-invoices/${invoice.id}`)
                     }
-                    className="cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/50"
+                    className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/50 ${
+                      selectedInvoiceIds.has(invoice.id)
+                        ? "bg-sky-50/70 dark:bg-sky-900/20"
+                        : ""
+                    }`}
                   >
+                    <td className="whitespace-nowrap px-3 py-2 text-sm">
+                      <button
+                        type="button"
+                        onClick={(
+                          event: React.MouseEvent<HTMLButtonElement>
+                        ) => {
+                          event.stopPropagation();
+                          toggleInvoiceSelection(invoice.id);
+                        }}
+                        className="rounded p-1 text-default-400 hover:bg-default-100 hover:text-sky-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-sky-400"
+                        title={
+                          selectedInvoiceIds.has(invoice.id)
+                            ? "Deselect invoice"
+                            : "Select invoice"
+                        }
+                      >
+                        {selectedInvoiceIds.has(invoice.id) ? (
+                          <IconSquareCheckFilled size={18} />
+                        ) : (
+                          <IconSquare size={18} />
+                        )}
+                      </button>
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm text-default-700 dark:text-gray-300">
                       {formatDate(invoice.purchase_date)}
                     </td>
@@ -394,6 +714,23 @@ const SelfBilledInvoiceListPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <SubmissionResultsModal
+        isOpen={showSubmissionResults}
+        onClose={() => setShowSubmissionResults(false)}
+        results={submissionResults}
+        isLoading={submitting}
+      />
+
+      <ConfirmationDialog
+        isOpen={showEInvoiceConfirm}
+        onClose={() => setShowEInvoiceConfirm(false)}
+        onConfirm={confirmBulkSubmitEInvoice}
+        title="Submit Selected Self-Billed E-Invoices"
+        message={`You are about to submit ${eligibleSelectedInvoices.length} eligible self-billed invoice(s) to MyInvois. Continue?`}
+        confirmButtonText="Submit e-Invoices"
+        variant="default"
+      />
     </div>
   );
 };
