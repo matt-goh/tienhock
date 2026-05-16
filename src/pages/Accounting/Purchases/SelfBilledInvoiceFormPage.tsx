@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   IconDownload,
+  IconEye,
   IconFile,
   IconRefresh,
   IconSend,
@@ -205,6 +206,8 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const [s3Enabled, setS3Enabled] = useState<boolean>(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [showCancelDialog, setShowCancelDialog] = useState<boolean>(false);
+  const [showDocViewer, setShowDocViewer] = useState<boolean>(false);
+  const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
 
   const canEdit =
     existingInvoice?.invoice_status !== "cancelled" &&
@@ -592,6 +595,40 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
           ? error.message
           : "Failed to download supporting document"
       );
+    }
+  };
+
+  const isViewable = (filename?: string | null, contentType?: string | null): boolean => {
+    if (contentType) return contentType.startsWith("image/") || contentType === "application/pdf";
+    if (filename) {
+      const lower = filename.toLowerCase();
+      return lower.endsWith(".pdf") || /\.(jpg|jpeg|png|gif|webp)$/.test(lower);
+    }
+    return false;
+  };
+
+  const viewSupportingDocument = async (): Promise<void> => {
+    if (!id || !existingInvoice?.supporting_document_filename) return;
+    try {
+      const blob = await api.downloadBlob(
+        `/api/self-billed-invoices/${id}/supporting-document`
+      );
+      const url = window.URL.createObjectURL(blob);
+      setDocViewerUrl(url);
+      setShowDocViewer(true);
+    } catch (error: unknown) {
+      console.error("Error viewing supporting document:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load document"
+      );
+    }
+  };
+
+  const closeDocViewer = (): void => {
+    setShowDocViewer(false);
+    if (docViewerUrl) {
+      window.URL.revokeObjectURL(docViewerUrl);
+      setDocViewerUrl(null);
     }
   };
 
@@ -1227,6 +1264,22 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                       }}
                     />
                   </label>
+                  {existingInvoice?.supporting_document_filename &&
+                    isViewable(
+                      existingInvoice.supporting_document_filename,
+                      existingInvoice.supporting_document_content_type
+                    ) && (
+                      <Button
+                        type="button"
+                        icon={IconEye}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-lg"
+                        onClick={viewSupportingDocument}
+                      >
+                        View
+                      </Button>
+                    )}
                   {existingInvoice?.supporting_document_filename && (
                     <Button
                       type="button"
@@ -1378,6 +1431,34 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
           )}
         </aside>
       </div>
+
+      {showDocViewer && docViewerUrl && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/80">
+          <div className="flex shrink-0 items-center justify-between gap-4 bg-gray-900 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <IconFile size={18} className="shrink-0 text-sky-400" />
+              <span className="truncate text-sm font-medium text-gray-100">
+                {existingInvoice?.supporting_document_filename}
+              </span>
+              <span className="shrink-0 text-xs text-gray-400">
+                {formatFileSize(existingInvoice?.supporting_document_size)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={closeDocViewer}
+              className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-700 hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <IconX size={20} />
+            </button>
+          </div>
+          <iframe
+            src={docViewerUrl}
+            title={existingInvoice?.supporting_document_filename ?? "Document"}
+            className="min-h-0 flex-1 w-full border-0 bg-white"
+          />
+        </div>
+      )}
 
       <ConfirmationDialog
         isOpen={showDeleteDialog}
