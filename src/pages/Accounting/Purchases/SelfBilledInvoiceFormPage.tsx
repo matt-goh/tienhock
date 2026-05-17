@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   IconDownload,
   IconEye,
+  IconExternalLink,
   IconFile,
   IconRefresh,
   IconSend,
@@ -212,12 +213,22 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const canEdit =
     existingInvoice?.invoice_status !== "cancelled" &&
     existingInvoice?.einvoice_status !== "pending" &&
-    existingInvoice?.einvoice_status !== "valid";
+    existingInvoice?.einvoice_status !== "valid" &&
+    existingInvoice?.einvoice_status !== "cancelled";
   const canEditRecords =
     !isEditMode || existingInvoice?.invoice_status !== "cancelled";
   const hasMultipleSavedLines = isEditMode && lines.length > 1;
   const canEditSummary = canEdit && !hasMultipleSavedLines;
   const summaryLine = lines[0] || createDefaultLine(1);
+  const canViewMyInvoisPortal =
+    isEditMode &&
+    Boolean(existingInvoice?.uuid) &&
+    Boolean(existingInvoice?.long_id) &&
+    (existingInvoice?.einvoice_status === "valid" ||
+      existingInvoice?.einvoice_status === "cancelled");
+  const myInvoisPortalUrl = canViewMyInvoisPortal
+    ? `https://myinvois.hasil.gov.my/${existingInvoice?.uuid}/share/${existingInvoice?.long_id}`
+    : null;
 
   const loadInvoice = useCallback(async (): Promise<void> => {
     if (!isEditMode || !id) return;
@@ -770,6 +781,18 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {myInvoisPortalUrl && (
+            <a
+              href={myInvoisPortalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-2 rounded-lg border border-default-300 bg-white px-3 text-sm font-medium text-default-700 hover:bg-default-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-sky-300"
+              title="View in MyInvois Portal"
+            >
+              <IconExternalLink size={16} />
+              E-Invoice Details
+            </a>
+          )}
           {isEditMode && existingInvoice?.uuid && (
             <Button
               type="button"
@@ -855,7 +878,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
       {/* UUID info bar */}
       {existingInvoice?.uuid && (
         <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-4">
             <div>
               <span className="text-sky-600 dark:text-sky-300">UUID</span>
               <p className="truncate font-mono">{existingInvoice.uuid}</p>
@@ -869,6 +892,22 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
             <div>
               <span className="text-sky-600 dark:text-sky-300">Long ID</span>
               <p className="truncate font-mono">{existingInvoice.long_id || "-"}</p>
+            </div>
+            <div>
+              {myInvoisPortalUrl ? (
+                <a
+                  href={myInvoisPortalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-200 dark:hover:text-sky-100"
+                  title="View in MyInvois Portal"
+                >
+                  E-Invoice Details
+                  <IconExternalLink size={13} />
+                </a>
+              ) : (
+                <p className="truncate font-mono">-</p>
+              )}
             </div>
           </div>
         </div>
