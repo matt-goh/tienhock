@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   IconDownload,
+  IconExternalLink,
   IconFileInvoice,
   IconPaperclip,
   IconPencil,
@@ -162,6 +163,21 @@ const canSubmitInvoice = (invoice: SelfBilledInvoiceListItem): boolean => {
     invoice.invoice_status !== "cancelled" &&
     (invoice.einvoice_status === null || invoice.einvoice_status === "invalid")
   );
+};
+
+const getMyInvoisPortalUrl = (
+  invoice: SelfBilledInvoiceListItem
+): string | null => {
+  if (
+    !invoice.uuid ||
+    !invoice.long_id ||
+    (invoice.einvoice_status !== "valid" &&
+      invoice.einvoice_status !== "cancelled")
+  ) {
+    return null;
+  }
+
+  return `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`;
 };
 
 const SelfBilledInvoiceListPage: React.FC = () => {
@@ -336,7 +352,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
       const ineligibleCount =
         selectedInvoiceIds.size - eligibleSelectedInvoices.length;
       toast.error(
-        `${ineligibleCount} selected invoice(s) will be skipped because they are cancelled, pending, or valid.`,
+        `${ineligibleCount} selected invoice(s) will be skipped because they are cancelled locally or already pending, valid, or cancelled in MyInvois.`,
         { duration: 6000 }
       );
     }
@@ -656,7 +672,9 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-default-200 dark:divide-gray-700">
-                {invoices.map((invoice: SelfBilledInvoiceListItem) => (
+                {invoices.map((invoice: SelfBilledInvoiceListItem) => {
+                  const portalUrl = getMyInvoisPortalUrl(invoice);
+                  return (
                   <tr
                     key={invoice.id}
                     onClick={() =>
@@ -746,13 +764,29 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClasses(
-                          invoice.einvoice_status
-                        )}`}
-                      >
-                        {getStatusLabel(invoice.einvoice_status)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClasses(
+                            invoice.einvoice_status
+                          )}`}
+                        >
+                          {getStatusLabel(invoice.einvoice_status)}
+                        </span>
+                        {portalUrl && (
+                          <a
+                            href={portalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event: React.MouseEvent<HTMLAnchorElement>) =>
+                              event.stopPropagation()
+                            }
+                            className="rounded p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-300 dark:hover:bg-sky-900/30 dark:hover:text-sky-100"
+                            title="View in MyInvois Portal"
+                          >
+                            <IconExternalLink size={15} />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right">
                       <button
@@ -770,7 +804,8 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

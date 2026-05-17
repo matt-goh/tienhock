@@ -70,7 +70,8 @@ function isLockedInvoice(invoice) {
   return (
     invoice?.invoice_status === LOCAL_STATUS_CANCELLED ||
     invoice?.einvoice_status === "pending" ||
-    invoice?.einvoice_status === "valid"
+    invoice?.einvoice_status === "valid" ||
+    invoice?.einvoice_status === "cancelled"
   );
 }
 
@@ -503,10 +504,10 @@ async function insertLines(client, invoiceId, lines) {
 
 function statusFromDocumentDetails(documentDetails, fallbackStatus = "pending") {
   const remoteStatus = normalizeText(documentDetails.status, "").toLowerCase();
-  if (documentDetails.longId) return "valid";
+  if (remoteStatus === "cancelled") return "cancelled";
   if (remoteStatus === "valid") return "valid";
   if (remoteStatus === "invalid" || remoteStatus === "rejected") return "invalid";
-  if (remoteStatus === "cancelled") return "cancelled";
+  if (documentDetails.longId) return "valid";
   return fallbackStatus;
 }
 
@@ -726,7 +727,8 @@ export default function (pool, config) {
             internalId,
             error: {
               code: "LOCKED_INVOICE",
-              message: "Cancelled, pending, or valid self-billed invoices cannot be submitted",
+              message:
+                "Cancelled local invoices and pending, valid, or cancelled e-invoices cannot be submitted",
             },
           });
           continue;
@@ -1209,7 +1211,8 @@ export default function (pool, config) {
       if (isLockedInvoice(existing)) {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: "Cancelled, pending, or valid self-billed invoices cannot be edited",
+          message:
+            "Cancelled local invoices and pending, valid, or cancelled e-invoices cannot be edited",
         });
       }
 
@@ -1290,7 +1293,8 @@ export default function (pool, config) {
       if (isLockedInvoice(existing)) {
         await client.query("ROLLBACK");
         return res.status(400).json({
-          message: "Cancelled, pending, or valid self-billed invoices cannot be deleted",
+          message:
+            "Cancelled local invoices and pending, valid, or cancelled e-invoices cannot be deleted",
         });
       }
 
@@ -1324,14 +1328,10 @@ export default function (pool, config) {
       if (!invoice) {
         return res.status(404).json({ message: "Self-billed invoice not found" });
       }
-      if (invoice.invoice_status === LOCAL_STATUS_CANCELLED) {
+      if (isLockedInvoice(invoice)) {
         return res.status(400).json({
-          message: "Cancelled self-billed invoices cannot be submitted",
-        });
-      }
-      if (invoice.einvoice_status === "pending" || invoice.einvoice_status === "valid") {
-        return res.status(400).json({
-          message: "This self-billed invoice has already been submitted",
+          message:
+            "Cancelled local invoices and pending, valid, or cancelled e-invoices cannot be submitted",
         });
       }
 
@@ -1502,9 +1502,12 @@ export default function (pool, config) {
           message: "Cannot clear e-invoice status for a cancelled self-billed invoice",
         });
       }
-      if (invoice.einvoice_status === "valid") {
+      if (
+        invoice.einvoice_status === "valid" ||
+        invoice.einvoice_status === "cancelled"
+      ) {
         return res.status(400).json({
-          message: "Cannot clear a valid MyInvois document status",
+          message: "Cannot clear a valid or cancelled MyInvois document status",
         });
       }
 
