@@ -34,6 +34,37 @@ function formatAmount(value, decimals = 2) {
   return safeValue.toFixed(decimals);
 }
 
+function convertMyrToDocumentAmount(value, fxRate) {
+  const parsedValue = typeof value === "string" ? Number.parseFloat(value) : Number(value);
+  const parsedFxRate = typeof fxRate === "string" ? Number.parseFloat(fxRate) : Number(fxRate);
+  const safeValue = Number.isFinite(parsedValue) ? parsedValue : 0;
+  return Number.isFinite(parsedFxRate) && parsedFxRate > 0
+    ? safeValue / parsedFxRate
+    : safeValue;
+}
+
+function getLineTaxAmount(line, amountForeign, fxRate) {
+  const taxAmountMyr = Number(line.tax_amount_myr || 0);
+  if (taxAmountMyr > 0) {
+    return convertMyrToDocumentAmount(taxAmountMyr, fxRate);
+  }
+
+  const taxRate = Number(line.tax_rate || 0);
+  return taxRate > 0 ? amountForeign * (taxRate / 100) : 0;
+}
+
+function getLineTaxAmountMyr(line, taxAmount, fxRate) {
+  const taxAmountMyr = Number(line.tax_amount_myr || 0);
+  if (taxAmountMyr > 0) {
+    return taxAmountMyr;
+  }
+
+  const parsedFxRate = typeof fxRate === "string" ? Number.parseFloat(fxRate) : Number(fxRate);
+  return Number.isFinite(parsedFxRate) && parsedFxRate > 0
+    ? taxAmount * parsedFxRate
+    : taxAmount;
+}
+
 function getCurrentIssueDateTime() {
   const now = new Date();
   const iso = now.toISOString();
@@ -223,11 +254,11 @@ function generatePaymentBlocks(invoice, currencyCode, issueDate, issueTime) {
   return paymentXml;
 }
 
-function generateTaxSubtotal(totalTaxableMyr, totalTaxMyr, taxType) {
+function generateTaxSubtotal(totalTaxableAmount, totalTaxAmountMyr, taxType, currencyCode) {
   return `
     <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="MYR">${formatAmount(totalTaxableMyr)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="MYR">${formatAmount(totalTaxMyr)}</cbc:TaxAmount>
+      <cbc:TaxableAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalTaxableAmount)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="MYR">${formatAmount(totalTaxAmountMyr)}</cbc:TaxAmount>
       <cbc:Percent>0.00</cbc:Percent>
       <cac:TaxCategory>
         <cbc:ID>${escapeXml(cleanValue(taxType, "06"))}</cbc:ID>
@@ -238,7 +269,7 @@ function generateTaxSubtotal(totalTaxableMyr, totalTaxMyr, taxType) {
     </cac:TaxSubtotal>`;
 }
 
-function generateInvoiceLines(lines, currencyCode) {
+function generateInvoiceLines(lines, currencyCode, fxRate) {
   return lines
     .map((line, index) => {
       const lineNumber = line.line_number || index + 1;
@@ -246,8 +277,8 @@ function generateInvoiceLines(lines, currencyCode) {
       const amountForeign = Number(line.amount_foreign || 0);
       const unitPriceForeign =
         Number(line.unit_price_foreign || 0) || (quantity > 0 ? amountForeign / quantity : 0);
-      const taxAmountMyr = Number(line.tax_amount_myr || 0);
-      const amountMyr = Number(line.amount_myr || 0);
+      const taxAmount = getLineTaxAmount(line, amountForeign, fxRate);
+      const taxAmountMyr = getLineTaxAmountMyr(line, taxAmount, fxRate);
       const taxType = cleanValue(line.tax_type, "06");
       const taxRate = Number(line.tax_rate || 0);
       const taxExemptionReason = cleanValue(line.tax_exemption_reason, "");
@@ -272,7 +303,7 @@ function generateInvoiceLines(lines, currencyCode) {
     <cac:TaxTotal>
       <cbc:TaxAmount currencyID="MYR">${formatAmount(taxAmountMyr)}</cbc:TaxAmount>
       <cac:TaxSubtotal>
-        <cbc:TaxableAmount currencyID="MYR">${formatAmount(amountMyr)}</cbc:TaxableAmount>
+        <cbc:TaxableAmount currencyID="${currencyCode}">${formatAmount(amountForeign)}</cbc:TaxableAmount>
         <cbc:TaxAmount currencyID="MYR">${formatAmount(taxAmountMyr)}</cbc:TaxAmount>
         <cbc:Percent>${formatAmount(taxRate)}</cbc:Percent>
         <cac:TaxCategory>
@@ -364,9 +395,17 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
     const { issueDate, issueTime } = getCurrentIssueDateTime();
     const currencyCode = cleanValue(invoiceData.currency_code, "CNY");
     const totalForeign = Number(invoiceData.total_foreign_amount || 0);
-    const totalExcludingTaxMyr = Number(invoiceData.total_excluding_tax_myr || 0);
-    const taxAmountMyr = Number(invoiceData.tax_amount_myr || 0);
     const fxRate = Number(invoiceData.fx_rate || 1);
+    const taxAmount = invoiceData.lines.reduce((sum, line) => {
+      const amountForeign = Number(line.amount_foreign || 0);
+      return sum + getLineTaxAmount(line, amountForeign, fxRate);
+    }, 0);
+    const taxAmountMyr = invoiceData.lines.reduce((sum, line) => {
+      const amountForeign = Number(line.amount_foreign || 0);
+      const lineTaxAmount = getLineTaxAmount(line, amountForeign, fxRate);
+      return sum + getLineTaxAmountMyr(line, lineTaxAmount, fxRate);
+    }, 0);
+    const totalIncludingTax = totalForeign + taxAmount;
     const firstTaxType = cleanValue(invoiceData.lines[0]?.tax_type, "06");
 
     let xml = TEMPLATE_HEADER;
@@ -378,15 +417,6 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
   <cbc:InvoiceTypeCode listVersionID="1.0">11</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>${escapeXml(currencyCode)}</cbc:DocumentCurrencyCode>
   <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;
-
-    if (currencyCode !== "MYR") {
-      xml += `
-  <cac:TaxExchangeRate>
-    <cbc:SourceCurrencyCode>${escapeXml(currencyCode)}</cbc:SourceCurrencyCode>
-    <cbc:TargetCurrencyCode>MYR</cbc:TargetCurrencyCode>
-    <cbc:CalculationRate>${formatAmount(fxRate, 8)}</cbc:CalculationRate>
-  </cac:TaxExchangeRate>`;
-    }
 
     xml += `
   <cac:InvoicePeriod>
@@ -411,22 +441,33 @@ export async function SelfBilledInvoiceTemplate(invoiceData) {
     <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
     <cbc:AllowanceChargeReason></cbc:AllowanceChargeReason>
     <cbc:Amount currencyID="${escapeXml(currencyCode)}">0.00</cbc:Amount>
-  </cac:AllowanceCharge>
+  </cac:AllowanceCharge>`;
+
+    if (currencyCode !== "MYR") {
+      xml += `
+  <cac:TaxExchangeRate>
+    <cbc:SourceCurrencyCode>${escapeXml(currencyCode)}</cbc:SourceCurrencyCode>
+    <cbc:TargetCurrencyCode>MYR</cbc:TargetCurrencyCode>
+    <cbc:CalculationRate>${formatAmount(fxRate, 8)}</cbc:CalculationRate>
+  </cac:TaxExchangeRate>`;
+    }
+
+    xml += `
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="MYR">${formatAmount(taxAmountMyr)}</cbc:TaxAmount>
-    ${generateTaxSubtotal(totalExcludingTaxMyr, taxAmountMyr, firstTaxType)}
+    ${generateTaxSubtotal(totalForeign, taxAmountMyr, firstTaxType, currencyCode)}
   </cac:TaxTotal>
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalForeign)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalForeign)}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalForeign)}</cbc:TaxInclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalIncludingTax)}</cbc:TaxInclusiveAmount>
     <cbc:AllowanceTotalAmount currencyID="${escapeXml(currencyCode)}">0.00</cbc:AllowanceTotalAmount>
     <cbc:ChargeTotalAmount currencyID="${escapeXml(currencyCode)}">0.00</cbc:ChargeTotalAmount>
     <cbc:PayableRoundingAmount currencyID="${escapeXml(currencyCode)}">0.00</cbc:PayableRoundingAmount>
-    <cbc:PayableAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalForeign)}</cbc:PayableAmount>
+    <cbc:PayableAmount currencyID="${escapeXml(currencyCode)}">${formatAmount(totalIncludingTax)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>`;
 
-    xml += generateInvoiceLines(invoiceData.lines, escapeXml(currencyCode));
+    xml += generateInvoiceLines(invoiceData.lines, escapeXml(currencyCode), fxRate);
     xml += TEMPLATE_FOOTER;
 
     return xml;
