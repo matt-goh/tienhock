@@ -556,7 +556,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
               <span className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-sky-800 dark:text-sky-300">
                 <span>{selectedInvoiceIds.size} selected</span>
                 <span className="hidden h-4 border-r border-sky-300 dark:border-sky-600 sm:inline" />
-                <span className="font-mono">
+                <span>
                   {formatAmount(selectedTotalMyr, "MYR")}
                 </span>
                 <span className="hidden h-4 border-r border-sky-300 dark:border-sky-600 sm:inline" />
