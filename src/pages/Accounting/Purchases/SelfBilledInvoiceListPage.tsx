@@ -545,17 +545,17 @@ const SelfBilledInvoiceListPage: React.FC = () => {
 
       {!loading && invoices.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-full p-1 transition-colors hover:bg-default-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-gray-700"
-              onClick={toggleSelectionBar}
-              title={
-                selectedInvoiceIds.size > 0
-                  ? "Clear selection"
-                  : "Select all visible self-billed invoices"
-              }
-            >
+          <button
+            type="button"
+            className="flex min-h-8 flex-1 flex-wrap items-center gap-2 rounded-lg px-1 text-left transition-colors hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-gray-700/50"
+            onClick={toggleSelectionBar}
+            title={
+              selectedInvoiceIds.size > 0
+                ? "Clear selection"
+                : "Select all visible self-billed invoices"
+            }
+          >
+            <span className="rounded-full p-1">
               {selectedInvoiceIds.size > 0 ? (
                 <IconSquareMinusFilled
                   className="text-sky-600 dark:text-sky-400"
@@ -567,7 +567,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                   size={20}
                 />
               )}
-            </button>
+            </span>
             {selectedInvoiceIds.size > 0 ? (
               <span className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-sky-800 dark:text-sky-300">
                 <span>{selectedInvoiceIds.size} selected</span>
@@ -579,30 +579,33 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                 <span>{eligibleSelectedInvoices.length} eligible</span>
               </span>
             ) : (
-              <button
-                type="button"
-                className="text-sm text-default-500 hover:text-default-800 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={toggleSelectionBar}
-              >
+              <span className="text-sm text-default-500 dark:text-gray-400">
                 Select invoices to submit
-              </button>
+              </span>
+            )}
+          </button>
+
+          <div
+            className="flex items-center"
+            onClick={(event: React.MouseEvent<HTMLDivElement>) =>
+              event.stopPropagation()
+            }
+          >
+            {selectedInvoiceIds.size > 0 && (
+              <Button
+                type="button"
+                icon={IconSend}
+                color="amber"
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-lg"
+                disabled={submitting}
+                onClick={handleBulkSubmitEInvoice}
+              >
+                Submit e-Invoice
+              </Button>
             )}
           </div>
-
-          {selectedInvoiceIds.size > 0 && (
-            <Button
-              type="button"
-              icon={IconSend}
-              color="amber"
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-lg"
-              disabled={submitting}
-              onClick={handleBulkSubmitEInvoice}
-            >
-              Submit e-Invoice
-            </Button>
-          )}
         </div>
       )}
 
