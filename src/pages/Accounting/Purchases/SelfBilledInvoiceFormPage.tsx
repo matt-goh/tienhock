@@ -10,7 +10,7 @@ import {
   IconUpload,
   IconX,
 } from "@tabler/icons-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
@@ -180,7 +180,10 @@ const formatDateTime = (value?: string | null): string => {
 const SelfBilledInvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const isEditMode = Boolean(id && id !== "new");
+
+  const backUrl = `/accounting/self-billed-invoices${searchParams.get("month") ? `?month=${searchParams.get("month")}` : ""}`;
 
   const [formData, setFormData] =
     useState<SelfBilledFormData>(defaultFormData);
@@ -750,7 +753,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
       {/* Sticky header */}
       <div className="sticky top-0 z-20 -mx-1 flex flex-col gap-2 rounded-lg border border-default-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-800/95 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <BackButton onClick={() => navigate("/accounting/self-billed-invoices")} />
+          <BackButton onClick={() => navigate(backUrl)} />
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
