@@ -536,7 +536,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
             variant="filled"
             size="sm"
             className="h-8 rounded-lg !px-3"
-            onClick={() => navigate("/accounting/self-billed-invoices/new")}
+            onClick={() => navigate(`/accounting/self-billed-invoices/new?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
           >
             New
           </Button>
@@ -681,7 +681,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                   <tr
                     key={invoice.id}
                     onClick={() =>
-                      navigate(`/accounting/self-billed-invoices/${invoice.id}`)
+                      navigate(`/accounting/self-billed-invoices/${invoice.id}?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)
                     }
                     className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/50 ${
                       selectedInvoiceIds.has(invoice.id)
@@ -797,7 +797,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                         onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
                           event.stopPropagation();
                           navigate(
-                            `/accounting/self-billed-invoices/${invoice.id}`
+                            `/accounting/self-billed-invoices/${invoice.id}?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`
                           );
                         }}
                         className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-default-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
