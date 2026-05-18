@@ -3,6 +3,44 @@ import { Router } from "express";
 
 export default function (pool) {
   const router = Router();
+  const validStockBuckets = new Set(["mee", "bihun", "shared"]);
+
+  function toNumber(value) {
+    return parseFloat(value) || 0;
+  }
+
+  function getPeriodStart(year, month) {
+    return `${year}-${String(month).padStart(2, "0")}-01`;
+  }
+
+  function getNextPeriod(year, month) {
+    if (month === 12) {
+      return { year: year + 1, month: 1 };
+    }
+    return { year, month: month + 1 };
+  }
+
+  function stockKey(row) {
+    return `${row.material_id}_${row.variant_id || ""}_${row.custom_description || ""}`;
+  }
+
+  function accumulateRows(rows, quantityField, valueField) {
+    const map = new Map();
+
+    rows.forEach((row) => {
+      const key = stockKey(row);
+      const current = map.get(key) || {
+        quantity: 0,
+        value: 0,
+      };
+
+      current.quantity += toNumber(row[quantityField]);
+      current.value += toNumber(row[valueField]);
+      map.set(key, current);
+    });
+
+    return map;
+  }
 
   // ==================== MATERIALS CRUD ====================
 
@@ -83,7 +121,7 @@ export default function (pool) {
   // ==================== STOCK ENTRIES ====================
   // NOTE: These routes MUST be defined BEFORE /:id to prevent route conflicts
 
-  // GET /stock/entries - Get stock entries for a period
+  // GET /stock/entries - Get manual stock adjustments for a period
   router.get("/stock/entries", async (req, res) => {
     try {
       const { year, month, product_line } = req.query;
@@ -97,8 +135,9 @@ export default function (pool) {
       let query = `
         SELECT
           mse.id, mse.year, mse.month, mse.material_id,
-          mse.product_line, mse.quantity, mse.unit_cost,
-          mse.value, mse.notes, mse.created_at, mse.updated_at,
+          mse.product_line, mse.variant_id, mse.custom_name, mse.custom_description,
+          mse.adjustment_quantity, mse.unit_cost, mse.adjustment_value,
+          mse.notes, mse.created_at, mse.updated_at,
           m.code as material_code, m.name as material_name,
           m.category as material_category, m.default_unit_cost
         FROM material_stock_entries mse
@@ -127,67 +166,8 @@ export default function (pool) {
     }
   });
 
-  // GET /stock/opening - Get opening balances (previous month's closing)
+  // GET /stock/opening - Get derived opening balances before a period
   router.get("/stock/opening", async (req, res) => {
-    try {
-      const { year, month, product_line } = req.query;
-
-      if (!year || !month) {
-        return res.status(400).json({
-          message: "Year and month are required",
-        });
-      }
-
-      // Calculate previous month
-      let prevYear = parseInt(year);
-      let prevMonth = parseInt(month) - 1;
-      if (prevMonth === 0) {
-        prevMonth = 12;
-        prevYear -= 1;
-      }
-
-      // Get previous month's closing stock as this month's opening
-      let query = `
-        SELECT
-          mse.material_id, mse.product_line,
-          mse.quantity as opening_quantity,
-          mse.unit_cost as opening_unit_cost,
-          mse.value as opening_value,
-          m.code as material_code, m.name as material_name,
-          m.category as material_category
-        FROM material_stock_entries mse
-        JOIN materials m ON mse.material_id = m.id
-        WHERE mse.year = $1 AND mse.month = $2
-      `;
-      const params = [prevYear, prevMonth];
-      let paramIndex = 3;
-
-      if (product_line) {
-        query += ` AND mse.product_line = $${paramIndex}`;
-        params.push(product_line);
-        paramIndex++;
-      }
-
-      query += ` ORDER BY m.sort_order, m.category, m.name`;
-
-      const result = await pool.query(query, params);
-      res.json({
-        period: { year: prevYear, month: prevMonth },
-        opening_balances: result.rows,
-      });
-    } catch (error) {
-      console.error("Error fetching opening balances:", error);
-      res.status(500).json({
-        message: "Error fetching opening balances",
-        error: error.message,
-      });
-    }
-  });
-
-  // GET /stock/with-opening - Get all materials with their stock data for a period
-  // SIMPLIFIED: Returns opening (previous month's closing), quantity (editable), value
-  // VARIANT SUPPORT: Materials with variants return multiple rows, one per variant
-  router.get("/stock/with-opening", async (req, res) => {
     try {
       const { year, month, product_line } = req.query;
 
@@ -199,187 +179,293 @@ export default function (pool) {
 
       const currentYear = parseInt(year);
       const currentMonth = parseInt(month);
+      const periodStart = getPeriodStart(currentYear, currentMonth);
 
-      // Calculate previous month
-      let prevYear = currentYear;
-      let prevMonth = currentMonth - 1;
-      if (prevMonth === 0) {
-        prevMonth = 12;
-        prevYear -= 1;
+      const purchasesResult = await pool.query(
+        `
+          SELECT
+            pil.material_id, pil.variant_id, NULL::text as custom_description,
+            SUM(pil.quantity) as opening_quantity,
+            SUM(pil.amount) as opening_value
+          FROM purchase_invoice_lines pil
+          JOIN purchase_invoices pi ON pi.id = pil.purchase_invoice_id
+          WHERE pi.invoice_date < $1
+            AND pil.stock_bucket = $2
+            AND pil.quantity IS NOT NULL
+          GROUP BY pil.material_id, pil.variant_id
+        `,
+        [periodStart, product_line]
+      );
+
+      const adjustmentsResult = await pool.query(
+        `
+          SELECT
+            material_id, variant_id, custom_description,
+            SUM(adjustment_quantity) as opening_quantity,
+            SUM(adjustment_value) as opening_value
+          FROM material_stock_entries
+          WHERE product_line = $1
+            AND (year < $2 OR (year = $2 AND month < $3))
+          GROUP BY material_id, variant_id, custom_description
+        `,
+        [product_line, currentYear, currentMonth]
+      );
+
+      res.json({
+        period: { year: currentYear, month: currentMonth },
+        opening_balances: [...purchasesResult.rows, ...adjustmentsResult.rows],
+      });
+    } catch (error) {
+      console.error("Error fetching opening balances:", error);
+      res.status(500).json({
+        message: "Error fetching opening balances",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /stock/with-opening - Get derived material stock for a period
+  router.get("/stock/with-opening", async (req, res) => {
+    try {
+      const { year, month, product_line } = req.query;
+
+      if (!year || !month || !product_line) {
+        return res.status(400).json({
+          message: "Year, month, and product_line are required",
+        });
       }
 
-      // Get all active materials that apply to this product line
+      if (!validStockBuckets.has(product_line)) {
+        return res.status(400).json({
+          message: "product_line must be one of: mee, bihun, shared",
+        });
+      }
+
+      const currentYear = parseInt(year);
+      const currentMonth = parseInt(month);
+      const nextPeriod = getNextPeriod(currentYear, currentMonth);
+      const periodStart = getPeriodStart(currentYear, currentMonth);
+      const nextPeriodStart = getPeriodStart(nextPeriod.year, nextPeriod.month);
+
       const materialsQuery = `
         SELECT
           m.id, m.code, m.name, m.category,
           m.default_unit_cost, m.applies_to, m.sort_order
         FROM materials m
         WHERE m.is_active = true
-          AND (m.applies_to = $1 OR m.applies_to = 'both')
+          AND (
+            ($1 = 'shared' AND m.applies_to = 'both')
+            OR ($1 != 'shared' AND (m.applies_to = $1 OR m.applies_to = 'both'))
+          )
         ORDER BY m.sort_order, m.category, m.name
       `;
       const materials = await pool.query(materialsQuery, [product_line]);
+      const materialIds = materials.rows.map((m) => m.id);
 
-      // Get all active variants for these materials
-      const variantsQuery = `
-        SELECT id, material_id, variant_name, default_unit_cost, sort_order
-        FROM material_variants
-        WHERE material_id = ANY($1) AND is_active = true
-        ORDER BY material_id, sort_order, variant_name
-      `;
-      const materialIds = materials.rows.map(m => m.id);
-      const variantsResult = await pool.query(variantsQuery, [materialIds]);
+      const variantsResult = materialIds.length > 0
+        ? await pool.query(
+            `
+              SELECT id, material_id, variant_name, default_unit_cost, sort_order
+              FROM material_variants
+              WHERE material_id = ANY($1) AND is_active = true
+              ORDER BY material_id, sort_order, variant_name
+            `,
+            [materialIds]
+          )
+        : { rows: [] };
 
-      // Group variants by material_id
       const variantsByMaterial = new Map();
-      variantsResult.rows.forEach(v => {
-        if (!variantsByMaterial.has(v.material_id)) {
-          variantsByMaterial.set(v.material_id, []);
+      variantsResult.rows.forEach((variant) => {
+        if (!variantsByMaterial.has(variant.material_id)) {
+          variantsByMaterial.set(variant.material_id, []);
         }
-        variantsByMaterial.get(v.material_id).push(v);
+        variantsByMaterial.get(variant.material_id).push(variant);
       });
 
-      // Get previous month's closing quantities (this month's opening)
-      const openingQuery = `
-        SELECT material_id, variant_id, custom_description, quantity, unit_cost
-        FROM material_stock_entries
-        WHERE year = $1 AND month = $2 AND product_line = $3
-      `;
-      const openingResult = await pool.query(openingQuery, [prevYear, prevMonth, product_line]);
+      const openingPurchases = await pool.query(
+        `
+          SELECT
+            pil.material_id, pil.variant_id, NULL::text as custom_description,
+            SUM(pil.quantity) as quantity,
+            SUM(pil.amount) as value
+          FROM purchase_invoice_lines pil
+          JOIN purchase_invoices pi ON pi.id = pil.purchase_invoice_id
+          WHERE pi.invoice_date < $1
+            AND pil.stock_bucket = $2
+            AND pil.quantity IS NOT NULL
+          GROUP BY pil.material_id, pil.variant_id
+        `,
+        [periodStart, product_line]
+      );
 
-      // Create opening map keyed by "materialId_variantId_customDesc"
-      const openingMap = new Map();
-      openingResult.rows.forEach(r => {
-        const key = `${r.material_id}_${r.variant_id || ''}_${r.custom_description || ''}`;
-        openingMap.set(key, r);
+      const currentPurchases = await pool.query(
+        `
+          SELECT
+            pil.material_id, pil.variant_id, NULL::text as custom_description,
+            SUM(pil.quantity) as quantity,
+            SUM(pil.amount) as value
+          FROM purchase_invoice_lines pil
+          JOIN purchase_invoices pi ON pi.id = pil.purchase_invoice_id
+          WHERE pi.invoice_date >= $1
+            AND pi.invoice_date < $2
+            AND pil.stock_bucket = $3
+            AND pil.quantity IS NOT NULL
+          GROUP BY pil.material_id, pil.variant_id
+        `,
+        [periodStart, nextPeriodStart, product_line]
+      );
+
+      const openingAdjustments = await pool.query(
+        `
+          SELECT
+            material_id, variant_id, custom_description,
+            SUM(adjustment_quantity) as quantity,
+            SUM(adjustment_value) as value
+          FROM material_stock_entries
+          WHERE product_line = $1
+            AND (year < $2 OR (year = $2 AND month < $3))
+          GROUP BY material_id, variant_id, custom_description
+        `,
+        [product_line, currentYear, currentMonth]
+      );
+
+      const currentAdjustments = await pool.query(
+        `
+          SELECT id, material_id, variant_id, custom_name, custom_description,
+                 adjustment_quantity, unit_cost, adjustment_value, notes
+          FROM material_stock_entries
+          WHERE year = $1 AND month = $2 AND product_line = $3
+        `,
+        [currentYear, currentMonth, product_line]
+      );
+
+      const openingPurchaseMap = accumulateRows(openingPurchases.rows, "quantity", "value");
+      const currentPurchaseMap = accumulateRows(currentPurchases.rows, "quantity", "value");
+      const openingAdjustmentMap = accumulateRows(openingAdjustments.rows, "quantity", "value");
+      const currentAdjustmentMap = new Map();
+      currentAdjustments.rows.forEach((row) => {
+        currentAdjustmentMap.set(stockKey(row), row);
       });
 
-      // Get current month's entries (if exist)
-      const currentQuery = `
-        SELECT id, material_id, variant_id, custom_name, custom_description,
-               quantity, unit_cost, value, notes
-        FROM material_stock_entries
-        WHERE year = $1 AND month = $2 AND product_line = $3
-      `;
-      const currentResult = await pool.query(currentQuery, [currentYear, currentMonth, product_line]);
-
-      // Create current map keyed by "materialId_variantId_customDesc"
-      const currentMap = new Map();
-      currentResult.rows.forEach(r => {
-        const key = `${r.material_id}_${r.variant_id || ''}_${r.custom_description || ''}`;
-        currentMap.set(key, r);
-      });
-
-      // Combine data - now handling variants
-      const data = materials.rows.map(m => {
-        const variants = variantsByMaterial.get(m.id) || [];
-        const hasVariants = variants.length > 0;
-
-        // Build variant rows (from registered variants + ad-hoc from current/previous entries)
-        const variantRows = [];
-
-        if (hasVariants) {
-          // Add registered variants
-          variants.forEach(v => {
-            const key = `${m.id}_${v.id}_`;
-            const prevEntry = openingMap.get(key);
-            const current = currentMap.get(key);
-
-            const openingQty = parseFloat(prevEntry?.quantity) || 0;
-            const unitCost = parseFloat(current?.unit_cost) || parseFloat(v.default_unit_cost) || parseFloat(m.default_unit_cost) || 0;
-            const qty = current ? parseFloat(current.quantity) || 0 : openingQty;
-            const value = qty * unitCost;
-
-            variantRows.push({
-              entry_id: current?.id || null,
-              variant_id: v.id,
-              variant_name: v.variant_name,
-              is_new_variant: false,
-              opening_quantity: openingQty,
-              quantity: qty,
-              value: value,
-              unit_cost: unitCost,
-              notes: current?.notes || null,
-            });
-          });
-
-          // Add any ad-hoc entries (variant_id=NULL but custom_description exists) from current month
-          currentResult.rows
-            .filter(r => r.material_id === m.id && !r.variant_id && r.custom_description)
-            .forEach(current => {
-              const key = `${m.id}__${current.custom_description}`;
-              const prevEntry = openingMap.get(key);
-
-              const openingQty = parseFloat(prevEntry?.quantity) || 0;
-              const unitCost = parseFloat(current.unit_cost) || parseFloat(m.default_unit_cost) || 0;
-              const qty = parseFloat(current.quantity) || 0;
-
-              variantRows.push({
-                entry_id: current.id,
-                variant_id: null,
-                variant_name: current.custom_description,
-                is_new_variant: false,
-                opening_quantity: openingQty,
-                quantity: qty,
-                value: qty * unitCost,
-                unit_cost: unitCost,
-                notes: current.notes || null,
-              });
-            });
-
-          // Also check previous entries for ad-hoc variants that don't have current entries
-          openingResult.rows
-            .filter(r => r.material_id === m.id && !r.variant_id && r.custom_description)
-            .forEach(prevEntry => {
-              // Check if we already have this entry
-              const alreadyExists = variantRows.some(
-                vr => !vr.variant_id && vr.variant_name === prevEntry.custom_description
-              );
-              if (!alreadyExists) {
-                const openingQty = parseFloat(prevEntry.quantity) || 0;
-                const unitCost = parseFloat(prevEntry.unit_cost) || parseFloat(m.default_unit_cost) || 0;
-
-                variantRows.push({
-                  entry_id: null,
-                  variant_id: null,
-                  variant_name: prevEntry.custom_description,
-                  is_new_variant: false,
-                  opening_quantity: openingQty,
-                  quantity: openingQty, // Default to opening if no current entry
-                  value: openingQty * unitCost,
-                  unit_cost: unitCost,
-                  notes: null,
-                });
-              }
-            });
-        }
-
-        // For materials without variants OR as default single entry
-        const defaultKey = `${m.id}__`;
-        const prevEntry = openingMap.get(defaultKey);
-        const current = currentMap.get(defaultKey);
-
-        const openingQty = parseFloat(prevEntry?.quantity) || 0;
-        const unitCost = parseFloat(current?.unit_cost) || parseFloat(m.default_unit_cost) || 0;
-        const qty = current ? parseFloat(current.quantity) || 0 : openingQty;
-        const value = qty * unitCost;
+      const buildStockRow = (material, variant = null, customDescription = null) => {
+        const rowKey = `${material.id}_${variant?.id || ""}_${customDescription || ""}`;
+        const openingPurchase = openingPurchaseMap.get(rowKey) || { quantity: 0, value: 0 };
+        const openingAdjustment = openingAdjustmentMap.get(rowKey) || { quantity: 0, value: 0 };
+        const currentPurchase = currentPurchaseMap.get(rowKey) || { quantity: 0, value: 0 };
+        const currentAdjustment = currentAdjustmentMap.get(rowKey);
+        const adjustmentQuantity = toNumber(currentAdjustment?.adjustment_quantity);
+        const adjustmentValue = toNumber(currentAdjustment?.adjustment_value);
+        const purchaseQuantity = currentPurchase.quantity;
+        const purchaseValue = currentPurchase.value;
+        const openingQuantity = openingPurchase.quantity + openingAdjustment.quantity;
+        const openingValue = openingPurchase.value + openingAdjustment.value;
+        const closingQuantity = openingQuantity + purchaseQuantity + adjustmentQuantity;
+        const closingValue = openingValue + purchaseValue + adjustmentValue;
+        const purchaseUnitCost = purchaseQuantity !== 0 ? purchaseValue / purchaseQuantity : 0;
+        const unitCost =
+          toNumber(currentAdjustment?.unit_cost) ||
+          purchaseUnitCost ||
+          toNumber(variant?.default_unit_cost) ||
+          toNumber(material.default_unit_cost);
 
         return {
-          ...m,
-          default_unit_cost: parseFloat(m.default_unit_cost) || 0,
+          entry_id: currentAdjustment?.id || null,
+          variant_id: variant?.id || null,
+          variant_name: variant?.variant_name || customDescription,
+          is_new_variant: false,
+          opening_quantity: openingQuantity,
+          opening_value: openingValue,
+          purchase_quantity: purchaseQuantity,
+          purchase_value: purchaseValue,
+          adjustment_quantity: adjustmentQuantity,
+          adjustment_value: adjustmentValue,
+          closing_quantity: closingQuantity,
+          closing_value: closingValue,
+          quantity: adjustmentQuantity,
+          value: closingValue,
+          unit_cost: unitCost,
+          notes: currentAdjustment?.notes || null,
+          custom_description: customDescription,
+        };
+      };
+
+      const data = materials.rows.map((material) => {
+        const variants = variantsByMaterial.get(material.id) || [];
+        const hasRegisteredVariants = variants.length > 0;
+        const variantRows = [];
+
+        variants.forEach((variant) => {
+          variantRows.push(buildStockRow(material, variant));
+        });
+
+        const defaultRow = buildStockRow(material);
+        const hasDefaultActivity =
+          defaultRow.opening_quantity !== 0 ||
+          defaultRow.purchase_quantity !== 0 ||
+          defaultRow.adjustment_quantity !== 0 ||
+          defaultRow.closing_quantity !== 0;
+
+        if (hasRegisteredVariants && hasDefaultActivity) {
+          variantRows.unshift({
+            ...defaultRow,
+            variant_name: "Default",
+          });
+        }
+
+        currentAdjustments.rows
+          .filter((row) => row.material_id === material.id && !row.variant_id && row.custom_description)
+          .forEach((row) => {
+            const exists = variantRows.some(
+              (variantRow) => variantRow.custom_description === row.custom_description
+            );
+            if (!exists) {
+              variantRows.push(buildStockRow(material, null, row.custom_description));
+            }
+          });
+
+        const hasVariants = hasRegisteredVariants || variantRows.length > 0;
+        const baseStock = hasVariants ? null : defaultRow;
+
+        return {
+          ...material,
+          default_unit_cost: toNumber(material.default_unit_cost),
           has_variants: hasVariants,
           variants: hasVariants ? variantRows : [],
-          // Totals (from variants or single entry)
-          opening_quantity: hasVariants ? variantRows.reduce((sum, v) => sum + v.opening_quantity, 0) : openingQty,
-          quantity: hasVariants ? variantRows.reduce((sum, v) => sum + v.quantity, 0) : qty,
-          value: hasVariants ? variantRows.reduce((sum, v) => sum + v.value, 0) : value,
-          // Per-entry customization (only for non-variant materials)
-          custom_name: hasVariants ? null : (current?.custom_name || null),
-          custom_description: hasVariants ? null : (current?.custom_description || null),
-          // Entry metadata
-          entry_id: hasVariants ? null : (current?.id || null),
-          unit_cost: hasVariants ? 0 : unitCost,
-          notes: hasVariants ? null : (current?.notes || null),
+          opening_quantity: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.opening_quantity, 0)
+            : baseStock.opening_quantity,
+          opening_value: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.opening_value, 0)
+            : baseStock.opening_value,
+          purchase_quantity: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.purchase_quantity, 0)
+            : baseStock.purchase_quantity,
+          purchase_value: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.purchase_value, 0)
+            : baseStock.purchase_value,
+          adjustment_quantity: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.adjustment_quantity, 0)
+            : baseStock.adjustment_quantity,
+          adjustment_value: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.adjustment_value, 0)
+            : baseStock.adjustment_value,
+          closing_quantity: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.closing_quantity, 0)
+            : baseStock.closing_quantity,
+          closing_value: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.closing_value, 0)
+            : baseStock.closing_value,
+          quantity: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.adjustment_quantity, 0)
+            : baseStock.adjustment_quantity,
+          value: hasVariants
+            ? variantRows.reduce((sum, row) => sum + row.closing_value, 0)
+            : baseStock.closing_value,
+          custom_name: hasVariants ? null : (currentAdjustmentMap.get(`${material.id}__`)?.custom_name || null),
+          custom_description: hasVariants ? null : null,
+          entry_id: hasVariants ? null : baseStock.entry_id,
+          unit_cost: hasVariants ? 0 : baseStock.unit_cost,
+          notes: hasVariants ? null : baseStock.notes,
         };
       });
 
@@ -398,15 +484,19 @@ export default function (pool) {
     }
   });
 
-  // POST /stock/batch - Batch upsert stock entries for a month
-  // SIMPLIFIED: Now just saves quantity, unit_cost, value (no purchases/consumption)
-  // VARIANT SUPPORT: Handles variant_id and register_variant flag
+  // POST /stock/batch - Batch upsert manual stock adjustments for a month
   router.post("/stock/batch", async (req, res) => {
     const { year, month, product_line, entries } = req.body;
 
     if (!year || !month || !product_line || !entries) {
       return res.status(400).json({
         message: "Year, month, product_line, and entries are required",
+      });
+    }
+
+    if (!validStockBuckets.has(product_line)) {
+      return res.status(400).json({
+        message: "product_line must be one of: mee, bihun, shared",
       });
     }
 
@@ -422,33 +512,31 @@ export default function (pool) {
 
       let upsertedCount = 0;
       let deletedCount = 0;
-      let registeredVariants = [];
+      const registeredVariants = [];
 
       for (const entry of entries) {
         const {
           material_id,
           variant_id,
+          adjustment_quantity,
           quantity,
           unit_cost,
           custom_name,
           custom_description,
           notes,
-          register_variant
+          register_variant,
         } = entry;
 
         if (!material_id) continue;
 
-        const qty = parseFloat(quantity) || 0;
-        const cost = parseFloat(unit_cost) || 0;
-        const value = qty * cost;
+        const adjustmentQty = toNumber(adjustment_quantity ?? quantity);
+        const cost = toNumber(unit_cost);
+        const adjustmentValue = adjustmentQty * cost;
 
-        // Determine the variant identifier
         let finalVariantId = variant_id || null;
         let finalCustomDescription = custom_description?.trim() || null;
 
-        // If register_variant is true and we have a custom_description, create a new variant
         if (register_variant && finalCustomDescription && !finalVariantId) {
-          // Check if variant already exists
           const existingVariant = await client.query(
             "SELECT id FROM material_variants WHERE material_id = $1 AND variant_name = $2",
             [material_id, finalCustomDescription]
@@ -456,9 +544,8 @@ export default function (pool) {
 
           if (existingVariant.rows.length > 0) {
             finalVariantId = existingVariant.rows[0].id;
-            finalCustomDescription = null; // Use the registered variant instead
+            finalCustomDescription = null;
           } else {
-            // Create new variant
             const newVariant = await client.query(
               `INSERT INTO material_variants (material_id, variant_name, default_unit_cost)
                VALUES ($1, $2, $3) RETURNING id, variant_name`,
@@ -466,64 +553,58 @@ export default function (pool) {
             );
             finalVariantId = newVariant.rows[0].id;
             registeredVariants.push(newVariant.rows[0]);
-            finalCustomDescription = null; // Now it's a registered variant
+            finalCustomDescription = null;
           }
         }
 
-        // Check if we should delete (quantity zero and no custom description)
-        const shouldDelete = qty === 0 && cost === 0 && !custom_name && !finalCustomDescription;
+        const conflictKey = finalVariantId ? String(finalVariantId) : (finalCustomDescription || "default");
+        const shouldDelete = adjustmentQty === 0 && !custom_name && !finalCustomDescription;
 
         if (shouldDelete) {
-          // Delete entry if quantity is zero
-          const deleteQuery = `
-            DELETE FROM material_stock_entries
-            WHERE year = $1 AND month = $2 AND material_id = $3 AND product_line = $4
-              AND COALESCE(variant_id::text, custom_description, 'default') = $5
-          `;
-          const conflictKey = finalVariantId ? String(finalVariantId) : (finalCustomDescription || 'default');
-          const deleteResult = await client.query(deleteQuery, [
-            parseInt(year),
-            parseInt(month),
-            material_id,
-            product_line,
-            conflictKey,
-          ]);
+          const deleteResult = await client.query(
+            `
+              DELETE FROM material_stock_entries
+              WHERE year = $1 AND month = $2 AND material_id = $3 AND product_line = $4
+                AND COALESCE(variant_id::text, custom_description, 'default') = $5
+            `,
+            [parseInt(year), parseInt(month), material_id, product_line, conflictKey]
+          );
           if (deleteResult.rowCount > 0) deletedCount++;
         } else {
-          // Upsert entry
-          const upsertQuery = `
-            INSERT INTO material_stock_entries (
-              year, month, material_id, product_line, variant_id,
-              custom_name, custom_description,
-              quantity, unit_cost, value,
-              notes, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default'))
-            DO UPDATE SET
-              custom_name = EXCLUDED.custom_name,
-              custom_description = EXCLUDED.custom_description,
-              quantity = EXCLUDED.quantity,
-              unit_cost = EXCLUDED.unit_cost,
-              value = EXCLUDED.value,
-              notes = EXCLUDED.notes,
-              updated_at = CURRENT_TIMESTAMP
-            RETURNING id
-          `;
-
-          await client.query(upsertQuery, [
-            parseInt(year),
-            parseInt(month),
-            material_id,
-            product_line,
-            finalVariantId,
-            custom_name?.trim() || null,
-            finalCustomDescription,
-            qty,
-            cost,
-            value,
-            notes?.trim() || null,
-            req.staffId || null,
-          ]);
+          await client.query(
+            `
+              INSERT INTO material_stock_entries (
+                year, month, material_id, product_line, variant_id,
+                custom_name, custom_description,
+                adjustment_quantity, unit_cost, adjustment_value,
+                notes, created_by
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+              ON CONFLICT (year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default'))
+              DO UPDATE SET
+                custom_name = EXCLUDED.custom_name,
+                custom_description = EXCLUDED.custom_description,
+                adjustment_quantity = EXCLUDED.adjustment_quantity,
+                unit_cost = EXCLUDED.unit_cost,
+                adjustment_value = EXCLUDED.adjustment_value,
+                notes = EXCLUDED.notes,
+                updated_at = CURRENT_TIMESTAMP
+              RETURNING id
+            `,
+            [
+              parseInt(year),
+              parseInt(month),
+              material_id,
+              product_line,
+              finalVariantId,
+              custom_name?.trim() || null,
+              finalCustomDescription,
+              adjustmentQty,
+              cost,
+              adjustmentValue,
+              notes?.trim() || null,
+              req.staffId || null,
+            ]
+          );
           upsertedCount++;
         }
       }
@@ -531,7 +612,7 @@ export default function (pool) {
       await client.query("COMMIT");
 
       res.json({
-        message: `Stock entries saved successfully`,
+        message: "Stock adjustments saved successfully",
         upserted: upsertedCount,
         deleted: deletedCount,
         registered_variants: registeredVariants,
@@ -548,7 +629,7 @@ export default function (pool) {
     }
   });
 
-  // GET /stock/summary - Get summary totals by category for a period
+  // GET /stock/summary - Get current adjustment totals by category for a period
   router.get("/stock/summary", async (req, res) => {
     try {
       const { year, month, product_line } = req.query;
@@ -563,7 +644,7 @@ export default function (pool) {
         SELECT
           m.category,
           mse.product_line,
-          SUM(mse.value) as total_value,
+          SUM(mse.adjustment_value) as total_value,
           COUNT(*) as entry_count
         FROM material_stock_entries mse
         JOIN materials m ON mse.material_id = m.id
@@ -591,7 +672,7 @@ export default function (pool) {
     }
   });
 
-  // GET /stock/history/:materialId - Get stock entry history for a material
+  // GET /stock/history/:materialId - Get manual adjustment history for a material
   router.get("/stock/history/:materialId", async (req, res) => {
     try {
       const { materialId } = req.params;
@@ -600,8 +681,8 @@ export default function (pool) {
       let query = `
         SELECT
           mse.id, mse.year, mse.month, mse.product_line,
-          mse.quantity, mse.unit_cost, mse.total_value,
-          mse.notes, mse.created_at
+          mse.variant_id, mse.adjustment_quantity, mse.unit_cost,
+          mse.adjustment_value, mse.notes, mse.created_at
         FROM material_stock_entries mse
         WHERE mse.material_id = $1
       `;

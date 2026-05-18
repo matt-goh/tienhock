@@ -1120,7 +1120,8 @@ export type StockViewType = "month" | "rolling" | "custom";
 
 export type MaterialCategory = "ingredient" | "raw_material" | "packing_material";
 export type MaterialAppliesTo = "mee" | "bihun" | "both";
-export type ProductLine = "mee" | "bihun";
+export type ProductLine = "mee" | "bihun" | "shared";
+export type StockBucket = ProductLine;
 
 // Material Master Data
 export interface Material {
@@ -1170,7 +1171,7 @@ export interface MaterialVariantInput {
   is_active?: boolean;
 }
 
-// Material Stock Entry (monthly stock with purchases/consumption)
+// Material Stock Entry (monthly manual stock adjustment)
 export interface MaterialStockEntry {
   id: number;
   year: number;
@@ -1183,17 +1184,18 @@ export interface MaterialStockEntry {
   custom_name?: string | null;
   custom_description?: string | null;  // Used for ad-hoc variants (when variant_id is null)
 
-  // Stock quantities (REDESIGNED)
+  // Derived stock quantities
   opening_quantity: number;
-  purchases_quantity: number;
-  consumption_quantity: number;
-  closing_quantity: number;  // Auto-calculated by DB
-
-  // Pricing
-  unit_cost: number;
   opening_value: number;
-  purchases_value: number;
+  purchase_quantity: number;
+  purchase_value: number;
+  adjustment_quantity: number;
+  adjustment_value: number;
+  closing_quantity: number;
   closing_value: number;
+
+  // Adjustment pricing
+  unit_cost: number;
 
   notes?: string | null;
   created_at?: string;
@@ -1213,14 +1215,22 @@ export interface StockEntryRow {
   entry_id: number | null;  // null for new entries
   variant_id: number | null;  // null for single-entry materials or ad-hoc variants
   variant_name: string | null;  // From variant table or custom_description for ad-hoc
+  custom_description?: string | null;
   is_new_variant: boolean;  // True if this is a newly added ad-hoc variant
 
   // Stock quantities
-  opening_quantity: number;  // Read-only, from previous month's quantity
-  quantity: number;          // Editable closing quantity
-  value: number;             // Calculated: quantity * unit_cost
+  opening_quantity: number;
+  opening_value: number;
+  purchase_quantity: number;
+  purchase_value: number;
+  adjustment_quantity: number;
+  adjustment_value: number;
+  closing_quantity: number;
+  closing_value: number;
+  quantity: number;          // Backward-compatible alias for adjustment_quantity
+  value: number;             // Backward-compatible alias for closing_value
 
-  // Pricing
+  // Adjustment pricing
   unit_cost: number;
 
   // Notes
@@ -1231,9 +1241,16 @@ export interface StockEntryRow {
 // Now supports multiple variant rows per material
 export interface MaterialWithStock extends Material {
   // Stock quantities
-  opening_quantity: number;  // Read-only, from previous month's quantity
-  quantity: number;          // Editable closing quantity
-  value: number;             // Calculated: quantity * unit_cost
+  opening_quantity: number;
+  opening_value: number;
+  purchase_quantity: number;
+  purchase_value: number;
+  adjustment_quantity: number;
+  adjustment_value: number;
+  closing_quantity: number;
+  closing_value: number;
+  quantity: number;          // Backward-compatible alias for adjustment_quantity
+  value: number;             // Backward-compatible alias for closing_value
 
   // Per-entry customization (for single-entry materials)
   custom_name?: string | null;
@@ -1257,7 +1274,7 @@ export interface MaterialWithStock extends Material {
 export interface MaterialStockEntryInput {
   material_id: number;
   variant_id?: number | null;  // Reference to registered variant (null for ad-hoc or single-entry)
-  quantity: number;            // Closing quantity
+  adjustment_quantity: number; // Manual plus/minus adjustment
   unit_cost: number;
   custom_name?: string | null;
   custom_description?: string | null;  // Used for ad-hoc variants when variant_id is null
@@ -1403,6 +1420,8 @@ export interface PurchaseInvoiceLine {
   purchase_invoice_id?: number;
   line_number: number;
   material_id: number;
+  variant_id?: number | null;
+  stock_bucket?: StockBucket | null;
   quantity?: number | null;
   unit_cost?: number | null;
   amount: number;
@@ -1411,6 +1430,7 @@ export interface PurchaseInvoiceLine {
   material_code?: string;
   material_name?: string;
   material_category?: MaterialCategory;
+  variant_name?: string | null;
 }
 
 // Material Purchase Input for create/update
@@ -1426,6 +1446,8 @@ export interface PurchaseInvoiceInput {
 export interface PurchaseInvoiceLineInput {
   line_number: number;
   material_id: number;
+  variant_id?: number | null;
+  stock_bucket?: StockBucket | null;
   quantity?: number | null;
   unit_cost?: number | null;
   amount: number;
@@ -1438,6 +1460,7 @@ export interface MaterialDropdown {
   code: string;
   name: string;
   category: MaterialCategory;
+  applies_to: MaterialAppliesTo;
   default_unit_cost: number;
   is_variant?: boolean;
   material_id?: number; // Parent material ID for variants
@@ -1460,6 +1483,43 @@ export type SelfBilledEInvoiceStatus =
   | null;
 
 export type SelfBilledInvoiceStatus = "active" | "cancelled";
+export type GeneralPurchaseKind = "foreign" | "local";
+
+export interface GeneralStockCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GeneralStockAdjustment {
+  id: number;
+  adjustment_date: string;
+  adjustment_quantity: number;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export interface GeneralStockRow {
+  line_id: number;
+  self_billed_invoice_id: number;
+  line_number: number;
+  description: string;
+  balance_quantity: number | null;
+  amount_myr: number;
+  general_stock_category_id: number | null;
+  category_name: string;
+  category_sort_order: number;
+  purchase_no: string;
+  purchase_date: string;
+  purchase_kind: GeneralPurchaseKind;
+  supplier_name: string | null;
+  adjustment_quantity: number;
+  current_stock: number;
+  used_adjustments?: GeneralStockAdjustment[];
+}
 
 export interface SelfBilledForeignSupplier {
   id?: number;
@@ -1493,6 +1553,7 @@ export interface SelfBilledInvoiceLine {
   description: string;
   quantity: number;
   balance_quantity?: number | null;
+  general_stock_category_id?: number | null;
   unit_price_foreign: number;
   amount_foreign: number;
   amount_myr: number;
@@ -1507,7 +1568,10 @@ export interface SelfBilledInvoiceLine {
 
 export interface SelfBilledInvoiceListItem {
   id: number;
+  purchase_kind?: GeneralPurchaseKind;
   self_billed_no: string;
+  purchase_no?: string;
+  local_supplier_name?: string | null;
   purchase_date: string;
   transaction_type: string;
   platform: string | null;
@@ -1529,7 +1593,9 @@ export interface SelfBilledInvoiceListItem {
 }
 
 export interface SelfBilledInvoiceInput {
+  purchase_kind?: GeneralPurchaseKind;
   foreign_supplier_id?: number | null;
+  local_supplier_name?: string | null;
   supplier: SelfBilledForeignSupplier;
   self_billed_no?: string;
   purchase_date: string;
@@ -1555,7 +1621,9 @@ export interface SelfBilledInvoiceInput {
 
 export interface SelfBilledInvoice extends SelfBilledInvoiceInput {
   id: number;
+  purchase_kind: GeneralPurchaseKind;
   self_billed_no: string;
+  purchase_no?: string;
   total_foreign_amount: number;
   total_excluding_tax_myr: number;
   tax_amount_myr: number;

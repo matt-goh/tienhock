@@ -173,6 +173,10 @@ export default function setupRoutes(app, pool) {
   app.use("/api/suppliers", suppliersRouter(pool));
   app.use("/api/purchase-invoices", purchaseInvoicesRouter(pool));
   app.use(
+    "/api/general-purchases",
+    selfBilledInvoicesRouter(pool, myInvoisConfig)
+  );
+  app.use(
     "/api/self-billed-invoices",
     selfBilledInvoicesRouter(pool, myInvoisConfig)
   );
