@@ -1,5 +1,6 @@
 // src/pages/Payroll/ECarumanPage.tsx
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   IconFileDownload,
   IconBuildingBank,
@@ -8,6 +9,7 @@ import {
   IconLoader2,
   IconUmbrella,
   IconAlertTriangle,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import MonthNavigator from "../../../components/MonthNavigator";
@@ -465,24 +467,34 @@ const ECarumanPage: React.FC = () => {
       </div>
 
       {/* Month/Year Selection */}
-      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Select Period</h2>
-        <div className="flex flex-wrap items-end gap-4">
+      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-3">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">Select Period</span>
+          <span className="text-gray-300 dark:text-gray-600">|</span>
           <YearNavigator
             selectedYear={selectedYear}
             onChange={handleYearChange}
             showGoToCurrentButton={false}
-            label="Year"
+            size="sm"
           />
+          <span className="text-gray-300 dark:text-gray-600">|</span>
           <MonthNavigator
             selectedMonth={selectedDate}
             onChange={setSelectedDate}
             showGoToCurrentButton={false}
-            label="Month"
+            size="sm"
             formatDisplay={(date) =>
               date.toLocaleDateString("en-MY", { month: "long" })
             }
           />
+          <span className="text-gray-300 dark:text-gray-600 ml-auto">|</span>
+          <Link
+            to="/catalogue/contribution-rates"
+            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap"
+          >
+            <IconExternalLink size={14} />
+            Contribution Rates
+          </Link>
         </div>
       </div>
 
