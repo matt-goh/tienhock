@@ -36,6 +36,9 @@ import {
   IconCalendar,
   IconAlertCircle,
   IconRefresh,
+  IconSearch,
+  IconUsers,
+  IconCheck,
 } from "@tabler/icons-react";
 
 interface MonthlyLogEntryPageProps {
@@ -109,20 +112,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const [deletedLeaveIds, setDeletedLeaveIds] = useState<number[]>([]);
   const [showAddLeaveModal, setShowAddLeaveModal] = useState(false);
   const [leaveFormData, setLeaveFormData] = useState({
-    employeeId: "",
     leaveDate: format(new Date(), "yyyy-MM-dd"),
     leaveType: "cuti_sakit" as "cuti_sakit" | "cuti_tahunan" | "cuti_umum",
   });
-
-  // Public holiday bulk add state
-  const [showBulkHolidayModal, setShowBulkHolidayModal] = useState(false);
-  const [pendingHolidayLeave, setPendingHolidayLeave] = useState<{
-    leaveDate: string;
-    leaveType: "cuti_umum";
-    firstEmployeeId: string;
-    firstEmployeeName: string;
-  } | null>(null);
-  const [bulkHolidaySelections, setBulkHolidaySelections] = useState<Record<string, boolean>>({});
+  // Multi-employee selection state for the Add Leave modal
+  const [leaveEmployeeSelections, setLeaveEmployeeSelections] = useState<Record<string, boolean>>({});
+  const [leaveEmployeeSearch, setLeaveEmployeeSearch] = useState("");
 
   // Ref to track which employee IDs were originally saved in the work log
   // Used to determine whether to use CREATE mode or EDIT mode activity selection logic
@@ -502,167 +497,106 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     }));
   };
 
-  const handleAddLeave = () => {
-    if (!leaveFormData.employeeId || !leaveFormData.leaveDate) {
-      toast.error("Please select an employee and date");
-      return;
-    }
-
-    const leaveType = leaveFormData.leaveType;
-
-    // Check for duplicate
-    const isDuplicate = [...existingLeaveRecords, ...newLeaveEntries].some(
-      (entry) =>
-        entry.employeeId === leaveFormData.employeeId &&
-        entry.leaveDate === leaveFormData.leaveDate
-    );
-
-    if (isDuplicate) {
-      toast.error("Leave entry already exists for this employee on this date");
-      return;
-    }
-
-    const employee = eligibleEmployees.find(
-      (e: Employee) => e.id === leaveFormData.employeeId
-    );
-
-    // If public holiday, show bulk add dialog
-    if (leaveType === "cuti_umum") {
-      setPendingHolidayLeave({
-        leaveDate: leaveFormData.leaveDate,
-        leaveType: "cuti_umum",
-        firstEmployeeId: leaveFormData.employeeId,
-        firstEmployeeName: employee?.name || "",
-      });
-
-      // Initialize selections - all selected employees except the first one
-      const initialSelections: Record<string, boolean> = {};
-      Object.values(employeeEntries).forEach((entry) => {
-        if (entry.selected && entry.employeeId !== leaveFormData.employeeId) {
-          // Check if this employee already has leave on this date
-          const hasExisting = [...existingLeaveRecords, ...newLeaveEntries].some(
-            (leave) =>
-              leave.employeeId === entry.employeeId &&
-              leave.leaveDate === leaveFormData.leaveDate
-          );
-          if (!hasExisting) {
-            initialSelections[entry.employeeId] = true;
-          }
-        }
-      });
-      setBulkHolidaySelections(initialSelections);
-
-      setShowAddLeaveModal(false);
-      setShowBulkHolidayModal(true);
-      return;
-    }
-
-    // Regular leave - just add it
-    setNewLeaveEntries((prev) => [
-      ...prev,
-      {
-        employeeId: leaveFormData.employeeId,
-        employeeName: employee?.name || "",
-        leaveDate: leaveFormData.leaveDate,
-        leaveType,
-        isNew: true,
-      },
-    ]);
-
-    setLeaveFormData({
-      employeeId: "",
-      leaveDate: format(new Date(), "yyyy-MM-dd"),
-      leaveType: "cuti_sakit",
-    });
-    setShowAddLeaveModal(false);
-  };
-
-  const handleConfirmBulkHoliday = () => {
-    if (!pendingHolidayLeave) return;
-
-    const newEntries: LeaveEntry[] = [];
-
-    // Add the first employee's leave
-    newEntries.push({
-      employeeId: pendingHolidayLeave.firstEmployeeId,
-      employeeName: pendingHolidayLeave.firstEmployeeName,
-      leaveDate: pendingHolidayLeave.leaveDate,
-      leaveType: "cuti_umum",
-      isNew: true,
-    });
-
-    // Add selected employees' leaves
-    Object.entries(bulkHolidaySelections).forEach(([employeeId, isSelected]) => {
-      if (isSelected) {
-        const employee = eligibleEmployees.find((e: Employee) => e.id === employeeId);
-        if (employee) {
-          newEntries.push({
-            employeeId,
-            employeeName: employee.name,
-            leaveDate: pendingHolidayLeave.leaveDate,
-            leaveType: "cuti_umum",
-            isNew: true,
-          });
-        }
+  // Employees that already have a leave entry on the selected date (existing or new),
+  // keyed by employee_id -> leave type label. Used to disable them in the picker.
+  const employeesWithLeaveOnSelectedDate = useMemo(() => {
+    const map: Record<string, string> = {};
+    [...existingLeaveRecords, ...newLeaveEntries].forEach((entry) => {
+      if (entry.leaveDate === leaveFormData.leaveDate) {
+        map[entry.employeeId] = entry.leaveType;
       }
     });
+    return map;
+  }, [existingLeaveRecords, newLeaveEntries, leaveFormData.leaveDate]);
 
-    setNewLeaveEntries((prev) => [...prev, ...newEntries]);
-
-    // Reset states
-    setPendingHolidayLeave(null);
-    setBulkHolidaySelections({});
-    setShowBulkHolidayModal(false);
-    setLeaveFormData({
-      employeeId: "",
-      leaveDate: format(new Date(), "yyyy-MM-dd"),
-      leaveType: "cuti_sakit",
+  // Open Add Leave modal and pre-select currently-selected employees on the table
+  const openAddLeaveModal = () => {
+    const initialSelections: Record<string, boolean> = {};
+    Object.values(employeeEntries).forEach((entry) => {
+      if (entry.selected) {
+        initialSelections[entry.employeeId] = true;
+      }
     });
-
-    toast.success(`Added public holiday leave for ${newEntries.length} employee(s)`);
+    setLeaveEmployeeSelections(initialSelections);
+    setLeaveEmployeeSearch("");
+    setShowAddLeaveModal(true);
   };
 
-  const handleSkipBulkHoliday = () => {
-    if (!pendingHolidayLeave) return;
-
-    // Just add the first employee's leave
-    setNewLeaveEntries((prev) => [
-      ...prev,
-      {
-        employeeId: pendingHolidayLeave.firstEmployeeId,
-        employeeName: pendingHolidayLeave.firstEmployeeName,
-        leaveDate: pendingHolidayLeave.leaveDate,
-        leaveType: "cuti_umum",
-        isNew: true,
-      },
-    ]);
-
-    // Reset states
-    setPendingHolidayLeave(null);
-    setBulkHolidaySelections({});
-    setShowBulkHolidayModal(false);
+  const closeAddLeaveModal = () => {
+    setShowAddLeaveModal(false);
+    setLeaveEmployeeSelections({});
+    setLeaveEmployeeSearch("");
     setLeaveFormData({
-      employeeId: "",
       leaveDate: format(new Date(), "yyyy-MM-dd"),
       leaveType: "cuti_sakit",
     });
   };
 
-  const handleBulkSelectionToggle = (employeeId: string) => {
-    setBulkHolidaySelections((prev) => ({
+  const handleLeaveEmployeeToggle = (employeeId: string) => {
+    if (employeesWithLeaveOnSelectedDate[employeeId]) return;
+    setLeaveEmployeeSelections((prev) => ({
       ...prev,
       [employeeId]: !prev[employeeId],
     }));
   };
 
-  const handleBulkSelectAll = () => {
-    const allSelected = Object.values(bulkHolidaySelections).every((v) => v);
-    const newSelections: Record<string, boolean> = {};
-    Object.keys(bulkHolidaySelections).forEach((id) => {
-      newSelections[id] = !allSelected;
+  const handleAddLeave = () => {
+    if (!leaveFormData.leaveDate) {
+      toast.error("Please select a date");
+      return;
+    }
+
+    // Collect selected employee IDs, excluding those that already have leave on this date
+    const targetEmployeeIds = Object.entries(leaveEmployeeSelections)
+      .filter(([id, selected]) => selected && !employeesWithLeaveOnSelectedDate[id])
+      .map(([id]) => id);
+
+    if (targetEmployeeIds.length === 0) {
+      toast.error("Please select at least one employee");
+      return;
+    }
+
+    const leaveType = leaveFormData.leaveType;
+    const leaveDate = leaveFormData.leaveDate;
+
+    const additions: LeaveEntry[] = targetEmployeeIds.map((employeeId) => {
+      const employee = eligibleEmployees.find((e: Employee) => e.id === employeeId);
+      return {
+        employeeId,
+        employeeName: employee?.name || "",
+        leaveDate,
+        leaveType,
+        isNew: true,
+      };
     });
-    setBulkHolidaySelections(newSelections);
+
+    setNewLeaveEntries((prev) => [...prev, ...additions]);
+    toast.success(
+      additions.length === 1
+        ? "Leave entry added"
+        : `Added leave for ${additions.length} employees`
+    );
+    closeAddLeaveModal();
   };
+
+  // Auto-switch type to public holiday when the chosen date is a holiday
+  const handleLeaveDateChange = (newDate: string) => {
+    const isPublicHoliday = newDate && isHoliday(new Date(newDate));
+    setLeaveFormData((prev) => ({
+      ...prev,
+      leaveDate: newDate,
+      leaveType: isPublicHoliday ? "cuti_umum" : prev.leaveType,
+    }));
+  };
+
+  // Selectable count = number of toggled employees that don't already have leave that day
+  const leaveSelectedCount = useMemo(
+    () =>
+      Object.entries(leaveEmployeeSelections).filter(
+        ([id, selected]) => selected && !employeesWithLeaveOnSelectedDate[id]
+      ).length,
+    [leaveEmployeeSelections, employeesWithLeaveOnSelectedDate]
+  );
 
   const handleRemoveNewLeave = (index: number) => {
     setNewLeaveEntries((prev) => prev.filter((_, i) => i !== index));
@@ -1044,7 +978,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             </p>
           </div>
           <Button
-            onClick={() => setShowAddLeaveModal(true)}
+            onClick={openAddLeaveModal}
             icon={IconPlus}
             color="sky"
             size="sm"
@@ -1136,12 +1070,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         )}
       </div>
 
-      {/* Add Leave Modal */}
+      {/* Add Leave Modal (multi-employee) */}
       <Transition appear show={showAddLeaveModal} as={React.Fragment}>
         <Dialog
           as="div"
           className="fixed inset-0 z-50 overflow-y-auto"
-          onClose={() => setShowAddLeaveModal(false)}
+          onClose={closeAddLeaveModal}
         >
           <div className="min-h-screen px-4 text-center">
             <TransitionChild
@@ -1170,64 +1104,38 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               leaveTo="opacity-0 scale-95"
             >
               <DialogPanel
-                className="relative z-50 inline-block w-full max-w-md p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
+                className="relative z-50 inline-block w-full max-w-2xl p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
-                  Add Leave Entry
+                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100 flex items-center gap-2">
+                  <IconUsers size={20} className="text-sky-600 dark:text-sky-400" />
+                  Add Leave
                 </DialogTitle>
+                <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
+                  Pick a date and leave type, then select one or more employees.
+                </p>
 
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Employee
-                    </label>
-                    <StyledListbox
-                      value={leaveFormData.employeeId}
-                      onChange={(value) =>
-                        setLeaveFormData({ ...leaveFormData, employeeId: String(value) })
-                      }
-                      options={[
-                        { id: "", name: "Select Employee" },
-                        ...eligibleEmployees.map((emp: Employee) => ({
-                          id: emp.id,
-                          name: `${emp.name} (${emp.id})`,
-                        })),
-                      ]}
-                      placeholder="Select Employee"
-                      rounded="lg"
-                    />
-                  </div>
-
+                {/* Date + Type row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Date
                     </label>
-                    <input
-                      type="date"
-                      value={leaveFormData.leaveDate}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        const isPublicHoliday = newDate && isHoliday(new Date(newDate));
-                        setLeaveFormData({
-                          ...leaveFormData,
-                          leaveDate: newDate,
-                          // Auto-select public holiday if date is a holiday
-                          leaveType: isPublicHoliday ? "cuti_umum" : leaveFormData.leaveType,
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
-                    />
-                    {leaveFormData.leaveDate && isHoliday(new Date(leaveFormData.leaveDate)) && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-sky-600 dark:text-sky-400">
-                        <IconAlertCircle size={14} />
-                        <span>
-                          This date is a public holiday: {getHolidayDescription(new Date(leaveFormData.leaveDate))}
-                        </span>
-                      </div>
-                    )}
+                    <div className="relative h-10">
+                      <IconCalendar
+                        size={18}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 pointer-events-none"
+                      />
+                      <input
+                        type="date"
+                        value={leaveFormData.leaveDate}
+                        min={getMinDate()}
+                        max={getMaxDate()}
+                        onChange={(e) => handleLeaveDateChange(e.target.value)}
+                        className="w-full h-full pl-10 pr-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500"
+                      />
+                    </div>
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Leave Type
@@ -1247,11 +1155,141 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       ]}
                       rounded="lg"
                     />
-                    {leaveFormData.leaveType === "cuti_umum" && (
-                      <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">
-                        You'll be prompted to add this leave for other employees too.
-                      </p>
-                    )}
+                  </div>
+                </div>
+
+                {leaveFormData.leaveDate && isHoliday(new Date(leaveFormData.leaveDate)) && (
+                  <div className="flex items-center gap-1 mt-2 text-xs text-sky-600 dark:text-sky-400">
+                    <IconAlertCircle size={14} />
+                    <span>
+                      Public holiday: {getHolidayDescription(new Date(leaveFormData.leaveDate))}
+                    </span>
+                  </div>
+                )}
+
+                {/* Employee picker */}
+                <div className="mt-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-default-700 dark:text-gray-200">
+                      Employees
+                      <span className="ml-2 text-xs font-normal text-default-500 dark:text-gray-400">
+                        {leaveSelectedCount} selected
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Toggle select-all among currently-visible+selectable employees
+                        const visibleSelectable = eligibleEmployees.filter((emp: Employee) => {
+                          if (employeesWithLeaveOnSelectedDate[emp.id]) return false;
+                          if (!leaveEmployeeSearch.trim()) return true;
+                          const q = leaveEmployeeSearch.trim().toLowerCase();
+                          return (
+                            emp.name.toLowerCase().includes(q) ||
+                            emp.id.toLowerCase().includes(q)
+                          );
+                        });
+                        const allOn = visibleSelectable.length > 0 &&
+                          visibleSelectable.every((emp: Employee) => leaveEmployeeSelections[emp.id]);
+                        const next = { ...leaveEmployeeSelections };
+                        visibleSelectable.forEach((emp: Employee) => {
+                          next[emp.id] = !allOn;
+                        });
+                        setLeaveEmployeeSelections(next);
+                      }}
+                      className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 font-medium"
+                    >
+                      {(() => {
+                        const visibleSelectable = eligibleEmployees.filter((emp: Employee) => {
+                          if (employeesWithLeaveOnSelectedDate[emp.id]) return false;
+                          if (!leaveEmployeeSearch.trim()) return true;
+                          const q = leaveEmployeeSearch.trim().toLowerCase();
+                          return (
+                            emp.name.toLowerCase().includes(q) ||
+                            emp.id.toLowerCase().includes(q)
+                          );
+                        });
+                        const allOn = visibleSelectable.length > 0 &&
+                          visibleSelectable.every((emp: Employee) => leaveEmployeeSelections[emp.id]);
+                        return allOn ? "Deselect All" : "Select All";
+                      })()}
+                    </button>
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative mb-2">
+                    <IconSearch
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+                    />
+                    <input
+                      type="text"
+                      value={leaveEmployeeSearch}
+                      onChange={(e) => setLeaveEmployeeSearch(e.target.value)}
+                      placeholder="Search by name or ID..."
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-700 dark:text-gray-100"
+                    />
+                  </div>
+
+                  {/* Employee list */}
+                  <div className="max-h-72 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg divide-y divide-default-100 dark:divide-gray-700">
+                    {(() => {
+                      const q = leaveEmployeeSearch.trim().toLowerCase();
+                      const filtered = eligibleEmployees.filter((emp: Employee) =>
+                        !q ||
+                        emp.name.toLowerCase().includes(q) ||
+                        emp.id.toLowerCase().includes(q)
+                      );
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="p-6 text-center text-sm text-default-500 dark:text-gray-400">
+                            No employees match your search.
+                          </div>
+                        );
+                      }
+                      return filtered.map((emp: Employee) => {
+                        const existingType = employeesWithLeaveOnSelectedDate[emp.id];
+                        const isDisabled = !!existingType;
+                        const isChecked = !!leaveEmployeeSelections[emp.id] && !isDisabled;
+                        return (
+                          <div
+                            key={emp.id}
+                            className={`flex items-center px-3 py-2 ${
+                              isDisabled
+                                ? "bg-default-50 dark:bg-gray-900/40 cursor-not-allowed"
+                                : isChecked
+                                ? "bg-sky-50 dark:bg-sky-900/30 cursor-pointer"
+                                : "hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
+                            }`}
+                            onClick={() => handleLeaveEmployeeToggle(emp.id)}
+                          >
+                            <Checkbox
+                              checked={isChecked}
+                              onChange={() => handleLeaveEmployeeToggle(emp.id)}
+                              size={18}
+                              checkedColor="text-sky-600"
+                              disabled={isDisabled}
+                            />
+                            <div className="ml-3 flex-1 flex items-center justify-between">
+                              <div className="text-sm">
+                                <span className={`font-medium ${isDisabled ? "text-default-400 dark:text-gray-500" : "text-default-700 dark:text-gray-200"}`}>
+                                  {emp.name}
+                                </span>
+                                <span className={`ml-2 ${isDisabled ? "text-default-300 dark:text-gray-600" : "text-default-400 dark:text-gray-500"}`}>
+                                  ({emp.id})
+                                </span>
+                              </div>
+                              {isDisabled && (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(existingType)}`}>
+                                  <IconCheck size={12} />
+                                  {getLeaveTypeLabel(existingType)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
@@ -1259,147 +1297,20 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   <button
                     type="button"
                     className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-800 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
-                    onClick={() => setShowAddLeaveModal(false)}
+                    onClick={closeAddLeaveModal}
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-sky-500 border border-transparent rounded-full hover:bg-sky-600 active:bg-sky-700 focus:outline-none"
+                    disabled={leaveSelectedCount === 0}
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-sky-500 border border-transparent rounded-full hover:bg-sky-600 active:bg-sky-700 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleAddLeave}
                   >
-                    Add Leave
+                    {leaveSelectedCount > 1
+                      ? `Add Leave for ${leaveSelectedCount} Employees`
+                      : "Add Leave"}
                   </button>
-                </div>
-              </DialogPanel>
-            </TransitionChild>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* Bulk Holiday Modal */}
-      <Transition appear show={showBulkHolidayModal} as={React.Fragment}>
-        <Dialog
-          as="div"
-          className="fixed inset-0 z-50 overflow-y-auto"
-          onClose={() => {
-            // Don't allow closing by clicking outside - must use buttons
-          }}
-        >
-          <div className="min-h-screen px-4 text-center">
-            <TransitionChild
-              as={React.Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <div className="fixed inset-0 bg-black opacity-30 z-40" />
-            </TransitionChild>
-
-            <span className="inline-block h-screen align-middle" aria-hidden="true">
-              &#8203;
-            </span>
-
-            <TransitionChild
-              as={React.Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <DialogPanel
-                className="relative z-50 inline-block w-full max-w-lg p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
-                  Add Public Holiday for Other Employees?
-                </DialogTitle>
-
-                <div className="mt-3">
-                  <p className="text-sm text-default-600 dark:text-gray-300">
-                    You're adding a public holiday leave for{" "}
-                    <span className="font-medium">{pendingHolidayLeave?.firstEmployeeName}</span> on{" "}
-                    <span className="font-medium">
-                      {pendingHolidayLeave?.leaveDate
-                        ? format(new Date(pendingHolidayLeave.leaveDate), "dd MMM yyyy")
-                        : ""}
-                    </span>
-                    .
-                  </p>
-                  <p className="text-sm text-default-600 dark:text-gray-300 mt-2">
-                    Would you like to add this leave for other selected employees too?
-                  </p>
-                </div>
-
-                {Object.keys(bulkHolidaySelections).length > 0 ? (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-default-700 dark:text-gray-200">
-                        Select Employees ({Object.values(bulkHolidaySelections).filter(Boolean).length} selected)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleBulkSelectAll}
-                        className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700"
-                      >
-                        {Object.values(bulkHolidaySelections).every((v) => v) ? "Deselect All" : "Select All"}
-                      </button>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg">
-                      {Object.entries(bulkHolidaySelections).map(([employeeId, isSelected]) => {
-                        const employee = eligibleEmployees.find((e: Employee) => e.id === employeeId);
-                        return (
-                          <div
-                            key={employeeId}
-                            className={`flex items-center px-3 py-2 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 ${
-                              isSelected ? "bg-sky-50 dark:bg-sky-900/30" : ""
-                            }`}
-                            onClick={() => handleBulkSelectionToggle(employeeId)}
-                          >
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => {}}
-                              size={18}
-                              checkedColor="text-sky-600"
-                            />
-                            <span className="ml-3 text-sm text-default-700 dark:text-gray-200">
-                              {employee?.name} ({employeeId})
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 p-4 bg-default-50 dark:bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-sm text-default-500 dark:text-gray-400">
-                      No other employees available to add this leave.
-                    </p>
-                  </div>
-                )}
-
-                <div className="mt-6 flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-800 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
-                    onClick={handleSkipBulkHoliday}
-                  >
-                    {Object.keys(bulkHolidaySelections).length > 0 ? "Skip" : "OK"}
-                  </button>
-                  {Object.keys(bulkHolidaySelections).length > 0 && (
-                    <button
-                      type="button"
-                      className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-sky-500 border border-transparent rounded-full hover:bg-sky-600 active:bg-sky-700 focus:outline-none"
-                      onClick={handleConfirmBulkHoliday}
-                    >
-                      Add for Selected ({Object.values(bulkHolidaySelections).filter(Boolean).length + 1})
-                    </button>
-                  )}
                 </div>
               </DialogPanel>
             </TransitionChild>

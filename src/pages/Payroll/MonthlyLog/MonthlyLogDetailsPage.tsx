@@ -167,13 +167,13 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   const getLeaveTypeColor = (type: string) => {
     switch (type) {
       case "cuti_sakit":
-        return "bg-amber-100 text-amber-700";
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
       case "cuti_tahunan":
-        return "bg-green-100 text-green-700";
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
       case "cuti_umum":
-        return "bg-red-100 text-red-700";
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
       default:
-        return "bg-default-100 text-default-700";
+        return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
     }
   };
 
@@ -629,7 +629,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-default-100">
+            <tbody className="divide-y divide-default-100 dark:divide-gray-700">
               {workLog.leaveRecords.map((record) => (
                 <tr
                   key={record.id}
@@ -664,8 +664,8 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
           </table>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="w-12 h-12 rounded-full bg-default-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-              <IconCalendarEvent size={24} className="text-default-400" />
+            <div className="w-12 h-12 rounded-full bg-default-100 dark:bg-gray-700 flex items-center justify-center mb-3">
+              <IconCalendarEvent size={24} className="text-default-400 dark:text-gray-500" />
             </div>
             <p className="text-default-500 dark:text-gray-400 text-sm">
               No leave records for this month
