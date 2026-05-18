@@ -55,6 +55,8 @@ interface EmployeeEntry {
   jobName: string;
   totalHours: number;
   overtimeHours: number;
+  ahadHours: number;
+  umumHours: number;
   selected: boolean;
 }
 
@@ -205,6 +207,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           jobName: savedEntry.job_name,
           totalHours: savedEntry.total_hours,
           overtimeHours: savedEntry.overtime_hours || 0,
+          ahadHours: savedEntry.ahad_hours || 0,
+          umumHours: savedEntry.umum_hours || 0,
           selected: true,
         };
       } else {
@@ -218,6 +222,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           jobName: matchingJob || JOB_IDS[0],
           totalHours: jobConfig?.defaultHours || 176,
           overtimeHours: 0,
+          ahadHours: 0,
+          umumHours: 0,
           selected: mode === "create",
         };
       }
@@ -237,7 +243,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       const newEmployeeActivities: Record<string, ActivityItem[]> = {};
 
       selectedEntries.forEach((entry) => {
-        const { employeeId, jobType: entryJobType, totalHours, overtimeHours } = entry;
+        const { employeeId, jobType: entryJobType, totalHours, overtimeHours, ahadHours, umumHours } = entry;
 
         // Get job pay codes from cache
         const jobPayCodes = jobPayCodeDetails[entryJobType] || [];
@@ -276,79 +282,91 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           ? mergedPayCodes
           : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
 
-        // Convert to activity format
-        const activities: ActivityItem[] = filteredPayCodes.map((payCode: any) => {
-          const isContextLinked = !!contextLinkedPayCodes[payCode.id];
+        // Compute Biasa/Ahad/Umum split for Base+Hour pay codes
+        const ahadHrs = ahadHours || 0;
+        const umumHrs = umumHours || 0;
+        const biasaHrs = Math.max(0, totalHours - ahadHrs - umumHrs);
 
-          // Find existing activity for this pay code if in edit mode
+        // Helper to determine default selection state for a pay code
+        const computeDefaultSelection = (payCode: any, isContextLinked: boolean): boolean => {
+          let isSelected: boolean;
+          if (payCode.pay_type === "Tambahan") {
+            isSelected = false;
+          } else if (payCode.pay_type === "Overtime") {
+            isSelected = hasOvertimeHours && payCode.is_default_setting;
+          } else if (payCode.pay_type === "Base") {
+            isSelected = payCode.is_default_setting;
+          } else {
+            isSelected = payCode.is_default_setting;
+          }
+          if (
+            isContextLinked ||
+            payCode.rate_unit === "Bag" ||
+            payCode.rate_unit === "Trip" ||
+            payCode.rate_unit === "Day"
+          ) {
+            isSelected = false;
+          }
+          return isSelected;
+        };
+
+        // Build a single activity entry, applying selection rules and existing-state lookup
+        const buildActivity = (
+          payCode: any,
+          rate: number,
+          hoursToApply: number,
+          descriptionSuffix: string,
+          isContextLinked: boolean
+        ): ActivityItem => {
+          // Match existing activity by payCodeId AND rate (to identify Biasa/Ahad/Umum variant)
           const existingActivity =
             mode === "edit"
+              ? existingActivitiesForEmployee.find(
+                  (ea) =>
+                    ea.payCodeId === payCode.id &&
+                    Math.abs((ea.rate || 0) - rate) < 0.001
+                )
+              : null;
+
+          // Fallback for new variants (e.g. user added Ahad hours after initial save):
+          // inherit selection state from any other saved variant of the same pay code
+          const fallbackActivity =
+            mode === "edit" && wasOriginallySaved && !existingActivity
               ? existingActivitiesForEmployee.find((ea) => ea.payCodeId === payCode.id)
               : null;
 
-          // Use Biasa rate for monthly (default rate)
-          const rate = payCode.override_rate_biasa || payCode.rate_biasa;
-
-          // Determine if selected based on specific rules
-          let isSelected = false;
-
-          // wasOriginallySaved is already defined above for existingActivitiesForEmployee lookup
-
+          let isSelected: boolean;
           if (mode === "edit" && wasOriginallySaved) {
-            // EDIT mode for originally saved employees:
-            // If existingActivity exists, use its saved state
-            // If not, the activity was deselected - keep it deselected
             if (existingActivity) {
               isSelected = existingActivity.isSelected;
+            } else if (fallbackActivity) {
+              isSelected = fallbackActivity.isSelected;
             } else {
               isSelected = false;
             }
           } else {
-            // CREATE mode OR employee wasn't in original work log:
-            // Apply auto-selection rules for new activities
-            if (payCode.pay_type === "Tambahan") {
-              isSelected = false;
-            } else if (payCode.pay_type === "Overtime") {
-              // Only auto-select OT codes if overtime hours exist AND is_default_setting is true
-              isSelected = hasOvertimeHours && payCode.is_default_setting;
-            } else if (payCode.pay_type === "Base") {
-              isSelected = payCode.is_default_setting;
-            } else {
-              isSelected = payCode.is_default_setting;
-            }
-
-            // Special rules for specific rate units
-            if (
-              isContextLinked ||
-              payCode.rate_unit === "Bag" ||
-              payCode.rate_unit === "Trip" ||
-              payCode.rate_unit === "Day"
-            ) {
-              isSelected = false;
-            }
+            isSelected = computeDefaultSelection(payCode, isContextLinked);
           }
 
-          // Determine units produced
           const unitsProduced = existingActivity
             ? existingActivity.unitsProduced
             : payCode.requires_units_input
             ? 0
             : undefined;
 
-          // For overtime activities, use overtime hours; otherwise use total hours
-          const hoursToApply = payCode.pay_type === "Overtime" ? overtimeHours : totalHours;
+          const description = `${payCode.description}${descriptionSuffix}`;
 
           return {
             payCodeId: payCode.id,
-            description: payCode.description,
+            description,
             payType: payCode.pay_type,
             rateUnit: payCode.rate_unit,
-            rate: rate,
+            rate,
             isDefault: payCode.is_default_setting,
-            isSelected: isSelected,
-            unitsProduced: unitsProduced,
+            isSelected,
+            unitsProduced,
             hoursApplied: hoursToApply,
-            isContextLinked: isContextLinked,
+            isContextLinked,
             source: payCode.source,
             calculatedAmount: calculateActivityAmount(
               {
@@ -363,6 +381,35 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               {}
             ),
           };
+        };
+
+        // Convert to activity format - Base+Hour pay codes split into up to 3 variants
+        const activities: ActivityItem[] = filteredPayCodes.flatMap((payCode: any) => {
+          const isContextLinked = !!contextLinkedPayCodes[payCode.id];
+
+          // Split Base+Hour pay codes into Biasa/Ahad/Umum variants with day-type-specific rates
+          if (payCode.pay_type === "Base" && payCode.rate_unit === "Hour") {
+            const biasaRate = payCode.override_rate_biasa ?? payCode.rate_biasa;
+            const ahadRate = payCode.override_rate_ahad ?? payCode.rate_ahad ?? biasaRate;
+            const umumRate = payCode.override_rate_umum ?? payCode.rate_umum ?? biasaRate;
+
+            const variants: ActivityItem[] = [];
+            if (biasaHrs > 0) {
+              variants.push(buildActivity(payCode, biasaRate, biasaHrs, "", isContextLinked));
+            }
+            if (ahadHrs > 0) {
+              variants.push(buildActivity(payCode, ahadRate, ahadHrs, " (Ahad)", isContextLinked));
+            }
+            if (umumHrs > 0) {
+              variants.push(buildActivity(payCode, umumRate, umumHrs, " (Umum)", isContextLinked));
+            }
+            return variants;
+          }
+
+          // All other pay codes (Overtime, Tambahan, non-Hour Base) - single activity at Biasa rate
+          const rate = payCode.override_rate_biasa || payCode.rate_biasa;
+          const hoursToApply = payCode.pay_type === "Overtime" ? overtimeHours : totalHours;
+          return [buildActivity(payCode, rate, hoursToApply, "", isContextLinked)];
         });
 
         // Apply calculation logic to all activities with proper hours for each activity type
@@ -486,7 +533,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     });
   };
 
-  const handleHoursChange = (employeeId: string, field: "totalHours" | "overtimeHours", value: string) => {
+  const handleHoursChange = (
+    employeeId: string,
+    field: "totalHours" | "overtimeHours" | "ahadHours" | "umumHours",
+    value: string
+  ) => {
     const numValue = parseFloat(value) || 0;
     setEmployeeEntries((prev) => ({
       ...prev,
@@ -648,6 +699,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         toast.error(`Please enter valid hours for ${emp.employeeName}`);
         return;
       }
+      if ((emp.ahadHours || 0) + (emp.umumHours || 0) > emp.totalHours) {
+        toast.error(
+          `${emp.employeeName}: Ahad + Umum hours cannot exceed Total hours`
+        );
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -664,6 +721,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           jobType: emp.jobType,
           totalHours: emp.totalHours,
           overtimeHours: emp.overtimeHours,
+          ahadHours: emp.ahadHours || 0,
+          umumHours: emp.umumHours || 0,
           activities: (employeeActivities[emp.employeeId] || []).filter(
             (a) => a.isSelected
           ),
@@ -760,6 +819,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const allSelected = Object.values(employeeEntries).length > 0 &&
     Object.values(employeeEntries).every((e) => e.selected);
 
+  // Block save when any selected employee has Ahad+Umum exceeding Total hours
+  const hasHoursValidationError = Object.values(employeeEntries).some(
+    (e) => e.selected && (e.ahadHours || 0) + (e.umumHours || 0) > e.totalHours
+  );
+
   const allLeaveRecords = [...existingLeaveRecords, ...newLeaveEntries];
 
   if (loadingStaffs) {
@@ -818,7 +882,17 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving}>
               Cancel
             </Button>
-            <Button color="sky" size="sm" onClick={handleSave} disabled={isSaving}>
+            <Button
+              color="sky"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving || hasHoursValidationError}
+              title={
+                hasHoursValidationError
+                  ? "Some employees have Ahad + Umum hours exceeding Total hours"
+                  : ""
+              }
+            >
               {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
             </Button>
           </div>
@@ -852,6 +926,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 </th>
                 <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-32">
                   Regular Hours
+                </th>
+                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-28">
+                  Ahad Hours
+                </th>
+                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-28">
+                  Umum Hours
                 </th>
                 <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-32">
                   Overtime
@@ -922,6 +1002,58 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       min="0"
                       step="0.5"
                     />
+                  </td>
+                  <td className="px-6 py-2 whitespace-nowrap">
+                    {(() => {
+                      const overLimit =
+                        entry.selected &&
+                        (entry.ahadHours || 0) + (entry.umumHours || 0) > entry.totalHours;
+                      return (
+                        <input
+                          type="number"
+                          value={entry.selected ? entry.ahadHours : ""}
+                          onChange={(e) =>
+                            handleHoursChange(entry.employeeId, "ahadHours", e.target.value)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={!entry.selected || isSaving}
+                          title={overLimit ? "Ahad + Umum hours exceed Total hours" : ""}
+                          className={`w-full pl-5 pr-1 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 ${
+                            overLimit
+                              ? "border-rose-500 focus:ring-rose-500 focus:border-rose-500 text-rose-700 dark:text-rose-400"
+                              : "border-default-300 dark:border-gray-600 focus:ring-sky-500 focus:border-sky-500"
+                          }`}
+                          min="0"
+                          step="0.5"
+                        />
+                      );
+                    })()}
+                  </td>
+                  <td className="px-6 py-2 whitespace-nowrap">
+                    {(() => {
+                      const overLimit =
+                        entry.selected &&
+                        (entry.ahadHours || 0) + (entry.umumHours || 0) > entry.totalHours;
+                      return (
+                        <input
+                          type="number"
+                          value={entry.selected ? entry.umumHours : ""}
+                          onChange={(e) =>
+                            handleHoursChange(entry.employeeId, "umumHours", e.target.value)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={!entry.selected || isSaving}
+                          title={overLimit ? "Ahad + Umum hours exceed Total hours" : ""}
+                          className={`w-full pl-5 pr-1 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 ${
+                            overLimit
+                              ? "border-rose-500 focus:ring-rose-500 focus:border-rose-500 text-rose-700 dark:text-rose-400"
+                              : "border-default-300 dark:border-gray-600 focus:ring-sky-500 focus:border-sky-500"
+                          }`}
+                          min="0"
+                          step="0.5"
+                        />
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-2 whitespace-nowrap">
                     <input

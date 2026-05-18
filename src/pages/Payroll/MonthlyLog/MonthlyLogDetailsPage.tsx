@@ -45,6 +45,8 @@ interface EmployeeEntry {
   job_name: string;
   total_hours: number;
   overtime_hours: number;
+  ahad_hours: number;
+  umum_hours: number;
   activities: Activity[];
 }
 
@@ -435,6 +437,16 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                           <p className="font-medium text-default-800 dark:text-gray-100">
                             {entry.total_hours.toFixed(1)}
                           </p>
+                          {(entry.ahad_hours || 0) > 0 && (
+                            <p className="text-default-500 dark:text-gray-400 text-xs">
+                              {entry.ahad_hours.toFixed(1)} Ahad
+                            </p>
+                          )}
+                          {(entry.umum_hours || 0) > 0 && (
+                            <p className="text-default-500 dark:text-gray-400 text-xs">
+                              {entry.umum_hours.toFixed(1)} Umum
+                            </p>
+                          )}
                           {entry.overtime_hours > 0 && (
                             <p className="text-default-500 dark:text-gray-400 text-xs">
                               +{entry.overtime_hours.toFixed(1)} OT

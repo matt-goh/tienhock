@@ -136,7 +136,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Work Logs (Monthly):**
 - `monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at
-- `monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
+- `monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, ahad_hours (subset of total_hours worked on Sundays, rated at rate_ahad), umum_hours (subset of total_hours worked on public holidays, rated at rate_umum), created_at
 - `monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added, created_at
 
 **Leave Management:**
