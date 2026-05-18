@@ -780,6 +780,25 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
               </div>
             )}
           </div>
+          {existingInvoice?.uuid && (
+            <>
+              <span className="text-default-300 dark:text-gray-600">|</span>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+                <div>
+                  <p className="text-default-400 dark:text-gray-500">UUID</p>
+                  <p className="max-w-[160px] truncate font-mono text-default-600 dark:text-gray-400">{existingInvoice.uuid}</p>
+                </div>
+                <div>
+                  <p className="text-default-400 dark:text-gray-500">Submission</p>
+                  <p className="max-w-[120px] truncate font-mono text-default-600 dark:text-gray-400">{existingInvoice.submission_uid || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-default-400 dark:text-gray-500">Long ID</p>
+                  <p className="max-w-[120px] truncate font-mono text-default-600 dark:text-gray-400">{existingInvoice.long_id || "-"}</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -876,44 +895,6 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* UUID info bar */}
-      {existingInvoice?.uuid && (
-        <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
-          <div className="grid gap-2 md:grid-cols-4">
-            <div>
-              <span className="text-sky-600 dark:text-sky-300">UUID</span>
-              <p className="truncate font-mono">{existingInvoice.uuid}</p>
-            </div>
-            <div>
-              <span className="text-sky-600 dark:text-sky-300">Submission</span>
-              <p className="truncate font-mono">
-                {existingInvoice.submission_uid || "-"}
-              </p>
-            </div>
-            <div>
-              <span className="text-sky-600 dark:text-sky-300">Long ID</span>
-              <p className="truncate font-mono">{existingInvoice.long_id || "-"}</p>
-            </div>
-            <div>
-              {myInvoisPortalUrl ? (
-                <a
-                  href={myInvoisPortalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-200 dark:hover:text-sky-100"
-                  title="View in MyInvois Portal"
-                >
-                  E-Invoice Details
-                  <IconExternalLink size={13} />
-                </a>
-              ) : (
-                <p className="truncate font-mono">-</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="space-y-2">
