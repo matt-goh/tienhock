@@ -1406,17 +1406,19 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <label className="block truncate text-sm font-medium text-default-700 dark:text-gray-200">
-                  Amount (MYR)
-                </label>
-                <input
-                  type="number"
-                  value={summaryLine.amount_myr}
-                  disabled={true}
-                  className="block w-full rounded-lg border border-default-300 bg-gray-50 px-3 py-2 text-right text-sm font-mono text-default-500 shadow-sm disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                />
-              </div>
+              <FormInput
+                name="amount_myr"
+                label="Amount (MYR)"
+                value={summaryLine.amount_myr}
+                type="number"
+                min={0}
+                step="0.01"
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  updateLineField(0, "amount_myr", event.target.value)
+                }
+                disabled={!canEditSummary}
+                required
+              />
             </div>
           </section>
 
