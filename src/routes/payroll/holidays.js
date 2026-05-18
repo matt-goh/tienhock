@@ -10,10 +10,10 @@ export default function (pool) {
 
     try {
       let query = `
-        SELECT 
-          id, 
-          holiday_date, 
-          description, 
+        SELECT
+          id,
+          TO_CHAR(holiday_date, 'YYYY-MM-DD') as holiday_date,
+          description,
           is_active
         FROM holiday_calendar
         WHERE is_active = true
