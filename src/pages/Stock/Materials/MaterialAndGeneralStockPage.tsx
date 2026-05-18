@@ -1,6 +1,6 @@
-// src/pages/Stock/Materials/MaterialStockEntryPage.tsx
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+// src/pages/Stock/Materials/MaterialAndGeneralStockPage.tsx
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -9,6 +9,9 @@ import {
   ProductLine,
   MaterialStockEntryInput,
   StockEntryRow,
+  GeneralStockCategory,
+  GeneralStockRow,
+  GeneralStockAdjustment,
 } from "../../../types/types";
 import {
   IconDeviceFloppy,
@@ -44,6 +47,7 @@ interface StockResponse {
 
 type EditableStockField = "adjustment_quantity" | "unit_cost";
 type NewVariantField = "variant_name" | EditableStockField;
+type StockEntryTab = ProductLine | "general";
 
 const categoryLabels: Record<MaterialCategory, string> = {
   ingredient: "Ingredients",
@@ -57,7 +61,8 @@ const categoryOrder: MaterialCategory[] = [
   "packing_material",
 ];
 
-const stockTabs: { id: ProductLine; label: string; activeClass: string }[] = [
+const stockTabs: { id: StockEntryTab; label: string; activeClass: string }[] = [
+  { id: "general", label: "GENERAL", activeClass: "bg-indigo-500 text-white shadow-sm" },
   { id: "mee", label: "MEE", activeClass: "bg-sky-500 text-white shadow-sm" },
   { id: "bihun", label: "BIHUN", activeClass: "bg-amber-500 text-white shadow-sm" },
   { id: "shared", label: "SHARED", activeClass: "bg-teal-500 text-white shadow-sm" },
@@ -109,9 +114,10 @@ const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
   notes: null,
 });
 
-const MaterialStockEntryPage: React.FC = () => {
+const MaterialAndGeneralStockPage: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
-  const [activeTab, setActiveTab] = useState<ProductLine>("mee");
+  const [activeTab, setActiveTab] = useState<StockEntryTab>("general");
   const [materials, setMaterials] = useState<MaterialWithStock[]>([]);
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -121,6 +127,15 @@ const MaterialStockEntryPage: React.FC = () => {
   const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
   const [newVariantRows, setNewVariantRows] = useState<Map<number, StockEntryRow>>(new Map());
   const [allCollapsed, setAllCollapsed] = useState(false);
+  const [generalStockRows, setGeneralStockRows] = useState<GeneralStockRow[]>([]);
+  const [generalStockCategories, setGeneralStockCategories] = useState<GeneralStockCategory[]>([]);
+  const [generalAdjustmentInputs, setGeneralAdjustmentInputs] = useState<Record<number, string>>({});
+  const [newGeneralCategoryName, setNewGeneralCategoryName] = useState<string>("");
+  const [editingGeneralCategoryId, setEditingGeneralCategoryId] = useState<number | null>(null);
+  const [editingGeneralCategoryName, setEditingGeneralCategoryName] = useState<string>("");
+  const [revertingAdjustmentId, setRevertingAdjustmentId] = useState<number | null>(null);
+  const [tooltipState, setTooltipState] = useState<{ lineId: number; x: number; y: number } | null>(null);
+  const tooltipTimeoutRef = useRef<number | null>(null);
 
   const productType = activeTab === "bihun" ? "bh" : "mee";
   const { products, isLoading: isLoadingProducts } = useProductsCache(productType);
@@ -129,6 +144,27 @@ const MaterialStockEntryPage: React.FC = () => {
   const month = selectedMonth.getMonth() + 1;
 
   const fetchData = useCallback(async () => {
+    if (activeTab === "general") {
+      setIsLoading(true);
+      try {
+        const stockResponse = await api.get<{ rows: GeneralStockRow[]; categories: GeneralStockCategory[] }>("/api/general-purchases/general-stock");
+
+        setGeneralStockRows(stockResponse.rows || []);
+        setGeneralStockCategories(stockResponse.categories || []);
+        setGeneralAdjustmentInputs({});
+        setMaterials([]);
+        setOriginalMaterials([]);
+      } catch (error: unknown) {
+        console.error("Error fetching general stock:", error);
+        toast.error("Failed to load general stock");
+        setGeneralStockRows([]);
+        setGeneralStockCategories([]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = (await api.get(
@@ -161,7 +197,7 @@ const MaterialStockEntryPage: React.FC = () => {
 
   useEffect(() => {
     const fetchStockKilang = async (): Promise<void> => {
-      if (activeTab === "shared" || products.length === 0 || isLoadingProducts) {
+      if (activeTab === "general" || activeTab === "shared" || products.length === 0 || isLoadingProducts) {
         setStockKilang([]);
         return;
       }
@@ -216,6 +252,12 @@ const MaterialStockEntryPage: React.FC = () => {
   }, [materials]);
 
   const hasUnsavedChanges = useMemo(() => {
+    if (activeTab === "general") {
+      return Object.values(generalAdjustmentInputs).some(
+        (value) => makeNumber(value) !== 0
+      );
+    }
+
     for (const row of newVariantRows.values()) {
       if (row.variant_name?.trim() || row.adjustment_quantity !== 0 || row.unit_cost !== 0) {
         return true;
@@ -258,7 +300,7 @@ const MaterialStockEntryPage: React.FC = () => {
     }
 
     return false;
-  }, [materials, originalMaterials, newVariantRows]);
+  }, [activeTab, materials, originalMaterials, newVariantRows, generalAdjustmentInputs]);
 
   const toggleMaterialExpansion = (materialId: number): void => {
     setExpandedMaterials((prev) => {
@@ -414,14 +456,158 @@ const MaterialStockEntryPage: React.FC = () => {
     return true;
   }, [hasUnsavedChanges]);
 
-  const handleTabChange = (tab: ProductLine): void => {
+  const handleTabChange = (tab: StockEntryTab): void => {
     if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Do you want to discard them?")) {
       return;
     }
     setActiveTab(tab);
   };
 
+  const handleAddGeneralCategory = async (): Promise<void> => {
+    const name = newGeneralCategoryName.trim();
+    if (!name) return;
+
+    try {
+      await api.post("/api/general-purchases/general-stock/categories", {
+        name,
+        sort_order: generalStockCategories.length + 1,
+      });
+      setNewGeneralCategoryName("");
+      await fetchData();
+      toast.success("General stock category added");
+    } catch (error: unknown) {
+      console.error("Error adding general stock category:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to add category");
+    }
+  };
+
+  const handleUpdateGeneralCategory = async (category: GeneralStockCategory): Promise<void> => {
+    const name = editingGeneralCategoryName.trim();
+    if (!name) return;
+
+    try {
+      await api.put(`/api/general-purchases/general-stock/categories/${category.id}`, {
+        name,
+        sort_order: category.sort_order,
+        is_active: category.is_active,
+      });
+      setEditingGeneralCategoryId(null);
+      setEditingGeneralCategoryName("");
+      await fetchData();
+      toast.success("General stock category updated");
+    } catch (error: unknown) {
+      console.error("Error updating general stock category:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update category");
+    }
+  };
+
+  const handleDeleteGeneralCategory = async (category: GeneralStockCategory): Promise<void> => {
+    if (!window.confirm(`Remove category "${category.name}"?`)) return;
+
+    try {
+      await api.delete(`/api/general-purchases/general-stock/categories/${category.id}`);
+      await fetchData();
+      toast.success("General stock category removed");
+    } catch (error: unknown) {
+      console.error("Error removing general stock category:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to remove category");
+    }
+  };
+
+  const handleGeneralAdjustmentChange = (lineId: number, value: string): void => {
+    setGeneralAdjustmentInputs((previous) => ({
+      ...previous,
+      [lineId]: value,
+    }));
+  };
+
+  const getGeneralPurchasePath = (row: GeneralStockRow): string => {
+    return row.purchase_kind === "local"
+      ? `/stock/general-purchases/local/${row.self_billed_invoice_id}`
+      : `/stock/general-purchases/${row.self_billed_invoice_id}`;
+  };
+
+  const openGeneralPurchase = (row: GeneralStockRow): void => {
+    navigate(getGeneralPurchasePath(row));
+  };
+
+  const handleUsedCellMouseEnter = (row: GeneralStockRow, event: React.MouseEvent<HTMLTableCellElement>): void => {
+    if (!row.used_adjustments?.length) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (tooltipTimeoutRef.current !== null) clearTimeout(tooltipTimeoutRef.current);
+    setTooltipState({ lineId: row.line_id, x: rect.left, y: rect.top });
+  };
+
+  const hideTooltip = (): void => {
+    tooltipTimeoutRef.current = window.setTimeout(() => setTooltipState(null), 100);
+  };
+
+  const handleTooltipMouseEnter = (): void => {
+    if (tooltipTimeoutRef.current !== null) clearTimeout(tooltipTimeoutRef.current);
+  };
+
+  const handleTooltipMouseLeave = (): void => {
+    tooltipTimeoutRef.current = window.setTimeout(() => setTooltipState(null), 100);
+  };
+
+  const saveGeneralStockAdjustments = async (): Promise<void> => {
+    const adjustments = Object.entries(generalAdjustmentInputs)
+      .map(([lineId, value]) => {
+        const row = generalStockRows.find((item) => item.line_id === Number.parseInt(lineId, 10));
+        return {
+          line_id: Number.parseInt(lineId, 10),
+          self_billed_invoice_line_id: Number.parseInt(lineId, 10),
+          general_stock_category_id: row?.general_stock_category_id || null,
+          adjustment_quantity: makeNumber(value),
+        };
+      })
+      .filter((adjustment) => adjustment.adjustment_quantity !== 0);
+
+    if (adjustments.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      await api.post("/api/general-purchases/general-stock/adjustments", {
+        adjustments,
+      });
+      toast.success("General stock adjustments saved");
+      await fetchData();
+    } catch (error: unknown) {
+      console.error("Error saving general stock adjustments:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save general stock adjustments");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRevertGeneralUsedAdjustment = async (
+    adjustment: GeneralStockAdjustment,
+    event?: React.MouseEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    event?.stopPropagation();
+    if (!window.confirm(`Revert used quantity ${formatQty(Math.abs(makeNumber(adjustment.adjustment_quantity)))}?`)) {
+      return;
+    }
+
+    setRevertingAdjustmentId(adjustment.id);
+    try {
+      await api.delete(`/api/general-purchases/general-stock/adjustments/${adjustment.id}`);
+      toast.success("Used adjustment reverted");
+      await fetchData();
+    } catch (error: unknown) {
+      console.error("Error reverting used adjustment:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to revert used adjustment");
+    } finally {
+      setRevertingAdjustmentId(null);
+    }
+  };
+
   const handleSave = async (): Promise<void> => {
+    if (activeTab === "general") {
+      await saveGeneralStockAdjustments();
+      return;
+    }
+
     let negativeCount = 0;
     materials.forEach((material) => {
       if (material.has_variants && material.variants) {
@@ -605,6 +791,25 @@ const MaterialStockEntryPage: React.FC = () => {
     return materials.filter((material) => material.closing_quantity < 0).length;
   }, [materials]);
 
+  const groupedGeneralStockRows = useMemo(() => {
+    const groups = new Map<string, GeneralStockRow[]>();
+    generalStockRows.forEach((row) => {
+      const key = row.category_name || "Uncategorised";
+      const rows = groups.get(key) || [];
+      rows.push(row);
+      groups.set(key, rows);
+    });
+    return Array.from(groups.entries());
+  }, [generalStockRows]);
+
+  const generalStockTotal = useMemo(() => {
+    return generalStockRows.reduce((sum, row) => sum + makeNumber(row.current_stock), 0);
+  }, [generalStockRows]);
+
+  const tooltipRow = tooltipState
+    ? generalStockRows.find((r) => r.line_id === tooltipState.lineId) ?? null
+    : null;
+
   const renderAdjustmentInput = (
     value: number,
     onChange: (value: string) => void,
@@ -652,16 +857,29 @@ const MaterialStockEntryPage: React.FC = () => {
             <span className="text-default-300 dark:text-gray-600">|</span>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-default-500 dark:text-gray-400">
-                {materials.length} materials
+                {activeTab === "general"
+                  ? `${generalStockRows.length} general items`
+                  : `${materials.length} materials`}
               </span>
-              <span className="text-default-300 dark:text-gray-600">|</span>
-              <span className="text-default-500 dark:text-gray-400">
-                Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
-              </span>
-              <span className="text-default-300 dark:text-gray-600">|</span>
-              <span className="text-default-500 dark:text-gray-400">
-                Closing: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
-              </span>
+              {activeTab === "general" ? (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <span className="text-default-500 dark:text-gray-400">
+                    Stock: <span className="font-medium text-indigo-600 dark:text-indigo-400">{formatQty(generalStockTotal)}</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <span className="text-default-500 dark:text-gray-400">
+                    Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
+                  </span>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
+                  <span className="text-default-500 dark:text-gray-400">
+                    Closing: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
+                  </span>
+                </>
+              )}
               {stockKilang.length > 0 && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
@@ -700,15 +918,17 @@ const MaterialStockEntryPage: React.FC = () => {
               ))}
             </div>
 
-            <span className="text-default-300 dark:text-gray-600">|</span>
-
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={setSelectedMonth}
-              beforeChange={handleBeforeMonthChange}
-            />
-
-            <span className="text-default-300 dark:text-gray-600">|</span>
+            {activeTab !== "general" && (
+              <>
+                <span className="text-default-300 dark:text-gray-600">|</span>
+                <MonthNavigator
+                  selectedMonth={selectedMonth}
+                  onChange={setSelectedMonth}
+                  beforeChange={handleBeforeMonthChange}
+                />
+                <span className="text-default-300 dark:text-gray-600">|</span>
+              </>
+            )}
 
             <Button
               color="sky"
@@ -732,6 +952,219 @@ const MaterialStockEntryPage: React.FC = () => {
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner />
+        </div>
+      ) : activeTab === "general" ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-default-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+                General Categories
+              </h2>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newGeneralCategoryName}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setNewGeneralCategoryName(event.target.value)
+                  }
+                  placeholder="New category"
+                  className="h-8 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                />
+                <Button
+                  type="button"
+                  color="sky"
+                  size="sm"
+                  icon={IconPlus}
+                  onClick={handleAddGeneralCategory}
+                  disabled={!newGeneralCategoryName.trim()}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {generalStockCategories.map((category: GeneralStockCategory) => (
+                <div
+                  key={category.id}
+                  className="flex h-8 items-center gap-1 rounded-lg border border-default-200 bg-default-50 px-2 text-sm dark:border-gray-700 dark:bg-gray-900/40"
+                >
+                  {editingGeneralCategoryId === category.id ? (
+                    <input
+                      type="text"
+                      value={editingGeneralCategoryName}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        setEditingGeneralCategoryName(event.target.value)
+                      }
+                      className="h-6 w-32 rounded border border-default-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="text-default-700 dark:text-gray-200">{category.name}</span>
+                  )}
+                  {editingGeneralCategoryId === category.id ? (
+                    <button
+                      type="button"
+                      className="rounded px-1 text-xs text-sky-600 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-900/30"
+                      onClick={() => handleUpdateGeneralCategory(category)}
+                    >
+                      Save
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded px-1 text-xs text-default-500 hover:bg-default-100 hover:text-default-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+                      onClick={() => {
+                        setEditingGeneralCategoryId(category.id);
+                        setEditingGeneralCategoryName(category.name);
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="rounded p-0.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    onClick={() => handleDeleteGeneralCategory(category)}
+                    title="Remove category"
+                  >
+                    <IconX size={14} />
+                  </button>
+                </div>
+              ))}
+              {generalStockCategories.length === 0 && (
+                <span className="text-sm text-default-500 dark:text-gray-400">
+                  No categories yet.
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-default-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+              <thead className="bg-default-50 dark:bg-gray-900/50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Purchase
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Supplier / Description
+                  </th>
+                  <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Source Qty
+                  </th>
+                  <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Used
+                  </th>
+                  <th className="w-28 px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                    Adjustment
+                  </th>
+                  <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
+                    Current
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-100 dark:divide-gray-700">
+                {groupedGeneralStockRows.map(([categoryName, rows]: [string, GeneralStockRow[]]) => {
+                  const categoryTotal = rows.reduce(
+                    (sum: number, row: GeneralStockRow) => sum + makeNumber(row.current_stock),
+                    0
+                  );
+
+                  return (
+                    <React.Fragment key={categoryName}>
+                      <tr className="bg-default-100 dark:bg-gray-700/50">
+                        <td colSpan={5} className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
+                          <div className="flex items-center gap-2">
+                            <IconPackage size={14} className="text-default-500" />
+                            {categoryName}
+                            <span className="text-default-400 font-normal">({rows.length})</span>
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono text-xs font-medium text-indigo-600 dark:text-indigo-300">
+                          {formatQty(categoryTotal)}
+                        </td>
+                      </tr>
+                      {rows.map((row: GeneralStockRow) => {
+                        const adjustmentInput = generalAdjustmentInputs[row.line_id] || "";
+                        const previewCurrent = makeNumber(row.current_stock) + makeNumber(adjustmentInput);
+
+                        return (
+                          <tr
+                            key={row.line_id}
+                            onClick={() => openGeneralPurchase(row)}
+                            className="cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/30"
+                            title="Open source general purchase"
+                          >
+                            <td className="whitespace-nowrap px-3 py-2 text-sm">
+                              <div className="font-mono font-medium text-sky-700 hover:underline dark:text-sky-300">
+                                {row.purchase_no}
+                              </div>
+                              <div className="text-xs text-default-500 dark:text-gray-400">
+                                {row.purchase_date}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-sm">
+                              <div className="font-medium text-default-800 dark:text-gray-100">
+                                {row.supplier_name || "-"}
+                              </div>
+                              <div className="max-w-xl whitespace-pre-wrap text-default-600 dark:text-gray-300">
+                                {row.description}
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono text-sm text-default-700 dark:text-gray-300">
+                              {formatQty(makeNumber(row.balance_quantity))}
+                            </td>
+                            <td
+                              className="px-2 py-2 text-right font-mono text-sm text-red-600 dark:text-red-400"
+                              onMouseEnter={(event: React.MouseEvent<HTMLTableCellElement>) => handleUsedCellMouseEnter(row, event)}
+                              onMouseLeave={hideTooltip}
+                            >
+                              <span
+                                className={
+                                  row.used_adjustments && row.used_adjustments.length > 0
+                                    ? "cursor-help underline decoration-dotted underline-offset-2"
+                                    : ""
+                                }
+                              >
+                                {formatQty(Math.abs(Math.min(makeNumber(row.adjustment_quantity), 0)))}
+                              </span>
+                            </td>
+                            <td className="px-1 py-2">
+                              <input
+                                type="number"
+                                value={adjustmentInput}
+                                step="1"
+                                onClick={(event: React.MouseEvent<HTMLInputElement>) =>
+                                  event.stopPropagation()
+                                }
+                                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                                  handleGeneralAdjustmentChange(row.line_id, event.target.value)
+                                }
+                                className="w-full rounded border border-indigo-200 bg-white px-2 py-1 text-right font-mono text-sm text-default-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-indigo-800 dark:bg-gray-700 dark:text-gray-100"
+                                placeholder="0"
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-300">
+                              {formatQty(previewCurrent)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+
+                {generalStockRows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
+                      <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
+                      <p>No General stock rows found.</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
@@ -1268,8 +1701,41 @@ const MaterialStockEntryPage: React.FC = () => {
           </table>
         </div>
       )}
+
+      {tooltipState && tooltipRow?.used_adjustments && tooltipRow.used_adjustments.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            top: tooltipState.y,
+            right: window.innerWidth - tooltipState.x,
+            zIndex: 9999,
+          }}
+          className="min-w-44 rounded-lg border border-default-200 bg-white p-2 text-left shadow-lg dark:border-gray-700 dark:bg-gray-900"
+          onMouseEnter={handleTooltipMouseEnter}
+          onMouseLeave={handleTooltipMouseLeave}
+        >
+          <div className="mb-1 text-xs font-semibold text-default-600 dark:text-gray-300">Used adjustments</div>
+          {tooltipRow.used_adjustments.map((adjustment: GeneralStockAdjustment) => (
+            <button
+              key={adjustment.id}
+              type="button"
+              disabled={revertingAdjustmentId === adjustment.id}
+              onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                event.stopPropagation();
+                setTooltipState(null);
+                handleRevertGeneralUsedAdjustment(adjustment);
+              }}
+              className="mb-1 flex w-full items-center justify-between gap-3 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40"
+              title={`Revert used adjustment from ${adjustment.adjustment_date}`}
+            >
+              <span>{adjustment.adjustment_date}</span>
+              <span>Revert {formatQty(Math.abs(makeNumber(adjustment.adjustment_quantity)))}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-export default MaterialStockEntryPage;
+export default MaterialAndGeneralStockPage;

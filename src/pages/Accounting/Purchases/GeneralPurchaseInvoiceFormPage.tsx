@@ -26,6 +26,7 @@ import {
   SelfBilledInvoiceStatus,
   SelfBilledInvoiceInput,
   SelfBilledInvoiceLine,
+  GeneralStockCategory,
 } from "../../../types/types";
 
 interface SelfBilledFormData {
@@ -86,6 +87,8 @@ const createDefaultLine = (lineNumber: number): SelfBilledInvoiceLine => ({
   line_number: lineNumber,
   description: "",
   quantity: 1,
+  balance_quantity: null,
+  general_stock_category_id: null,
   unit_price_foreign: 0,
   amount_foreign: 0,
   amount_myr: 0,
@@ -177,13 +180,13 @@ const formatDateTime = (value?: string | null): string => {
   });
 };
 
-const SelfBilledInvoiceFormPage: React.FC = () => {
+const GeneralPurchaseInvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const isEditMode = Boolean(id && id !== "new");
 
-  const backUrl = `/accounting/self-billed-invoices${searchParams.get("month") ? `?month=${searchParams.get("month")}` : ""}`;
+  const backUrl = `/stock/general-purchases${searchParams.get("month") ? `?month=${searchParams.get("month")}` : ""}`;
 
   const [formData, setFormData] =
     useState<SelfBilledFormData>(defaultFormData);
@@ -196,6 +199,9 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     useState<SelfBilledInvoice | null>(null);
   const [supplierSuggestions, setSupplierSuggestions] = useState<
     SelfBilledForeignSupplier[]
+  >([]);
+  const [generalStockCategories, setGeneralStockCategories] = useState<
+    GeneralStockCategory[]
   >([]);
   const [supplierSearchFocused, setSupplierSearchFocused] =
     useState<boolean>(false);
@@ -238,35 +244,40 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = (await api.get(
-        `/api/self-billed-invoices/${id}`
-      )) as SelfBilledInvoice;
+      const { invoice, s3Enabled, categories } = await api.get<{
+        invoice: SelfBilledInvoice;
+        s3Enabled: boolean;
+        categories: GeneralStockCategory[];
+      }>(`/api/general-purchases/${id}`);
 
-      setExistingInvoice(response);
+      setExistingInvoice(invoice);
+      setS3Enabled(s3Enabled);
+      setGeneralStockCategories(categories || []);
       setSupplier({
         ...defaultSupplier,
-        ...response.supplier,
+        ...invoice.supplier,
       });
       setFormData({
-        purchase_date: response.purchase_date?.slice(0, 10) || today,
-        transaction_type: response.transaction_type,
-        platform: response.platform || "",
-        order_no: response.order_no || "",
-        payment_reference: response.payment_reference || "",
-        shipping_method: response.shipping_method || "",
-        shipping_number: response.shipping_number || "",
-        has_supporting_document: response.has_supporting_document,
-        supporting_document_notes: response.supporting_document_notes || "",
-        currency_code: response.currency_code,
-        fx_rate: String(response.fx_rate || "1"),
-        notes: response.notes || "",
+        purchase_date: invoice.purchase_date?.slice(0, 10) || today,
+        transaction_type: invoice.transaction_type,
+        platform: invoice.platform || "",
+        order_no: invoice.order_no || "",
+        payment_reference: invoice.payment_reference || "",
+        shipping_method: invoice.shipping_method || "",
+        shipping_number: invoice.shipping_number || "",
+        has_supporting_document: invoice.has_supporting_document,
+        supporting_document_notes: invoice.supporting_document_notes || "",
+        currency_code: invoice.currency_code,
+        fx_rate: String(invoice.fx_rate || "1"),
+        notes: invoice.notes || "",
       });
       setLines(
-        response.lines.length > 0
-          ? response.lines.map((line: SelfBilledInvoiceLine) => ({
+        invoice.lines.length > 0
+          ? invoice.lines.map((line: SelfBilledInvoiceLine) => ({
               ...line,
               quantity: toNumber(line.quantity),
               balance_quantity: toNullableNumber(line.balance_quantity),
+              general_stock_category_id: line.general_stock_category_id || null,
               unit_price_foreign: toNumber(line.unit_price_foreign),
               amount_foreign: toNumber(line.amount_foreign),
               amount_myr: toNumber(line.amount_myr),
@@ -276,8 +287,8 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
           : [createDefaultLine(1)]
       );
     } catch (error) {
-      console.error("Error loading self-billed invoice:", error);
-      toast.error("Failed to load self-billed invoice");
+      console.error("Error loading general purchase:", error);
+      toast.error("Failed to load general purchase");
     } finally {
       setLoading(false);
     }
@@ -288,11 +299,29 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   }, [loadInvoice]);
 
   useEffect(() => {
+    if (isEditMode) return;
     api
-      .get<{ s3Enabled: boolean }>("/api/self-billed-invoices/features")
-      .then((data) => setS3Enabled(data.s3Enabled))
-      .catch(() => setS3Enabled(false));
-  }, []);
+      .get<{ s3Enabled: boolean; categories: GeneralStockCategory[] }>("/api/general-purchases/init")
+      .then(({ s3Enabled, categories }) => {
+        setS3Enabled(s3Enabled);
+        setGeneralStockCategories(categories || []);
+      })
+      .catch((error: unknown) => {
+        console.error("Error loading init data:", error);
+        setS3Enabled(false);
+      });
+  }, [isEditMode]);
+
+  const generalStockCategoryOptions = useMemo(
+    () => [
+      { id: "", name: "No General stock category" },
+      ...generalStockCategories.map((category: GeneralStockCategory) => ({
+        id: String(category.id),
+        name: category.name,
+      })),
+    ],
+    [generalStockCategories]
+  );
 
   useEffect(() => {
     const search = supplier.supplier_name.trim();
@@ -304,7 +333,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     const timer: number = window.setTimeout(async () => {
       try {
         const response = (await api.get(
-          `/api/self-billed-invoices/foreign-suppliers?search=${encodeURIComponent(
+          `/api/general-purchases/foreign-suppliers?search=${encodeURIComponent(
             search
           )}&limit=8`
         )) as SelfBilledForeignSupplier[];
@@ -437,6 +466,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     customs_form_reference: line.customs_form_reference || null,
     tax_exemption_reason: line.tax_exemption_reason || null,
     balance_quantity: toNullableNumber(line.balance_quantity),
+    general_stock_category_id: line.general_stock_category_id || null,
     notes: line.notes || null,
   });
 
@@ -459,6 +489,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
       customs_form_reference: null,
       tax_exemption_reason: null,
       balance_quantity: toNullableNumber(line.balance_quantity),
+      general_stock_category_id: line.general_stock_category_id || null,
       notes: line.notes || null,
     };
   };
@@ -469,6 +500,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
       : [buildSummaryLinePayload(summaryLine)];
 
     return {
+      purchase_kind: "foreign",
       foreign_supplier_id:
         supplier.id || existingInvoice?.foreign_supplier_id || null,
       supplier: {
@@ -509,7 +541,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     setSupportingDocumentUploading(true);
     try {
       await api.uploadRaw(
-        `/api/self-billed-invoices/${invoiceId}/supporting-document?filename=${encodeURIComponent(
+        `/api/general-purchases/${invoiceId}/supporting-document?filename=${encodeURIComponent(
           supportingDocumentFile.name
         )}`,
         supportingDocumentFile,
@@ -538,21 +570,21 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     try {
       const payload = buildPayload();
       if (isEditMode && id) {
-        await api.put(`/api/self-billed-invoices/${id}`, payload);
+        await api.put(`/api/general-purchases/${id}`, payload);
         await uploadSupportingDocument(Number.parseInt(id, 10));
-        toast.success("Self-billed invoice updated");
+        toast.success("General purchase updated");
         await loadInvoice();
         return Number.parseInt(id, 10);
       }
 
-      const response = await api.post("/api/self-billed-invoices", payload);
+      const response = await api.post("/api/general-purchases", payload);
       const newId = response.invoice.id as number;
       await uploadSupportingDocument(newId);
-      toast.success("Self-billed invoice created");
-      navigate(`/accounting/self-billed-invoices/${newId}`, { replace: true });
+      toast.success("General purchase created");
+      navigate(`/stock/general-purchases/${newId}`, { replace: true });
       return newId;
     } catch (error: unknown) {
-      console.error("Error saving self-billed invoice:", error);
+      console.error("Error saving general purchase:", error);
       toast.error(error instanceof Error ? error.message : "Failed to save invoice");
       return null;
     } finally {
@@ -565,11 +597,12 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
 
     setSavingRecords(true);
     try {
-      await api.patch(`/api/self-billed-invoices/${id}/record-fields`, {
+      await api.patch(`/api/general-purchases/${id}/record-fields`, {
         lines: lines.map((line: SelfBilledInvoiceLine, index: number) => ({
           id: line.id,
           line_number: line.line_number || index + 1,
           balance_quantity: toNullableNumber(line.balance_quantity),
+          general_stock_category_id: line.general_stock_category_id || null,
         })),
       });
 
@@ -591,7 +624,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
 
     try {
       const blob = await api.downloadBlob(
-        `/api/self-billed-invoices/${id}/supporting-document`
+        `/api/general-purchases/${id}/supporting-document`
       );
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -624,7 +657,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     if (!id || !existingInvoice?.supporting_document_filename) return;
     try {
       const blob = await api.downloadBlob(
-        `/api/self-billed-invoices/${id}/supporting-document`
+        `/api/general-purchases/${id}/supporting-document`
       );
       const url = window.URL.createObjectURL(blob);
       setDocViewerUrl(url);
@@ -649,7 +682,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     if (!id || !canEditRecords) return;
 
     try {
-      await api.delete(`/api/self-billed-invoices/${id}/supporting-document`, {});
+      await api.delete(`/api/general-purchases/${id}/supporting-document`, {});
       setSupportingDocumentFile(null);
       toast.success("Supporting document removed");
       await loadInvoice();
@@ -669,12 +702,12 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await api.post(`/api/self-billed-invoices/${invoiceId}/submit`, {});
+      await api.post(`/api/general-purchases/${invoiceId}/submit`, {});
       toast.success("Submitted to MyInvois");
       if (isEditMode) {
         await loadInvoice();
       } else {
-        navigate(`/accounting/self-billed-invoices/${invoiceId}`, {
+        navigate(`/stock/general-purchases/${invoiceId}`, {
           replace: true,
         });
       }
@@ -691,7 +724,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const refreshStatus = async (): Promise<void> => {
     if (!id) return;
     try {
-      await api.put(`/api/self-billed-invoices/${id}/refresh-status`, {});
+      await api.put(`/api/general-purchases/${id}/refresh-status`, {});
       toast.success("Status refreshed");
       await loadInvoice();
     } catch (error: unknown) {
@@ -703,7 +736,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const clearStatus = async (): Promise<void> => {
     if (!id) return;
     try {
-      await api.post(`/api/self-billed-invoices/${id}/clear-status`, {});
+      await api.post(`/api/general-purchases/${id}/clear-status`, {});
       toast.success("E-invoice status cleared");
       await loadInvoice();
     } catch (error: unknown) {
@@ -715,10 +748,10 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const cancelInvoice = async (): Promise<void> => {
     if (!id) return;
     try {
-      await api.post(`/api/self-billed-invoices/${id}/cancel`, {
+      await api.post(`/api/general-purchases/${id}/cancel`, {
         reason: "Cancelled via system",
       });
-      toast.success("Self-billed invoice cancelled");
+      toast.success("General purchase cancelled");
       setShowCancelDialog(false);
       await loadInvoice();
     } catch (error: unknown) {
@@ -730,9 +763,9 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   const deleteInvoice = async (): Promise<void> => {
     if (!id) return;
     try {
-      await api.delete(`/api/self-billed-invoices/${id}`);
-      toast.success("Self-billed invoice deleted");
-      navigate("/accounting/self-billed-invoices");
+      await api.delete(`/api/general-purchases/${id}`);
+      toast.success("General purchase deleted");
+      navigate("/stock/general-purchases");
     } catch (error: unknown) {
       console.error("Error deleting self-billed invoice:", error);
       toast.error(error instanceof Error ? error.message : "Failed to delete invoice");
@@ -756,7 +789,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              {isEditMode ? "Self-Billed E-Invoice" : "New Self-Billed E-Invoice"}
+              {isEditMode ? "Foreign General Purchase" : "New Foreign General Purchase"}
             </h1>
             {isEditMode && existingInvoice && (
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
@@ -1120,6 +1153,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                         <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">MYR</th>
                         <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Tax MYR</th>
                         <th className="w-32 px-2 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">Balance Qty</th>
+                        <th className="w-44 px-2 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">General Category</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-default-200 dark:divide-gray-700">
@@ -1145,6 +1179,27 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                               />
                             ) : (
                               <span className="font-mono text-default-900 dark:text-gray-100">{line.balance_quantity ?? "-"}</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-2">
+                            {canEditRecords ? (
+                              <FormListbox
+                                name={`general_stock_category_${index}`}
+                                value={line.general_stock_category_id ? String(line.general_stock_category_id) : ""}
+                                onChange={(value: string) =>
+                                  updateLineField(
+                                    index,
+                                    "general_stock_category_id",
+                                    value ? Number.parseInt(value, 10) : ""
+                                  )
+                                }
+                                options={generalStockCategoryOptions}
+                                className="[&_button]:py-1"
+                              />
+                            ) : (
+                              <span className="text-default-700 dark:text-gray-300">
+                                {generalStockCategories.find((category) => category.id === line.general_stock_category_id)?.name || "-"}
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -1173,7 +1228,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                 </div>
 
                 {/* Tax + Balance — row */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <FormInput
                     name="balance_quantity"
                     label="Balance Quantity"
@@ -1185,6 +1240,21 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
                       updateLineField(0, "balance_quantity", event.target.value)
                     }
                     disabled={!canEditRecords}
+                  />
+                  <FormListbox
+                    name="general_stock_category"
+                    label="General Category"
+                    value={summaryLine.general_stock_category_id ? String(summaryLine.general_stock_category_id) : ""}
+                    onChange={(value: string) =>
+                      updateLineField(
+                        0,
+                        "general_stock_category_id",
+                        value ? Number.parseInt(value, 10) : ""
+                      )
+                    }
+                    options={generalStockCategoryOptions}
+                    disabled={!canEditRecords}
+                    className="[&_button]:py-2"
                   />
                   <FormListbox
                     name="summary_tax_type"
@@ -1488,7 +1558,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={deleteInvoice}
-        title="Delete Self-Billed Invoice"
+        title="Delete General Purchase"
         message={`Delete "${existingInvoice?.self_billed_no || "this draft"}"?`}
         confirmButtonText="Delete"
         variant="danger"
@@ -1498,7 +1568,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
         isOpen={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
         onConfirm={cancelInvoice}
-        title="Cancel Self-Billed Invoice"
+        title="Cancel General Purchase"
         message={`Cancel "${
           existingInvoice?.self_billed_no || "this draft"
         }"? This marks the local invoice as Cancelled and will also cancel the MyInvois document when possible.`}
@@ -1509,4 +1579,4 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
   );
 };
 
-export default SelfBilledInvoiceFormPage;
+export default GeneralPurchaseInvoiceFormPage;
