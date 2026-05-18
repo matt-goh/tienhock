@@ -253,7 +253,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Commission",
+    name: "Others (Advance)",
     path: "/payroll/commission",
     component: CommissionPage,
   });

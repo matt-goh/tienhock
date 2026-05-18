@@ -36,6 +36,8 @@ interface AddIncentiveModalProps {
   currentYear: number;
   currentMonth: number;
   incentiveType: IncentiveType;
+  displayLabel?: string;
+  displayLabelPlural?: string;
 }
 
 const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
@@ -45,6 +47,8 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   currentYear,
   currentMonth,
   incentiveType,
+  displayLabel = incentiveType,
+  displayLabelPlural,
 }) => {
   const { staffs } = useStaffsCache();
   const { locations } = useLocationMappingsCache();
@@ -55,6 +59,8 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   const [entries, setEntries] = useState<IncentiveEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [staffQueries, setStaffQueries] = useState<Record<number, string>>({});
+  const displayLabelLower: string = displayLabel.toLowerCase();
+  const saveButtonLabel: string = displayLabelPlural || `${displayLabel}s`;
 
   // Filter locations to only show 16-24 for commission entries
   const commissionLocationOptions = useMemo(() => {
@@ -73,14 +79,14 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
         id: Date.now(),
         employeeId: null,
         amount: "",
-        description: incentiveType,
+        description: displayLabel,
         locationCode: incentiveType === "Commission" ? "18" : null, // Default to COMM-KILANG for Commission
       };
       setEntries([initialEntry]);
       setStaffQueries({});
       setIncentiveDate(new Date().toISOString().split("T")[0]);
     }
-  }, [isOpen, incentiveType, currentYear, currentMonth]);
+  }, [isOpen, incentiveType, currentYear, currentMonth, displayLabel]);
 
   const allStaffOptions = useMemo(
     () =>
@@ -91,15 +97,16 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
     [staffs]
   );
 
-  const handleEntryChange = (
+  const handleEntryChange = <K extends keyof IncentiveEntry>(
     index: number,
-    field: keyof IncentiveEntry,
-    value: any
-  ) => {
-    const newEntries = [...entries];
-    // @ts-ignore
-    newEntries[index][field] = value;
-    setEntries(newEntries);
+    field: K,
+    value: IncentiveEntry[K]
+  ): void => {
+    setEntries((prevEntries) =>
+      prevEntries.map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, [field]: value } : entry
+      )
+    );
   };
 
   const getStaffQuery = (entryId: number): string => {
@@ -109,7 +116,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   const setStaffQuery = (
     entryId: number,
     query: React.SetStateAction<string>
-  ) => {
+  ): void => {
     setStaffQueries((prev) => ({
       ...prev,
       [entryId]:
@@ -117,20 +124,20 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
     }));
   };
 
-  const addEntryRow = () => {
+  const addEntryRow = (): void => {
     setEntries([
       ...entries,
       {
         id: Date.now(),
         employeeId: null,
         amount: "",
-        description: incentiveType,
+        description: displayLabel,
         locationCode: incentiveType === "Commission" ? "18" : null, // Default to COMM-KILANG for Commission
       },
     ]);
   };
 
-  const removeEntryRow = (id: number) => {
+  const removeEntryRow = (id: number): void => {
     if (entries.length > 1) {
       setEntries(entries.filter((entry) => entry.id !== id));
       setStaffQueries((prev) => {
@@ -141,7 +148,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     // For Commission entries, also validate location_code
     const validEntries = entries.filter((e) => {
       const hasBasicInfo = e.employeeId && parseFloat(e.amount) > 0 && e.description;
@@ -154,7 +161,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
     if (validEntries.length === 0) {
       const locationMsg = incentiveType === "Commission" ? ", and location" : "";
       toast.error(
-        `Please add at least one valid ${incentiveType.toLowerCase()} entry with staff, amount${locationMsg}, and description.`
+        `Please add at least one valid ${displayLabelLower} entry with staff, amount${locationMsg}, and description.`
       );
       return;
     }
@@ -178,7 +185,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
       toast.success(
         `${
           validEntries.length
-        } ${incentiveType.toLowerCase()} record(s) saved successfully!`
+        } ${displayLabelLower} record(s) saved successfully!`
       );
       onSuccess();
       onClose();
@@ -186,14 +193,14 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
       console.error(`Failed to save ${incentiveType}s:`, error);
       toast.error(
         error.response?.data?.message ||
-          `Failed to save one or more ${incentiveType.toLowerCase()}s.`
+          `Failed to save one or more ${displayLabelLower} records.`
       );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     if (!isSaving) {
       onClose();
     }
@@ -214,8 +221,8 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
           <div className="fixed inset-0 bg-black/50 dark:bg-black/70" />
         </TransitionChild>
 
-        <div className="fixed inset-0">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-start justify-center p-4 py-6 text-center">
             <TransitionChild
               as={Fragment}
               enter="ease-out duration-300"
@@ -225,21 +232,21 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-4xl transform rounded-2xl bg-white dark:bg-default-900 p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200 dark:border-default-700">
+              <DialogPanel className="my-auto w-full max-w-4xl transform rounded-2xl border border-default-200 bg-white p-0 text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
+                <div className="px-6 py-4 border-b border-default-200 bg-default-50 dark:border-gray-700 dark:bg-gray-900/60">
                   <DialogTitle
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
-                    Record Staff {incentiveType}
+                    Record Staff {displayLabel}
                   </DialogTitle>
                 </div>
 
-                <div className="px-6 py-4 max-h-[70vh]">
+                <div className="px-6 py-4 text-default-800 dark:text-gray-100">
                   <div className="max-w-xs mb-4">
                     <FormInput
                       name="incentiveDate"
-                      label={`${incentiveType} Date`}
+                      label={`${displayLabel} Date`}
                       type="date"
                       value={incentiveDate}
                       onChange={(e) => setIncentiveDate(e.target.value)}
@@ -267,17 +274,23 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                         <th className="py-2 text-left font-medium text-default-600 dark:text-default-400"></th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-default-100 dark:divide-gray-700/70">
                       {entries.map((entry, index) => (
-                        <tr key={entry.id} className="group">
+                        <tr
+                          key={entry.id}
+                          className="group transition-colors duration-150 hover:bg-sky-50/60 dark:hover:bg-sky-900/20"
+                        >
                           <td className="py-2 align-top">
                             <FormCombobox
                               name={`employee-${index}`}
                               label=""
                               value={entry.employeeId ?? undefined}
-                              onChange={(value) =>
-                                handleEntryChange(index, "employeeId", value)
-                              }
+                              onChange={(value) => {
+                                const employeeId: string | null = Array.isArray(value)
+                                  ? null
+                                  : value;
+                                handleEntryChange(index, "employeeId", employeeId);
+                              }}
                               options={allStaffOptions}
                               query={getStaffQuery(entry.id)}
                               setQuery={(query: React.SetStateAction<string>) =>
@@ -331,14 +344,14 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                                   e.target.value
                                 )
                               }
-                              placeholder="e.g., Commission, bonus work"
+                              placeholder={`e.g., ${displayLabel}, bonus work`}
                             />
                           </td>
                           <td className="py-2 align-top">
                             {entries.length > 1 && (
                               <button
                                 onClick={() => removeEntryRow(entry.id)}
-                                className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="p-2 rounded-full text-default-400 opacity-0 transition-all duration-150 hover:bg-rose-100 hover:text-rose-600 group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-rose-900/40 dark:hover:text-rose-300"
                                 title="Remove row"
                               >
                                 <IconX size={18} />
@@ -350,7 +363,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center mt-6 border-t border-default-200 dark:border-default-700 pt-6">
+                  <div className="flex justify-between items-center mt-6 border-t border-default-200 bg-white pt-6 dark:border-gray-700 dark:bg-gray-800">
                     <Button
                       variant="outline"
                       onClick={addEntryRow}
@@ -372,7 +385,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                         disabled={isSaving}
                         icon={IconDeviceFloppy}
                       >
-                        {isSaving ? "Saving..." : `Save ${incentiveType}s`}
+                        {isSaving ? "Saving..." : `Save ${saveButtonLabel}`}
                       </Button>
                     </div>
                   </div>

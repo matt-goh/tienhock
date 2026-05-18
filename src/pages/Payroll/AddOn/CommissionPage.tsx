@@ -19,6 +19,8 @@ import EditIncentiveModal from "../../../components/Payroll/EditIncentiveModal";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 
+const DISPLAY_LABEL = "Others (Advance)";
+
 interface Commission {
   id: number;
   employee_id: string;
@@ -93,7 +95,7 @@ const CommissionPage: React.FC = () => {
     fetchCommissions();
   }, [currentYear, currentMonth]);
 
-  const fetchCommissions = async () => {
+  const fetchCommissions = async (): Promise<void> => {
     setIsLoading(true);
     try {
       const startDate = `${currentYear}-${currentMonth
@@ -110,7 +112,7 @@ const CommissionPage: React.FC = () => {
       setCommissions(response || []);
     } catch (error) {
       console.error("Error fetching commissions:", error);
-      toast.error("Failed to load commissions");
+      toast.error(`Failed to load ${DISPLAY_LABEL}`);
     } finally {
       setIsLoading(false);
     }
@@ -121,21 +123,21 @@ const CommissionPage: React.FC = () => {
     setShowEditModal(true);
   };
 
-  const handleDeleteCommission = async () => {
+  const handleDeleteCommission = async (): Promise<void> => {
     if (!deletingId) return;
     try {
       await api.delete(`/api/incentives/${deletingId}`);
-      toast.success("Commission record deleted successfully");
+      toast.success(`${DISPLAY_LABEL} record deleted successfully`);
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchCommissions();
     } catch (error) {
       console.error("Error deleting commission:", error);
-      toast.error("Failed to delete commission");
+      toast.error(`Failed to delete ${DISPLAY_LABEL}`);
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
       style: "currency",
       currency: "MYR",
@@ -151,7 +153,7 @@ const CommissionPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Commission Records
+          {DISPLAY_LABEL}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -168,7 +170,7 @@ const CommissionPage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add Commission
+            Add {DISPLAY_LABEL}
           </Button>
         </div>
       </div>
@@ -202,7 +204,7 @@ const CommissionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Commissions Table */}
+      {/* Others (Advance) Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
         <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
           <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
@@ -216,8 +218,8 @@ const CommissionPage: React.FC = () => {
         ) : commissions.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No commissions found</p>
-            <p>Click "Add Commission" to create records</p>
+            <p className="text-lg font-medium">No {DISPLAY_LABEL} records found</p>
+            <p>Click "Add {DISPLAY_LABEL}" to create records</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -311,6 +313,8 @@ const CommissionPage: React.FC = () => {
           currentYear={currentYear}
           currentMonth={currentMonth}
           incentiveType="Commission"
+          displayLabel={DISPLAY_LABEL}
+          displayLabelPlural={DISPLAY_LABEL}
         />
       )}
 
@@ -322,6 +326,7 @@ const CommissionPage: React.FC = () => {
         }}
         onSuccess={fetchCommissions}
         incentive={editingCommission}
+        displayLabel={DISPLAY_LABEL}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -332,8 +337,8 @@ const CommissionPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeleteCommission}
-        title="Delete Commission"
-        message="Are you sure you want to delete this commission record? This action cannot be undone."
+        title={`Delete ${DISPLAY_LABEL}`}
+        message={`Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`}
         confirmButtonText="Delete"
         variant="danger"
       />
