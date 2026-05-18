@@ -444,7 +444,6 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
     line: SelfBilledInvoiceLine
   ): SelfBilledInvoiceLine => {
     const amountForeign = toNumber(line.amount_foreign);
-    const fxRate = toNumber(formData.fx_rate) || 1;
 
     return {
       ...line,
@@ -452,7 +451,7 @@ const SelfBilledInvoiceFormPage: React.FC = () => {
       quantity: 1,
       unit_price_foreign: amountForeign,
       amount_foreign: amountForeign,
-      amount_myr: Number((amountForeign * fxRate).toFixed(2)),
+      amount_myr: toNumber(line.amount_myr),
       tax_rate: toNumber(line.tax_rate),
       tax_amount_myr: toNumber(line.tax_amount_myr),
       classification_code: "034",
