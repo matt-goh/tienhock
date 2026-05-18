@@ -582,10 +582,15 @@ export default function (pool) {
         to_char(lr.leave_date, 'YYYY-MM-DD') as date,
         lr.leave_type,
         lr.days_taken,
-        lr.amount_paid
+        lr.amount_paid,
+        h.description as holiday_description
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       JOIN leave_records lr ON ep.employee_id = lr.employee_id
+      LEFT JOIN holiday_calendar h
+        ON lr.leave_type = 'cuti_umum'
+        AND h.holiday_date = lr.leave_date
+        AND h.is_active = true
       WHERE ep.id = ANY($1)
         AND EXTRACT(YEAR FROM lr.leave_date) = mp.year
         AND EXTRACT(MONTH FROM lr.leave_date) = mp.month
@@ -605,6 +610,7 @@ export default function (pool) {
             leave_type: record.leave_type,
             days_taken: parseFloat(record.days_taken),
             amount_paid: parseFloat(record.amount_paid || 0),
+            holiday_description: record.holiday_description || null,
           });
           return acc;
         },
@@ -787,16 +793,21 @@ export default function (pool) {
         // Get leave records for this employee for the specific month/year
         pool.query(`
           SELECT 
-            to_char(leave_date, 'YYYY-MM-DD') as date,
-            leave_type,
-            days_taken,
-            amount_paid
-          FROM leave_records
-          WHERE employee_id = $1 
-            AND EXTRACT(YEAR FROM leave_date) = $2
-            AND EXTRACT(MONTH FROM leave_date) = $3
-            AND status = 'approved'
-          ORDER BY leave_date ASC
+            to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+            lr.leave_type,
+            lr.days_taken,
+            lr.amount_paid,
+            h.description as holiday_description
+          FROM leave_records lr
+          LEFT JOIN holiday_calendar h
+            ON lr.leave_type = 'cuti_umum'
+            AND h.holiday_date = lr.leave_date
+            AND h.is_active = true
+          WHERE lr.employee_id = $1
+            AND EXTRACT(YEAR FROM lr.leave_date) = $2
+            AND EXTRACT(MONTH FROM lr.leave_date) = $3
+            AND lr.status = 'approved'
+          ORDER BY lr.leave_date ASC
         `, [payrollData.employee_id, payrollData.year, payrollData.month]),
 
         // Get mid-month payroll data
@@ -982,16 +993,21 @@ export default function (pool) {
         // Get leave records for this employee for the specific month/year
         pool.query(`
           SELECT 
-            to_char(leave_date, 'YYYY-MM-DD') as date,
-            leave_type,
-            days_taken,
-            amount_paid
-          FROM leave_records
-          WHERE employee_id = $1 
-            AND EXTRACT(YEAR FROM leave_date) = $2
-            AND EXTRACT(MONTH FROM leave_date) = $3
-            AND status = 'approved'
-          ORDER BY leave_date ASC
+            to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+            lr.leave_type,
+            lr.days_taken,
+            lr.amount_paid,
+            h.description as holiday_description
+          FROM leave_records lr
+          LEFT JOIN holiday_calendar h
+            ON lr.leave_type = 'cuti_umum'
+            AND h.holiday_date = lr.leave_date
+            AND h.is_active = true
+          WHERE lr.employee_id = $1
+            AND EXTRACT(YEAR FROM lr.leave_date) = $2
+            AND EXTRACT(MONTH FROM lr.leave_date) = $3
+            AND lr.status = 'approved'
+          ORDER BY lr.leave_date ASC
         `, [payrollData.employee_id, payrollData.year, payrollData.month]),
 
         // Get mid-month payroll data

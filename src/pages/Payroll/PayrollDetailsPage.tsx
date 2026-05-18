@@ -68,6 +68,7 @@ interface MonthlyLeaveRecord {
   amount_paid: number;
   status: string;
   work_log_id?: number;
+  holiday_description?: string | null;
 }
 
 const EmployeePayrollDetailsPage: React.FC = () => {
@@ -1805,6 +1806,22 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           return leaveType;
                       }
                     };
+                    const getLeaveRecordDisplay = (
+                      leaveRecord: MonthlyLeaveRecord
+                    ) => {
+                      const baseLabel = getLeaveTypeDisplay(
+                        leaveRecord.leave_type
+                      );
+
+                      if (
+                        leaveRecord.leave_type === "cuti_umum" &&
+                        leaveRecord.holiday_description
+                      ) {
+                        return `${baseLabel} - ${leaveRecord.holiday_description}`;
+                      }
+
+                      return baseLabel;
+                    };
                     const getLeaveTypeColor = (leaveType: string) => {
                       switch (leaveType) {
                         case "cuti_umum":
@@ -1831,7 +1848,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               record.leave_type
                             )}`}
                           >
-                            {getLeaveTypeDisplay(record.leave_type)}
+                            {getLeaveRecordDisplay(record)}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center text-sm text-default-800 dark:text-gray-100">

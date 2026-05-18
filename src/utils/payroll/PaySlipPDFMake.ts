@@ -17,6 +17,13 @@ interface IndividualJobPayroll {
   gross_pay_portion: number;
 }
 
+interface GroupedLeaveRecord {
+  leave_type: string;
+  total_days: number;
+  total_amount: number;
+  holiday_descriptions: string[];
+}
+
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
@@ -42,6 +49,18 @@ const prettifyLeaveType = (leaveType: string): string => {
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
+};
+
+const getLeaveDisplayName = (leaveRecord: GroupedLeaveRecord): string => {
+  const baseLabel = prettifyLeaveType(leaveRecord.leave_type);
+  if (
+    leaveRecord.leave_type === 'cuti_umum' &&
+    leaveRecord.holiday_descriptions.length > 0
+  ) {
+    return `${baseLabel} - ${leaveRecord.holiday_descriptions.join(', ')}`;
+  }
+
+  return baseLabel;
 };
 
 const itemBelongsToJobByName = (description: string, payCode: string, jobType: string): boolean => {
@@ -251,12 +270,23 @@ const buildMainPayrollPage = (
   const groupedLeaveRecords = (payroll.leave_records || []).reduce((acc, record) => {
     const leaveType = record.leave_type;
     if (!acc[leaveType]) {
-      acc[leaveType] = { leave_type: leaveType, total_days: 0, total_amount: 0 };
+      acc[leaveType] = {
+        leave_type: leaveType,
+        total_days: 0,
+        total_amount: 0,
+        holiday_descriptions: [],
+      };
     }
     acc[leaveType].total_days += record.days_taken;
     acc[leaveType].total_amount += record.amount_paid;
+    if (
+      record.holiday_description &&
+      !acc[leaveType].holiday_descriptions.includes(record.holiday_description)
+    ) {
+      acc[leaveType].holiday_descriptions.push(record.holiday_description);
+    }
     return acc;
-  }, {} as Record<string, { leave_type: string; total_days: number; total_amount: number }>);
+  }, {} as Record<string, GroupedLeaveRecord>);
   const leaveRecordsArray = Object.values(groupedLeaveRecords);
   const leaveTotalAmount = leaveRecordsArray.reduce((sum, record) => sum + (record.total_amount || 0), 0);
 
@@ -372,7 +402,7 @@ const buildMainPayrollPage = (
     // Leave records
     leaveRecordsArray.forEach(leaveRecord => {
       tableBody.push(createItemRow(
-        prettifyLeaveType(leaveRecord.leave_type),
+        getLeaveDisplayName(leaveRecord),
         '',
         `${leaveRecord.total_days} Hari`,
         formatCurrency(leaveRecord.total_amount)
@@ -721,13 +751,24 @@ const buildIndividualJobPage = (
   const groupedLeaveRecords = (individualJob.leave_records || []).reduce((acc, record) => {
     const leaveType = record.leave_type;
     if (!acc[leaveType]) {
-      acc[leaveType] = { leave_type: leaveType, total_days: 0, total_amount: 0 };
+      acc[leaveType] = {
+        leave_type: leaveType,
+        total_days: 0,
+        total_amount: 0,
+        holiday_descriptions: [],
+      };
     }
     acc[leaveType].total_days += record.days_taken;
     acc[leaveType].total_amount += record.amount_paid;
+    if (
+      record.holiday_description &&
+      !acc[leaveType].holiday_descriptions.includes(record.holiday_description)
+    ) {
+      acc[leaveType].holiday_descriptions.push(record.holiday_description);
+    }
     return acc;
-  }, {} as Record<string, { leave_type: string; total_days: number; total_amount: number }>);
-  const leaveRecordsArray: { leave_type: string; total_days: number; total_amount: number }[] = Object.values(groupedLeaveRecords);
+  }, {} as Record<string, GroupedLeaveRecord>);
+  const leaveRecordsArray: GroupedLeaveRecord[] = Object.values(groupedLeaveRecords);
   const leaveTotalAmount = leaveRecordsArray.reduce((sum, record) => sum + (record.total_amount || 0), 0);
 
   // Commission records
@@ -797,7 +838,7 @@ const buildIndividualJobPage = (
 
     leaveRecordsArray.forEach(leaveRecord => {
       tableBody.push(createItemRow(
-        prettifyLeaveType(leaveRecord.leave_type),
+        getLeaveDisplayName(leaveRecord),
         '',
         `${leaveRecord.total_days} Hari`,
         formatCurrency(leaveRecord.total_amount)

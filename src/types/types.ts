@@ -689,6 +689,7 @@ export interface LeaveRecord {
   leave_type: string;
   days_taken: number;
   amount_paid: number;
+  holiday_description?: string | null;
 }
 
 export interface PayrollItem {
