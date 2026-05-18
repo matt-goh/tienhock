@@ -1,5 +1,5 @@
 // src/pages/Payroll/MidMonthPayrollPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import {
   IconPlus,
@@ -7,6 +7,8 @@ import {
   IconTrash,
   IconCash,
   IconRefresh,
+  IconPrinter,
+  IconFileExport,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -21,6 +23,12 @@ import YearNavigator from "../../../components/YearNavigator";
 import MonthNavigator from "../../../components/MonthNavigator";
 import AddMidMonthPayrollModal from "../../../components/Payroll/AddMidMonthPayrollModal";
 import EditMidMonthPayrollModal from "../../../components/Payroll/EditMidMonthPayrollModal";
+import {
+  generateMidMonthPayrollReportPDF,
+  MidMonthPayrollReportPDFData,
+} from "../../../utils/payroll/MidMonthPayrollReportPDF";
+import { api } from "../../../routes/utils/api";
+import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import toast from "react-hot-toast";
 
 const MidMonthPayrollPage: React.FC = () => {
@@ -59,6 +67,12 @@ const MidMonthPayrollPage: React.FC = () => {
   );
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [pinjamByEmp, setPinjamByEmp] = useState<Record<string, number>>({});
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isGeneratingExport, setIsGeneratingExport] = useState(false);
+  const [isPrintDropdownOpen, setIsPrintDropdownOpen] = useState(false);
+  const printDropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { staffs } = useStaffsCache();
 
   // Filters - initialize from URL params
   const [currentYear, setCurrentYear] = useState(getInitialYear);
@@ -87,17 +101,255 @@ const MidMonthPayrollPage: React.FC = () => {
   const fetchPayrolls = async () => {
     setIsLoading(true);
     try {
-      const response = await getMidMonthPayrolls({
-        year: currentYear,
-        month: currentMonth,
-        limit: 100,
-      });
-      setPayrolls(response.payrolls);
+      const [payrollsResponse, pinjamSummary] = await Promise.all([
+        getMidMonthPayrolls({
+          year: currentYear,
+          month: currentMonth,
+          limit: 100,
+        }),
+        api.get(
+          `/api/pinjam-records/summary?year=${currentYear}&month=${currentMonth}`
+        ),
+      ]);
+      setPayrolls(payrollsResponse.payrolls);
+
+      const pinjamMap: Record<string, number> = {};
+      if (Array.isArray(pinjamSummary)) {
+        pinjamSummary.forEach((entry: any) => {
+          const amount = Number(entry?.mid_month?.total_amount ?? 0);
+          if (entry?.employee_id) {
+            pinjamMap[entry.employee_id] = amount;
+          }
+        });
+      }
+      setPinjamByEmp(pinjamMap);
     } catch (error) {
       console.error("Error fetching payrolls:", error);
       toast.error("Failed to load mid-month payrolls");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePrintDropdownMouseEnter = () => {
+    if (printDropdownTimeoutRef.current) {
+      clearTimeout(printDropdownTimeoutRef.current);
+      printDropdownTimeoutRef.current = null;
+    }
+    setIsPrintDropdownOpen(true);
+  };
+
+  const handlePrintDropdownMouseLeave = () => {
+    printDropdownTimeoutRef.current = setTimeout(() => {
+      setIsPrintDropdownOpen(false);
+    }, 300);
+  };
+
+  const generatePDF = async (action: "download" | "print") => {
+    if (payrolls.length === 0) {
+      toast.error("No data available to generate PDF");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    try {
+      const staffById = new Map(staffs.map((s) => [s.id, s]));
+
+      const rows = payrolls.map((payroll, idx) => {
+        const staff = staffById.get(payroll.employee_id);
+        const midMonthAmount = Number(payroll.amount) || 0;
+        const pinjamAmount = pinjamByEmp[payroll.employee_id] ?? 0;
+        const netAmount = midMonthAmount - pinjamAmount;
+        return {
+          no: idx + 1,
+          staff_name: payroll.employee_name,
+          icNo: staff?.icNo ?? "",
+          midMonthAmount,
+          pinjamAmount,
+          netAmount,
+          total: netAmount,
+          payment_preference: payroll.payment_method,
+        };
+      });
+
+      const totalFinal = rows.reduce((sum, r) => sum + r.netAmount, 0);
+
+      const pdfData: MidMonthPayrollReportPDFData = {
+        year: currentYear,
+        month: currentMonth,
+        data: rows,
+        total_records: rows.length,
+        summary: { total_final: totalFinal },
+      };
+
+      await generateMidMonthPayrollReportPDF(pdfData, action);
+      const actionText =
+        action === "download" ? "downloaded" : "generated for printing";
+      toast.success(`Mid-month payroll report ${actionText} successfully`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const generateTextExport = async () => {
+    const bankPayrolls = payrolls.filter((p) => p.payment_method === "Bank");
+    if (bankPayrolls.length === 0) {
+      toast.error("No Bank-payment employees available to export");
+      return;
+    }
+
+    setIsGeneratingExport(true);
+    try {
+      const staffById = new Map(staffs.map((s) => [s.id, s]));
+
+      const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const paymentDate = `${lastDayOfMonth
+        .toString()
+        .padStart(2, "0")}/${currentMonth
+        .toString()
+        .padStart(2, "0")}/${currentYear}`;
+
+      const paymentDateRow = [
+        "PAYMENT DATE : (DD/MM/YYYY)",
+        paymentDate,
+        ...Array(19).fill(""),
+      ];
+
+      const headerRow1 = [
+        "Payment Type/ Mode : PBB/IBG/REN",
+        "Bene Acct No.",
+        "BIC",
+        "Bene Full Name",
+        "ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "Bene Identification No / Passport",
+        "Payment Amount (with 2 decimal points)",
+        "Recipient Reference (shown in sender and bene statement)",
+        "Other Payment Details (shown in sender and bene statement)",
+        "Bene Email 1",
+        "Bene Email 2",
+        "Bene Mobile No. 1 (charge RM0.20 per number)",
+        "Bene Mobile No. 2 (charge RM0.20 per number)",
+        "Joint Bene Name",
+        "Joint Bene Identification No.",
+        "Joint ID Type: For Intrabank & IBG NI, OI, BR, PL, ML, PP For Rentas NI, OI, BR, OT",
+        "E-mail Content Line 1 (will be shown in bene email)",
+        "E-mail Content Line 2 (will be shown in bene email)",
+        "E-mail Content Line 3 (will be shown in bene email)",
+        "E-mail Content Line 4 (will be shown in bene email)",
+        "E-mail Content Line 5 (will be shown in bene email)",
+      ];
+
+      const headerRow2 = [
+        "(M) - Char: 3 - A",
+        "(M) - Char: 20 - N",
+        "(M) - Char: 11 - A",
+        "(M) - Char: 120 - A",
+        "(M) - Char: 2 - A",
+        "(O) - Char: 29 - AN",
+        "(M) - Char: 18 - N",
+        "(M) - Char: 20 - AN",
+        "(O) - Char: 20 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 70 - AN",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 15 - N",
+        "(O) - Char: 120 - A",
+        "(O) - Char: 29 - AN",
+        "(O) - Char: 2 - A",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+        "(O) - Char: 40 - AN",
+      ];
+
+      const dataRows = bankPayrolls
+        .map((payroll) => {
+          const gross = Number(payroll.amount) || 0;
+          const pinjam = pinjamByEmp[payroll.employee_id] ?? 0;
+          const net = gross - pinjam;
+          if (net <= 0) return null;
+
+          const staff = staffById.get(payroll.employee_id);
+          return [
+            "PBB",
+            (staff?.bankAccountNumber || "").replace(/-/g, ""),
+            "PBBEMYKL",
+            (payroll.employee_name || "").replace(/,/g, " "),
+            staff?.document || "",
+            (staff?.icNo || "").replace(/-/g, ""),
+            net.toFixed(2),
+            "Mid-Month",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Content Line 1",
+            "Content Line 2",
+            "Content Line 3",
+            "Content Line 4",
+            "Content Line 5",
+          ];
+        })
+        .filter((row): row is string[] => row !== null);
+
+      if (dataRows.length === 0) {
+        toast.error("No payable rows after deducting pinjam");
+        return;
+      }
+
+      const totalAmount = dataRows.reduce(
+        (sum, row) => sum + parseFloat(row[6]),
+        0
+      );
+
+      const totalRow = [
+        "TOTAL:",
+        "",
+        "",
+        "",
+        "",
+        "",
+        totalAmount.toFixed(2),
+        ...Array(14).fill(""),
+      ];
+
+      const allRows = [
+        paymentDateRow,
+        headerRow1,
+        headerRow2,
+        ...dataRows,
+        totalRow,
+      ];
+
+      const textContent = allRows.map((row) => row.join(";")).join("\r\n");
+      const blob = new Blob([textContent], {
+        type: "text/plain;charset=utf-8",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `mid-month-payment-export-${currentMonth
+        .toString()
+        .padStart(2, "0")}-${currentYear}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Mid-month payment export file downloaded successfully");
+    } catch (error) {
+      console.error("Error generating text export:", error);
+      toast.error("Failed to generate text export");
+    } finally {
+      setIsGeneratingExport(false);
     }
   };
 
@@ -148,6 +400,56 @@ const MidMonthPayrollPage: React.FC = () => {
             disabled={isLoading}
           >
             Refresh
+          </Button>
+          <div
+            className="relative"
+            onMouseEnter={handlePrintDropdownMouseEnter}
+            onMouseLeave={handlePrintDropdownMouseLeave}
+          >
+            <Button
+              onClick={() => generatePDF("print")}
+              icon={IconPrinter}
+              color="green"
+              variant="outline"
+              disabled={payrolls.length === 0 || isGeneratingPDF}
+            >
+              Print
+            </Button>
+            {isPrintDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-default-200 dark:border-gray-700 py-1 min-w-[140px]">
+                  <button
+                    onClick={() => {
+                      setIsPrintDropdownOpen(false);
+                      generatePDF("print");
+                    }}
+                    disabled={payrolls.length === 0 || isGeneratingPDF}
+                    className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Print
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsPrintDropdownOpen(false);
+                      generatePDF("download");
+                    }}
+                    disabled={payrolls.length === 0 || isGeneratingPDF}
+                    className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <Button
+            onClick={generateTextExport}
+            icon={IconFileExport}
+            color="purple"
+            variant="outline"
+            disabled={payrolls.length === 0 || isGeneratingExport}
+          >
+            Export
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}

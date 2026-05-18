@@ -584,6 +584,8 @@ export interface ConsolidatedInfo {
 export interface SelectOption {
   id: string;
   name: string;
+  phone_number?: string;
+  job?: string;
 }
 
 export type PayType = "Base" | "Tambahan" | "Overtime";

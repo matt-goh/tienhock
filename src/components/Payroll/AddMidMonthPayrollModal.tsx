@@ -53,8 +53,9 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
     () =>
       staffs.map((staff) => ({
         id: staff.id,
-        name: staff.name,
+        name: `${staff.id} — ${staff.name}`,
         phone_number: staff.telephoneNo,
+        job: Array.isArray(staff.job) ? staff.job.join(", ") : "",
       })),
     [staffs]
   );

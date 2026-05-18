@@ -322,15 +322,15 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-6xl transform rounded-2xl bg-white p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200">
+              <DialogPanel className="w-full max-w-6xl transform rounded-2xl bg-white dark:bg-gray-800 p-0 text-left align-middle shadow-xl transition-all">
+                <div className="px-6 py-4 border-b border-default-200 dark:border-gray-600">
                   <DialogTitle
                     as="h3"
-                    className="text-xl font-semibold text-default-800"
+                    className="text-xl font-semibold text-default-800 dark:text-gray-100"
                   >
                     {editingRecord ? "Edit Pinjam Record" : "Record Pinjam"}
                   </DialogTitle>
-                  <p className="text-sm text-default-600 mt-1">
+                  <p className="text-sm text-default-600 dark:text-gray-400 mt-1">
                     {monthName} {currentYear} - Enter amounts in the respective
                     columns (Mid-month or Monthly)
                   </p>
@@ -342,23 +342,23 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                       <table className="min-w-full table-fixed">
                         <thead>
                           <tr>
-                            <th className="py-2 text-left font-medium text-default-600 w-[35%]">
+                            <th className="py-2 text-left font-medium text-default-600 dark:text-gray-300 w-[35%]">
                               Staff
                             </th>
-                            <th className="py-2 px-3 text-left font-medium text-default-600 w-[30%]">
+                            <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-gray-300 w-[30%]">
                               Description
                             </th>
-                            <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
-                              <div className="bg-blue-50 rounded px-2 py-1">
+                            <th className="py-2 px-3 text-center font-medium text-default-600 dark:text-gray-300 w-[15%]">
+                              <div className="bg-blue-50 dark:bg-blue-900/30 dark:text-blue-100 rounded px-2 py-1">
                                 Mid-Month (RM)
                               </div>
                             </th>
-                            <th className="py-2 px-3 text-center font-medium text-default-600 w-[15%]">
-                              <div className="bg-green-50 rounded px-2 py-1">
+                            <th className="py-2 px-3 text-center font-medium text-default-600 dark:text-gray-300 w-[15%]">
+                              <div className="bg-green-50 dark:bg-green-900/30 dark:text-green-100 rounded px-2 py-1">
                                 Monthly (RM)
                               </div>
                             </th>
-                            <th className="py-2 text-center font-medium text-default-600 w-12"></th>
+                            <th className="py-2 text-center font-medium text-default-600 dark:text-gray-300 w-12"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -398,7 +398,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                                 />
                               </td>
                               <td className="py-1 px-3 align-top">
-                                <div className="bg-blue-50 rounded px-1">
+                                <div className="bg-blue-50 dark:bg-blue-900/30 rounded px-1">
                                   <FormInput
                                     name={`midMonthAmount-${index}`}
                                     label=""
@@ -417,7 +417,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                                 </div>
                               </td>
                               <td className="py-1 px-3 align-top">
-                                <div className="bg-green-50 rounded px-1">
+                                <div className="bg-green-50 dark:bg-green-900/30 rounded px-1">
                                   <FormInput
                                     name={`monthlyAmount-${index}`}
                                     label=""
@@ -439,7 +439,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                                 {entries.length > 1 && (
                                   <button
                                     onClick={() => removeEntryRow(entry.id)}
-                                    className="p-2 text-default-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="p-2 text-default-400 dark:text-gray-500 hover:text-rose-500 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                     title="Remove row"
                                   >
                                     <IconX size={18} />
@@ -454,7 +454,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                   </div>
                 </div>
 
-                <div className="px-6 flex justify-between items-center my-4 border-t border-default-200 pt-4">
+                <div className="px-6 flex justify-between items-center my-4 border-t border-default-200 dark:border-gray-600 pt-4">
                     <Button
                       variant="outline"
                       onClick={addEntryRow}
