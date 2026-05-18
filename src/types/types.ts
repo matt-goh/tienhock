@@ -1483,6 +1483,43 @@ export type SelfBilledEInvoiceStatus =
   | null;
 
 export type SelfBilledInvoiceStatus = "active" | "cancelled";
+export type GeneralPurchaseKind = "foreign" | "local";
+
+export interface GeneralStockCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GeneralStockAdjustment {
+  id: number;
+  adjustment_date: string;
+  adjustment_quantity: number;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export interface GeneralStockRow {
+  line_id: number;
+  self_billed_invoice_id: number;
+  line_number: number;
+  description: string;
+  balance_quantity: number | null;
+  amount_myr: number;
+  general_stock_category_id: number | null;
+  category_name: string;
+  category_sort_order: number;
+  purchase_no: string;
+  purchase_date: string;
+  purchase_kind: GeneralPurchaseKind;
+  supplier_name: string | null;
+  adjustment_quantity: number;
+  current_stock: number;
+  used_adjustments?: GeneralStockAdjustment[];
+}
 
 export interface SelfBilledForeignSupplier {
   id?: number;
@@ -1516,6 +1553,7 @@ export interface SelfBilledInvoiceLine {
   description: string;
   quantity: number;
   balance_quantity?: number | null;
+  general_stock_category_id?: number | null;
   unit_price_foreign: number;
   amount_foreign: number;
   amount_myr: number;
@@ -1530,7 +1568,10 @@ export interface SelfBilledInvoiceLine {
 
 export interface SelfBilledInvoiceListItem {
   id: number;
+  purchase_kind?: GeneralPurchaseKind;
   self_billed_no: string;
+  purchase_no?: string;
+  local_supplier_name?: string | null;
   purchase_date: string;
   transaction_type: string;
   platform: string | null;
@@ -1552,7 +1593,9 @@ export interface SelfBilledInvoiceListItem {
 }
 
 export interface SelfBilledInvoiceInput {
+  purchase_kind?: GeneralPurchaseKind;
   foreign_supplier_id?: number | null;
+  local_supplier_name?: string | null;
   supplier: SelfBilledForeignSupplier;
   self_billed_no?: string;
   purchase_date: string;
@@ -1578,7 +1621,9 @@ export interface SelfBilledInvoiceInput {
 
 export interface SelfBilledInvoice extends SelfBilledInvoiceInput {
   id: number;
+  purchase_kind: GeneralPurchaseKind;
   self_billed_no: string;
+  purchase_no?: string;
   total_foreign_amount: number;
   total_excluding_tax_myr: number;
   tax_amount_myr: number;

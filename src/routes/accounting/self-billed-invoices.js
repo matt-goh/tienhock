@@ -16,6 +16,8 @@ const DEFAULT_TRANSACTION_TYPE = "Importation of goods";
 const DEFAULT_CURRENCY = "CNY";
 const DEFAULT_CLASSIFICATION = "034";
 const DEFAULT_TAX_TYPE = "06";
+const PURCHASE_KIND_FOREIGN = "foreign";
+const PURCHASE_KIND_LOCAL = "local";
 const LOCAL_STATUS_ACTIVE = "active";
 const LOCAL_STATUS_CANCELLED = "cancelled";
 const MAX_SUPPORTING_DOCUMENT_BYTES = 25 * 1024 * 1024;
@@ -127,11 +129,11 @@ function setDownloadHeaders(res, invoice, s3Object) {
   }
 }
 
-async function generateSelfBilledNo(client) {
+async function generatePurchaseNo(client, purchaseKind = PURCHASE_KIND_FOREIGN) {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
-  const prefix = `SB${year}${month}`;
+  const prefix = purchaseKind === PURCHASE_KIND_LOCAL ? `GP${year}${month}` : `SB${year}${month}`;
   const result = await client.query(
     `SELECT self_billed_no
      FROM self_billed_invoices
@@ -151,6 +153,10 @@ async function generateSelfBilledNo(client) {
   );
   const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
   return `${prefix}${String(nextNumber).padStart(4, "0")}`;
+}
+
+async function generateSelfBilledNo(client) {
+  return generatePurchaseNo(client, PURCHASE_KIND_FOREIGN);
 }
 
 function sanitizeSupplierPayload(payload = {}) {
@@ -189,13 +195,20 @@ function validateSupplier(supplier) {
   return errors;
 }
 
-function sanitizeLines(lines, fxRate) {
+function sanitizeLines(lines, fxRate, purchaseKind = PURCHASE_KIND_FOREIGN) {
   return lines.map((line, index) => {
     const quantity = parseDecimal(line.quantity, 1);
-    const unitPriceForeign = parseDecimal(line.unit_price_foreign, 0);
+    const amountMyr = parseDecimal(line.amount_myr, 0);
+    const unitPriceForeign =
+      purchaseKind === PURCHASE_KIND_LOCAL
+        ? amountMyr
+        : parseDecimal(line.unit_price_foreign, 0);
     const amountForeign =
-      parseDecimal(line.amount_foreign, 0) || quantity * unitPriceForeign;
-    const amountMyr = parseDecimal(line.amount_myr, 0) || amountForeign * fxRate;
+      purchaseKind === PURCHASE_KIND_LOCAL
+        ? amountMyr
+        : parseDecimal(line.amount_foreign, 0) || quantity * unitPriceForeign;
+    const calculatedAmountMyr =
+      amountMyr || (purchaseKind === PURCHASE_KIND_LOCAL ? amountForeign : amountForeign * fxRate);
 
     return {
       line_number: Number.parseInt(line.line_number || index + 1, 10),
@@ -204,21 +217,26 @@ function sanitizeLines(lines, fxRate) {
       balance_quantity: parseNullableDecimal(line.balance_quantity),
       unit_price_foreign: unitPriceForeign,
       amount_foreign: amountForeign,
-      amount_myr: amountMyr,
+      amount_myr: calculatedAmountMyr,
       classification_code: normalizeText(line.classification_code, DEFAULT_CLASSIFICATION),
       tax_type: normalizeText(line.tax_type, DEFAULT_TAX_TYPE),
       tax_rate: parseDecimal(line.tax_rate, 0),
       tax_amount_myr: parseDecimal(line.tax_amount_myr, 0),
       tax_exemption_reason: normalizeText(line.tax_exemption_reason),
       customs_form_reference: normalizeText(line.customs_form_reference),
+      general_stock_category_id: line.general_stock_category_id
+        ? Number.parseInt(line.general_stock_category_id, 10)
+        : null,
       notes: normalizeText(line.notes),
     };
   });
 }
 
 function sanitizeInvoicePayload(payload = {}) {
-  const fxRate = parseDecimal(payload.fx_rate, 1);
-  const lines = sanitizeLines(Array.isArray(payload.lines) ? payload.lines : [], fxRate);
+  const purchaseKind =
+    payload.purchase_kind === PURCHASE_KIND_LOCAL ? PURCHASE_KIND_LOCAL : PURCHASE_KIND_FOREIGN;
+  const fxRate = purchaseKind === PURCHASE_KIND_LOCAL ? 1 : parseDecimal(payload.fx_rate, 1);
+  const lines = sanitizeLines(Array.isArray(payload.lines) ? payload.lines : [], fxRate, purchaseKind);
   const totalForeignAmount = lines.reduce(
     (sum, line) => sum + line.amount_foreign,
     0
@@ -227,13 +245,18 @@ function sanitizeInvoicePayload(payload = {}) {
   const taxAmountMyr = lines.reduce((sum, line) => sum + line.tax_amount_myr, 0);
 
   return {
+    purchase_kind: purchaseKind,
     foreign_supplier_id: payload.foreign_supplier_id
       ? Number.parseInt(payload.foreign_supplier_id, 10)
       : null,
     supplier: sanitizeSupplierPayload(payload.supplier || {}),
+    local_supplier_name: normalizeText(payload.local_supplier_name),
     self_billed_no: normalizeText(payload.self_billed_no),
     purchase_date: normalizeText(payload.purchase_date),
-    transaction_type: normalizeText(payload.transaction_type, DEFAULT_TRANSACTION_TYPE),
+    transaction_type: normalizeText(
+      payload.transaction_type,
+      purchaseKind === PURCHASE_KIND_LOCAL ? "Local general purchase" : DEFAULT_TRANSACTION_TYPE
+    ),
     platform: normalizeText(payload.platform),
     order_no: normalizeText(payload.order_no),
     payment_reference: normalizeText(payload.payment_reference),
@@ -241,7 +264,10 @@ function sanitizeInvoicePayload(payload = {}) {
     shipping_number: normalizeText(payload.shipping_number),
     has_supporting_document: Boolean(payload.has_supporting_document),
     supporting_document_notes: normalizeText(payload.supporting_document_notes),
-    currency_code: normalizeUpper(payload.currency_code, DEFAULT_CURRENCY),
+    currency_code: normalizeUpper(
+      payload.currency_code,
+      purchaseKind === PURCHASE_KIND_LOCAL ? "MYR" : DEFAULT_CURRENCY
+    ),
     fx_rate: fxRate,
     total_foreign_amount: totalForeignAmount,
     total_excluding_tax_myr: totalExcludingTaxMyr,
@@ -256,6 +282,9 @@ function sanitizeInvoicePayload(payload = {}) {
 function validateInvoice(input) {
   const errors = [];
   if (!input.purchase_date) errors.push("Purchase date is required");
+  if (input.purchase_kind === PURCHASE_KIND_LOCAL && !input.local_supplier_name) {
+    errors.push("Supplier name is required");
+  }
   if (!input.currency_code) errors.push("Currency is required");
   if (input.fx_rate <= 0) errors.push("FX rate must be greater than zero");
   if (!Array.isArray(input.lines) || input.lines.length === 0) {
@@ -266,12 +295,16 @@ function validateInvoice(input) {
     const label = `Line ${index + 1}`;
     if (!line.description) errors.push(`${label}: description is required`);
     if (line.quantity <= 0) errors.push(`${label}: quantity must be greater than zero`);
-    if (line.amount_foreign <= 0) {
+    if (input.purchase_kind !== PURCHASE_KIND_LOCAL && line.amount_foreign <= 0) {
       errors.push(`${label}: foreign amount must be greater than zero`);
     }
     if (line.amount_myr <= 0) errors.push(`${label}: MYR amount must be greater than zero`);
-    if (!line.classification_code) errors.push(`${label}: classification is required`);
-    if (!line.tax_type) errors.push(`${label}: tax type is required`);
+    if (input.purchase_kind !== PURCHASE_KIND_LOCAL && !line.classification_code) {
+      errors.push(`${label}: classification is required`);
+    }
+    if (input.purchase_kind !== PURCHASE_KIND_LOCAL && !line.tax_type) {
+      errors.push(`${label}: tax type is required`);
+    }
   });
 
   return errors;
@@ -387,7 +420,7 @@ async function getFullInvoice(poolOrClient, id) {
        fs.state_code, fs.country_code, fs.contact_number, fs.email,
        fs.notes AS supplier_notes, fs.is_active AS supplier_is_active
      FROM self_billed_invoices sbi
-     JOIN self_billed_foreign_suppliers fs ON sbi.foreign_supplier_id = fs.id
+     LEFT JOIN self_billed_foreign_suppliers fs ON sbi.foreign_supplier_id = fs.id
      WHERE sbi.id = $1`,
     [id]
   );
@@ -430,8 +463,11 @@ async function getFullInvoice(poolOrClient, id) {
 
   return {
     id: row.id,
+    purchase_kind: row.purchase_kind || PURCHASE_KIND_FOREIGN,
     foreign_supplier_id: row.foreign_supplier_id,
+    local_supplier_name: row.local_supplier_name,
     self_billed_no: row.self_billed_no,
+    purchase_no: row.self_billed_no,
     purchase_date: row.purchase_date,
     transaction_type: row.transaction_type,
     platform: row.platform,
@@ -477,8 +513,8 @@ async function insertLines(client, invoiceId, lines) {
       self_billed_invoice_id, line_number, description, quantity,
       balance_quantity, unit_price_foreign, amount_foreign, amount_myr, classification_code,
       tax_type, tax_rate, tax_amount_myr, tax_exemption_reason,
-      customs_form_reference, notes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      customs_form_reference, general_stock_category_id, notes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
   `;
 
   for (const line of lines) {
@@ -497,6 +533,7 @@ async function insertLines(client, invoiceId, lines) {
       line.tax_amount_myr,
       line.tax_exemption_reason,
       line.customs_form_reference,
+      line.general_stock_category_id,
       line.notes,
     ]);
   }
@@ -527,6 +564,24 @@ export default function (pool, config) {
 
   router.get("/features", (req, res) => {
     res.json({ s3Enabled: isS3ObjectStorageEnabled() });
+  });
+
+  router.get("/init", async (req, res) => {
+    try {
+      const categoriesResult = await pool.query(
+        `SELECT id, name, sort_order, is_active, created_at, updated_at
+         FROM general_stock_categories
+         WHERE is_active = true
+         ORDER BY sort_order ASC, name ASC`
+      );
+      res.json({
+        s3Enabled: isS3ObjectStorageEnabled(),
+        categories: categoriesResult.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching init data:", error);
+      res.status(500).json({ message: "Error fetching init data", error: error.message });
+    }
   });
 
   router.get("/foreign-suppliers", async (req, res) => {
@@ -605,6 +660,7 @@ export default function (pool, config) {
         invoice_status,
         einvoice_status,
         supplier_id,
+        purchase_kind,
         start_date,
         end_date,
         limit = 100,
@@ -614,7 +670,10 @@ export default function (pool, config) {
       const params = [];
       let query = `
         SELECT
-          sbi.id, sbi.self_billed_no, sbi.purchase_date::text AS purchase_date,
+          sbi.id, sbi.self_billed_no, sbi.self_billed_no AS purchase_no,
+          COALESCE(sbi.purchase_kind, '${PURCHASE_KIND_FOREIGN}') AS purchase_kind,
+          sbi.local_supplier_name,
+          sbi.purchase_date::text AS purchase_date,
           sbi.transaction_type, sbi.platform, sbi.order_no, sbi.currency_code,
           sbi.total_foreign_amount, sbi.payable_amount_myr, sbi.uuid,
           sbi.long_id,
@@ -623,9 +682,9 @@ export default function (pool, config) {
           (sbi.supporting_document_s3_key IS NOT NULL) AS has_supporting_document,
           sbi.supporting_document_filename, sbi.supporting_document_content_type,
           sbi.supporting_document_size, sbi.supporting_document_uploaded_at,
-          fs.supplier_name
+          COALESCE(fs.supplier_name, sbi.local_supplier_name) AS supplier_name
         FROM self_billed_invoices sbi
-        JOIN self_billed_foreign_suppliers fs ON sbi.foreign_supplier_id = fs.id
+        LEFT JOIN self_billed_foreign_suppliers fs ON sbi.foreign_supplier_id = fs.id
         WHERE 1=1
       `;
 
@@ -634,9 +693,15 @@ export default function (pool, config) {
         query += ` AND (
           sbi.self_billed_no ILIKE $${params.length}
           OR fs.supplier_name ILIKE $${params.length}
+          OR sbi.local_supplier_name ILIKE $${params.length}
           OR sbi.order_no ILIKE $${params.length}
           OR sbi.platform ILIKE $${params.length}
         )`;
+      }
+
+      if (purchase_kind) {
+        params.push(purchase_kind);
+        query += ` AND COALESCE(sbi.purchase_kind, '${PURCHASE_KIND_FOREIGN}') = $${params.length}`;
       }
 
       const invoiceStatusFilter = invoice_status;
@@ -717,6 +782,17 @@ export default function (pool, config) {
             error: {
               code: "NOT_FOUND",
               message: `Self-billed invoice ${invoiceId} was not found`,
+            },
+          });
+          continue;
+        }
+
+        if (invoice.purchase_kind === PURCHASE_KIND_LOCAL) {
+          validationErrors.push({
+            internalId,
+            error: {
+              code: "LOCAL_PURCHASE",
+              message: "Local general purchases do not require e-invoice submission",
             },
           });
           continue;
@@ -879,22 +955,25 @@ export default function (pool, config) {
       const lines = Array.isArray(req.body?.lines) ? req.body.lines : [];
       for (const line of lines) {
         const balanceQuantity = parseNullableDecimal(line.balance_quantity);
+        const generalStockCategoryId = line.general_stock_category_id
+          ? Number.parseInt(line.general_stock_category_id, 10)
+          : null;
         const lineId = Number.parseInt(line.id, 10);
         const lineNumber = Number.parseInt(line.line_number, 10);
 
         if (Number.isInteger(lineId)) {
           await client.query(
             `UPDATE self_billed_invoice_lines
-             SET balance_quantity = $1
-             WHERE id = $2 AND self_billed_invoice_id = $3`,
-            [balanceQuantity, lineId, req.params.id]
+             SET balance_quantity = $1, general_stock_category_id = $2
+             WHERE id = $3 AND self_billed_invoice_id = $4`,
+            [balanceQuantity, generalStockCategoryId, lineId, req.params.id]
           );
         } else if (Number.isInteger(lineNumber)) {
           await client.query(
             `UPDATE self_billed_invoice_lines
-             SET balance_quantity = $1
-             WHERE self_billed_invoice_id = $2 AND line_number = $3`,
-            [balanceQuantity, req.params.id, lineNumber]
+             SET balance_quantity = $1, general_stock_category_id = $2
+             WHERE self_billed_invoice_id = $3 AND line_number = $4`,
+            [balanceQuantity, generalStockCategoryId, req.params.id, lineNumber]
           );
         }
       }
@@ -1082,13 +1161,300 @@ export default function (pool, config) {
     }
   });
 
+  router.get("/general-stock/categories", async (req, res) => {
+    try {
+      const includeInactive = req.query.include_inactive === "true";
+      const result = await pool.query(
+        `SELECT id, name, sort_order, is_active, created_at, updated_at
+         FROM general_stock_categories
+         WHERE $1::boolean = true OR is_active = true
+         ORDER BY sort_order ASC, name ASC`,
+        [includeInactive]
+      );
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching general stock categories:", error);
+      res.status(500).json({
+        message: "Error fetching general stock categories",
+        error: error.message,
+      });
+    }
+  });
+
+  router.post("/general-stock/categories", async (req, res) => {
+    try {
+      const name = normalizeText(req.body?.name);
+      const sortOrder = Number.parseInt(req.body?.sort_order, 10) || 0;
+      if (!name) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO general_stock_categories (name, sort_order, created_by)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (name)
+         DO UPDATE SET is_active = true, sort_order = EXCLUDED.sort_order,
+                       updated_by = EXCLUDED.created_by, updated_at = CURRENT_TIMESTAMP
+         RETURNING id, name, sort_order, is_active, created_at, updated_at`,
+        [name, sortOrder, req.staffId || null]
+      );
+
+      res.status(201).json({ message: "General stock category saved", category: result.rows[0] });
+    } catch (error) {
+      console.error("Error saving general stock category:", error);
+      res.status(500).json({
+        message: "Error saving general stock category",
+        error: error.message,
+      });
+    }
+  });
+
+  router.put("/general-stock/categories/:categoryId", async (req, res) => {
+    try {
+      const name = normalizeText(req.body?.name);
+      const sortOrder = Number.parseInt(req.body?.sort_order, 10) || 0;
+      const isActive = req.body?.is_active !== undefined ? Boolean(req.body.is_active) : true;
+      if (!name) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+
+      const result = await pool.query(
+        `UPDATE general_stock_categories
+         SET name = $1, sort_order = $2, is_active = $3,
+             updated_by = $4, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5
+         RETURNING id, name, sort_order, is_active, created_at, updated_at`,
+        [name, sortOrder, isActive, req.staffId || null, req.params.categoryId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "General stock category not found" });
+      }
+
+      res.json({ message: "General stock category updated", category: result.rows[0] });
+    } catch (error) {
+      console.error("Error updating general stock category:", error);
+      res.status(500).json({
+        message: "Error updating general stock category",
+        error: error.message,
+      });
+    }
+  });
+
+  router.delete("/general-stock/categories/:categoryId", async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE general_stock_categories
+         SET is_active = false, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2
+         RETURNING id`,
+        [req.staffId || null, req.params.categoryId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "General stock category not found" });
+      }
+
+      res.json({ message: "General stock category archived" });
+    } catch (error) {
+      console.error("Error archiving general stock category:", error);
+      res.status(500).json({
+        message: "Error archiving general stock category",
+        error: error.message,
+      });
+    }
+  });
+
+  router.get("/general-stock", async (req, res) => {
+    try {
+      const [result, categoriesResult] = await Promise.all([
+        pool.query(
+          `WITH adjustment_totals AS (
+             SELECT
+               self_billed_invoice_line_id,
+               SUM(adjustment_quantity) AS adjustment_quantity
+             FROM general_stock_adjustments
+             GROUP BY self_billed_invoice_line_id
+           ),
+           used_adjustments AS (
+             SELECT
+               self_billed_invoice_line_id,
+               json_agg(
+                 json_build_object(
+                   'id', id,
+                   'adjustment_date', adjustment_date::text,
+                   'adjustment_quantity', adjustment_quantity,
+                   'notes', notes,
+                   'created_at', created_at
+                 )
+                 ORDER BY created_at DESC, id DESC
+               ) FILTER (WHERE adjustment_quantity < 0) AS used_adjustments
+             FROM general_stock_adjustments
+             GROUP BY self_billed_invoice_line_id
+           )
+           SELECT
+             sbil.id AS line_id,
+             sbil.self_billed_invoice_id,
+             sbil.line_number,
+             sbil.description,
+             sbil.balance_quantity,
+             sbil.amount_myr,
+             sbil.general_stock_category_id,
+             COALESCE(gsc.name, 'Uncategorised') AS category_name,
+             COALESCE(gsc.sort_order, 9999) AS category_sort_order,
+             sbi.self_billed_no AS purchase_no,
+             sbi.purchase_date::text AS purchase_date,
+             COALESCE(sbi.purchase_kind, '${PURCHASE_KIND_FOREIGN}') AS purchase_kind,
+             COALESCE(fs.supplier_name, sbi.local_supplier_name) AS supplier_name,
+             COALESCE(at.adjustment_quantity, 0) AS adjustment_quantity,
+             COALESCE(sbil.balance_quantity, 0) + COALESCE(at.adjustment_quantity, 0) AS current_stock,
+             COALESCE(ua.used_adjustments, '[]'::json) AS used_adjustments
+           FROM self_billed_invoice_lines sbil
+           JOIN self_billed_invoices sbi ON sbi.id = sbil.self_billed_invoice_id
+           LEFT JOIN self_billed_foreign_suppliers fs ON fs.id = sbi.foreign_supplier_id
+           LEFT JOIN general_stock_categories gsc ON gsc.id = sbil.general_stock_category_id
+           LEFT JOIN adjustment_totals at ON at.self_billed_invoice_line_id = sbil.id
+           LEFT JOIN used_adjustments ua ON ua.self_billed_invoice_line_id = sbil.id
+           WHERE sbil.balance_quantity IS NOT NULL
+              OR sbil.general_stock_category_id IS NOT NULL
+           ORDER BY COALESCE(gsc.sort_order, 9999), COALESCE(gsc.name, 'Uncategorised'),
+                    sbi.purchase_date DESC, sbi.id DESC, sbil.line_number ASC`
+        ),
+        pool.query(
+          `SELECT id, name, sort_order, is_active, created_at, updated_at
+           FROM general_stock_categories
+           WHERE is_active = true
+           ORDER BY sort_order ASC, name ASC`
+        ),
+      ]);
+
+      res.json({ rows: result.rows, categories: categoriesResult.rows });
+    } catch (error) {
+      console.error("Error fetching general stock:", error);
+      res.status(500).json({
+        message: "Error fetching general stock",
+        error: error.message,
+      });
+    }
+  });
+
+  router.post("/general-stock/adjustments", async (req, res) => {
+    const adjustments = Array.isArray(req.body?.adjustments)
+      ? req.body.adjustments
+      : [];
+
+    if (adjustments.length === 0) {
+      return res.status(400).json({ message: "At least one adjustment is required" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      let insertedCount = 0;
+      let balanceUpdateCount = 0;
+
+      for (const adjustment of adjustments) {
+        const lineId = Number.parseInt(adjustment.self_billed_invoice_line_id || adjustment.line_id, 10);
+        const categoryId = adjustment.general_stock_category_id
+          ? Number.parseInt(adjustment.general_stock_category_id, 10)
+          : null;
+        const adjustmentQuantity = parseDecimal(adjustment.adjustment_quantity, 0);
+        const notes = normalizeText(adjustment.notes);
+
+        if (!Number.isInteger(lineId) || adjustmentQuantity === 0) continue;
+
+        const lineResult = await client.query(
+          `SELECT id, general_stock_category_id
+           FROM self_billed_invoice_lines
+           WHERE id = $1`,
+          [lineId]
+        );
+        if (lineResult.rows.length === 0) continue;
+
+        const finalCategoryId = categoryId || lineResult.rows[0].general_stock_category_id;
+
+        if (adjustmentQuantity > 0) {
+          await client.query(
+            `UPDATE self_billed_invoice_lines
+             SET balance_quantity = COALESCE(balance_quantity, 0) + $1,
+                 general_stock_category_id = COALESCE($2, general_stock_category_id)
+             WHERE id = $3`,
+            [adjustmentQuantity, finalCategoryId, lineId]
+          );
+          balanceUpdateCount++;
+        } else {
+          await client.query(
+            `INSERT INTO general_stock_adjustments (
+               self_billed_invoice_line_id, general_stock_category_id,
+               adjustment_quantity, notes, created_by
+             ) VALUES ($1, $2, $3, $4, $5)`,
+            [lineId, finalCategoryId, adjustmentQuantity, notes, req.staffId || null]
+          );
+          insertedCount++;
+        }
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "General stock adjustments saved",
+        inserted: insertedCount,
+        balance_updates: balanceUpdateCount,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving general stock adjustments:", error);
+      res.status(500).json({
+        message: "Error saving general stock adjustments",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  router.delete("/general-stock/adjustments/:adjustmentId", async (req, res) => {
+    try {
+      const result = await pool.query(
+        `DELETE FROM general_stock_adjustments
+         WHERE id = $1 AND adjustment_quantity < 0
+         RETURNING id`,
+        [req.params.adjustmentId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Used adjustment not found" });
+      }
+
+      res.json({ message: "Used adjustment reverted" });
+    } catch (error) {
+      console.error("Error reverting general stock adjustment:", error);
+      res.status(500).json({
+        message: "Error reverting general stock adjustment",
+        error: error.message,
+      });
+    }
+  });
+
   router.get("/:id", async (req, res) => {
     try {
-      const invoice = await getFullInvoice(pool, req.params.id);
+      const [invoice, categoriesResult] = await Promise.all([
+        getFullInvoice(pool, req.params.id),
+        pool.query(
+          `SELECT id, name, sort_order, is_active, created_at, updated_at
+           FROM general_stock_categories
+           WHERE is_active = true
+           ORDER BY sort_order ASC, name ASC`
+        ),
+      ]);
       if (!invoice) {
         return res.status(404).json({ message: "Self-billed invoice not found" });
       }
-      res.json(invoice);
+      res.json({
+        invoice,
+        s3Enabled: isS3ObjectStorageEnabled(),
+        categories: categoriesResult.rows,
+      });
     } catch (error) {
       console.error("Error fetching self-billed invoice:", error);
       res.status(500).json({
@@ -1101,7 +1467,7 @@ export default function (pool, config) {
   router.post("/", async (req, res) => {
     const input = sanitizeInvoicePayload(req.body);
     const validationErrors = [
-      ...validateSupplier(input.supplier),
+      ...(input.purchase_kind === PURCHASE_KIND_FOREIGN ? validateSupplier(input.supplier) : []),
       ...validateInvoice(input),
     ];
 
@@ -1113,14 +1479,16 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
       const supplier =
-        input.foreign_supplier_id && !input.supplier.supplier_name
+        input.purchase_kind === PURCHASE_KIND_LOCAL
+          ? { id: null }
+          : input.foreign_supplier_id && !input.supplier.supplier_name
           ? { id: input.foreign_supplier_id }
           : await upsertSupplier(client, {
               ...input.supplier,
               id: input.foreign_supplier_id || input.supplier.id,
             });
       const supplierId = supplier.id || input.foreign_supplier_id;
-      const selfBilledNo = await generateSelfBilledNo(client);
+      const selfBilledNo = await generatePurchaseNo(client, input.purchase_kind);
 
       const duplicateResult = await client.query(
         "SELECT 1 FROM self_billed_invoices WHERE self_billed_no = $1",
@@ -1135,7 +1503,8 @@ export default function (pool, config) {
 
       const invoiceResult = await client.query(
         `INSERT INTO self_billed_invoices (
-           foreign_supplier_id, self_billed_no, purchase_date, transaction_type,
+           purchase_kind, foreign_supplier_id, local_supplier_name,
+           self_billed_no, purchase_date, transaction_type,
            platform, order_no, payment_reference, shipping_method,
            shipping_number, has_supporting_document, supporting_document_notes,
            currency_code, fx_rate,
@@ -1143,11 +1512,13 @@ export default function (pool, config) {
            total_including_tax_myr, payable_amount_myr, notes, created_by
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-           $13, $14, $15, $16, $17, $18, $19, $20
+           $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
          )
         RETURNING id`,
         [
+          input.purchase_kind,
           supplierId,
+          input.local_supplier_name,
           selfBilledNo,
           input.purchase_date,
           input.transaction_type,
@@ -1175,8 +1546,8 @@ export default function (pool, config) {
       await client.query("COMMIT");
 
       res.status(201).json({
-        message: "Self-billed invoice created successfully",
-        invoice: { id: invoiceId, self_billed_no: selfBilledNo },
+        message: "General purchase created successfully",
+        invoice: { id: invoiceId, self_billed_no: selfBilledNo, purchase_no: selfBilledNo },
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -1192,7 +1563,7 @@ export default function (pool, config) {
   router.put("/:id", async (req, res) => {
     const input = sanitizeInvoicePayload(req.body);
     const validationErrors = [
-      ...validateSupplier(input.supplier),
+      ...(input.purchase_kind === PURCHASE_KIND_FOREIGN ? validateSupplier(input.supplier) : []),
       ...validateInvoice(input),
     ];
 
@@ -1216,24 +1587,30 @@ export default function (pool, config) {
         });
       }
 
-      const supplier = await upsertSupplier(client, {
-        ...input.supplier,
-        id: input.foreign_supplier_id || input.supplier.id || existing.foreign_supplier_id,
-      });
+      const supplier =
+        input.purchase_kind === PURCHASE_KIND_LOCAL
+          ? { id: null }
+          : await upsertSupplier(client, {
+              ...input.supplier,
+              id: input.foreign_supplier_id || input.supplier.id || existing.foreign_supplier_id,
+            });
 
       await client.query(
         `UPDATE self_billed_invoices
-         SET foreign_supplier_id = $1, self_billed_no = $2, purchase_date = $3,
-             transaction_type = $4, platform = $5, order_no = $6,
-             payment_reference = $7, shipping_method = $8, shipping_number = $9,
-             has_supporting_document = $10, supporting_document_notes = $11,
-             currency_code = $12, fx_rate = $13, total_foreign_amount = $14,
-             total_excluding_tax_myr = $15, tax_amount_myr = $16,
-             total_including_tax_myr = $17, payable_amount_myr = $18,
-             notes = $19, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $20`,
+         SET purchase_kind = $1, foreign_supplier_id = $2, local_supplier_name = $3,
+             self_billed_no = $4, purchase_date = $5,
+             transaction_type = $6, platform = $7, order_no = $8,
+             payment_reference = $9, shipping_method = $10, shipping_number = $11,
+             has_supporting_document = $12, supporting_document_notes = $13,
+             currency_code = $14, fx_rate = $15, total_foreign_amount = $16,
+             total_excluding_tax_myr = $17, tax_amount_myr = $18,
+             total_including_tax_myr = $19, payable_amount_myr = $20,
+             notes = $21, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $22`,
         [
+          input.purchase_kind,
           supplier.id,
+          input.local_supplier_name,
           existing.self_billed_no,
           input.purchase_date,
           input.transaction_type,
@@ -1327,6 +1704,11 @@ export default function (pool, config) {
       const invoice = await getFullInvoice(pool, req.params.id);
       if (!invoice) {
         return res.status(404).json({ message: "Self-billed invoice not found" });
+      }
+      if (invoice.purchase_kind === PURCHASE_KIND_LOCAL) {
+        return res.status(400).json({
+          message: "Local general purchases do not require e-invoice submission",
+        });
       }
       if (isLockedInvoice(invoice)) {
         return res.status(400).json({

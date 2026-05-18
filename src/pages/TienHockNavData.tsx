@@ -33,13 +33,14 @@ import SuppliersListPage from "./Accounting/Purchases/SuppliersListPage";
 import SupplierFormPage from "./Accounting/Purchases/SupplierFormPage";
 import MaterialPurchaseListPage from "./Accounting/Purchases/MaterialPurchaseListPage";
 import MaterialPurchaseFormPage from "./Accounting/Purchases/MaterialPurchaseFormPage";
-import SelfBilledInvoiceListPage from "./Accounting/Purchases/SelfBilledInvoiceListPage";
-import SelfBilledInvoiceFormPage from "./Accounting/Purchases/SelfBilledInvoiceFormPage";
+import GeneralPurchaseInvoiceListPage from "./Accounting/Purchases/GeneralPurchaseInvoiceListPage";
+import GeneralPurchaseInvoiceFormPage from "./Accounting/Purchases/GeneralPurchaseInvoiceFormPage";
+import LocalGeneralPurchaseFormPage from "./Accounting/Purchases/LocalGeneralPurchaseFormPage";
 
 // Stock - Materials
 import MaterialsListPage from "./Stock/Materials/MaterialsListPage";
 import MaterialFormPage from "./Stock/Materials/MaterialFormPage";
-import MaterialStockEntryPage from "./Stock/Materials/MaterialStockEntryPage";
+import MaterialAndGeneralStockPage from "./Stock/Materials/MaterialAndGeneralStockPage";
 
 // Invoice related imports
 import InvoiceListPage from "./Invoice/InvoiceListPage";
@@ -52,8 +53,8 @@ import SalesSummaryPage from "./Sales/SalesSummaryPage";
 
 // Stock related imports
 import ProductionEntryPage from "./Stock/ProductionEntryPage";
-import StockMovementPage from "./Stock/StockMovementPage";
-import StockAdjustmentEntryPage from "./Stock/StockAdjustmentEntryPage";
+import ProductStockMovementPage from "./Stock/ProductStockMovementPage";
+import ProductStockAdjustmentEntryPage from "./Stock/ProductStockAdjustmentEntryPage";
 
 // Payroll - DailyLog
 import DailyLogListPage from "./Payroll/DailyLog/DailyLogListPage";
@@ -335,24 +336,6 @@ export const TienHockNavData: SidebarItem[] = [
         component: VoucherGeneratorPage,
       },
       {
-        name: "Self-Billed E-Invoices",
-        path: "/accounting/self-billed-invoices",
-        component: SelfBilledInvoiceListPage,
-        subItems: [
-          {
-            name: "New Self-Billed",
-            path: "/accounting/self-billed-invoices/new",
-            component: SelfBilledInvoiceFormPage,
-            showInPopover: true,
-          },
-          {
-            name: "Edit Self-Billed",
-            path: "/accounting/self-billed-invoices/:id",
-            component: SelfBilledInvoiceFormPage,
-          },
-        ],
-      },
-      {
         name: "Account Mappings",
         path: "/accounting/location-account-mappings",
         component: LocationAccountMappingsPage,
@@ -443,9 +426,38 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Stock",
+        name: "General Purchases",
+        path: "/stock/general-purchases",
+        component: GeneralPurchaseInvoiceListPage,
+        subItems: [
+          {
+            name: "New Local Purchase",
+            path: "/stock/general-purchases/new/local",
+            component: LocalGeneralPurchaseFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "New Foreign Self-Billed",
+            path: "/stock/general-purchases/new/foreign",
+            component: GeneralPurchaseInvoiceFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Edit Local Purchase",
+            path: "/stock/general-purchases/local/:id",
+            component: LocalGeneralPurchaseFormPage,
+          },
+          {
+            name: "Edit General Purchase",
+            path: "/stock/general-purchases/:id",
+            component: GeneralPurchaseInvoiceFormPage,
+          },
+        ],
+      },
+      {
+        name: "General Stock",
         path: "/stock/entry",
-        component: MaterialStockEntryPage,
+        component: MaterialAndGeneralStockPage,
       },
       {
         name: "Production Entry",
@@ -453,14 +465,14 @@ export const TienHockNavData: SidebarItem[] = [
         component: ProductionEntryPage,
       },
       {
-        name: "Product Movement",
+        name: "Product Stock",
         path: "/stock/movement",
-        component: StockMovementPage,
+        component: ProductStockMovementPage,
       },
       {
         name: "Product Adjustments",
         path: "/stock/adjustments",
-        component: StockAdjustmentEntryPage,
+        component: ProductStockAdjustmentEntryPage,
       },
     ],
   },

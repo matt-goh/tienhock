@@ -1,9 +1,9 @@
-// src/pages/Stock/StockMovementPage.tsx
+// src/pages/Stock/ProductStockMovementPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
-import StockMovementTable from "../../components/Stock/StockMovementTable";
+import ProductStockMovementTable from "../../components/Stock/ProductStockMovementTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import {
   StockMovement,
@@ -29,7 +29,7 @@ const STOCK_SYSTEM_START_DATE_STRING = "2026-01-01";
 
 type ViewType = "month" | "rolling" | "custom";
 
-const StockMovementPage: React.FC = () => {
+const ProductStockMovementPage: React.FC = () => {
   // State
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     null
@@ -567,7 +567,7 @@ const StockMovementPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <StockMovementTable
+        <ProductStockMovementTable
           movements={movements}
           monthlyTotals={monthlyTotals || undefined}
           isLoading={isLoading}
@@ -578,4 +578,4 @@ const StockMovementPage: React.FC = () => {
   );
 };
 
-export default StockMovementPage;
+export default ProductStockMovementPage;
