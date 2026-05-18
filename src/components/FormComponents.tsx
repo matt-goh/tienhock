@@ -454,29 +454,42 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
                       { active, selected } // `selected` indicates if the option matches the Combobox's value
                     ) => (
                       <>
-                        <div className="flex justify-between items-center w-full mr-5">
-                          {/* Name */}
-                          <span
-                            className={clsx(
-                              "block truncate",
-                              selected ? "font-medium" : "font-normal"
-                            )}
-                          >
-                            {option.name}
-                          </span>
-                          {/* Phone number (conditional) */}
-                          {option.phone_number && (
+                        <div className="w-full mr-5">
+                          <div className="flex justify-between items-center w-full">
+                            {/* Name */}
                             <span
                               className={clsx(
-                                "text-xs ml-2 flex-shrink-0 flex items-center",
+                                "block truncate",
+                                selected ? "font-medium" : "font-normal"
+                              )}
+                            >
+                              {option.name}
+                            </span>
+                            {/* Phone number (conditional) */}
+                            {option.phone_number && (
+                              <span
+                                className={clsx(
+                                  "text-xs ml-2 flex-shrink-0 flex items-center",
+                                  active ? "text-sky-700 dark:text-sky-300" : "text-gray-500 dark:text-gray-400"
+                                )}
+                              >
+                                <IconPhone
+                                  size={14}
+                                  className="inline mr-1 relative -top-[1px]"
+                                />
+                                {option.phone_number}
+                              </span>
+                            )}
+                          </div>
+                          {/* Job (conditional) */}
+                          {option.job && (
+                            <span
+                              className={clsx(
+                                "block text-xs mt-0.5 truncate",
                                 active ? "text-sky-700 dark:text-sky-300" : "text-gray-500 dark:text-gray-400"
                               )}
                             >
-                              <IconPhone
-                                size={14}
-                                className="inline mr-1 relative -top-[1px]"
-                              />
-                              {option.phone_number}
+                              {option.job}
                             </span>
                           )}
                         </div>
