@@ -123,6 +123,8 @@ export default function (pool) {
           mwle.*,
           CAST(mwle.total_hours AS NUMERIC(10, 2)) as total_hours,
           CAST(mwle.overtime_hours AS NUMERIC(10, 2)) as overtime_hours,
+          CAST(mwle.ahad_hours AS NUMERIC(10, 2)) as ahad_hours,
+          CAST(mwle.umum_hours AS NUMERIC(10, 2)) as umum_hours,
           s.name as employee_name,
           j.name as job_name
         FROM monthly_work_log_entries mwle
@@ -155,6 +157,8 @@ export default function (pool) {
             ...entry,
             total_hours: parseFloat(entry.total_hours),
             overtime_hours: parseFloat(entry.overtime_hours),
+            ahad_hours: parseFloat(entry.ahad_hours || 0),
+            umum_hours: parseFloat(entry.umum_hours || 0),
             activities: activitiesResult.rows.map((activity) => ({
               ...activity,
               hours_applied: activity.hours_applied
@@ -267,13 +271,13 @@ export default function (pool) {
 
       // Insert employee entries and activities
       for (const entry of employeeEntries) {
-        const { employeeId, jobType, totalHours, overtimeHours, activities } = entry;
+        const { employeeId, jobType, totalHours, overtimeHours, ahadHours, umumHours, activities } = entry;
 
         // Insert employee entry
         const entryQuery = `
           INSERT INTO monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5)
+            monthly_log_id, employee_id, job_id, total_hours, overtime_hours, ahad_hours, umum_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
         `;
 
@@ -283,6 +287,8 @@ export default function (pool) {
           jobType,
           totalHours,
           overtimeHours || 0,
+          ahadHours || 0,
+          umumHours || 0,
         ]);
 
         const entryId = entryResult.rows[0].id;
@@ -423,12 +429,12 @@ export default function (pool) {
 
       // Insert updated employee entries and activities
       for (const entry of employeeEntries) {
-        const { employeeId, jobType, totalHours, overtimeHours, activities } = entry;
+        const { employeeId, jobType, totalHours, overtimeHours, ahadHours, umumHours, activities } = entry;
 
         const entryQuery = `
           INSERT INTO monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5)
+            monthly_log_id, employee_id, job_id, total_hours, overtime_hours, ahad_hours, umum_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
         `;
 
@@ -438,6 +444,8 @@ export default function (pool) {
           jobType,
           totalHours,
           overtimeHours || 0,
+          ahadHours || 0,
+          umumHours || 0,
         ]);
 
         const entryId = entryResult.rows[0].id;

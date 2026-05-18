@@ -458,6 +458,9 @@ export default function (pool) {
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', mwla.rate_used,
+              'rate_biasa', pc.rate_biasa,
+              'rate_ahad', pc.rate_ahad,
+              'rate_umum', pc.rate_umum,
               'hours_applied', mwla.hours_applied,
               'calculated_amount', mwla.calculated_amount
             )) as activities
@@ -606,12 +609,36 @@ export default function (pool) {
           const qty = activity.rate_unit === "Hour"
             ? parseFloat(activity.hours_applied) || 0
             : 1;
+          // Append day-type suffix when activity's rate matches Ahad/Umum rate
+          // (handles Base+Hour pay codes split across Biasa/Ahad/Umum variants)
+          let description = activity.description || "";
+          const rateUsed = parseFloat(activity.rate_used) || 0;
+          const rateBiasa = parseFloat(activity.rate_biasa) || 0;
+          const rateAhad = parseFloat(activity.rate_ahad) || 0;
+          const rateUmum = parseFloat(activity.rate_umum) || 0;
+          if (
+            activity.pay_type === "Base" &&
+            activity.rate_unit === "Hour" &&
+            rateAhad > 0 &&
+            Math.abs(rateUsed - rateAhad) < 0.001 &&
+            Math.abs(rateAhad - rateBiasa) > 0.001
+          ) {
+            description = `${description} (Ahad)`;
+          } else if (
+            activity.pay_type === "Base" &&
+            activity.rate_unit === "Hour" &&
+            rateUmum > 0 &&
+            Math.abs(rateUsed - rateUmum) < 0.001 &&
+            Math.abs(rateUmum - rateBiasa) > 0.001
+          ) {
+            description = `${description} (Umum)`;
+          }
           // Each activity becomes a separate item with source tracking
           workLogsByEmployeeJob[key].items.push({
             pay_code_id: activity.pay_code_id,
-            description: activity.description || "",
+            description,
             pay_type: activity.pay_type || "Tambahan",
-            rate: parseFloat(activity.rate_used) || 0,
+            rate: rateUsed,
             rate_unit: activity.rate_unit || "Fixed",
             quantity: qty,
             amount: parseFloat(activity.calculated_amount) || 0,
