@@ -114,7 +114,7 @@ const HolidayCalendarPage: React.FC = () => {
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <div className="relative overflow-hidden">
-            <div className="max-h-[620px] overflow-y-auto">
+            <div>
               <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                 <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>

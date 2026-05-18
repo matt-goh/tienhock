@@ -47,16 +47,15 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (holiday) {
-        // When editing, format the date correctly for the date input
-        const date = new Date(holiday.holiday_date);
         setFormData({
-          holiday_date: date.toISOString().split("T")[0],
+          holiday_date: holiday.holiday_date,
           description: holiday.description || "",
         });
       } else {
-        // When adding, set today's date as default
+        const today = new Date();
+        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
         setFormData({
-          holiday_date: new Date().toISOString().split("T")[0],
+          holiday_date: localDate,
           description: "",
         });
       }

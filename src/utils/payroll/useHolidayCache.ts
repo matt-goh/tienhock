@@ -15,7 +15,7 @@ interface CachedHolidays {
   timestamp: number;
 }
 
-const CACHE_KEY = "holidays_cache";
+const CACHE_KEY = "holidays_cache_v2";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const HOLIDAYS_UPDATED_EVENT = "holidays-updated";
 
