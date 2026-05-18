@@ -27,7 +27,6 @@ import MonthNavigator from "../../../components/MonthNavigator";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 
-// Stock Kilang item from products/stock movements
 interface StockKilangItem {
   product_id: string;
   name: string;
@@ -36,75 +35,117 @@ interface StockKilangItem {
   closing_value: number;
 }
 
-// Category labels (stock_kilang comes from products, not materials table)
+interface StockResponse {
+  year: number;
+  month: number;
+  product_line: ProductLine;
+  materials: MaterialWithStock[];
+}
+
+type EditableStockField = "adjustment_quantity" | "unit_cost";
+type NewVariantField = "variant_name" | EditableStockField;
+
 const categoryLabels: Record<MaterialCategory, string> = {
   ingredient: "Ingredients",
   raw_material: "Raw Materials",
   packing_material: "Packing Materials",
 };
 
-// Category order (stock_kilang handled separately from products)
 const categoryOrder: MaterialCategory[] = [
   "ingredient",
   "raw_material",
   "packing_material",
 ];
 
+const stockTabs: { id: ProductLine; label: string; activeClass: string }[] = [
+  { id: "mee", label: "MEE", activeClass: "bg-sky-500 text-white shadow-sm" },
+  { id: "bihun", label: "BIHUN", activeClass: "bg-amber-500 text-white shadow-sm" },
+  { id: "shared", label: "SHARED", activeClass: "bg-teal-500 text-white shadow-sm" },
+];
+
+const makeNumber = (value: number | string | null | undefined): number => {
+  return parseFloat(String(value ?? "")) || 0;
+};
+
+const recalculateStock = <T extends StockEntryRow | MaterialWithStock>(
+  item: T,
+  adjustmentQuantity: number,
+  unitCost: number
+): T => {
+  const adjustmentValue = adjustmentQuantity * unitCost;
+  const closingQuantity =
+    item.opening_quantity + item.purchase_quantity + adjustmentQuantity;
+  const closingValue = item.opening_value + item.purchase_value + adjustmentValue;
+
+  return {
+    ...item,
+    adjustment_quantity: adjustmentQuantity,
+    adjustment_value: adjustmentValue,
+    closing_quantity: closingQuantity,
+    closing_value: closingValue,
+    quantity: adjustmentQuantity,
+    value: closingValue,
+    unit_cost: unitCost,
+  } as T;
+};
+
+const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
+  entry_id: null,
+  variant_id: null,
+  variant_name: "",
+  custom_description: null,
+  is_new_variant: true,
+  opening_quantity: 0,
+  opening_value: 0,
+  purchase_quantity: 0,
+  purchase_value: 0,
+  adjustment_quantity: 0,
+  adjustment_value: 0,
+  closing_quantity: 0,
+  closing_value: 0,
+  quantity: 0,
+  value: 0,
+  unit_cost: defaultUnitCost,
+  notes: null,
+});
+
 const MaterialStockEntryPage: React.FC = () => {
-  // Month selection state
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
-
-  // Tab state
   const [activeTab, setActiveTab] = useState<ProductLine>("mee");
-
-  // Materials state
   const [materials, setMaterials] = useState<MaterialWithStock[]>([]);
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Stock Kilang state (from products)
   const [stockKilang, setStockKilang] = useState<StockKilangItem[]>([]);
   const [isLoadingStockKilang, setIsLoadingStockKilang] = useState(false);
-
-  // Variant expansion state (tracks which materials are expanded to show variants)
   const [expandedMaterials, setExpandedMaterials] = useState<Set<number>>(new Set());
-
-  // New variant row state (tracks materials with a new ad-hoc variant being added)
   const [newVariantRows, setNewVariantRows] = useState<Map<number, StockEntryRow>>(new Map());
-
-  // Collapse all toggle state
   const [allCollapsed, setAllCollapsed] = useState(false);
 
-  // Get products for stock kilang (MEE or BH based on active tab)
-  const productType = activeTab === "mee" ? "mee" : "bh";
+  const productType = activeTab === "bihun" ? "bh" : "mee";
   const { products, isLoading: isLoadingProducts } = useProductsCache(productType);
 
-  // Get year and month from selected date
   const year = selectedMonth.getFullYear();
-  const month = selectedMonth.getMonth() + 1; // 1-12
+  const month = selectedMonth.getMonth() + 1;
 
-  // Fetch materials with stock data
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.get(
+      const response = (await api.get(
         `/api/materials/stock/with-opening?year=${year}&month=${month}&product_line=${activeTab}`
-      );
+      )) as StockResponse;
 
       const data = response.materials || [];
       setMaterials(data);
-      setOriginalMaterials(JSON.parse(JSON.stringify(data))); // Deep copy
+      setOriginalMaterials(JSON.parse(JSON.stringify(data)));
 
-      // Auto-expand materials that have variants
       const materialsWithVariants = data
-        .filter((m: MaterialWithStock) => m.has_variants && m.variants && m.variants.length > 0)
-        .map((m: MaterialWithStock) => m.id);
-      setExpandedMaterials(new Set(materialsWithVariants));
+        .filter((material: MaterialWithStock) => material.has_variants && material.variants && material.variants.length > 0)
+        .map((material: MaterialWithStock) => material.id);
 
-      // Clear new variant rows on data refresh
+      setExpandedMaterials(new Set(materialsWithVariants));
       setNewVariantRows(new Map());
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching materials:", error);
       toast.error("Failed to load materials data");
       setMaterials([]);
@@ -114,45 +155,40 @@ const MaterialStockEntryPage: React.FC = () => {
     }
   }, [year, month, activeTab]);
 
-  // Fetch data when month or tab changes
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Fetch Stock Kilang data from products using batch endpoint (more efficient)
   useEffect(() => {
-    const fetchStockKilang = async () => {
-      if (products.length === 0 || isLoadingProducts) return;
+    const fetchStockKilang = async (): Promise<void> => {
+      if (activeTab === "shared" || products.length === 0 || isLoadingProducts) {
+        setStockKilang([]);
+        return;
+      }
 
       setIsLoadingStockKilang(true);
       try {
-        // Get product IDs as comma-separated string
-        const productIds = products.map((p) => p.id).join(",");
-
-        // Fetch closing balances in a single API call
+        const productIds = products.map((product) => product.id).join(",");
         const response = await api.get(
           `/api/stock/closing-batch?product_ids=${productIds}&year=${year}&month=${month}`
         );
+        const closingBalances: Record<string, number> = response.closing_balances || {};
 
-        const closingBalances = response.closing_balances || {};
-
-        // Build stock data from products and closing balances
         const stockData: StockKilangItem[] = products.map((product) => {
           const closingQty = closingBalances[product.id] || 0;
-          const price = parseFloat(String(product.price_per_unit)) || 0;
+          const price = makeNumber(product.price_per_unit);
 
           return {
             product_id: product.id,
             name: product.description,
-            price: price,
+            price,
             closing_quantity: closingQty,
             closing_value: closingQty * price,
           };
         });
 
-        // Filter out items with zero closing quantity
         setStockKilang(stockData.filter((item) => item.closing_quantity > 0));
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error fetching stock kilang:", error);
         setStockKilang([]);
       } finally {
@@ -161,9 +197,8 @@ const MaterialStockEntryPage: React.FC = () => {
     };
 
     fetchStockKilang();
-  }, [products, isLoadingProducts, year, month]);
+  }, [activeTab, products, isLoadingProducts, year, month]);
 
-  // Group materials by category
   const groupedMaterials = useMemo(() => {
     const groups: Record<MaterialCategory, MaterialWithStock[]> = {
       ingredient: [],
@@ -171,56 +206,50 @@ const MaterialStockEntryPage: React.FC = () => {
       packing_material: [],
     };
 
-    materials.forEach((m) => {
-      if (groups[m.category]) {
-        groups[m.category].push(m);
+    materials.forEach((material) => {
+      if (groups[material.category]) {
+        groups[material.category].push(material);
       }
     });
 
     return groups;
   }, [materials]);
 
-  // Calculate if there are unsaved changes (compare by material ID)
   const hasUnsavedChanges = useMemo(() => {
-    // Check if there are new variant rows with data
-    if (newVariantRows.size > 0) {
-      for (const row of newVariantRows.values()) {
-        if (row.variant_name?.trim() || row.quantity > 0 || row.unit_cost > 0) {
-          return true;
-        }
+    for (const row of newVariantRows.values()) {
+      if (row.variant_name?.trim() || row.adjustment_quantity !== 0 || row.unit_cost !== 0) {
+        return true;
       }
     }
 
     if (materials.length !== originalMaterials.length) return true;
 
-    // Create a map of original materials by ID for faster lookup
-    const originalMap = new Map(
-      originalMaterials.map((m) => [m.id, m])
-    );
+    const originalMap = new Map(originalMaterials.map((material) => [material.id, material]));
 
     for (const current of materials) {
       const original = originalMap.get(current.id);
-
-      // If material doesn't exist in original, there's a change
       if (!original) return true;
 
-      // Check non-variant material fields
       if (
-        current.quantity !== original.quantity ||
+        current.adjustment_quantity !== original.adjustment_quantity ||
         current.unit_cost !== original.unit_cost
       ) {
         return true;
       }
 
-      // Check variant fields
       if (current.has_variants && current.variants && original.variants) {
-        for (const cv of current.variants) {
-          const ov = original.variants.find((v) => v.variant_id === cv.variant_id);
-          if (!ov) return true;
+        for (const currentVariant of current.variants) {
+          const originalVariant = original.variants.find(
+            (variant) =>
+              variant.variant_id === currentVariant.variant_id &&
+              variant.variant_name === currentVariant.variant_name
+          );
+
+          if (!originalVariant) return true;
+
           if (
-            cv.quantity !== ov.quantity ||
-            cv.unit_cost !== ov.unit_cost ||
-            cv.variant_name !== ov.variant_name
+            currentVariant.adjustment_quantity !== originalVariant.adjustment_quantity ||
+            currentVariant.unit_cost !== originalVariant.unit_cost
           ) {
             return true;
           }
@@ -231,8 +260,7 @@ const MaterialStockEntryPage: React.FC = () => {
     return false;
   }, [materials, originalMaterials, newVariantRows]);
 
-  // Toggle material expansion
-  const toggleMaterialExpansion = (materialId: number) => {
+  const toggleMaterialExpansion = (materialId: number): void => {
     setExpandedMaterials((prev) => {
       const next = new Set(prev);
       if (next.has(materialId)) {
@@ -244,48 +272,30 @@ const MaterialStockEntryPage: React.FC = () => {
     });
   };
 
-  // Toggle all materials expansion
-  const toggleAllExpansion = () => {
+  const toggleAllExpansion = (): void => {
     const materialsWithVariants = materials
-      .filter((m) => m.has_variants && m.variants && m.variants.length > 0)
-      .map((m) => m.id);
+      .filter((material) => material.has_variants && material.variants && material.variants.length > 0)
+      .map((material) => material.id);
 
     if (allCollapsed) {
-      // Expand all
       setExpandedMaterials(new Set(materialsWithVariants));
       setAllCollapsed(false);
     } else {
-      // Collapse all
       setExpandedMaterials(new Set());
       setAllCollapsed(true);
     }
   };
 
-  // Count materials with variants
   const variantMaterialCount = useMemo(() => {
-    return materials.filter((m) => m.has_variants && m.variants && m.variants.length > 0).length;
+    return materials.filter((material) => material.has_variants && material.variants && material.variants.length > 0).length;
   }, [materials]);
 
-  // Add new variant row for a material
-  const handleAddVariantRow = (materialId: number, defaultUnitCost: number) => {
-    const newRow: StockEntryRow = {
-      entry_id: null,
-      variant_id: null,
-      variant_name: "",
-      is_new_variant: true,
-      opening_quantity: 0,
-      quantity: 0,
-      value: 0,
-      unit_cost: defaultUnitCost,
-      notes: null,
-    };
-    setNewVariantRows((prev) => new Map(prev).set(materialId, newRow));
-    // Ensure material is expanded
+  const handleAddVariantRow = (materialId: number, defaultUnitCost: number): void => {
+    setNewVariantRows((prev) => new Map(prev).set(materialId, makeNewVariantRow(defaultUnitCost)));
     setExpandedMaterials((prev) => new Set(prev).add(materialId));
   };
 
-  // Cancel adding new variant
-  const handleCancelNewVariant = (materialId: number) => {
+  const handleCancelNewVariant = (materialId: number): void => {
     setNewVariantRows((prev) => {
       const next = new Map(prev);
       next.delete(materialId);
@@ -293,161 +303,145 @@ const MaterialStockEntryPage: React.FC = () => {
     });
   };
 
-  // Update variant name (for existing variants)
   const handleVariantNameChange = (
     materialId: number,
     variantId: number | null,
+    oldName: string | null,
     newName: string
-  ) => {
+  ): void => {
     setMaterials((prev) =>
-      prev.map((m) => {
-        if (m.id === materialId && m.has_variants && m.variants) {
-          const updatedVariants = m.variants.map((v) => {
-            if (v.variant_id === variantId) {
-              return { ...v, variant_name: newName };
-            }
-            return v;
-          });
-          return { ...m, variants: updatedVariants };
+      prev.map((material) => {
+        if (material.id !== materialId || !material.has_variants || !material.variants) {
+          return material;
         }
-        return m;
+
+        return {
+          ...material,
+          variants: material.variants.map((variant) => {
+            const isMatchingVariant = variantId
+              ? variant.variant_id === variantId
+              : !variant.variant_id && variant.variant_name === oldName;
+
+            return isMatchingVariant ? { ...variant, variant_name: newName } : variant;
+          }),
+        };
       })
     );
   };
 
-  // Update new variant row
   const handleNewVariantChange = (
     materialId: number,
-    field: keyof StockEntryRow,
+    field: NewVariantField,
     value: string | number
-  ) => {
+  ): void => {
     setNewVariantRows((prev) => {
       const next = new Map(prev);
       const row = next.get(materialId);
-      if (row) {
-        const updated = { ...row };
-        if (field === "variant_name") {
-          updated.variant_name = String(value);
-        } else if (field === "unit_cost" || field === "quantity") {
-          const numValue = parseFloat(String(value)) || 0;
-          (updated as any)[field] = numValue;
-          // Recalculate value
-          updated.value = updated.quantity * updated.unit_cost;
-        }
-        next.set(materialId, updated);
+      if (!row) return next;
+
+      if (field === "variant_name") {
+        next.set(materialId, { ...row, variant_name: String(value) });
+        return next;
       }
+
+      const numericValue = makeNumber(value);
+      const adjustmentQuantity =
+        field === "adjustment_quantity" ? numericValue : row.adjustment_quantity;
+      const unitCost = field === "unit_cost" ? numericValue : row.unit_cost;
+
+      next.set(materialId, recalculateStock(row, adjustmentQuantity, unitCost));
       return next;
     });
   };
 
-  // Handle input change for quantity, unit_cost, or custom_description
-  // Supports both material-level and variant-level changes
   const handleInputChange = (
     materialId: number,
-    field: "quantity" | "unit_cost" | "custom_description",
+    field: EditableStockField,
     value: string,
-    variantId?: number | null
-  ) => {
+    variantId?: number | null,
+    variantName?: string | null
+  ): void => {
     setMaterials((prev) =>
-      prev.map((m) => {
-        if (m.id === materialId) {
-          // If this is a variant-level change
-          if (variantId !== undefined && m.has_variants && m.variants) {
-            const updatedVariants = m.variants.map((v) => {
-              if (v.variant_id === variantId) {
-                const updated = { ...v };
-                if (field === "custom_description") {
-                  // Variants use variant_name instead
-                  return updated;
-                } else {
-                  const numValue = parseFloat(value) || 0;
-                  (updated as any)[field] = numValue;
-                }
-                // Recalculate value
-                updated.value = updated.quantity * updated.unit_cost;
-                return updated;
-              }
-              return v;
-            });
+      prev.map((material) => {
+        if (material.id !== materialId) return material;
 
-            // Recalculate material totals from variants
-            const totalOpening = updatedVariants.reduce((sum, v) => sum + v.opening_quantity, 0);
-            const totalQty = updatedVariants.reduce((sum, v) => sum + v.quantity, 0);
-            const totalValue = updatedVariants.reduce((sum, v) => sum + v.value, 0);
+        if (variantId !== undefined && material.has_variants && material.variants) {
+          const updatedVariants = material.variants.map((variant) => {
+            const isMatchingVariant = variantId
+              ? variant.variant_id === variantId
+              : !variant.variant_id && variant.variant_name === variantName;
 
-            return {
-              ...m,
-              variants: updatedVariants,
-              opening_quantity: totalOpening,
-              quantity: totalQty,
-              value: totalValue,
-            };
-          }
+            if (!isMatchingVariant) return variant;
 
-          // Material-level change (non-variant materials)
-          const updated = { ...m };
+            const numericValue = makeNumber(value);
+            const adjustmentQuantity =
+              field === "adjustment_quantity" ? numericValue : variant.adjustment_quantity;
+            const unitCost = field === "unit_cost" ? numericValue : variant.unit_cost;
 
-          if (field === "custom_description") {
-            updated.custom_description = value || null;
-          } else {
-            const numValue = parseFloat(value) || 0;
-            updated[field] = numValue;
-          }
+            return recalculateStock(variant, adjustmentQuantity, unitCost);
+          });
 
-          // Recalculate value
-          updated.value = updated.quantity * updated.unit_cost;
-
-          return updated;
+          return {
+            ...material,
+            variants: updatedVariants,
+            opening_quantity: updatedVariants.reduce((sum, variant) => sum + variant.opening_quantity, 0),
+            opening_value: updatedVariants.reduce((sum, variant) => sum + variant.opening_value, 0),
+            purchase_quantity: updatedVariants.reduce((sum, variant) => sum + variant.purchase_quantity, 0),
+            purchase_value: updatedVariants.reduce((sum, variant) => sum + variant.purchase_value, 0),
+            adjustment_quantity: updatedVariants.reduce((sum, variant) => sum + variant.adjustment_quantity, 0),
+            adjustment_value: updatedVariants.reduce((sum, variant) => sum + variant.adjustment_value, 0),
+            closing_quantity: updatedVariants.reduce((sum, variant) => sum + variant.closing_quantity, 0),
+            closing_value: updatedVariants.reduce((sum, variant) => sum + variant.closing_value, 0),
+            quantity: updatedVariants.reduce((sum, variant) => sum + variant.adjustment_quantity, 0),
+            value: updatedVariants.reduce((sum, variant) => sum + variant.closing_value, 0),
+          };
         }
-        return m;
+
+        const numericValue = makeNumber(value);
+        const adjustmentQuantity =
+          field === "adjustment_quantity" ? numericValue : material.adjustment_quantity;
+        const unitCost = field === "unit_cost" ? numericValue : material.unit_cost;
+
+        return recalculateStock(material, adjustmentQuantity, unitCost);
       })
     );
   };
 
-  // Before month change - check for unsaved changes
   const handleBeforeMonthChange = useCallback(() => {
     if (hasUnsavedChanges) {
-      return window.confirm(
-        "You have unsaved changes. Do you want to discard them?"
-      );
+      return window.confirm("You have unsaved changes. Do you want to discard them?");
     }
     return true;
   }, [hasUnsavedChanges]);
 
-  // Handle tab change
-  const handleTabChange = (tab: ProductLine) => {
-    if (hasUnsavedChanges) {
-      if (!window.confirm("You have unsaved changes. Do you want to discard them?")) {
-        return;
-      }
+  const handleTabChange = (tab: ProductLine): void => {
+    if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Do you want to discard them?")) {
+      return;
     }
     setActiveTab(tab);
   };
 
-  // Save entries
-  const handleSave = async () => {
-    // Check for negative quantities (including variants)
+  const handleSave = async (): Promise<void> => {
     let negativeCount = 0;
-    materials.forEach((m) => {
-      if (m.has_variants && m.variants) {
-        negativeCount += m.variants.filter((v) => v.quantity < 0).length;
-      } else if (m.quantity < 0) {
+    materials.forEach((material) => {
+      if (material.has_variants && material.variants) {
+        negativeCount += material.variants.filter((variant) => variant.closing_quantity < 0).length;
+      } else if (material.closing_quantity < 0) {
         negativeCount++;
       }
     });
 
     if (negativeCount > 0) {
       const confirmed = window.confirm(
-        `Warning: ${negativeCount} item(s) have negative stock. Do you want to save anyway?`
+        `Warning: ${negativeCount} item(s) have negative calculated closing stock. Do you want to save anyway?`
       );
       if (!confirmed) return;
     }
 
-    // Check for new variants that need names
     const incompleteNewVariants: string[] = [];
     newVariantRows.forEach((row, materialId) => {
-      if (row.quantity > 0 && !row.variant_name?.trim()) {
-        const material = materials.find((m) => m.id === materialId);
+      if (row.adjustment_quantity !== 0 && !row.variant_name?.trim()) {
+        const material = materials.find((item) => item.id === materialId);
         incompleteNewVariants.push(material?.name || `Material ${materialId}`);
       }
     });
@@ -459,82 +453,78 @@ const MaterialStockEntryPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      // First, update any changed variant names
       const variantNameUpdates: Promise<void>[] = [];
-      const originalMap = new Map(originalMaterials.map((m) => [m.id, m]));
+      const originalMap = new Map(originalMaterials.map((material) => [material.id, material]));
 
-      materials.forEach((m) => {
-        if (m.has_variants && m.variants) {
-          const original = originalMap.get(m.id);
-          if (original?.variants) {
-            m.variants.forEach((v) => {
-              if (v.variant_id) {
-                const ov = original.variants?.find((ov) => ov.variant_id === v.variant_id);
-                if (ov && v.variant_name !== ov.variant_name && v.variant_name?.trim()) {
-                  // Update variant name via API
-                  variantNameUpdates.push(
-                    api.put(`/api/materials/variants/${v.variant_id}`, {
-                      variant_name: v.variant_name.trim(),
-                      default_unit_cost: v.unit_cost,
-                    }).catch((err) => {
-                      console.error(`Failed to update variant ${v.variant_id}:`, err);
-                    })
-                  );
-                }
-              }
-            });
+      materials.forEach((material) => {
+        if (!material.has_variants || !material.variants) return;
+
+        const original = originalMap.get(material.id);
+        material.variants.forEach((variant) => {
+          if (!variant.variant_id || !variant.variant_name?.trim()) return;
+
+          const originalVariant = original?.variants?.find(
+            (item) => item.variant_id === variant.variant_id
+          );
+
+          if (originalVariant && variant.variant_name !== originalVariant.variant_name) {
+            variantNameUpdates.push(
+              api.put(`/api/materials/variants/${variant.variant_id}`, {
+                variant_name: variant.variant_name.trim(),
+                default_unit_cost: variant.unit_cost,
+              }).catch((error: unknown) => {
+                console.error(`Failed to update variant ${variant.variant_id}:`, error);
+              })
+            );
           }
-        }
+        });
       });
 
-      // Wait for all variant name updates
       if (variantNameUpdates.length > 0) {
         await Promise.all(variantNameUpdates);
       }
 
-      // Build stock entries
       const entries: MaterialStockEntryInput[] = [];
 
-      materials.forEach((m) => {
-        if (m.has_variants && m.variants && m.variants.length > 0) {
-          // Add entries for each variant
-          m.variants.forEach((v) => {
+      materials.forEach((material) => {
+        if (material.has_variants && material.variants && material.variants.length > 0) {
+          material.variants.forEach((variant) => {
             entries.push({
-              material_id: m.id,
-              variant_id: v.variant_id,
-              quantity: v.quantity,
-              unit_cost: v.unit_cost,
+              material_id: material.id,
+              variant_id: variant.variant_id,
+              adjustment_quantity: variant.adjustment_quantity,
+              unit_cost: variant.unit_cost,
               custom_name: null,
-              custom_description: v.variant_id ? null : v.variant_name, // Ad-hoc variants use custom_description
-              notes: v.notes || null,
+              custom_description: variant.variant_id
+                ? null
+                : variant.custom_description || (variant.variant_name === "Default" ? null : variant.variant_name),
+              notes: variant.notes || null,
             });
           });
         } else {
-          // Non-variant material: single entry
           entries.push({
-            material_id: m.id,
+            material_id: material.id,
             variant_id: null,
-            quantity: m.quantity,
-            unit_cost: m.unit_cost,
-            custom_name: m.custom_name || null,
+            adjustment_quantity: material.adjustment_quantity,
+            unit_cost: material.unit_cost,
+            custom_name: material.custom_name || null,
             custom_description: null,
-            notes: m.notes || null,
+            notes: material.notes || null,
           });
         }
       });
 
-      // Add new variant rows (will be registered as permanent variants)
       newVariantRows.forEach((row, materialId) => {
-        if (row.variant_name?.trim() && (row.quantity > 0 || row.unit_cost > 0)) {
+        if (row.variant_name?.trim() && (row.adjustment_quantity !== 0 || row.unit_cost > 0)) {
           entries.push({
             material_id: materialId,
             variant_id: null,
-            quantity: row.quantity,
+            adjustment_quantity: row.adjustment_quantity,
             unit_cost: row.unit_cost,
             custom_name: null,
             custom_description: row.variant_name.trim(),
             notes: null,
-            register_variant: true, // Signal to register as permanent variant
+            register_variant: true,
           });
         }
       });
@@ -546,7 +536,6 @@ const MaterialStockEntryPage: React.FC = () => {
         entries,
       });
 
-      // Build success message
       const messages: string[] = [];
       if (variantNameUpdates.length > 0) {
         messages.push(`${variantNameUpdates.length} variant name(s) updated`);
@@ -555,113 +544,135 @@ const MaterialStockEntryPage: React.FC = () => {
         messages.push(`${response.registered_variants.length} new variant(s) registered`);
       }
 
-      if (messages.length > 0) {
-        toast.success(`Saved! ${messages.join(", ")}.`, { duration: 4000 });
-      } else {
-        toast.success("Stock entries saved successfully");
-      }
-
-      // Refresh to get updated data
+      toast.success(messages.length > 0 ? `Saved. ${messages.join(", ")}.` : "Stock adjustments saved");
       await fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving stock entries:", error);
-      toast.error(error.message || "Failed to save stock entries");
+      const message = error instanceof Error ? error.message : "Failed to save stock adjustments";
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Format number with 2 decimal places
-  const formatNumber = (value: number) => {
+  const formatNumber = (value: number): string => {
     return value.toLocaleString("en-MY", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   };
 
-  // Format quantity (up to 4 decimal places, but trim trailing zeros)
-  const formatQty = (value: number) => {
+  const formatQty = (value: number): string => {
     return value.toLocaleString("en-MY", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 4,
     });
   };
 
-  // Calculate category totals
   const categoryTotals = useMemo(() => {
-    const totals: Record<MaterialCategory, { opening: number; closing: number; value: number }> = {
-      ingredient: { opening: 0, closing: 0, value: 0 },
-      raw_material: { opening: 0, closing: 0, value: 0 },
-      packing_material: { opening: 0, closing: 0, value: 0 },
+    const totals: Record<MaterialCategory, { opening: number; purchases: number; adjustments: number; closing: number }> = {
+      ingredient: { opening: 0, purchases: 0, adjustments: 0, closing: 0 },
+      raw_material: { opening: 0, purchases: 0, adjustments: 0, closing: 0 },
+      packing_material: { opening: 0, purchases: 0, adjustments: 0, closing: 0 },
     };
 
-    materials.forEach((m) => {
-      if (totals[m.category]) {
-        totals[m.category].opening += m.opening_quantity * m.unit_cost;
-        totals[m.category].closing += m.quantity;
-        totals[m.category].value += m.value;
+    materials.forEach((material) => {
+      if (totals[material.category]) {
+        totals[material.category].opening += material.opening_value;
+        totals[material.category].purchases += material.purchase_value;
+        totals[material.category].adjustments += material.adjustment_value;
+        totals[material.category].closing += material.closing_value;
       }
     });
 
     return totals;
   }, [materials]);
 
-  // Grand total (materials only)
   const grandTotal = useMemo(() => {
     return {
-      opening: materials.reduce((sum, m) => sum + (m.opening_quantity * m.unit_cost), 0),
-      value: materials.reduce((sum, m) => sum + m.value, 0),
+      opening: materials.reduce((sum, material) => sum + material.opening_value, 0),
+      purchases: materials.reduce((sum, material) => sum + material.purchase_value, 0),
+      adjustments: materials.reduce((sum, material) => sum + material.adjustment_value, 0),
+      closing: materials.reduce((sum, material) => sum + material.closing_value, 0),
     };
   }, [materials]);
 
-  // Stock Kilang total
   const stockKilangTotal = useMemo(() => {
     return stockKilang.reduce((sum, item) => sum + item.closing_value, 0);
   }, [stockKilang]);
 
-  // Count negative items
   const negativeCount = useMemo(() => {
-    return materials.filter((m) => m.quantity < 0).length;
+    return materials.filter((material) => material.closing_quantity < 0).length;
   }, [materials]);
+
+  const renderAdjustmentInput = (
+    value: number,
+    onChange: (value: string) => void,
+    onClick?: (event: React.MouseEvent<HTMLInputElement>) => void
+  ): React.ReactNode => (
+    <input
+      type="number"
+      value={value || ""}
+      onChange={(event) => onChange(event.target.value)}
+      onClick={onClick}
+      className="w-full px-2 py-1 text-right font-mono text-sm border border-sky-200 dark:border-sky-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+      step="1"
+      placeholder="0"
+    />
+  );
+
+  const renderUnitCostInput = (
+    value: number,
+    onChange: (value: string) => void,
+    onClick?: (event: React.MouseEvent<HTMLInputElement>) => void
+  ): React.ReactNode => (
+    <input
+      type="number"
+      value={value || ""}
+      onChange={(event) => onChange(event.target.value)}
+      onClick={onClick}
+      className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+      step="0.01"
+      min="0"
+      placeholder="0.00"
+    />
+  );
 
   return (
     <div className="space-y-3">
-      {/* Header Card */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          {/* Left: Title & Stats */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <IconBox size={22} className="text-default-500 dark:text-gray-400" />
               <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-                Stock Entry
+                Stock Adjustments
               </h1>
             </div>
             <span className="text-default-300 dark:text-gray-600">|</span>
-            {/* Stats */}
             <div className="flex items-center gap-3 text-sm">
               <span className="text-default-500 dark:text-gray-400">
                 {materials.length} materials
               </span>
-              <span className="text-default-300 dark:text-gray-600">•</span>
+              <span className="text-default-300 dark:text-gray-600">|</span>
               <span className="text-default-500 dark:text-gray-400">
-                Mat: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.value)}</span>
+                Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
+              </span>
+              <span className="text-default-300 dark:text-gray-600">|</span>
+              <span className="text-default-500 dark:text-gray-400">
+                Closing: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
               </span>
               {stockKilang.length > 0 && (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
                   <span className="text-default-500 dark:text-gray-400">
                     FG: <span className="font-medium text-emerald-600 dark:text-emerald-400">RM {formatNumber(stockKilangTotal)}</span>
                   </span>
                 </>
               )}
-              <span className="text-default-300 dark:text-gray-600">•</span>
-              <span className="text-default-500 dark:text-gray-400">
-                Total: <span className="font-medium text-sky-600 dark:text-sky-400">RM {formatNumber(grandTotal.value + stockKilangTotal)}</span>
-              </span>
               {negativeCount > 0 && (
                 <>
-                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <span className="text-default-300 dark:text-gray-600">|</span>
                   <span className="text-red-500 flex items-center gap-1">
                     <IconAlertTriangle size={14} />
                     {negativeCount} negative
@@ -671,37 +682,26 @@ const MaterialStockEntryPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Controls */}
           <div className="flex items-center gap-3">
-            {/* Tab Pills */}
             <div className="flex items-center bg-default-100 dark:bg-gray-700 rounded-full p-0.5">
-              <button
-                onClick={() => handleTabChange("mee")}
-                className={clsx(
-                  "px-4 py-1 rounded-full text-sm font-medium transition-colors",
-                  activeTab === "mee"
-                    ? "bg-sky-500 text-white shadow-sm"
-                    : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
-                )}
-              >
-                MEE
-              </button>
-              <button
-                onClick={() => handleTabChange("bihun")}
-                className={clsx(
-                  "px-4 py-1 rounded-full text-sm font-medium transition-colors",
-                  activeTab === "bihun"
-                    ? "bg-amber-500 text-white shadow-sm"
-                    : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
-                )}
-              >
-                BIHUN
-              </button>
+              {stockTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={clsx(
+                    "px-4 py-1 rounded-full text-sm font-medium transition-colors",
+                    activeTab === tab.id
+                      ? tab.activeClass
+                      : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             <span className="text-default-300 dark:text-gray-600">|</span>
 
-            {/* Month Navigator */}
             <MonthNavigator
               selectedMonth={selectedMonth}
               onChange={setSelectedMonth}
@@ -710,7 +710,6 @@ const MaterialStockEntryPage: React.FC = () => {
 
             <span className="text-default-300 dark:text-gray-600">|</span>
 
-            {/* Save Button */}
             <Button
               color="sky"
               size="sm"
@@ -721,23 +720,20 @@ const MaterialStockEntryPage: React.FC = () => {
               {isSaving ? "Saving..." : "Save"}
             </Button>
 
-            {/* Unsaved indicator */}
             {hasUnsavedChanges && (
               <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                • Unsaved
+                Unsaved
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Loading */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner />
         </div>
       ) : (
-        /* Table */
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm overflow-hidden">
           <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
             <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -760,11 +756,17 @@ const MaterialStockEntryPage: React.FC = () => {
                 <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
                   Opening
                 </th>
+                <th className="px-2 py-2 text-right text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider w-24">
+                  Purchases
+                </th>
                 <th className="px-2 py-2 text-center text-xs font-medium text-sky-600 dark:text-sky-400 uppercase tracking-wider w-28 bg-sky-50 dark:bg-sky-900/20">
-                  Closing
+                  Adjustment
                 </th>
                 <th className="px-2 py-2 text-center text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
                   Unit Cost
+                </th>
+                <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
+                  Closing
                 </th>
                 <th className="px-2 py-2 text-right text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wider w-28">
                   Value
@@ -778,7 +780,6 @@ const MaterialStockEntryPage: React.FC = () => {
 
                 return (
                   <React.Fragment key={category}>
-                    {/* Category Header */}
                     <tr className="bg-default-100 dark:bg-gray-700/50">
                       <td className="px-3 py-1.5 text-xs font-semibold text-default-700 dark:text-gray-300">
                         <div className="flex items-center gap-2">
@@ -790,39 +791,40 @@ const MaterialStockEntryPage: React.FC = () => {
                       <td className="px-2 py-1.5 text-xs text-right text-default-500 dark:text-gray-400">
                         {formatNumber(categoryTotals[category].opening)}
                       </td>
+                      <td className="px-2 py-1.5 text-xs text-right text-blue-600 dark:text-blue-400">
+                        {formatNumber(categoryTotals[category].purchases)}
+                      </td>
+                      <td className="px-2 py-1.5 text-xs text-right text-sky-600 dark:text-sky-400">
+                        {formatNumber(categoryTotals[category].adjustments)}
+                      </td>
                       <td></td>
                       <td></td>
                       <td className="px-2 py-1.5 text-xs text-right">
                         <span className="text-green-600 dark:text-green-400 font-medium">
-                          {formatNumber(categoryTotals[category].value)}
+                          {formatNumber(categoryTotals[category].closing)}
                         </span>
                       </td>
                     </tr>
-                    {/* Category Items */}
+
                     {items.map((material) => {
-                      const isNegative = material.quantity < 0;
+                      const isNegative = material.closing_quantity < 0;
                       const hasVariants = material.has_variants && material.variants && material.variants.length > 0;
                       const isExpanded = expandedMaterials.has(material.id);
                       const newVariant = newVariantRows.get(material.id);
 
-                      // Material with variants - show header + sub-rows
                       if (hasVariants) {
                         return (
                           <React.Fragment key={material.id}>
-                            {/* Material Header Row (expandable, shows totals) */}
                             <tr
                               className={clsx(
-                                "bg-gradient-to-r from-purple-50 to-purple-50/30 dark:from-gray-800 dark:to-gray-800 cursor-pointer hover:from-purple-100 hover:to-purple-50 dark:hover:from-gray-750 dark:hover:to-gray-800 border-l-2 border-purple-400 dark:border-purple-700/60",
-                                isNegative && "from-red-50 to-red-50/30 dark:from-red-900/10 dark:to-gray-800 border-red-400 dark:border-red-700/60"
+                                "bg-purple-50/70 dark:bg-gray-800 cursor-pointer hover:bg-purple-100/70 dark:hover:bg-gray-700/50 border-l-2 border-purple-400 dark:border-purple-700/60",
+                                isNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-400 dark:border-red-700/60"
                               )}
                               onClick={() => toggleMaterialExpansion(material.id)}
                             >
                               <td className="px-3 py-1.5">
                                 <div className="flex items-center gap-2">
-                                  <div className={clsx(
-                                    "p-0.5 rounded",
-                                    isExpanded ? "bg-purple-200 dark:bg-gray-700" : "bg-purple-100 dark:bg-gray-700/70"
-                                  )}>
+                                  <div className="p-0.5 rounded bg-purple-100 dark:bg-gray-700">
                                     {isExpanded ? (
                                       <IconChevronDown size={14} className="text-purple-600 dark:text-gray-300" />
                                     ) : (
@@ -831,7 +833,7 @@ const MaterialStockEntryPage: React.FC = () => {
                                   </div>
                                   <Link
                                     to={`/materials/${material.id}`}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(event) => event.stopPropagation()}
                                     className="text-sm font-semibold text-default-800 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
                                   >
                                     {material.name}
@@ -840,45 +842,58 @@ const MaterialStockEntryPage: React.FC = () => {
                                     {material.code}
                                   </span>
                                   {isNegative && (
-                                    <IconAlertTriangle size={14} className="text-red-500" title="Negative stock" />
+                                    <IconAlertTriangle size={14} className="text-red-500" title="Negative closing stock" />
                                   )}
                                 </div>
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
                                 {formatQty(material.opening_quantity)}
                               </td>
-                              <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-default-700 dark:text-gray-200 bg-sky-50/50 dark:bg-sky-900/10">
-                                {formatQty(material.quantity)}
+                              <td className="px-2 py-1.5 text-right font-mono text-sm text-blue-600 dark:text-blue-400">
+                                {formatQty(material.purchase_quantity)}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs text-default-400 dark:text-gray-500">—</td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/10">
+                                {formatQty(material.adjustment_quantity)}
+                              </td>
+                              <td className="px-2 py-1.5 text-center text-xs text-default-400 dark:text-gray-500">-</td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm font-semibold text-default-700 dark:text-gray-200">
+                                {formatQty(material.closing_quantity)}
+                              </td>
                               <td className="px-2 py-1.5 text-right">
-                                <span className="font-mono text-sm font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">
-                                  {formatNumber(material.value)}
+                                <span className="font-mono text-sm font-bold text-green-600 dark:text-green-400">
+                                  {formatNumber(material.closing_value)}
                                 </span>
                               </td>
                             </tr>
 
-                            {/* Variant Sub-rows (when expanded) */}
-                            {isExpanded && material.variants!.map((variant, idx) => {
-                              const variantNegative = variant.quantity < 0;
-                              const isLastVariant = idx === material.variants!.length - 1;
+                            {isExpanded && material.variants!.map((variant, index) => {
+                              const variantNegative = variant.closing_quantity < 0;
+                              const isLastVariant = index === material.variants!.length - 1;
+
                               return (
                                 <tr
                                   key={`${material.id}-${variant.variant_id || variant.variant_name}`}
                                   className={clsx(
-                                    "bg-white dark:bg-gray-800 hover:bg-purple-50/50 dark:hover:bg-gray-750 border-l-2 border-purple-200 dark:border-purple-900/60",
+                                    "bg-white dark:bg-gray-800 hover:bg-purple-50/50 dark:hover:bg-gray-700/30 border-l-2 border-purple-200 dark:border-purple-900/60",
                                     variantNegative && "bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-900/60",
                                     !isLastVariant && "border-b border-dashed border-default-100 dark:border-gray-700"
                                   )}
                                 >
                                   <td className="px-3 py-1.5 pl-12">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-purple-300 dark:text-gray-600">└</span>
+                                      <span className="text-purple-300 dark:text-gray-600">-</span>
                                       <input
                                         type="text"
                                         value={variant.variant_name || ""}
-                                        onChange={(e) => handleVariantNameChange(material.id, variant.variant_id, e.target.value)}
-                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(event) =>
+                                          handleVariantNameChange(
+                                            material.id,
+                                            variant.variant_id,
+                                            variant.variant_name,
+                                            event.target.value
+                                          )
+                                        }
+                                        onClick={(event) => event.stopPropagation()}
                                         className="text-sm text-default-700 dark:text-gray-300 bg-transparent border-b border-transparent hover:border-dashed hover:border-purple-300 dark:hover:border-gray-500 focus:outline-none focus:border-solid focus:border-purple-500 dark:focus:border-gray-400 px-1 py-0.5 min-w-[120px]"
                                         placeholder="Variant name..."
                                       />
@@ -890,51 +905,63 @@ const MaterialStockEntryPage: React.FC = () => {
                                   <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">
                                     {formatQty(variant.opening_quantity)}
                                   </td>
+                                  <td className="px-2 py-1.5 text-right font-mono text-xs text-blue-600 dark:text-blue-400">
+                                    {formatQty(variant.purchase_quantity)}
+                                  </td>
                                   <td className="px-1 py-1 bg-sky-50/20 dark:bg-sky-900/5">
-                                    <input
-                                      type="number"
-                                      value={variant.quantity || ""}
-                                      onChange={(e) => handleInputChange(material.id, "quantity", e.target.value, variant.variant_id)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-sky-200 dark:border-sky-700 rounded bg-sky-50/50 dark:bg-sky-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700"
-                                      min="0"
-                                      step="1"
-                                      placeholder="0"
-                                    />
+                                    {renderAdjustmentInput(
+                                      variant.adjustment_quantity,
+                                      (value) => handleInputChange(
+                                        material.id,
+                                        "adjustment_quantity",
+                                        value,
+                                        variant.variant_id,
+                                        variant.variant_name
+                                      ),
+                                      (event) => event.stopPropagation()
+                                    )}
                                   </td>
                                   <td className="px-1 py-1">
-                                    <input
-                                      type="number"
-                                      value={variant.unit_cost || ""}
-                                      onChange={(e) => handleInputChange(material.id, "unit_cost", e.target.value, variant.variant_id)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-full px-2 py-0.5 text-right font-mono text-sm border border-default-200 dark:border-gray-600 rounded bg-default-50 dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white"
-                                      step="0.01"
-                                      min="0"
-                                    />
+                                    {renderUnitCostInput(
+                                      variant.unit_cost,
+                                      (value) => handleInputChange(
+                                        material.id,
+                                        "unit_cost",
+                                        value,
+                                        variant.variant_id,
+                                        variant.variant_name
+                                      ),
+                                      (event) => event.stopPropagation()
+                                    )}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
+                                    {formatQty(variant.closing_quantity)}
                                   </td>
                                   <td className="px-2 py-1.5 text-right">
                                     <span className={clsx(
                                       "font-mono text-sm",
-                                      variantNegative ? "text-red-600 dark:text-red-400" : variant.value > 0 ? "text-green-600 dark:text-green-400" : "text-default-400 dark:text-gray-500"
+                                      variantNegative
+                                        ? "text-red-600 dark:text-red-400"
+                                        : variant.closing_value > 0
+                                          ? "text-green-600 dark:text-green-400"
+                                          : "text-default-400 dark:text-gray-500"
                                     )}>
-                                      {formatNumber(variant.value)}
+                                      {formatNumber(variant.closing_value)}
                                     </span>
                                   </td>
                                 </tr>
                               );
                             })}
 
-                            {/* New Variant Row (when adding) */}
                             {isExpanded && newVariant && (
-                              <tr className="bg-gradient-to-r from-sky-50 to-sky-50/30 dark:from-gray-800 dark:to-gray-800 border-l-2 border-sky-400 dark:border-sky-700/60">
+                              <tr className="bg-sky-50/60 dark:bg-gray-800 border-l-2 border-sky-400 dark:border-sky-700/60">
                                 <td className="px-3 py-1.5 pl-12">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sky-400 dark:text-gray-500">+</span>
                                     <input
                                       type="text"
                                       value={newVariant.variant_name || ""}
-                                      onChange={(e) => handleNewVariantChange(material.id, "variant_name", e.target.value)}
+                                      onChange={(event) => handleNewVariantChange(material.id, "variant_name", event.target.value)}
                                       className="flex-1 px-2 py-0.5 text-sm border border-sky-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-700"
                                       placeholder="Enter variant name..."
                                       autoFocus
@@ -949,40 +976,34 @@ const MaterialStockEntryPage: React.FC = () => {
                                   </div>
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">0</td>
-                                <td className="px-1 py-1 bg-sky-50/30 dark:bg-sky-900/5">
-                                  <input
-                                    type="number"
-                                    value={newVariant.quantity || ""}
-                                    onChange={(e) => handleNewVariantChange(material.id, "quantity", e.target.value)}
-                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-sky-200 dark:border-sky-700 rounded bg-sky-50/50 dark:bg-sky-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700"
-                                    min="0"
-                                    step="1"
-                                    placeholder="0"
-                                  />
+                                <td className="px-2 py-1.5 text-right font-mono text-xs text-blue-600 dark:text-blue-400">0</td>
+                                <td className="px-1 py-1">
+                                  {renderAdjustmentInput(
+                                    newVariant.adjustment_quantity,
+                                    (value) => handleNewVariantChange(material.id, "adjustment_quantity", value)
+                                  )}
                                 </td>
                                 <td className="px-1 py-1">
-                                  <input
-                                    type="number"
-                                    value={newVariant.unit_cost || ""}
-                                    onChange={(e) => handleNewVariantChange(material.id, "unit_cost", e.target.value)}
-                                    className="w-full px-2 py-0.5 text-right font-mono text-sm border border-default-200 dark:border-gray-600 rounded bg-default-50 dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white"
-                                    step="0.01"
-                                    min="0"
-                                  />
+                                  {renderUnitCostInput(
+                                    newVariant.unit_cost,
+                                    (value) => handleNewVariantChange(material.id, "unit_cost", value)
+                                  )}
+                                </td>
+                                <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
+                                  {formatQty(newVariant.closing_quantity)}
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
-                                  {formatNumber(newVariant.value)}
+                                  {formatNumber(newVariant.closing_value)}
                                 </td>
                               </tr>
                             )}
 
-                            {/* Add Variant Button (when expanded and not already adding) */}
                             {isExpanded && !newVariant && (
                               <tr className="bg-white dark:bg-gray-800 border-l-2 border-purple-100 dark:border-gray-700 hover:border-purple-300 dark:hover:border-gray-500 transition-colors">
-                                <td colSpan={5} className="px-3 py-1.5 pl-12">
+                                <td colSpan={7} className="px-3 py-1.5 pl-12">
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
+                                    onClick={(event) => {
+                                      event.stopPropagation();
                                       handleAddVariantRow(material.id, material.default_unit_cost);
                                     }}
                                     className="text-xs text-purple-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-gray-200 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-purple-50 dark:hover:bg-gray-700 transition-colors"
@@ -997,7 +1018,6 @@ const MaterialStockEntryPage: React.FC = () => {
                         );
                       }
 
-                      // Material without variants - single editable row
                       return (
                         <React.Fragment key={material.id}>
                           <tr
@@ -1021,10 +1041,9 @@ const MaterialStockEntryPage: React.FC = () => {
                                   <IconAlertTriangle
                                     size={14}
                                     className="text-red-500"
-                                    title="Negative stock"
+                                    title="Negative closing stock"
                                   />
                                 )}
-                                {/* Add variant button for non-variant materials */}
                                 {!newVariant && (
                                   <button
                                     onClick={() => handleAddVariantRow(material.id, material.default_unit_cost)}
@@ -1041,60 +1060,53 @@ const MaterialStockEntryPage: React.FC = () => {
                                 {formatQty(material.opening_quantity)}
                               </span>
                             </td>
-                            {/* Closing qty input */}
+                            <td className="px-2 py-1.5 text-right">
+                              <span className="font-mono text-sm text-blue-600 dark:text-blue-400">
+                                {formatQty(material.purchase_quantity)}
+                              </span>
+                            </td>
                             <td className="px-1 py-1 bg-sky-50/50 dark:bg-sky-900/10">
-                              <input
-                                type="number"
-                                value={material.quantity || ""}
-                                onChange={(e) =>
-                                  handleInputChange(material.id, "quantity", e.target.value)
-                                }
-                                className="w-full px-2 py-1 text-right font-mono text-sm border border-sky-200 dark:border-sky-800 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-                                min="0"
-                                step="1"
-                                placeholder="0"
-                              />
+                              {renderAdjustmentInput(
+                                material.adjustment_quantity,
+                                (value) => handleInputChange(material.id, "adjustment_quantity", value)
+                              )}
                             </td>
-                            {/* Unit cost input */}
                             <td className="px-1 py-1">
-                              <input
-                                type="number"
-                                value={material.unit_cost || ""}
-                                onChange={(e) =>
-                                  handleInputChange(material.id, "unit_cost", e.target.value)
-                                }
-                                className="w-full px-2 py-1 text-right font-mono text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-                                step="0.05"
-                                min="0"
-                              />
+                              {renderUnitCostInput(
+                                material.unit_cost,
+                                (value) => handleInputChange(material.id, "unit_cost", value)
+                              )}
                             </td>
-                            {/* Value (calculated) */}
+                            <td className="px-2 py-1.5 text-right">
+                              <span className="font-mono text-sm text-default-700 dark:text-gray-300">
+                                {formatQty(material.closing_quantity)}
+                              </span>
+                            </td>
                             <td className="px-2 py-1.5 text-right">
                               <span
                                 className={clsx(
                                   "font-mono text-sm font-medium",
                                   isNegative
                                     ? "text-red-600 dark:text-red-400"
-                                    : material.value > 0
+                                    : material.closing_value > 0
                                       ? "text-green-600 dark:text-green-400"
                                       : "text-default-400 dark:text-gray-500"
                                 )}
                               >
-                                {formatNumber(material.value)}
+                                {formatNumber(material.closing_value)}
                               </span>
                             </td>
                           </tr>
 
-                          {/* New Variant Row for non-variant materials (when adding) */}
                           {newVariant && (
-                            <tr className="bg-gradient-to-r from-sky-50 to-sky-50/30 dark:from-gray-800 dark:to-gray-800 border-l-2 border-sky-400 dark:border-sky-700/60">
+                            <tr className="bg-sky-50/60 dark:bg-gray-800 border-l-2 border-sky-400 dark:border-sky-700/60">
                               <td className="px-3 py-1.5 pl-8">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sky-400 dark:text-gray-500">+</span>
                                   <input
                                     type="text"
                                     value={newVariant.variant_name || ""}
-                                    onChange={(e) => handleNewVariantChange(material.id, "variant_name", e.target.value)}
+                                    onChange={(event) => handleNewVariantChange(material.id, "variant_name", event.target.value)}
                                     className="flex-1 px-2 py-0.5 text-sm border border-sky-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-700"
                                     placeholder="Enter variant name..."
                                     autoFocus
@@ -1109,29 +1121,24 @@ const MaterialStockEntryPage: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-xs text-default-400 dark:text-gray-500">0</td>
-                              <td className="px-1 py-1 bg-sky-50/30 dark:bg-sky-900/5">
-                                <input
-                                  type="number"
-                                  value={newVariant.quantity || ""}
-                                  onChange={(e) => handleNewVariantChange(material.id, "quantity", e.target.value)}
-                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-sky-200 dark:border-sky-700 rounded bg-sky-50/50 dark:bg-sky-900/20 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700"
-                                  min="0"
-                                  step="1"
-                                  placeholder="0"
-                                />
+                              <td className="px-2 py-1.5 text-right font-mono text-xs text-blue-600 dark:text-blue-400">0</td>
+                              <td className="px-1 py-1">
+                                {renderAdjustmentInput(
+                                  newVariant.adjustment_quantity,
+                                  (value) => handleNewVariantChange(material.id, "adjustment_quantity", value)
+                                )}
                               </td>
                               <td className="px-1 py-1">
-                                <input
-                                  type="number"
-                                  value={newVariant.unit_cost || ""}
-                                  onChange={(e) => handleNewVariantChange(material.id, "unit_cost", e.target.value)}
-                                  className="w-full px-2 py-0.5 text-right font-mono text-sm border border-default-200 dark:border-gray-600 rounded bg-default-50 dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white"
-                                  step="0.01"
-                                  min="0"
-                                />
+                                {renderUnitCostInput(
+                                  newVariant.unit_cost,
+                                  (value) => handleNewVariantChange(material.id, "unit_cost", value)
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-right font-mono text-sm text-default-700 dark:text-gray-300">
+                                {formatQty(newVariant.closing_quantity)}
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
-                                {formatNumber(newVariant.value)}
+                                {formatNumber(newVariant.closing_value)}
                               </td>
                             </tr>
                           )}
@@ -1142,17 +1149,15 @@ const MaterialStockEntryPage: React.FC = () => {
                 );
               })}
 
-              {/* Stock Kilang Section - READ ONLY from Products */}
               {stockKilang.length > 0 && (
                 <React.Fragment>
-                  {/* Stock Kilang Header */}
                   <tr className="bg-emerald-100 dark:bg-emerald-900/30">
                     <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                       <div className="flex items-center gap-2">
                         <IconBuildingFactory2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-                        Stock Kilang (Finished Goods)
+                        Stock Kilang
                         <span className="text-emerald-500 dark:text-emerald-400 font-normal">
-                          ({stockKilang.length}) - Auto from Production
+                          ({stockKilang.length})
                         </span>
                       </div>
                     </td>
@@ -1160,13 +1165,14 @@ const MaterialStockEntryPage: React.FC = () => {
                       Read-only
                     </td>
                     <td></td>
+                    <td></td>
+                    <td></td>
                     <td className="px-2 py-1.5 text-xs text-right">
                       <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                         {formatNumber(stockKilangTotal)}
                       </span>
                     </td>
                   </tr>
-                  {/* Stock Kilang Items */}
                   {stockKilang.map((item) => (
                     <tr
                       key={item.product_id}
@@ -1177,16 +1183,16 @@ const MaterialStockEntryPage: React.FC = () => {
                           {item.name}
                         </span>
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">
-                        -
+                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
+                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
+                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-400 dark:text-gray-500">-</td>
+                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
+                        {formatNumber(item.price)}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">
                           {formatQty(item.closing_quantity)}
                         </span>
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-sm text-default-500 dark:text-gray-400">
-                        {formatNumber(item.price)}
                       </td>
                       <td className="px-2 py-1.5 text-right">
                         <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">
@@ -1198,10 +1204,9 @@ const MaterialStockEntryPage: React.FC = () => {
                 </React.Fragment>
               )}
 
-              {/* Loading Stock Kilang */}
               {isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
+                  <td colSpan={7} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
                     Loading finished goods stock...
                   </td>
                 </tr>
@@ -1209,52 +1214,53 @@ const MaterialStockEntryPage: React.FC = () => {
 
               {materials.length === 0 && stockKilang.length === 0 && !isLoadingStockKilang && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                     <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
-                    <p>No materials found for {activeTab.toUpperCase()} production</p>
+                    <p>No materials found for {activeTab.toUpperCase()}</p>
                   </td>
                 </tr>
               )}
             </tbody>
 
-            {/* Footer with totals */}
             {(materials.length > 0 || stockKilang.length > 0) && (
               <tfoot className="bg-default-100 dark:bg-gray-900/50 border-t border-default-200 dark:border-gray-700">
-                {/* Materials subtotal */}
                 {materials.length > 0 && (
                   <tr>
-                    <td colSpan={2} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Materials:
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-sm text-default-600 dark:text-gray-400">
+                      {formatNumber(grandTotal.opening)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-sm text-blue-600 dark:text-blue-400">
+                      {formatNumber(grandTotal.purchases)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono text-sm text-sky-600 dark:text-sky-400">
+                      {formatNumber(grandTotal.adjustments)}
                     </td>
                     <td></td>
                     <td></td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-green-600 dark:text-green-400">
-                      {formatNumber(grandTotal.value)}
+                      {formatNumber(grandTotal.closing)}
                     </td>
                   </tr>
                 )}
-                {/* Stock Kilang subtotal */}
                 {stockKilang.length > 0 && (
                   <tr>
-                    <td colSpan={2} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
+                    <td colSpan={6} className="px-3 py-1.5 text-right text-sm text-default-600 dark:text-gray-400">
                       Stock Kilang:
                     </td>
-                    <td></td>
-                    <td></td>
                     <td className="px-2 py-1.5 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
                       {formatNumber(stockKilangTotal)}
                     </td>
                   </tr>
                 )}
-                {/* Grand Total */}
                 <tr className="font-semibold border-t border-default-200 dark:border-gray-600">
-                  <td colSpan={2} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
+                  <td colSpan={6} className="px-3 py-2 text-right text-sm text-default-700 dark:text-gray-300">
                     Grand Total:
                   </td>
-                  <td></td>
-                  <td></td>
                   <td className="px-2 py-2 text-right font-mono text-sm text-sky-600 dark:text-sky-400">
-                    RM {formatNumber(grandTotal.value + stockKilangTotal)}
+                    RM {formatNumber(grandTotal.closing + stockKilangTotal)}
                   </td>
                 </tr>
               </tfoot>

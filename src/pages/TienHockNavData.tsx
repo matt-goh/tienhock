@@ -443,7 +443,7 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Stock Entry",
+        name: "Stock",
         path: "/stock/entry",
         component: MaterialStockEntryPage,
       },

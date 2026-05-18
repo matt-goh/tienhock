@@ -3,6 +3,13 @@ import { Router } from "express";
 
 export default function (pool) {
   const router = Router();
+  const validStockBuckets = new Set(["mee", "bihun", "shared"]);
+
+  function isStockBucketCompatible(appliesTo, stockBucket) {
+    if (!stockBucket) return true;
+    if (stockBucket === "shared") return appliesTo === "both";
+    return appliesTo === stockBucket || appliesTo === "both";
+  }
 
   // ==================== HELPER FUNCTIONS ====================
 
@@ -144,7 +151,7 @@ export default function (pool) {
     try {
       // Get base materials
       const materialsQuery = `
-        SELECT id, code, name, category, default_unit_cost
+        SELECT id, code, name, category, default_unit_cost, applies_to
         FROM materials
         WHERE is_active = true
         ORDER BY category, sort_order, name
@@ -154,7 +161,7 @@ export default function (pool) {
       // Get variants for materials that have them
       const variantsQuery = `
         SELECT mv.id as variant_id, mv.material_id, mv.variant_name, mv.default_unit_cost,
-               m.code as material_code, m.name as material_name, m.category
+               m.code as material_code, m.name as material_name, m.category, m.applies_to
         FROM material_variants mv
         JOIN materials m ON mv.material_id = m.id
         WHERE mv.is_active = true AND m.is_active = true
@@ -172,6 +179,7 @@ export default function (pool) {
           code: material.code,
           name: material.name,
           category: material.category,
+          applies_to: material.applies_to,
           default_unit_cost: material.default_unit_cost,
           is_variant: false,
         });
@@ -186,6 +194,7 @@ export default function (pool) {
           code: variant.material_code,
           name: `${variant.material_name} - ${variant.variant_name}`,
           category: variant.category,
+          applies_to: variant.applies_to,
           default_unit_cost: variant.default_unit_cost,
           is_variant: true,
           variant_name: variant.variant_name,
@@ -326,11 +335,13 @@ export default function (pool) {
       // Get invoice lines with material info
       const linesQuery = `
         SELECT
-          pil.id, pil.line_number, pil.material_id,
+          pil.id, pil.line_number, pil.material_id, pil.variant_id, pil.stock_bucket,
           pil.quantity, pil.unit_cost, pil.amount, pil.notes,
-          m.code as material_code, m.name as material_name, m.category as material_category
+          m.code as material_code, m.name as material_name, m.category as material_category,
+          mv.variant_name
         FROM purchase_invoice_lines pil
         LEFT JOIN materials m ON pil.material_id = m.id
+        LEFT JOIN material_variants mv ON pil.variant_id = mv.id
         WHERE pil.purchase_invoice_id = $1
         ORDER BY pil.line_number
       `;
@@ -398,20 +409,62 @@ export default function (pool) {
       // Validate and fetch all materials
       const enrichedLines = [];
       for (const line of lines) {
+        const materialId = parseInt(line.material_id);
+        const variantId = line.variant_id ? parseInt(line.variant_id) : null;
+        const stockBucket = line.stock_bucket || null;
+
+        if (!materialId) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: "Each purchase line must have a valid material",
+          });
+        }
+
+        if (stockBucket && !validStockBuckets.has(stockBucket)) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: "Stock bucket must be one of: mee, bihun, shared",
+          });
+        }
+
         const matQuery = `
-          SELECT id, code, name, category
+          SELECT id, code, name, category, applies_to
           FROM materials
           WHERE id = $1
         `;
-        const matResult = await client.query(matQuery, [line.material_id]);
+        const matResult = await client.query(matQuery, [materialId]);
         if (matResult.rows.length === 0) {
           await client.query("ROLLBACK");
           return res.status(400).json({
-            message: `Material with ID '${line.material_id}' does not exist`,
+            message: `Material with ID '${materialId}' does not exist`,
           });
         }
+
+        if (!isStockBucketCompatible(matResult.rows[0].applies_to, stockBucket)) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Material '${matResult.rows[0].name}' cannot be assigned to stock bucket '${stockBucket}'`,
+          });
+        }
+
+        if (variantId) {
+          const variantResult = await client.query(
+            "SELECT id FROM material_variants WHERE id = $1 AND material_id = $2",
+            [variantId, materialId]
+          );
+          if (variantResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: `Variant '${variantId}' does not belong to material '${materialId}'`,
+            });
+          }
+        }
+
         enrichedLines.push({
           ...line,
+          material_id: materialId,
+          variant_id: variantId,
+          stock_bucket: stockBucket,
           material_code: matResult.rows[0].code,
           material_name: matResult.rows[0].name,
           material_category: matResult.rows[0].category,
@@ -451,17 +504,19 @@ export default function (pool) {
       // Insert invoice lines
       const insertLineQuery = `
         INSERT INTO purchase_invoice_lines (
-          purchase_invoice_id, line_number, material_id,
+          purchase_invoice_id, line_number, material_id, variant_id, stock_bucket,
           quantity, unit_cost, amount, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+      for (let i = 0; i < enrichedLines.length; i++) {
+        const line = enrichedLines[i];
         await client.query(insertLineQuery, [
           invoiceId,
           line.line_number || i + 1,
           line.material_id,
+          line.variant_id,
+          line.stock_bucket,
           line.quantity || null,
           line.unit_cost || null,
           parseFloat(line.amount),
@@ -567,20 +622,62 @@ export default function (pool) {
       // Validate and fetch all materials
       const enrichedLines = [];
       for (const line of lines) {
+        const materialId = parseInt(line.material_id);
+        const variantId = line.variant_id ? parseInt(line.variant_id) : null;
+        const stockBucket = line.stock_bucket || null;
+
+        if (!materialId) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: "Each purchase line must have a valid material",
+          });
+        }
+
+        if (stockBucket && !validStockBuckets.has(stockBucket)) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: "Stock bucket must be one of: mee, bihun, shared",
+          });
+        }
+
         const matQuery = `
-          SELECT id, code, name, category
+          SELECT id, code, name, category, applies_to
           FROM materials
           WHERE id = $1
         `;
-        const matResult = await client.query(matQuery, [line.material_id]);
+        const matResult = await client.query(matQuery, [materialId]);
         if (matResult.rows.length === 0) {
           await client.query("ROLLBACK");
           return res.status(400).json({
-            message: `Material with ID '${line.material_id}' does not exist`,
+            message: `Material with ID '${materialId}' does not exist`,
           });
         }
+
+        if (!isStockBucketCompatible(matResult.rows[0].applies_to, stockBucket)) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message: `Material '${matResult.rows[0].name}' cannot be assigned to stock bucket '${stockBucket}'`,
+          });
+        }
+
+        if (variantId) {
+          const variantResult = await client.query(
+            "SELECT id FROM material_variants WHERE id = $1 AND material_id = $2",
+            [variantId, materialId]
+          );
+          if (variantResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: `Variant '${variantId}' does not belong to material '${materialId}'`,
+            });
+          }
+        }
+
         enrichedLines.push({
           ...line,
+          material_id: materialId,
+          variant_id: variantId,
+          stock_bucket: stockBucket,
           material_code: matResult.rows[0].code,
           material_name: matResult.rows[0].name,
           material_category: matResult.rows[0].category,
@@ -673,17 +770,19 @@ export default function (pool) {
 
       const insertPurchaseLineQuery = `
         INSERT INTO purchase_invoice_lines (
-          purchase_invoice_id, line_number, material_id,
+          purchase_invoice_id, line_number, material_id, variant_id, stock_bucket,
           quantity, unit_cost, amount, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+      for (let i = 0; i < enrichedLines.length; i++) {
+        const line = enrichedLines[i];
         await client.query(insertPurchaseLineQuery, [
           id,
           line.line_number || i + 1,
           line.material_id,
+          line.variant_id,
+          line.stock_bucket,
           line.quantity || null,
           line.unit_cost || null,
           parseFloat(line.amount),
