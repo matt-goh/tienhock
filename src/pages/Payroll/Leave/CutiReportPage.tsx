@@ -842,7 +842,7 @@ const CutiReportPage: React.FC = () => {
           </div>
 
           {/* --- Employee Card Grid --- */}
-          <div className="max-h-[calc(100vh-300px)] overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm p-4">
+          <div className="overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredEmployees.map((employee) => (
                 <EmployeeCard

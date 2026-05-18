@@ -349,7 +349,9 @@ export default function (pool) {
                     // Total OT = natural OT + forced OT
                     hoursApplied = Math.max(0, hours - overtimeThreshold) + forceOT;
                   } else {
-                    hoursApplied = hours;
+                    // Regular hours capped at OT threshold so OT hours
+                    // are not double-counted in base pay quantity.
+                    hoursApplied = Math.min(hours, overtimeThreshold);
                   }
                 }
 
@@ -623,7 +625,9 @@ export default function (pool) {
                     // Total OT = natural OT + forced OT
                     hoursApplied = Math.max(0, hours - overtimeThreshold) + forceOT;
                   } else {
-                    hoursApplied = hours;
+                    // Regular hours capped at OT threshold so OT hours
+                    // are not double-counted in base pay quantity.
+                    hoursApplied = Math.min(hours, overtimeThreshold);
                   }
                 }
 
