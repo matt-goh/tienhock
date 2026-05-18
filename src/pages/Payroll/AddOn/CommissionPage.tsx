@@ -118,7 +118,7 @@ const CommissionPage: React.FC = () => {
     }
   };
 
-  const handleEdit = (commission: Commission) => {
+  const handleEdit = (commission: Commission): void => {
     setEditingCommission(commission);
     setShowEditModal(true);
   };
@@ -176,7 +176,7 @@ const CommissionPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4 transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20">
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
             <YearNavigator
@@ -205,8 +205,8 @@ const CommissionPage: React.FC = () => {
       </div>
 
       {/* Others (Advance) Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20">
+        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg">
           <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
             {getMonthName(currentMonth)} {currentYear}
           </h2>
@@ -219,7 +219,7 @@ const CommissionPage: React.FC = () => {
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No {DISPLAY_LABEL} records found</p>
-            <p>Click "Add {DISPLAY_LABEL}" to create records</p>
+            <p>Click &quot;Add {DISPLAY_LABEL}&quot; to create records</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -251,7 +251,10 @@ const CommissionPage: React.FC = () => {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                 {commissions.map((commission) => (
-                  <tr key={commission.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                  <tr
+                    key={commission.id}
+                    className="group transition-colors duration-150 hover:bg-sky-50/60 dark:hover:bg-sky-900/20"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
                       {commission.employee_id}
                     </td>
@@ -259,7 +262,7 @@ const CommissionPage: React.FC = () => {
                       {commission.employee_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
-                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 transition-colors duration-150 group-hover:bg-sky-200 dark:group-hover:bg-sky-900/50">
                         {commission.location_code} - {commission.location_name || "Unknown"}
                       </span>
                     </td>
@@ -279,7 +282,7 @@ const CommissionPage: React.FC = () => {
                       <div className="flex items-center justify-end space-x-3">
                         <button
                           onClick={() => handleEdit(commission)}
-                          className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
+                          className="p-1.5 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-150"
                           title="Edit"
                         >
                           <IconEdit size={18} />
@@ -289,7 +292,7 @@ const CommissionPage: React.FC = () => {
                             setDeletingId(commission.id);
                             setShowDeleteDialog(true);
                           }}
-                          className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
+                          className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors duration-150"
                           title="Delete"
                         >
                           <IconTrash size={18} />

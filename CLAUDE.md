@@ -16,7 +16,7 @@ If unsure why existing code is structured a certain way, ask.
 10. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
 11. Use rm instead of del when deleting files.
 12. If needed during planning, access the dev database to understand the system better, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
-13. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
+13. Anytime any changes need to be made to the database, please update the Database Schema in AGENTS.md and CLAUDE.md.
 14. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
 15. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
 
@@ -50,7 +50,7 @@ This is a comprehensive ERP system supporting three companies:
 - Maintenance mode support for database operations
 - Environment variables for database configuration
 
-#### Database Schema (74 tables)
+#### Database Schema (76 tables)
 
 **Accounting & Finance:**
 - `account_codes` - id, code, description, ledger_type, parent_code, level, sort_order, is_active, is_system, notes, created_at, updated_at, created_by, updated_by, fs_note (financial statement note reference)
@@ -63,11 +63,13 @@ This is a comprehensive ERP system supporting three companies:
 - `location_account_mappings` - id, location_id, location_name, mapping_type, account_code, voucher_type, is_active, created_at, updated_at, created_by, updated_by
 - `suppliers` - id, code (unique), name, contact_person, phone, email, is_active, created_at, updated_at
 - `purchase_invoices` - id, supplier_id (FK suppliers), invoice_number, invoice_date, total_amount, payment_status (unpaid/partial/paid), amount_paid, journal_entry_id (FK journal_entries), notes, created_at, updated_at, created_by (unique: supplier_id, invoice_number)
-- `purchase_invoice_lines` - id, purchase_invoice_id (FK purchase_invoices CASCADE), line_number, material_id (FK materials), quantity, unit_cost, amount, notes, created_at (material purchase lines for tracking raw material/ingredient/packing purchases)
+- `purchase_invoice_lines` - id, purchase_invoice_id (FK purchase_invoices CASCADE), line_number, material_id (FK materials), variant_id (nullable FK material_variants), stock_bucket (mee/bihun/shared/null; null means accounting-only), quantity, unit_cost, amount, notes, created_at (material purchase lines for tracking raw material/ingredient/packing purchases and derived stock purchases)
 - `material_purchase_account_mappings` - id, material_category (unique), purchase_account_code (FK account_codes), description, is_active, created_at (maps material categories to GL purchase accounts for auto-journaling: ingredient→PUR, raw_material→PUR, packing_material→PM)
 - `self_billed_foreign_suppliers` - id, supplier_name (unique), tin_number (default EI00000000030), id_type, id_number, sst_number, ttx_number, msic_code, business_activity_description, address_line_0-2, city, postcode, state_code, country_code, contact_number, email, notes, is_active, created_at, updated_at (foreign seller profiles for manual self-billed e-invoices)
-- `self_billed_invoices` - id, foreign_supplier_id (FK self_billed_foreign_suppliers), self_billed_no (unique), purchase_date, transaction_type, platform, order_no, payment_reference, shipping_method, shipping_number, has_supporting_document, supporting_document_notes, supporting_document_s3_key, supporting_document_filename, supporting_document_content_type, supporting_document_size, supporting_document_uploaded_at, supporting_document_uploaded_by, currency_code, fx_rate, total_foreign_amount, total_excluding_tax_myr, tax_amount_myr, total_including_tax_myr, payable_amount_myr, uuid, submission_uid, long_id, datetime_validated, invoice_status, einvoice_status, cancellation_reason, notes, created_at, updated_at, created_by
-- `self_billed_invoice_lines` - id, self_billed_invoice_id (FK self_billed_invoices CASCADE), line_number, description, quantity, balance_quantity (local record-only stock balance), unit_price_foreign, amount_foreign, amount_myr, classification_code, tax_type, tax_rate, tax_amount_myr, tax_exemption_reason, customs_form_reference, notes, created_at
+- `self_billed_invoices` - id, purchase_kind (foreign/local; compatibility field for General Purchases), foreign_supplier_id (nullable FK self_billed_foreign_suppliers for foreign purchases), local_supplier_name (free-text supplier for local purchases), self_billed_no (unique internal purchase no.; SB prefix for foreign, GP prefix for local), purchase_date, transaction_type, platform, order_no, payment_reference, shipping_method, shipping_number, has_supporting_document, supporting_document_notes, supporting_document_s3_key, supporting_document_filename, supporting_document_content_type, supporting_document_size, supporting_document_uploaded_at, supporting_document_uploaded_by, currency_code, fx_rate, total_foreign_amount, total_excluding_tax_myr, tax_amount_myr, total_including_tax_myr, payable_amount_myr, uuid, submission_uid, long_id, datetime_validated, invoice_status, einvoice_status, cancellation_reason, notes, created_at, updated_at, created_by
+- `self_billed_invoice_lines` - id, self_billed_invoice_id (FK self_billed_invoices CASCADE), line_number, description, quantity, balance_quantity (source balance for General stock), general_stock_category_id (nullable FK general_stock_categories), unit_price_foreign, amount_foreign, amount_myr, classification_code, tax_type, tax_rate, tax_amount_myr, tax_exemption_reason, customs_form_reference, notes, created_at
+- `general_stock_categories` - id, name (unique), sort_order, is_active, created_at, updated_at, created_by, updated_by (user-managed subcategories for General stock such as Bearing)
+- `general_stock_adjustments` - id, self_billed_invoice_line_id (nullable FK self_billed_invoice_lines CASCADE), general_stock_category_id (nullable FK general_stock_categories), adjustment_date, adjustment_quantity, notes, created_at, updated_at, created_by, updated_by (General stock usage/adjustment ledger; positive source-linked adjustments increase invoice line balance_quantity, negative adjustments reduce General stock only)
 
 **Customers & Sales:**
 - `customers` - id, name, closeness, salesman, tin_number, id_type, state, email, address, city, id_number, phone_number, credit_limit, credit_used, updated_at
@@ -92,7 +94,7 @@ This is a comprehensive ERP system supporting three companies:
 **Materials (Ingredients/Raw/Packing):**
 - `materials` - id, code (unique), name, category (ingredient/raw_material/packing_material), default_unit_cost, applies_to (mee/bihun/both), sort_order, is_active, created_at, updated_at, created_by
 - `material_variants` - id, material_id (FK), variant_name, default_unit_cost, sort_order, is_active, created_at, updated_at (unique: material_id, variant_name). For materials with multiple suppliers/types like "Beras 50KG" having Vietnam Coklat, Vietnam Hijau, etc.
-- `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun), variant_id (nullable FK to material_variants), custom_name, custom_description, quantity (closing stock qty), unit_cost, value (quantity * unit_cost), notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default')). Opening quantity is derived from previous month's closing quantity.
+- `material_stock_entries` - id, year, month, material_id, product_line (mee/bihun/shared), variant_id (nullable FK to material_variants), custom_name, custom_description, adjustment_quantity (manual plus/minus stock adjustment), unit_cost, adjustment_value (adjustment_quantity * unit_cost), notes, created_at, updated_at, created_by (unique: year, month, material_id, product_line, COALESCE(variant_id::text, custom_description, 'default')). Closing stock is derived from cumulative opening + purchase_invoice_lines for the bucket + adjustment_quantity.
 
 **Staff & Employees:**
 - `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
@@ -140,7 +142,7 @@ This is a comprehensive ERP system supporting three companies:
 **Leave Management:**
 - `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at
 - `leave_records` - id, employee_id, leave_date, leave_type, work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
-- `holiday_calendar` - id, holiday_date, description, is_active
+- `holiday_calendar` - id, holiday_date, description, is_active, is_cuti_umum (checked holidays count toward yearly Cuti Umum entitlement)
 
 **Reference Data:**
 - `agama` - id, name

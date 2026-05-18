@@ -237,11 +237,11 @@ export default function (pool) {
           -- Commission and bonus data
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd 
-             WHERE cd.employee_id = ebd.employee_id AND UPPER(cd.description) LIKE '%COMMISSION%'), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
           ) as commission_total,
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd 
-             WHERE cd.employee_id = ebd.employee_id AND UPPER(cd.description) LIKE '%BONUS%'), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
           ) as bonus_total,
           -- Leave data
           COALESCE(
@@ -377,7 +377,7 @@ export default function (pool) {
         JOIN staffs s ON cr.employee_id = s.id
         WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
           AND EXTRACT(MONTH FROM cr.commission_date) = $2
-          AND UPPER(cr.description) LIKE '%COMMISSION%'
+          AND cr.location_code IS NOT NULL
         GROUP BY cr.employee_id, cr.location_code, s.name, s.ic_no, s.bank_account_number, s.payment_preference
       `;
       const commissionResult = await pool.query(commissionQuery, [yearInt, monthInt]);
@@ -938,11 +938,11 @@ export default function (pool) {
           -- Commission and bonus data
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND UPPER(cd.description) LIKE '%COMMISSION%'), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
           ) as commission_total,
           COALESCE(
             (SELECT SUM(commission_amount) FROM commission_data cd
-             WHERE cd.employee_id = ebd.employee_id AND UPPER(cd.description) LIKE '%BONUS%'), 0
+             WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
           ) as bonus_total,
           -- Leave data
           COALESCE(
@@ -1071,7 +1071,7 @@ export default function (pool) {
         FROM commission_records cr
         JOIN staffs s ON cr.employee_id = s.id
         WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
-          AND UPPER(cr.description) LIKE '%COMMISSION%'
+          AND cr.location_code IS NOT NULL
         GROUP BY cr.employee_id, cr.location_code, s.name, s.ic_no, s.bank_account_number, s.payment_preference
       `;
       const commissionResult = await pool.query(commissionQuery, [yearInt]);

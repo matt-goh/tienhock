@@ -16,7 +16,7 @@ If unsure why existing code is structured a certain way, ask.
 10. Don't run or ask to run npm run build, type checks or lint commands unless explicitly requested by the user. The user will do the tests manually.
 11. Use rm instead of del when deleting files.
 12. If needed during planning, access the dev database to understand the system better, use Docker: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` or pipe SQL files with `< file.sql`.
-13. Anytime any changes need to be made to the database, please update the Database Schema in this markdown too.
+13. Anytime any changes need to be made to the database, please update the Database Schema in AGENTS.md and CLAUDE.md.
 14. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
 15. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
 
@@ -142,7 +142,7 @@ This is a comprehensive ERP system supporting three companies:
 **Leave Management:**
 - `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at
 - `leave_records` - id, employee_id, leave_date, leave_type, work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
-- `holiday_calendar` - id, holiday_date, description, is_active
+- `holiday_calendar` - id, holiday_date, description, is_active, is_cuti_umum (checked holidays count toward yearly Cuti Umum entitlement)
 
 **Reference Data:**
 - `agama` - id, name

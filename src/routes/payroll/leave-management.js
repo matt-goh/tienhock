@@ -47,6 +47,21 @@ const calculateLeaveAllocation = (yearsOfService) => {
   return { cuti_tahunan_total, cuti_sakit_total };
 };
 
+const getCutiUmumTotal = async (client, year) => {
+  const result = await client.query(
+    `
+      SELECT COUNT(*)::integer as total
+      FROM holiday_calendar
+      WHERE is_active = true
+        AND is_cuti_umum = true
+        AND EXTRACT(YEAR FROM holiday_date) = $1
+    `,
+    [year]
+  );
+
+  return Number(result.rows[0]?.total || 0);
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -76,6 +91,7 @@ export default function (pool) {
         await client.query("BEGIN");
 
         const result = {};
+        const cutiUmumTotal = await getCutiUmumTotal(client, parseInt(year));
 
         // Process each employee
         for (const employeeId of employeeIdList) {
@@ -133,7 +149,10 @@ export default function (pool) {
           }, {});
 
           result[employeeId] = {
-            balance: balanceResult.rows[0],
+            balance: {
+              ...balanceResult.rows[0],
+              cuti_umum_total: cutiUmumTotal,
+            },
             taken: takenLeave,
           };
         }
@@ -202,6 +221,8 @@ export default function (pool) {
           ]);
         }
 
+        const cutiUmumTotal = await getCutiUmumTotal(client, parseInt(year));
+
         // Now, get the sum of taken leave days for the year
         const takenLeaveQuery = `
             SELECT leave_type, SUM(days_taken) as total_taken
@@ -221,7 +242,10 @@ export default function (pool) {
 
         await client.query("COMMIT");
         res.json({
-          balance: balanceResult.rows[0],
+          balance: {
+            ...balanceResult.rows[0],
+            cuti_umum_total: cutiUmumTotal,
+          },
           taken: takenLeave,
         });
       } catch (error) {
@@ -451,11 +475,17 @@ export default function (pool) {
           leave_balances AS (
             SELECT 
               lb.employee_id,
-              lb.cuti_umum_total,
               lb.cuti_tahunan_total,
               lb.cuti_sakit_total
             FROM employee_leave_balances lb
             WHERE lb.employee_id = ANY($1::text[]) AND lb.year = $2
+          ),
+          cuti_umum_entitlement AS (
+            SELECT COUNT(*)::integer as total
+            FROM holiday_calendar
+            WHERE is_active = true
+              AND is_cuti_umum = true
+              AND EXTRACT(YEAR FROM holiday_date) = $2
           ),
           leave_records AS (
             SELECT 
@@ -480,7 +510,7 @@ export default function (pool) {
           )
           SELECT 
             ei.*,
-            COALESCE(lb.cuti_umum_total, 14) as cuti_umum_total,
+            (SELECT total FROM cuti_umum_entitlement) as cuti_umum_total,
             COALESCE(lb.cuti_tahunan_total, 
               CASE 
                 WHEN ei.years_of_service < 2 THEN 8
@@ -517,7 +547,7 @@ export default function (pool) {
           LEFT JOIN leave_records lr ON ei.id = lr.employee_id
           GROUP BY 
             ei.id, ei.name, ei.job, ei."dateJoined", ei."icNo", ei.nationality, ei.years_of_service,
-            lb.cuti_umum_total, lb.cuti_tahunan_total, lb.cuti_sakit_total,
+            lb.cuti_tahunan_total, lb.cuti_sakit_total,
             lt.cuti_umum, lt.cuti_sakit, lt.cuti_tahunan
           ORDER BY ei.name
         `;
@@ -569,7 +599,7 @@ export default function (pool) {
             year: year,
             yearsOfService: Number(row.years_of_service || 0),
             leaveBalance: {
-              cuti_umum_total: Number(row.cuti_umum_total || 14),
+              cuti_umum_total: Number(row.cuti_umum_total || 0),
               cuti_tahunan_total: Number(row.cuti_tahunan_total || 8),
               cuti_sakit_total: Number(row.cuti_sakit_total || 14),
             },

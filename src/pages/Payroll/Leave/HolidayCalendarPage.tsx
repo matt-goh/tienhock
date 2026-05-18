@@ -23,6 +23,7 @@ interface Holiday {
   holiday_date: string;
   description: string;
   is_active: boolean;
+  is_cuti_umum: boolean;
 }
 
 const HolidayCalendarPage: React.FC = () => {
@@ -43,6 +44,10 @@ const HolidayCalendarPage: React.FC = () => {
       return holidayYear === selectedYear;
     });
   }, [allHolidays, selectedYear]);
+
+  const cutiUmumCount: number = React.useMemo(() => {
+    return holidays.filter((holiday) => holiday.is_cuti_umum).length;
+  }, [holidays]);
 
   const handleYearChange = (direction: "prev" | "next") => {
     setSelectedYear((year) => (direction === "prev" ? year - 1 : year + 1));
@@ -68,7 +73,7 @@ const HolidayCalendarPage: React.FC = () => {
     <div className="space-y-2">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Holiday Calendar ({holidays.length})
+          Holiday Calendar ({holidays.length}) - Cuti Umum ({cutiUmumCount})
         </h1>
         <div className="flex items-center gap-4">
           {/* Year Navigation */}
@@ -128,6 +133,9 @@ const HolidayCalendarPage: React.FC = () => {
                       Description
                     </th>
                     <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
+                      Cuti Umum
+                    </th>
+                    <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
                       Actions
                     </th>
                   </tr>
@@ -165,6 +173,15 @@ const HolidayCalendarPage: React.FC = () => {
                           <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                             {holiday.description || "-"}
                           </td>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={holiday.is_cuti_umum}
+                              readOnly
+                              aria-label="Counts toward Cuti Umum"
+                              className="h-4 w-4 rounded border-default-300 text-sky-600 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700"
+                            />
+                          </td>
                           <td className="px-4 py-3 text-center text-sm">
                             <div className="flex items-center justify-center space-x-2">
                               <button
@@ -192,7 +209,7 @@ const HolidayCalendarPage: React.FC = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                       >
                         No holidays recorded for {selectedYear}
