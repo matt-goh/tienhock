@@ -95,6 +95,47 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
         }
       : null;
 
+  const themeClasses: Record<
+    string,
+    { container: string; icon: string; title: string; message: string }
+  > = {
+    emerald: {
+      container:
+        "border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/30",
+      icon: "text-emerald-600 dark:text-emerald-400",
+      title: "text-emerald-800 dark:text-emerald-300",
+      message: "text-emerald-700 dark:text-emerald-400",
+    },
+    sky: {
+      container:
+        "border-sky-200 bg-sky-50 dark:border-sky-700 dark:bg-sky-900/30",
+      icon: "text-sky-600 dark:text-sky-400",
+      title: "text-sky-800 dark:text-sky-300",
+      message: "text-sky-700 dark:text-sky-400",
+    },
+    amber: {
+      container:
+        "border-amber-200 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/30",
+      icon: "text-amber-600 dark:text-amber-400",
+      title: "text-amber-800 dark:text-amber-300",
+      message: "text-amber-700 dark:text-amber-400",
+    },
+    rose: {
+      container:
+        "border-rose-200 bg-rose-50 dark:border-rose-700 dark:bg-rose-900/30",
+      icon: "text-rose-600 dark:text-rose-400",
+      title: "text-rose-800 dark:text-rose-300",
+      message: "text-rose-700 dark:text-rose-400",
+    },
+    default: {
+      container:
+        "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800",
+      icon: "text-gray-600 dark:text-gray-400",
+      title: "text-gray-800 dark:text-gray-200",
+      message: "text-gray-700 dark:text-gray-400",
+    },
+  };
+
   // Determine overall theme based on success/status
   // Treat pending update successes as 'emerald'
   const isOverallSuccess = results?.success ?? false;
@@ -221,22 +262,21 @@ const SubmissionResultsModal: React.FC<SubmissionResultsModalProps> = ({
             <div className="space-y-6">
               {/* ----- Overall Status Message ----- */}
               <div
-                className={`flex items-start p-4 rounded-lg border border-${themeColor}-200 bg-${themeColor}-50`}
+                className={`flex items-start p-4 rounded-lg border ${themeClasses[themeColor]?.container ?? themeClasses.default.container}`}
               >
                 <ThemeIcon
                   size={20}
-                  className={`flex-shrink-0 mr-3 mt-0.5 text-${themeColor}-600`}
+                  className={`flex-shrink-0 mr-3 mt-0.5 ${themeClasses[themeColor]?.icon ?? themeClasses.default.icon}`}
                 />
                 <div>
                   <h3
-                    className={`text-base font-semibold text-${themeColor}-800`}
+                    className={`text-base font-semibold ${themeClasses[themeColor]?.title ?? themeClasses.default.title}`}
                   >
-                    {/* Use overallStatus if available, otherwise derive from success */}
                     {results.overallStatus ||
                       (isOverallSuccess ? "Success" : "Failed")}
                   </h3>
                   {results.message && (
-                    <p className={`text-sm text-${themeColor}-700 mt-1`}>
+                    <p className={`text-sm mt-1 ${themeClasses[themeColor]?.message ?? themeClasses.default.message}`}>
                       {results.message}
                     </p>
                   )}
