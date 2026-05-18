@@ -74,10 +74,32 @@ interface DailyLogEntryPageProps {
 }
 
 type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan";
+type BulkLeaveTypeValue = LeaveType | "mixed";
 
 interface LeaveEntry {
   selected: boolean;
   leaveType: LeaveType;
+}
+
+interface LeaveOption {
+  id: LeaveType;
+  name: string;
+}
+
+interface LeaveBalance {
+  cuti_tahunan_total: number;
+  cuti_sakit_total: number;
+  cuti_umum_total: number;
+  cuti_tahunan_taken: number;
+  cuti_sakit_taken: number;
+  cuti_umum_taken: number;
+}
+
+interface LeaveAvailability {
+  available: boolean;
+  remaining: number;
+  totalAllowed: number;
+  taken: number;
 }
 
 interface ActivityItem {
@@ -131,17 +153,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     useState(false);
   const [leaveSelectAll, setLeaveSelectAll] = useState(false);
   const [leaveBalances, setLeaveBalances] = useState<
-    Record<
-      string,
-      {
-        cuti_tahunan_total: number;
-        cuti_sakit_total: number;
-        cuti_umum_total: number;
-        cuti_tahunan_taken: number;
-        cuti_sakit_taken: number;
-        cuti_umum_taken: number;
-      }
-    >
+    Record<string, LeaveBalance>
   >({});
   // State for BIHUN_SANGKUT tray counts (only used for BIHUN jobType)
   const [trayCounts, setTrayCounts] = useState<Record<string, number>>({});
@@ -702,6 +714,37 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
   }, [uniqueEmployees, employeeSelectionState.selectedJobs]);
 
+  const leaveOptions = useMemo<LeaveOption[]>(() => {
+    const options: LeaveOption[] = [
+      { id: "cuti_sakit", name: "Cuti Sakit" },
+      { id: "cuti_tahunan", name: "Cuti Tahunan" },
+    ];
+
+    if (formData.dayType === "Umum") {
+      return [{ id: "cuti_umum", name: "Cuti Umum" }, ...options];
+    }
+
+    return options;
+  }, [formData.dayType]);
+
+  const selectedLeaveEmployeesForBulk = useMemo<EmployeeWithHours[]>(() => {
+    return availableForLeave.filter((emp) => leaveEmployees[emp.id]?.selected);
+  }, [availableForLeave, leaveEmployees]);
+
+  const bulkLeaveTypeValue = useMemo<BulkLeaveTypeValue>(() => {
+    if (selectedLeaveEmployeesForBulk.length === 0) return "mixed";
+
+    const firstLeaveType =
+      leaveEmployees[selectedLeaveEmployeesForBulk[0].id]?.leaveType;
+    if (!firstLeaveType) return "mixed";
+
+    const allSameType = selectedLeaveEmployeesForBulk.every(
+      (emp) => leaveEmployees[emp.id]?.leaveType === firstLeaveType
+    );
+
+    return allSameType ? firstLeaveType : "mixed";
+  }, [leaveEmployees, selectedLeaveEmployeesForBulk]);
+
   // Update day type and hours when date changes
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = new Date(e.target.value);
@@ -751,7 +794,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       );
 
       // Process the batch response and update state
-      const newBalances: Record<string, any> = {};
+      const newBalances: Record<string, LeaveBalance> = {};
 
       Object.entries(response).forEach(([employeeId, data]: [string, any]) => {
         const balance = data.balance;
@@ -834,6 +877,51 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     }
 
     return { available, remaining, message, taken, totalAllowed };
+  };
+
+  const getLeaveTypeDisplayName = (leaveType: LeaveType): string => {
+    switch (leaveType) {
+      case "cuti_tahunan":
+        return "Annual Leave";
+      case "cuti_sakit":
+        return "Sick Leave";
+      case "cuti_umum":
+        return "Public Holiday Leave";
+    }
+  };
+
+  const getLeaveAvailabilityFromBalance = (
+    balanceData: LeaveBalance,
+    leaveType: LeaveType
+  ): LeaveAvailability => {
+    let remaining = 0;
+    let totalAllowed = 0;
+    let taken = 0;
+
+    switch (leaveType) {
+      case "cuti_tahunan":
+        totalAllowed = balanceData.cuti_tahunan_total || 0;
+        taken = balanceData.cuti_tahunan_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_sakit":
+        totalAllowed = balanceData.cuti_sakit_total || 0;
+        taken = balanceData.cuti_sakit_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_umum":
+        totalAllowed = balanceData.cuti_umum_total || 0;
+        taken = balanceData.cuti_umum_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+    }
+
+    return {
+      available: remaining > 0,
+      remaining,
+      totalAllowed,
+      taken,
+    };
   };
 
   // Add this useEffect to capture initial state - only once after initialization is complete
@@ -1254,6 +1342,81 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     // Show remaining balance for the new leave type
     toast.success(
       `Leave type changed - ${remaining} days remaining`
+    );
+  };
+
+  const handleBulkLeaveTypeChange = async (
+    leaveType: LeaveType
+  ): Promise<void> => {
+    if (isSaving) return;
+
+    if (leaveType === "cuti_umum" && formData.dayType !== "Umum") {
+      toast.error("Cuti Umum is only available on public holiday logs");
+      return;
+    }
+
+    if (selectedLeaveEmployeesForBulk.length === 0) {
+      toast.error("Select employees for leave first");
+      return;
+    }
+
+    const employeesToLoad: string[] = selectedLeaveEmployeesForBulk
+      .filter((emp) => !leaveBalances[emp.id])
+      .map((emp) => emp.id);
+
+    const loadedBalances: Record<string, LeaveBalance> =
+      employeesToLoad.length > 0
+        ? await fetchLeaveBalancesBatch(employeesToLoad)
+        : {};
+
+    const balancesForCheck: Record<string, LeaveBalance> = {
+      ...leaveBalances,
+      ...loadedBalances,
+    };
+
+    const employeesWithInsufficientBalance: string[] = [];
+
+    selectedLeaveEmployeesForBulk.forEach((emp) => {
+      const balanceData = balancesForCheck[emp.id];
+      if (!balanceData) {
+        employeesWithInsufficientBalance.push(emp.name);
+        return;
+      }
+
+      const availability = getLeaveAvailabilityFromBalance(
+        balanceData,
+        leaveType
+      );
+
+      if (!availability.available) {
+        employeesWithInsufficientBalance.push(emp.name);
+      }
+    });
+
+    if (employeesWithInsufficientBalance.length > 0) {
+      toast.error(
+        `Cannot change all: ${employeesWithInsufficientBalance.join(
+          ", "
+        )} have insufficient ${getLeaveTypeDisplayName(leaveType)} balance`
+      );
+      return;
+    }
+
+    setLeaveEmployees((prev) => {
+      const newLeaveEmployees: Record<string, LeaveEntry> = { ...prev };
+      selectedLeaveEmployeesForBulk.forEach((emp) => {
+        newLeaveEmployees[emp.id] = {
+          selected: true,
+          leaveType,
+        };
+      });
+      return newLeaveEmployees;
+    });
+
+    toast.success(
+      `Changed ${selectedLeaveEmployeesForBulk.length} selected leave ${
+        selectedLeaveEmployeesForBulk.length === 1 ? "employee" : "employees"
+      } to ${getLeaveTypeDisplayName(leaveType)}`
     );
   };
 
@@ -3054,7 +3217,86 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       scope="col"
                       className="px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      Leave Type
+                      <div className="flex items-center gap-2">
+                        <span>SET ALL</span>
+                        <Listbox
+                          value={bulkLeaveTypeValue}
+                          onChange={(value) => {
+                            void handleBulkLeaveTypeChange(value as LeaveType);
+                          }}
+                          disabled={
+                            selectedLeaveEmployeesForBulk.length === 0 ||
+                            isSaving
+                          }
+                        >
+                          <div className="relative w-40 normal-case">
+                            <ListboxButton
+                              className={`relative w-full pl-3 pr-8 py-1.5 text-left rounded-md border text-xs font-medium ${
+                                selectedLeaveEmployeesForBulk.length === 0 ||
+                                isSaving
+                                  ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
+                                  : "bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-300 dark:border-gray-600 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                              }`}
+                            >
+                              <span className="block truncate">
+                                {leaveOptions.find(
+                                  (option) => option.id === bulkLeaveTypeValue
+                                )?.name || "Set selected"}
+                              </span>
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                <IconChevronDown
+                                  className="w-4 h-4 text-default-400 dark:text-gray-500"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            </ListboxButton>
+                            <Transition
+                              as={Fragment}
+                              leave="transition ease-in duration-100"
+                              leaveFrom="opacity-100"
+                              leaveTo="opacity-0"
+                            >
+                              <ListboxOptions className="absolute z-50 w-full py-1 mt-1 overflow-auto text-sm bg-white dark:bg-gray-800 rounded-md shadow-lg max-h-60 ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                {leaveOptions.map((option) => (
+                                  <ListboxOption
+                                    key={option.id}
+                                    value={option.id}
+                                    className={({ active }) =>
+                                      `${
+                                        active
+                                          ? "bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200"
+                                          : "text-default-700 dark:text-gray-200"
+                                      } cursor-pointer select-none relative py-2 pl-3 pr-8`
+                                    }
+                                  >
+                                    {({ selected }) => (
+                                      <>
+                                        <span
+                                          className={`${
+                                            selected
+                                              ? "font-medium"
+                                              : "font-normal"
+                                          } block truncate`}
+                                        >
+                                          {option.name}
+                                        </span>
+                                        {selected && (
+                                          <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-amber-600 dark:text-amber-400">
+                                            <IconCheck
+                                              className="w-4 h-4"
+                                              aria-hidden="true"
+                                            />
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </ListboxOption>
+                                ))}
+                              </ListboxOptions>
+                            </Transition>
+                          </div>
+                        </Listbox>
+                      </div>
                     </th>
                     <th
                       scope="col"
@@ -3066,17 +3308,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {availableForLeave.map((employee) => {
-                    const leaveOptions = [
-                      { id: "cuti_sakit", name: "Cuti Sakit" },
-                      { id: "cuti_tahunan", name: "Cuti Tahunan" },
-                    ];
-                    if (formData.dayType === "Umum") {
-                      leaveOptions.unshift({
-                        id: "cuti_umum",
-                        name: "Cuti Umum",
-                      });
-                    }
-
                     const isSelected =
                       leaveEmployees[employee.id]?.selected || false;
                     const defaultLeaveType =
