@@ -408,6 +408,26 @@ export const TienHockNavData: SidebarItem[] = [
     icon: IconPackage,
     subItems: [
       {
+        name: "Product Stock",
+        path: "/stock/movement",
+        component: ProductStockMovementPage,
+      },
+      {
+        name: "General Stock",
+        path: "/stock/entry",
+        component: MaterialAndGeneralStockPage,
+      },
+      {
+        name: "Production Entry",
+        path: "/stock/production",
+        component: ProductionEntryPage,
+      },
+      {
+        name: "Product Adjustments",
+        path: "/stock/adjustments",
+        component: ProductStockAdjustmentEntryPage,
+      },
+      {
         name: "Material Purchases",
         path: "/stock/material-purchases",
         component: MaterialPurchaseListPage,
@@ -453,26 +473,6 @@ export const TienHockNavData: SidebarItem[] = [
             component: GeneralPurchaseInvoiceFormPage,
           },
         ],
-      },
-      {
-        name: "General Stock",
-        path: "/stock/entry",
-        component: MaterialAndGeneralStockPage,
-      },
-      {
-        name: "Production Entry",
-        path: "/stock/production",
-        component: ProductionEntryPage,
-      },
-      {
-        name: "Product Stock",
-        path: "/stock/movement",
-        component: ProductStockMovementPage,
-      },
-      {
-        name: "Product Adjustments",
-        path: "/stock/adjustments",
-        component: ProductStockAdjustmentEntryPage,
       },
     ],
   },
