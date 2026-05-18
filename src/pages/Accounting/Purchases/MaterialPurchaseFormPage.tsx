@@ -10,6 +10,8 @@ import {
   PurchaseInvoiceLineInput,
   SupplierDropdown,
   MaterialDropdown,
+  StockBucket,
+  MaterialAppliesTo,
 } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
@@ -20,9 +22,12 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 interface PurchaseLine {
   id?: number;
   line_number: number;
+  material_option_id: string;
   material_id: string;
+  variant_id: string;
   material_name: string;
   material_category: string;
+  stock_bucket: StockBucket | "";
   quantity: string;
   unit_cost: string;
   amount: string;
@@ -48,6 +53,31 @@ const formatCategory = (category: string): string => {
     default:
       return category;
   }
+};
+
+const stockBucketOptions: { id: StockBucket | ""; name: string }[] = [
+  { id: "", name: "Accounting only" },
+  { id: "mee", name: "Mee" },
+  { id: "bihun", name: "Bihun" },
+  { id: "shared", name: "Shared" },
+];
+
+const isStockBucketAllowed = (
+  appliesTo: MaterialAppliesTo | undefined,
+  stockBucket: StockBucket | ""
+): boolean => {
+  if (!stockBucket) return true;
+  if (!appliesTo) return false;
+  if (stockBucket === "shared") return appliesTo === "both";
+  return appliesTo === stockBucket || appliesTo === "both";
+};
+
+const getStockBucketOptions = (
+  appliesTo: MaterialAppliesTo | undefined
+): { id: StockBucket | ""; name: string }[] => {
+  return stockBucketOptions.filter((option) =>
+    isStockBucketAllowed(appliesTo, option.id)
+  );
 };
 
 // Material Combobox Component
@@ -359,9 +389,12 @@ const MaterialPurchaseFormPage: React.FC = () => {
   const [lines, setLines] = useState<PurchaseLine[]>([
     {
       line_number: 1,
+      material_option_id: "",
       material_id: "",
+      variant_id: "",
       material_name: "",
       material_category: "",
+      stock_bucket: "",
       quantity: "",
       unit_cost: "",
       amount: "",
@@ -439,35 +472,44 @@ const MaterialPurchaseFormPage: React.FC = () => {
       const fetchedLines: PurchaseLine[] = response.lines.map((line) => ({
         id: line.id,
         line_number: line.line_number,
+        material_option_id: line.variant_id
+          ? `${line.material_id}-${line.variant_id}`
+          : String(line.material_id),
         material_id: String(line.material_id),
+        variant_id: line.variant_id ? String(line.variant_id) : "",
         material_name: line.material_name || "",
         material_category: line.material_category || "",
+        stock_bucket: line.stock_bucket || "",
         quantity: line.quantity ? String(line.quantity) : "",
         unit_cost: line.unit_cost ? String(line.unit_cost) : "",
         amount: String(line.amount),
         notes: line.notes || "",
       }));
 
-      setFormData(fetchedFormData);
-      setLines(
+      const displayedLines: PurchaseLine[] =
         fetchedLines.length > 0
           ? fetchedLines
           : [
               {
                 line_number: 1,
+                material_option_id: "",
                 material_id: "",
+                variant_id: "",
                 material_name: "",
                 material_category: "",
+                stock_bucket: "",
                 quantity: "",
                 unit_cost: "",
                 amount: "",
                 notes: "",
               },
-            ]
-      );
+            ];
+
+      setFormData(fetchedFormData);
+      setLines(displayedLines);
 
       initialFormDataRef.current = { ...fetchedFormData };
-      initialLinesRef.current = JSON.parse(JSON.stringify(fetchedLines));
+      initialLinesRef.current = JSON.parse(JSON.stringify(displayedLines));
     } catch (err: unknown) {
       console.error("Error fetching invoice data:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -526,13 +568,24 @@ const MaterialPurchaseFormPage: React.FC = () => {
     if (!materialId || materialId.startsWith("header-")) return;
 
     const material = materials.find((m) => String(m.id) === materialId);
+    const baseMaterialId = material?.is_variant
+      ? String(material.material_id)
+      : materialId;
+    const variantId = material?.variant_id ? String(material.variant_id) : "";
+
     setLines((prev) => {
       const newLines = [...prev];
+      const currentBucket = newLines[index].stock_bucket;
       newLines[index] = {
         ...newLines[index],
-        material_id: materialId,
+        material_option_id: materialId,
+        material_id: baseMaterialId,
+        variant_id: variantId,
         material_name: material?.name || "",
         material_category: material?.category || "",
+        stock_bucket: isStockBucketAllowed(material?.applies_to, currentBucket)
+          ? currentBucket
+          : "",
         unit_cost: material?.default_unit_cost
           ? String(material.default_unit_cost)
           : "",
@@ -568,9 +621,12 @@ const MaterialPurchaseFormPage: React.FC = () => {
       ...prev,
       {
         line_number: prev.length + 1,
+        material_option_id: "",
         material_id: "",
+        variant_id: "",
         material_name: "",
         material_category: "",
+        stock_bucket: "",
         quantity: "",
         unit_cost: "",
         amount: "",
@@ -642,6 +698,18 @@ const MaterialPurchaseFormPage: React.FC = () => {
       return;
     }
 
+    const invalidStockLine = validLines.find((line) => {
+      const selectedMaterial = materials.find(
+        (material) => String(material.id) === line.material_option_id
+      );
+      return !isStockBucketAllowed(selectedMaterial?.applies_to, line.stock_bucket);
+    });
+
+    if (invalidStockLine) {
+      toast.error(`${invalidStockLine.material_name || "Selected material"} cannot use the selected stock bucket`);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -654,6 +722,8 @@ const MaterialPurchaseFormPage: React.FC = () => {
           (line): PurchaseInvoiceLineInput => ({
             line_number: line.line_number,
             material_id: parseInt(line.material_id),
+            variant_id: line.variant_id ? parseInt(line.variant_id) : null,
+            stock_bucket: line.stock_bucket || null,
             quantity: line.quantity ? parseFloat(line.quantity) : null,
             unit_cost: line.unit_cost ? parseFloat(line.unit_cost) : null,
             amount: parseFloat(line.amount),
@@ -820,6 +890,9 @@ const MaterialPurchaseFormPage: React.FC = () => {
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
                     Material
                   </th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-36">
+                    Stock
+                  </th>
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-24">
                     Qty
                   </th>
@@ -833,26 +906,52 @@ const MaterialPurchaseFormPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-800">
-                {lines.map((line, index) => (
-                  <tr
-                    key={index}
-                    className="group hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors"
-                  >
-                    {/* Line Number */}
-                    <td className="px-3 py-1 text-sm text-default-500 dark:text-gray-400 font-mono">
-                      {String(line.line_number).padStart(2, "0")}
-                    </td>
+                {lines.map((line, index) => {
+                  const selectedMaterial = materials.find(
+                    (material) => String(material.id) === line.material_option_id
+                  );
+                  const allowedStockBucketOptions = getStockBucketOptions(
+                    selectedMaterial?.applies_to
+                  );
+
+                  return (
+                    <tr
+                      key={index}
+                      className="group hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors"
+                    >
+                      {/* Line Number */}
+                      <td className="px-3 py-1 text-sm text-default-500 dark:text-gray-400 font-mono">
+                        {String(line.line_number).padStart(2, "0")}
+                      </td>
 
                     {/* Material */}
                     <td className="px-1 py-1">
                       <MaterialCombobox
-                        value={line.material_id}
+                        value={line.material_option_id}
                         materials={materials}
                         onChange={(materialId) =>
                           handleMaterialChange(index, materialId)
                         }
                         disabled={!canEdit}
                       />
+                    </td>
+
+                    {/* Stock Bucket */}
+                    <td className="px-1 py-1">
+                      <select
+                        value={line.stock_bucket}
+                        onChange={(e) =>
+                          handleLineChange(index, "stock_bucket", e.target.value)
+                        }
+                        disabled={!canEdit}
+                        className="w-full px-2 py-1.5 text-sm bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded text-default-900 dark:text-gray-100 disabled:cursor-not-allowed"
+                      >
+                        {allowedStockBucketOptions.map((option) => (
+                          <option key={option.id || "none"} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
                     </td>
 
                     {/* Quantity */}
@@ -916,12 +1015,13 @@ const MaterialPurchaseFormPage: React.FC = () => {
                         </button>
                       )}
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 dark:bg-gray-900/50">
-                  <td colSpan={2} className="px-3 py-2.5">
+                  <td colSpan={3} className="px-3 py-2.5">
                     {canEdit && (
                       <button
                         type="button"

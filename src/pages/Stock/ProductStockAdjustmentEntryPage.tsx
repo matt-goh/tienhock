@@ -1,4 +1,4 @@
-// src/pages/Stock/StockAdjustmentEntryPage.tsx
+// src/pages/Stock/ProductStockAdjustmentEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -22,7 +22,7 @@ import MonthNavigator from "../../components/MonthNavigator";
 
 type ProductTab = "BH" | "MEE";
 
-const StockAdjustmentEntryPage: React.FC = () => {
+const ProductStockAdjustmentEntryPage: React.FC = () => {
   // Month selection state
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
 
@@ -649,4 +649,4 @@ const StockAdjustmentEntryPage: React.FC = () => {
   );
 };
 
-export default StockAdjustmentEntryPage;
+export default ProductStockAdjustmentEntryPage;

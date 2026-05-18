@@ -160,6 +160,7 @@ const formatDateForApi = (date: Date): string => {
 
 const canSubmitInvoice = (invoice: SelfBilledInvoiceListItem): boolean => {
   return (
+    invoice.purchase_kind !== "local" &&
     invoice.invoice_status !== "cancelled" &&
     (invoice.einvoice_status === null || invoice.einvoice_status === "invalid")
   );
@@ -180,7 +181,14 @@ const getMyInvoisPortalUrl = (
   return `https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`;
 };
 
-const SelfBilledInvoiceListPage: React.FC = () => {
+const getInvoicePath = (invoice: SelfBilledInvoiceListItem, selectedMonth: Date): string => {
+  const month = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`;
+  return invoice.purchase_kind === "local"
+    ? `/stock/general-purchases/local/${invoice.id}?month=${month}`
+    : `/stock/general-purchases/${invoice.id}?month=${month}`;
+};
+
+const GeneralPurchaseInvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<SelfBilledInvoiceListItem[]>([]);
@@ -238,13 +246,13 @@ const SelfBilledInvoiceListPage: React.FC = () => {
       params.append("end_date", formatDateForApi(dateRange.end));
 
       const response = await api.get(
-        `/api/self-billed-invoices?${params.toString()}`
+        `/api/general-purchases?${params.toString()}`
       );
       setInvoices(response.invoices || []);
       setTotal(response.total || 0);
     } catch (error) {
-      console.error("Error fetching self-billed invoices:", error);
-      toast.error("Failed to load self-billed invoices");
+      console.error("Error fetching general purchases:", error);
+      toast.error("Failed to load general purchases");
     } finally {
       setLoading(false);
     }
@@ -343,7 +351,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
 
     if (eligibleSelectedInvoices.length === 0) {
       toast.error(
-        "No selected self-billed invoices are eligible for e-invoice submission."
+        "No selected foreign purchases are eligible for e-invoice submission."
       );
       return;
     }
@@ -369,7 +377,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
 
     try {
       const blob = await api.downloadBlob(
-        `/api/self-billed-invoices/${invoice.id}/supporting-document`
+        `/api/general-purchases/${invoice.id}/supporting-document`
       );
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -406,7 +414,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
     setShowSubmissionResults(true);
 
     try {
-      const response = (await api.post("/api/self-billed-invoices/submit", {
+      const response = (await api.post("/api/general-purchases/submit", {
         invoiceIds,
       })) as SelfBilledSubmissionResult;
 
@@ -416,13 +424,13 @@ const SelfBilledInvoiceListPage: React.FC = () => {
       const rejectedCount = response.rejectedDocuments?.length || 0;
 
       if (acceptedCount > 0 && rejectedCount === 0) {
-        toast.success(`Submitted ${acceptedCount} self-billed invoice(s)`);
+        toast.success(`Submitted ${acceptedCount} foreign purchase(s)`);
       } else if (acceptedCount > 0 && rejectedCount > 0) {
         toast.success(
           `Partial success: ${acceptedCount} accepted, ${rejectedCount} rejected`
         );
       } else {
-        toast.error(response.message || "Self-billed e-invoice submission failed");
+        toast.error(response.message || "E-invoice submission failed");
       }
 
       setSelectedInvoiceIds(new Set());
@@ -446,7 +454,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
       <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-            {total > 0 && !loading ? `${total} ` : ""}Self-Billed E-Invoices
+            {total > 0 && !loading ? `${total} ` : ""}General Purchases
           </h1>
           <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
             |
@@ -474,7 +482,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div
             className="relative h-8 w-full sm:w-48"
-            title="Search by self-billed number, supplier, order, or platform"
+            title="Search by purchase number, supplier, order, or platform"
           >
             <IconSearch
               size={16}
@@ -536,9 +544,20 @@ const SelfBilledInvoiceListPage: React.FC = () => {
             variant="filled"
             size="sm"
             className="h-8 rounded-lg !px-3"
-            onClick={() => navigate(`/accounting/self-billed-invoices/new?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
+            onClick={() => navigate(`/stock/general-purchases/new/local?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
           >
-            New
+            New Local
+          </Button>
+          <Button
+            type="button"
+            icon={IconPlus}
+            color="amber"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg !px-3"
+            onClick={() => navigate(`/stock/general-purchases/new/foreign?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)}
+          >
+            New Foreign
           </Button>
         </div>
       </div>
@@ -552,7 +571,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
             title={
               selectedInvoiceIds.size > 0
                 ? "Clear selection"
-                : "Select all visible self-billed invoices"
+                : "Select all visible general purchases"
             }
           >
             <span className="rounded-full p-1">
@@ -580,7 +599,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
               </span>
             ) : (
               <span className="text-sm text-default-500 dark:text-gray-400">
-                Select invoices to submit
+                Select foreign purchases to submit
               </span>
             )}
           </button>
@@ -617,7 +636,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
         ) : invoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-default-500 dark:text-gray-400">
             <IconFileInvoice size={32} className="mb-2" />
-            <p className="text-sm">No self-billed invoices found.</p>
+            <p className="text-sm">No general purchases found.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -632,7 +651,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                       title={
                         allVisibleSelected
                           ? "Clear selection"
-                          : "Select all visible self-billed invoices"
+                          : "Select all visible general purchases"
                       }
                     >
                       {allVisibleSelected ? (
@@ -681,7 +700,7 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                   <tr
                     key={invoice.id}
                     onClick={() =>
-                      navigate(`/accounting/self-billed-invoices/${invoice.id}?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`)
+                      navigate(getInvoicePath(invoice, selectedMonth))
                     }
                     className={`cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/50 ${
                       selectedInvoiceIds.has(invoice.id)
@@ -717,6 +736,15 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-default-900 dark:text-gray-100">
                       {invoice.self_billed_no}
+                      <span
+                        className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          invoice.purchase_kind === "local"
+                            ? "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                        }`}
+                      >
+                        {invoice.purchase_kind === "local" ? "Local" : "Foreign"}
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-sm text-default-700 dark:text-gray-300">
                       <span className="block truncate">{invoice.supplier_name}</span>
@@ -750,8 +778,8 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-mono text-default-700 dark:text-gray-300">
                       {formatAmount(
-                        invoice.total_foreign_amount,
-                        invoice.currency_code
+                        invoice.purchase_kind === "local" ? 0 : invoice.total_foreign_amount,
+                        invoice.purchase_kind === "local" ? "MYR" : invoice.currency_code
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-mono text-default-900 dark:text-gray-100">
@@ -768,13 +796,19 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">
                       <div className="flex items-center gap-1.5">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClasses(
-                            invoice.einvoice_status
-                          )}`}
-                        >
-                          {getStatusLabel(invoice.einvoice_status)}
-                        </span>
+                        {invoice.purchase_kind === "local" ? (
+                          <span className="inline-flex rounded-full bg-default-100 px-2.5 py-1 text-xs font-medium text-default-600 dark:bg-gray-700 dark:text-gray-300">
+                            Not Required
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusClasses(
+                              invoice.einvoice_status
+                            )}`}
+                          >
+                            {getStatusLabel(invoice.einvoice_status)}
+                          </span>
+                        )}
                         {portalUrl && (
                           <a
                             href={portalUrl}
@@ -797,11 +831,11 @@ const SelfBilledInvoiceListPage: React.FC = () => {
                         onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
                           event.stopPropagation();
                           navigate(
-                            `/accounting/self-billed-invoices/${invoice.id}?month=${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`
+                            getInvoicePath(invoice, selectedMonth)
                           );
                         }}
                         className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-default-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
-                        title="Open self-billed invoice"
+                        title="Open general purchase"
                       >
                         <IconPencil size={17} />
                       </button>
@@ -826,8 +860,8 @@ const SelfBilledInvoiceListPage: React.FC = () => {
         isOpen={showEInvoiceConfirm}
         onClose={() => setShowEInvoiceConfirm(false)}
         onConfirm={confirmBulkSubmitEInvoice}
-        title="Submit Selected Self-Billed E-Invoices"
-        message={`You are about to submit ${eligibleSelectedInvoices.length} eligible self-billed invoice(s) to MyInvois. Continue?`}
+        title="Submit Selected Foreign Purchases"
+        message={`You are about to submit ${eligibleSelectedInvoices.length} eligible foreign purchase(s) to MyInvois. Continue?`}
         confirmButtonText="Submit e-Invoices"
         variant="default"
       />
@@ -835,4 +869,4 @@ const SelfBilledInvoiceListPage: React.FC = () => {
   );
 };
 
-export default SelfBilledInvoiceListPage;
+export default GeneralPurchaseInvoiceListPage;

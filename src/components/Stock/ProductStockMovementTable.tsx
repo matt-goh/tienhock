@@ -1,9 +1,9 @@
-// src/components/Stock/StockMovementTable.tsx
+// src/components/Stock/ProductStockMovementTable.tsx
 import React from "react";
 import clsx from "clsx";
 import { StockMovement } from "../../types/types";
 
-interface StockMovementTableProps {
+interface ProductStockMovementTableProps {
   movements: StockMovement[];
   monthlyTotals?: {
     production: number;
@@ -16,7 +16,7 @@ interface StockMovementTableProps {
   isLoading?: boolean;
 }
 
-const StockMovementTable: React.FC<StockMovementTableProps> = ({
+const ProductStockMovementTable: React.FC<ProductStockMovementTableProps> = ({
   movements,
   monthlyTotals,
   isLoading = false,
@@ -207,4 +207,4 @@ const StockMovementTable: React.FC<StockMovementTableProps> = ({
   );
 };
 
-export default StockMovementTable;
+export default ProductStockMovementTable;
