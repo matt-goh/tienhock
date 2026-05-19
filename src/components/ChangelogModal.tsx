@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-05-19",
+    ms: "Pembetulan: Slip gaji kini memaparkan Rate/Jam atau Rate/Bag pada lajur kadar, bersama jumlah Jam atau Bag pekerja.",
+    en: "Fix: Payslips now show Rate/Jam or Rate/Bag in the rate column, together with the worker's total Jam or Bag.",
+  },
+  {
+    date: "2026-05-19",
     ms: 'Halaman baru "Others (Kerja Luar OT)" dalam Payroll untuk merekod OT kerja luar — entri akan keluar pada slip gaji setiap pekerja sebagai pendahuluan.',
     en: 'New "Others (Kerja Luar OT)" page in Payroll for recording outside-work overtime — entries appear on each employee\'s payslip as an advance.',
   },
