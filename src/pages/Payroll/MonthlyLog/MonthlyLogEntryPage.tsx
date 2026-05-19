@@ -27,6 +27,7 @@ import ManageActivitiesModal, {
 } from "../../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import { calculateActivityAmount } from "../../../utils/payroll/calculateActivityAmount";
+import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
 import {
   Dialog,
   DialogPanel,
@@ -251,6 +252,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       return employeeJobs.some((job: string) => JOB_IDS.includes(job));
     });
   }, [allStaffs, loadingStaffs, JOB_IDS]);
+
+  // Leave is aggregated per name on the backend, so the Add Leave modal
+  // picker collapses multi-ID employees to a single row (senior ID kept).
+  const leaveEligibleEmployees = useMemo(
+    () => groupStaffsByName(eligibleEmployees),
+    [eligibleEmployees],
+  );
 
   // Initialize employee entries
   useEffect(() => {
@@ -756,23 +764,45 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
   // Employees that already have a leave entry on the selected date (existing or new),
   // keyed by employee_id -> leave type label. Used to disable them in the picker.
+  // Multi-ID employees: the flag is propagated across all sibling IDs so the
+  // senior shown in the deduped picker disables when ANY sibling has leave that day.
   const employeesWithLeaveOnSelectedDate = useMemo(() => {
+    const nameToIds = new Map<string, string[]>();
+    const idToName = new Map<string, string>();
+    for (const s of allStaffs || []) {
+      idToName.set(s.id, s.name);
+      const list = nameToIds.get(s.name);
+      if (list) list.push(s.id);
+      else nameToIds.set(s.name, [s.id]);
+    }
+
     const map: Record<string, string> = {};
     [...existingLeaveRecords, ...newLeaveEntries].forEach((entry) => {
-      if (entry.leaveDate === leaveFormData.leaveDate) {
-        map[entry.employeeId] = entry.leaveType;
-      }
+      if (entry.leaveDate !== leaveFormData.leaveDate) return;
+      const name = idToName.get(entry.employeeId);
+      const siblings = (name && nameToIds.get(name)) || [entry.employeeId];
+      siblings.forEach((sib) => {
+        map[sib] = entry.leaveType;
+      });
     });
     return map;
-  }, [existingLeaveRecords, newLeaveEntries, leaveFormData.leaveDate]);
+  }, [allStaffs, existingLeaveRecords, newLeaveEntries, leaveFormData.leaveDate]);
 
-  // Open Add Leave modal and pre-select currently-selected employees on the table
+  // Open Add Leave modal and pre-select currently-selected employees on the table.
+  // The picker is deduped to senior IDs, so map each selected work-row's ID to
+  // the senior sibling sharing the same name before pre-checking.
   const openAddLeaveModal = () => {
+    const nameToSenior = new Map<string, string>();
+    for (const emp of leaveEligibleEmployees) nameToSenior.set(emp.name, emp.id);
+    const idToName = new Map<string, string>();
+    for (const emp of allStaffs || []) idToName.set(emp.id, emp.name);
+
     const initialSelections: Record<string, boolean> = {};
     Object.values(employeeEntries).forEach((entry) => {
-      if (entry.selected) {
-        initialSelections[entry.employeeId] = true;
-      }
+      if (!entry.selected) return;
+      const name = idToName.get(entry.employeeId);
+      const seniorId = (name && nameToSenior.get(name)) || entry.employeeId;
+      initialSelections[seniorId] = true;
     });
     setLeaveEmployeeSelections(initialSelections);
     setLeaveEmployeeSearch("");
@@ -1623,7 +1653,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       type="button"
                       onClick={() => {
                         // Toggle select-all among currently-visible+selectable employees
-                        const visibleSelectable = eligibleEmployees.filter(
+                        const visibleSelectable = leaveEligibleEmployees.filter(
                           (emp: Employee) => {
                             if (employeesWithLeaveOnSelectedDate[emp.id])
                               return false;
@@ -1649,7 +1679,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 font-medium"
                     >
                       {(() => {
-                        const visibleSelectable = eligibleEmployees.filter(
+                        const visibleSelectable = leaveEligibleEmployees.filter(
                           (emp: Employee) => {
                             if (employeesWithLeaveOnSelectedDate[emp.id])
                               return false;
@@ -1690,7 +1720,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   <div className="max-h-72 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg divide-y divide-default-100 dark:divide-gray-700">
                     {(() => {
                       const q = leaveEmployeeSearch.trim().toLowerCase();
-                      const filtered = eligibleEmployees.filter(
+                      const filtered = leaveEligibleEmployees.filter(
                         (emp: Employee) =>
                           !q ||
                           emp.name.toLowerCase().includes(q) ||
