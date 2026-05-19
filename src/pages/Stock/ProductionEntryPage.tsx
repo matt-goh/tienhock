@@ -39,6 +39,10 @@ import { Switch } from "@headlessui/react";
 import Button from "../../components/Button";
 import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMappingModal";
 import { isSpecialItem } from "../../config/specialItems";
+import {
+  OTH_PRODUCTION_IDS,
+  getOthProductionConfig,
+} from "../../config/othProductionProducts";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
@@ -141,11 +145,14 @@ const ProductionEntryPage: React.FC = () => {
 
   // Filter out HANCUR special items from regular product lists
   // BUNDLE products are star-able even though they're special items
+  // OTH products are only included if they're whitelisted for production entry
   const regularProducts = useMemo(() => {
     return products.filter(
       (product) =>
         !isSpecialItem(product.id) &&
-        (product.type === "BH" || product.type === "MEE")
+        (product.type === "BH" ||
+          product.type === "MEE" ||
+          OTH_PRODUCTION_IDS.includes(product.id))
     ) as StockProduct[];
   }, [products]);
 
@@ -187,6 +194,7 @@ const ProductionEntryPage: React.FC = () => {
       MEE: filtered.filter((p) => p.type === "MEE"),
       BH: bhProducts,
       BUNDLE: bundleProducts,
+      OTH: filtered.filter((p) => p.type === "OTH"),
     };
   }, [regularProducts, favorites, products]);
 
@@ -198,26 +206,25 @@ const ProductionEntryPage: React.FC = () => {
       | undefined;
   }, [selectedProductId, products]);
 
-  // Determine product type for worker filtering
-  const productType = useMemo(() => {
-    if (!selectedProduct) return null;
-    return selectedProduct.type === "MEE" ? "MEE" : "BH";
-  }, [selectedProduct]);
-
-  // Filter workers from cached staffs based on product type
+  // Filter workers from cached staffs.
+  // OTH products with explicit job config use the union of their jobs.
+  // Otherwise fall back to MEE_PACKING (for MEE) or BH_PACKING (for everything else).
   const workers: ProductionWorker[] = useMemo(() => {
-    if (!productType) return [];
+    if (!selectedProduct) return [];
 
-    const jobFilter = productType === "MEE" ? "MEE_PACKING" : "BH_PACKING";
+    const othConfig = getOthProductionConfig(selectedProduct.id);
+    const jobFilters: string[] = othConfig
+      ? othConfig.jobs
+      : [selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING"];
 
     return staffs
-      .filter((staff) => staff.job.includes(jobFilter))
+      .filter((staff) => jobFilters.some((j) => staff.job.includes(j)))
       .map((staff) => ({
         id: staff.id,
         name: staff.name,
         job: staff.job,
       }));
-  }, [staffs, productType]);
+  }, [staffs, selectedProduct]);
 
   // Fetch existing entries when date or product changes
   useEffect(() => {
@@ -554,7 +561,7 @@ const ProductionEntryPage: React.FC = () => {
                 label="Search for a product (click star to favorite)"
                 value={selectedProductId}
                 onChange={handleProductSelect}
-                productTypes={["MEE", "BH", "BUNDLE"]}
+                productTypes={["MEE", "BH", "BUNDLE", "OTH"]}
               />
             </div>
 
@@ -706,6 +713,39 @@ const ProductionEntryPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Other Products Section */}
+            {nonFavoriteProducts.OTH.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <IconBox size={14} className="text-purple-500" />
+                  <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                    Other Products
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nonFavoriteProducts.OTH.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => handleProductSelect(product.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 px-2.5 py-1.5 text-sm transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                    >
+                      <span className="font-semibold text-default-900 dark:text-gray-100">
+                        {product.id}
+                      </span>
+                      {product.description && (
+                        <>
+                          <span className="text-default-400 dark:text-gray-500">·</span>
+                          <span className="text-default-700 dark:text-gray-300">
+                            {product.description}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -722,10 +762,16 @@ const ProductionEntryPage: React.FC = () => {
                   className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium flex-shrink-0 ${
                     selectedProduct?.type === "MEE"
                       ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                      : selectedProduct?.type === "OTH"
+                      ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
                       : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
                   }`}
                 >
-                  {selectedProduct?.type === "MEE" ? "Mee" : "Bihun"}
+                  {selectedProduct?.type === "MEE"
+                    ? "Mee"
+                    : selectedProduct?.type === "OTH"
+                    ? "Other"
+                    : "Bihun"}
                 </span>
                 <div className="flex-shrink-0">
                   <span className="font-semibold text-default-900 dark:text-gray-100">

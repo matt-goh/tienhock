@@ -110,7 +110,7 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform rounded-2xl border border-transparent bg-white p-6 shadow-xl transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100 mb-4"
@@ -120,11 +120,11 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Employee Info (Read-only) */}
-                  <div className="bg-default-50 rounded-lg p-4 border">
-                    <div className="text-sm text-default-600 mb-1">
+                  <div className="rounded-lg border border-default-200 bg-default-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+                    <div className="mb-1 text-sm text-default-600 dark:text-gray-400">
                       Employee
                     </div>
-                    <div className="font-medium text-default-900">
+                    <div className="font-medium text-default-900 dark:text-gray-100">
                       {payroll.employee_name} ({payroll.employee_id})
                     </div>
                   </div>
