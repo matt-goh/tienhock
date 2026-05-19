@@ -168,6 +168,15 @@ export default function (pool) {
             AND EXTRACT(MONTH FROM cr.commission_date) = $2
           GROUP BY cr.employee_id, cr.description, cr.location_code
         ),
+        others_data AS (
+          SELECT
+            orec.employee_id,
+            COALESCE(SUM(orec.amount), 0) as others_amount
+          FROM others_records orec
+          WHERE EXTRACT(YEAR FROM orec.record_date) = $1
+            AND EXTRACT(MONTH FROM orec.record_date) = $2
+          GROUP BY orec.employee_id
+        ),
         leave_data AS (
           SELECT 
             lr.employee_id,
@@ -236,16 +245,21 @@ export default function (pool) {
           ) as income_tax,
           -- Commission and bonus data
           COALESCE(
-            (SELECT SUM(commission_amount) FROM commission_data cd 
+            (SELECT SUM(commission_amount) FROM commission_data cd
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NOT NULL), 0
           ) as commission_total,
           COALESCE(
-            (SELECT SUM(commission_amount) FROM commission_data cd 
+            (SELECT SUM(commission_amount) FROM commission_data cd
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
           ) as bonus_total,
+          -- Others (Kerja Luar OT) data - advances deducted from net_pay just like commission
+          COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id), 0
+          ) as others_total,
           -- Leave data
           COALESCE(
-            (SELECT SUM(leave_amount) FROM leave_data ld 
+            (SELECT SUM(leave_amount) FROM leave_data ld
              WHERE ld.employee_id = ebd.employee_id AND ld.leave_type = 'cuti_tahunan'), 0
           ) as cuti_tahunan_amount
         FROM employee_base_data ebd
@@ -258,14 +272,19 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        const gaji = parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
+        const gaji =
+          parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        // Commission and bonus from commission_records are advances already deducted from net_pay in DB
-        const commissionAdvance = parseFloat(row.commission_total || 0) + parseFloat(row.bonus_total || 0);
+        // Commission and bonus from commission_records are advances already deducted from net_pay in DB.
+        // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
+        const commissionAdvance =
+          parseFloat(row.commission_total || 0) +
+          parseFloat(row.bonus_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
-        const jumlah = parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
+        const jumlah =
+          parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
         // Rounding: DIGENAPKAN rounds up to nearest whole ringgit
         const setelah_digenapkan = Math.ceil(jumlah);
         const digenapkan = setelah_digenapkan - jumlah;
@@ -302,9 +321,14 @@ export default function (pool) {
           setelah_digenapkan: setelah_digenapkan,
           cuti_tahunan_amount: parseFloat(row.cuti_tahunan_amount || 0),
           // Bank/Pinjam tab data
-          gaji_genap: parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0),
+          gaji_genap:
+            parseFloat(row.net_pay || 0) -
+            parseFloat(row.mid_month_amount || 0),
           total_pinjam: parseFloat(row.total_pinjam || 0),
-          final_total: parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0) - parseFloat(row.total_pinjam || 0),
+          final_total:
+            parseFloat(row.net_pay || 0) -
+            parseFloat(row.mid_month_amount || 0) -
+            parseFloat(row.total_pinjam || 0),
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
         };
@@ -315,32 +339,60 @@ export default function (pool) {
       // Track unique employees for grand totals to avoid double-counting
       const locationData = {};
       const grandTotals = {
-        gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
-        epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-        sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
-        setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
+        gaji: 0,
+        ot: 0,
+        bonus: 0,
+        comm: 0,
+        gaji_kasar: 0,
+        epf_majikan: 0,
+        epf_pekerja: 0,
+        socso_majikan: 0,
+        socso_pekerja: 0,
+        sip_majikan: 0,
+        sip_pekerja: 0,
+        pcb: 0,
+        gaji_bersih: 0,
+        setengah_bulan: 0,
+        jumlah: 0,
+        digenapkan: 0,
+        setelah_digenapkan: 0,
       };
       const processedUniqueEmployees = new Set(); // Track unique employees for grand totals
 
       // Fetch all locations from database
-      const locationsResult = await pool.query("SELECT id FROM locations ORDER BY id");
-      const allLocations = locationsResult.rows.map(r => r.id);
-      allLocations.forEach(loc => {
+      const locationsResult = await pool.query(
+        "SELECT id FROM locations ORDER BY id",
+      );
+      const allLocations = locationsResult.rows.map((r) => r.id);
+      allLocations.forEach((loc) => {
         locationData[loc] = {
           location: loc,
           employees: [],
           totals: {
-            gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
-            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-            sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
-            setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
-          }
+            gaji: 0,
+            ot: 0,
+            bonus: 0,
+            comm: 0,
+            gaji_kasar: 0,
+            epf_majikan: 0,
+            epf_pekerja: 0,
+            socso_majikan: 0,
+            socso_pekerja: 0,
+            sip_majikan: 0,
+            sip_pekerja: 0,
+            pcb: 0,
+            gaji_bersih: 0,
+            setengah_bulan: 0,
+            jumlah: 0,
+            digenapkan: 0,
+            setelah_digenapkan: 0,
+          },
         };
       });
 
       // Process each employee and group by location
       // With dual-location, an employee may appear in multiple locations
-      processedData.forEach(employee => {
+      processedData.forEach((employee) => {
         const loc = employee.location_code || "02";
 
         if (locationData[loc]) {
@@ -348,7 +400,7 @@ export default function (pool) {
           locationData[loc].employees.push(employee);
 
           // Add to location totals (each location gets the full amount)
-          Object.keys(locationData[loc].totals).forEach(key => {
+          Object.keys(locationData[loc].totals).forEach((key) => {
             locationData[loc].totals[key] += employee[key] || 0;
           });
         }
@@ -356,7 +408,7 @@ export default function (pool) {
         // Add to grand totals ONLY ONCE per unique employee (avoid double-counting)
         if (!processedUniqueEmployees.has(employee.staff_id)) {
           processedUniqueEmployees.add(employee.staff_id);
-          Object.keys(grandTotals).forEach(key => {
+          Object.keys(grandTotals).forEach((key) => {
             grandTotals[key] += employee[key] || 0;
           });
         }
@@ -380,7 +432,10 @@ export default function (pool) {
           AND cr.location_code IS NOT NULL
         GROUP BY cr.employee_id, cr.location_code, s.name, s.ic_no, s.bank_account_number, s.payment_preference
       `;
-      const commissionResult = await pool.query(commissionQuery, [yearInt, monthInt]);
+      const commissionResult = await pool.query(commissionQuery, [
+        yearInt,
+        monthInt,
+      ]);
 
       // Get mid-month data for commission location employees
       const midMonthQuery = `
@@ -388,9 +443,12 @@ export default function (pool) {
         FROM mid_month_payrolls
         WHERE year = $1 AND month = $2
       `;
-      const midMonthResult = await pool.query(midMonthQuery, [yearInt, monthInt]);
+      const midMonthResult = await pool.query(midMonthQuery, [
+        yearInt,
+        monthInt,
+      ]);
       const midMonthMap = new Map();
-      midMonthResult.rows.forEach(row => {
+      midMonthResult.rows.forEach((row) => {
         midMonthMap.set(row.employee_id, parseFloat(row.mid_month_amount || 0));
       });
 
@@ -398,24 +456,28 @@ export default function (pool) {
       const commissionOnlyEmployees = [];
 
       // Group commissions by location (16-24), defaulting to "18" if no location_code
-      commissionResult.rows.forEach(row => {
+      commissionResult.rows.forEach((row) => {
         const locCode = row.location_code || "18"; // Default to COMM-KILANG if no location
         const commAmount = parseFloat(row.commission_amount || 0);
         const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
 
         // Check if this employee exists in processedData (has regular payroll)
-        const hasRegularPayroll = processedData.some(e => e.staff_id === row.employee_id);
+        const hasRegularPayroll = processedData.some(
+          (e) => e.staff_id === row.employee_id,
+        );
 
         // Only process for commission locations (16-24)
         if (locationData[locCode]) {
           // Find if employee already exists in this location
           const existingEmployee = locationData[locCode].employees.find(
-            e => e.staff_id === row.employee_id
+            (e) => e.staff_id === row.employee_id,
           );
 
           if (!existingEmployee) {
             // Find employee base data from processed data
-            const baseEmp = processedData.find(e => e.staff_id === row.employee_id);
+            const baseEmp = processedData.find(
+              (e) => e.staff_id === row.employee_id,
+            );
 
             const jumlah = commAmount - midMonthAmount;
 
@@ -427,10 +489,18 @@ export default function (pool) {
               bank_account_number: row.bank_account_number,
               payment_preference: row.payment_preference,
               location_code: locCode,
-              gaji: 0, ot: 0, bonus: 0, comm: commAmount,
+              gaji: 0,
+              ot: 0,
+              bonus: 0,
+              comm: commAmount,
               gaji_kasar: commAmount,
-              epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-              sip_majikan: 0, sip_pekerja: 0, pcb: 0,
+              epf_majikan: 0,
+              epf_pekerja: 0,
+              socso_majikan: 0,
+              socso_pekerja: 0,
+              sip_majikan: 0,
+              sip_pekerja: 0,
+              pcb: 0,
               gaji_bersih: commAmount,
               setengah_bulan: midMonthAmount,
               jumlah: jumlah,
@@ -452,7 +522,9 @@ export default function (pool) {
             // Track commission-only employees for main data response
             if (!hasRegularPayroll) {
               // Check if already tracked (multiple commission entries for same employee)
-              const existingCommOnly = commissionOnlyEmployees.find(e => e.staff_id === row.employee_id);
+              const existingCommOnly = commissionOnlyEmployees.find(
+                (e) => e.staff_id === row.employee_id,
+              );
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
                 // Add to grand totals for commission-only employees
@@ -466,8 +538,12 @@ export default function (pool) {
                 existingCommOnly.comm += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
-                existingCommOnly.jumlah = existingCommOnly.gaji_bersih - existingCommOnly.setengah_bulan;
-                existingCommOnly.gaji_genap = existingCommOnly.gaji_bersih - existingCommOnly.mid_month_amount;
+                existingCommOnly.jumlah =
+                  existingCommOnly.gaji_bersih -
+                  existingCommOnly.setengah_bulan;
+                existingCommOnly.gaji_genap =
+                  existingCommOnly.gaji_bersih -
+                  existingCommOnly.mid_month_amount;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 // Update grand totals
@@ -482,7 +558,8 @@ export default function (pool) {
             existingEmployee.comm += commAmount;
             existingEmployee.gaji_kasar += commAmount;
             existingEmployee.gaji_bersih += commAmount;
-            existingEmployee.jumlah = existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
+            existingEmployee.jumlah =
+              existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
 
             locationData[locCode].totals.comm += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
@@ -493,17 +570,29 @@ export default function (pool) {
       });
 
       // CUTI TAHUNAN (23) - Leave records
-      const cutiTahunanEmployees = processedData.filter(emp => emp.cuti_tahunan_amount > 0);
-      cutiTahunanEmployees.forEach(emp => {
-        if (!locationData["23"].employees.find(e => e.staff_id === emp.staff_id)) {
+      const cutiTahunanEmployees = processedData.filter(
+        (emp) => emp.cuti_tahunan_amount > 0,
+      );
+      cutiTahunanEmployees.forEach((emp) => {
+        if (
+          !locationData["23"].employees.find((e) => e.staff_id === emp.staff_id)
+        ) {
           locationData["23"].employees.push({
             ...emp,
-            gaji: 0, ot: 0, bonus: 0, comm: emp.cuti_tahunan_amount,
-            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-            sip_majikan: 0, sip_pekerja: 0, pcb: 0,
+            gaji: 0,
+            ot: 0,
+            bonus: 0,
+            comm: emp.cuti_tahunan_amount,
+            epf_majikan: 0,
+            epf_pekerja: 0,
+            socso_majikan: 0,
+            socso_pekerja: 0,
+            sip_majikan: 0,
+            sip_pekerja: 0,
+            pcb: 0,
             gaji_kasar: emp.cuti_tahunan_amount,
             gaji_bersih: emp.cuti_tahunan_amount,
-            jumlah: emp.cuti_tahunan_amount
+            jumlah: emp.cuti_tahunan_amount,
           });
           locationData["23"].totals.comm += emp.cuti_tahunan_amount;
           locationData["23"].totals.gaji_kasar += emp.cuti_tahunan_amount;
@@ -513,7 +602,7 @@ export default function (pool) {
       });
 
       // Convert locationData object to array for response
-      const locationsArray = allLocations.map(loc => locationData[loc]);
+      const locationsArray = allLocations.map((loc) => locationData[loc]);
 
       // Get unique employees for Bank/Pinjam tabs (avoid duplicates from dual-location)
       // Include both regular payroll employees and commission-only employees
@@ -522,7 +611,7 @@ export default function (pool) {
         const result = [];
 
         // First add regular payroll employees
-        processedData.forEach(emp => {
+        processedData.forEach((emp) => {
           if (!seen.has(emp.staff_id)) {
             seen.add(emp.staff_id);
             result.push(emp);
@@ -530,7 +619,7 @@ export default function (pool) {
         });
 
         // Then add commission-only employees
-        commissionOnlyEmployees.forEach(emp => {
+        commissionOnlyEmployees.forEach((emp) => {
           if (!seen.has(emp.staff_id)) {
             seen.add(emp.staff_id);
             result.push(emp);
@@ -558,16 +647,25 @@ export default function (pool) {
         })),
         total_records: uniqueEmployeesForBankPinjam.length,
         summary: {
-          total_gaji_genap: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.gaji_genap, 0),
-          total_pinjam: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.total_pinjam, 0),
-          total_final: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.final_total, 0),
+          total_gaji_genap: uniqueEmployeesForBankPinjam.reduce(
+            (sum, item) => sum + item.gaji_genap,
+            0,
+          ),
+          total_pinjam: uniqueEmployeesForBankPinjam.reduce(
+            (sum, item) => sum + item.total_pinjam,
+            0,
+          ),
+          total_final: uniqueEmployeesForBankPinjam.reduce(
+            (sum, item) => sum + item.final_total,
+            0,
+          ),
         },
         // Comprehensive salary data for the new Salary tab
         comprehensive: {
           year: yearInt,
           month: monthInt,
           locations: locationsArray,
-          grand_totals: grandTotals
+          grand_totals: grandTotals,
         },
         // Individual employees data for Employee tab (deduplicated, sorted by name)
         employees: (() => {
@@ -575,7 +673,7 @@ export default function (pool) {
           const result = [];
 
           // Add regular payroll employees
-          processedData.forEach(emp => {
+          processedData.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id)) {
               seenEmployees.add(emp.staff_id);
               result.push(emp);
@@ -583,7 +681,7 @@ export default function (pool) {
           });
 
           // Add commission-only employees
-          commissionOnlyEmployees.forEach(emp => {
+          commissionOnlyEmployees.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id)) {
               seenEmployees.add(emp.staff_id);
               result.push(emp);
@@ -591,7 +689,9 @@ export default function (pool) {
           });
 
           // Sort by staff_name alphabetically
-          result.sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
+          result.sort((a, b) =>
+            (a.staff_name || "").localeCompare(b.staff_name || ""),
+          );
 
           // Return with row numbers
           return result.map((emp, index) => ({
@@ -627,7 +727,7 @@ export default function (pool) {
           const result = [];
 
           // First add regular payroll employees
-          processedData.forEach(emp => {
+          processedData.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id) && emp.final_total > 0) {
               seenEmployees.add(emp.staff_id);
               result.push({
@@ -642,7 +742,7 @@ export default function (pool) {
           });
 
           // Then add commission-only employees
-          commissionOnlyEmployees.forEach(emp => {
+          commissionOnlyEmployees.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id) && emp.final_total > 0) {
               seenEmployees.add(emp.staff_id);
               result.push({
@@ -664,7 +764,7 @@ export default function (pool) {
             total: emp.total,
             payment_preference: emp.payment_preference,
           }));
-        })()
+        })(),
       });
     } catch (error) {
       console.error("Error fetching comprehensive salary report:", error);
@@ -870,6 +970,14 @@ export default function (pool) {
           WHERE EXTRACT(YEAR FROM cr.commission_date) = $1
           GROUP BY cr.employee_id, cr.description, cr.location_code
         ),
+        others_data AS (
+          SELECT
+            orec.employee_id,
+            COALESCE(SUM(orec.amount), 0) as others_amount
+          FROM others_records orec
+          WHERE EXTRACT(YEAR FROM orec.record_date) = $1
+          GROUP BY orec.employee_id
+        ),
         leave_data AS (
           SELECT
             lr.employee_id,
@@ -944,6 +1052,11 @@ export default function (pool) {
             (SELECT SUM(commission_amount) FROM commission_data cd
              WHERE cd.employee_id = ebd.employee_id AND cd.location_code IS NULL), 0
           ) as bonus_total,
+          -- Others (Kerja Luar OT) data - advances deducted from net_pay just like commission
+          COALESCE(
+            (SELECT SUM(others_amount) FROM others_data od
+             WHERE od.employee_id = ebd.employee_id), 0
+          ) as others_total,
           -- Leave data
           COALESCE(
             (SELECT SUM(leave_amount) FROM leave_data ld
@@ -959,17 +1072,24 @@ export default function (pool) {
 
       // Process the data for different views
       const processedData = result.rows.map((row, index) => {
-        const gaji = parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
+        const gaji =
+          parseFloat(row.base_pay || 0) + parseFloat(row.tambahan_pay || 0);
         const gajiKasar = parseFloat(row.gross_pay || 0);
-        // Commission and bonus from commission_records are advances already deducted from net_pay in DB
-        const commissionAdvance = parseFloat(row.commission_total || 0) + parseFloat(row.bonus_total || 0);
+        // Commission and bonus from commission_records are advances already deducted from net_pay in DB.
+        // Others (Kerja Luar OT) is a regular earning, NOT an advance, so it is NOT added back here.
+        const commissionAdvance =
+          parseFloat(row.commission_total || 0) +
+          parseFloat(row.bonus_total || 0);
         // GAJI BERSIH = net_pay + commission (add back to show true net before advances)
         const gajiBersih = parseFloat(row.net_pay || 0) + commissionAdvance;
         // JUMLAH = net_pay - mid_month (commission already deducted from net_pay)
-        const jumlah = parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
+        const jumlah =
+          parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0);
         // Use pre-calculated digenapkan values from monthly payrolls (summed across months)
         // This ensures yearly totals match sum of monthly totals exactly
-        const setelah_digenapkan = parseFloat(row.total_setelah_digenapkan || 0);
+        const setelah_digenapkan = parseFloat(
+          row.total_setelah_digenapkan || 0,
+        );
         const digenapkan = parseFloat(row.total_digenapkan || 0);
 
         return {
@@ -1004,9 +1124,14 @@ export default function (pool) {
           setelah_digenapkan: setelah_digenapkan,
           cuti_tahunan_amount: parseFloat(row.cuti_tahunan_amount || 0),
           // Bank/Pinjam tab data
-          gaji_genap: parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0),
+          gaji_genap:
+            parseFloat(row.net_pay || 0) -
+            parseFloat(row.mid_month_amount || 0),
           total_pinjam: parseFloat(row.total_pinjam || 0),
-          final_total: parseFloat(row.net_pay || 0) - parseFloat(row.mid_month_amount || 0) - parseFloat(row.total_pinjam || 0),
+          final_total:
+            parseFloat(row.net_pay || 0) -
+            parseFloat(row.mid_month_amount || 0) -
+            parseFloat(row.total_pinjam || 0),
           net_pay: parseFloat(row.net_pay || 0),
           mid_month_amount: parseFloat(row.mid_month_amount || 0),
         };
@@ -1015,36 +1140,64 @@ export default function (pool) {
       // Group data by location for comprehensive salary view
       const locationData = {};
       const grandTotals = {
-        gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
-        epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-        sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
-        setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
+        gaji: 0,
+        ot: 0,
+        bonus: 0,
+        comm: 0,
+        gaji_kasar: 0,
+        epf_majikan: 0,
+        epf_pekerja: 0,
+        socso_majikan: 0,
+        socso_pekerja: 0,
+        sip_majikan: 0,
+        sip_pekerja: 0,
+        pcb: 0,
+        gaji_bersih: 0,
+        setengah_bulan: 0,
+        jumlah: 0,
+        digenapkan: 0,
+        setelah_digenapkan: 0,
       };
       const processedUniqueEmployees = new Set();
 
       // Fetch all locations from database
-      const locationsResult = await pool.query("SELECT id FROM locations ORDER BY id");
-      const allLocations = locationsResult.rows.map(r => r.id);
-      allLocations.forEach(loc => {
+      const locationsResult = await pool.query(
+        "SELECT id FROM locations ORDER BY id",
+      );
+      const allLocations = locationsResult.rows.map((r) => r.id);
+      allLocations.forEach((loc) => {
         locationData[loc] = {
           location: loc,
           employees: [],
           totals: {
-            gaji: 0, ot: 0, bonus: 0, comm: 0, gaji_kasar: 0,
-            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-            sip_majikan: 0, sip_pekerja: 0, pcb: 0, gaji_bersih: 0,
-            setengah_bulan: 0, jumlah: 0, digenapkan: 0, setelah_digenapkan: 0
-          }
+            gaji: 0,
+            ot: 0,
+            bonus: 0,
+            comm: 0,
+            gaji_kasar: 0,
+            epf_majikan: 0,
+            epf_pekerja: 0,
+            socso_majikan: 0,
+            socso_pekerja: 0,
+            sip_majikan: 0,
+            sip_pekerja: 0,
+            pcb: 0,
+            gaji_bersih: 0,
+            setengah_bulan: 0,
+            jumlah: 0,
+            digenapkan: 0,
+            setelah_digenapkan: 0,
+          },
         };
       });
 
       // Process each employee and group by location
-      processedData.forEach(employee => {
+      processedData.forEach((employee) => {
         const loc = employee.location_code || "02";
 
         if (locationData[loc]) {
           locationData[loc].employees.push(employee);
-          Object.keys(locationData[loc].totals).forEach(key => {
+          Object.keys(locationData[loc].totals).forEach((key) => {
             locationData[loc].totals[key] += employee[key] || 0;
           });
         }
@@ -1052,7 +1205,7 @@ export default function (pool) {
         // Add to grand totals ONLY ONCE per unique employee
         if (!processedUniqueEmployees.has(employee.staff_id)) {
           processedUniqueEmployees.add(employee.staff_id);
-          Object.keys(grandTotals).forEach(key => {
+          Object.keys(grandTotals).forEach((key) => {
             grandTotals[key] += employee[key] || 0;
           });
         }
@@ -1085,7 +1238,7 @@ export default function (pool) {
       `;
       const midMonthResult = await pool.query(midMonthQuery, [yearInt]);
       const midMonthMap = new Map();
-      midMonthResult.rows.forEach(row => {
+      midMonthResult.rows.forEach((row) => {
         midMonthMap.set(row.employee_id, parseFloat(row.mid_month_amount || 0));
       });
 
@@ -1093,16 +1246,18 @@ export default function (pool) {
       const commissionOnlyEmployees = [];
 
       // Group commissions by location (16-24)
-      commissionResult.rows.forEach(row => {
+      commissionResult.rows.forEach((row) => {
         const locCode = row.location_code || "18";
         const commAmount = parseFloat(row.commission_amount || 0);
         const midMonthAmount = midMonthMap.get(row.employee_id) || 0;
 
-        const hasRegularPayroll = processedData.some(e => e.staff_id === row.employee_id);
+        const hasRegularPayroll = processedData.some(
+          (e) => e.staff_id === row.employee_id,
+        );
 
         if (locationData[locCode]) {
           const existingEmployee = locationData[locCode].employees.find(
-            e => e.staff_id === row.employee_id
+            (e) => e.staff_id === row.employee_id,
           );
 
           if (!existingEmployee) {
@@ -1116,10 +1271,18 @@ export default function (pool) {
               bank_account_number: row.bank_account_number,
               payment_preference: row.payment_preference,
               location_code: locCode,
-              gaji: 0, ot: 0, bonus: 0, comm: commAmount,
+              gaji: 0,
+              ot: 0,
+              bonus: 0,
+              comm: commAmount,
               gaji_kasar: commAmount,
-              epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-              sip_majikan: 0, sip_pekerja: 0, pcb: 0,
+              epf_majikan: 0,
+              epf_pekerja: 0,
+              socso_majikan: 0,
+              socso_pekerja: 0,
+              sip_majikan: 0,
+              sip_pekerja: 0,
+              pcb: 0,
               gaji_bersih: commAmount,
               setengah_bulan: midMonthAmount,
               jumlah: jumlah,
@@ -1138,7 +1301,9 @@ export default function (pool) {
             locationData[locCode].totals.jumlah += jumlah;
 
             if (!hasRegularPayroll) {
-              const existingCommOnly = commissionOnlyEmployees.find(e => e.staff_id === row.employee_id);
+              const existingCommOnly = commissionOnlyEmployees.find(
+                (e) => e.staff_id === row.employee_id,
+              );
               if (!existingCommOnly) {
                 commissionOnlyEmployees.push(commissionEmployeeData);
                 grandTotals.comm += commAmount;
@@ -1150,8 +1315,12 @@ export default function (pool) {
                 existingCommOnly.comm += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
-                existingCommOnly.jumlah = existingCommOnly.gaji_bersih - existingCommOnly.setengah_bulan;
-                existingCommOnly.gaji_genap = existingCommOnly.gaji_bersih - existingCommOnly.mid_month_amount;
+                existingCommOnly.jumlah =
+                  existingCommOnly.gaji_bersih -
+                  existingCommOnly.setengah_bulan;
+                existingCommOnly.gaji_genap =
+                  existingCommOnly.gaji_bersih -
+                  existingCommOnly.mid_month_amount;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 grandTotals.comm += commAmount;
@@ -1164,7 +1333,8 @@ export default function (pool) {
             existingEmployee.comm += commAmount;
             existingEmployee.gaji_kasar += commAmount;
             existingEmployee.gaji_bersih += commAmount;
-            existingEmployee.jumlah = existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
+            existingEmployee.jumlah =
+              existingEmployee.gaji_bersih - existingEmployee.setengah_bulan;
 
             locationData[locCode].totals.comm += commAmount;
             locationData[locCode].totals.gaji_kasar += commAmount;
@@ -1175,17 +1345,29 @@ export default function (pool) {
       });
 
       // CUTI TAHUNAN (23) - Leave records
-      const cutiTahunanEmployees = processedData.filter(emp => emp.cuti_tahunan_amount > 0);
-      cutiTahunanEmployees.forEach(emp => {
-        if (!locationData["23"].employees.find(e => e.staff_id === emp.staff_id)) {
+      const cutiTahunanEmployees = processedData.filter(
+        (emp) => emp.cuti_tahunan_amount > 0,
+      );
+      cutiTahunanEmployees.forEach((emp) => {
+        if (
+          !locationData["23"].employees.find((e) => e.staff_id === emp.staff_id)
+        ) {
           locationData["23"].employees.push({
             ...emp,
-            gaji: 0, ot: 0, bonus: 0, comm: emp.cuti_tahunan_amount,
-            epf_majikan: 0, epf_pekerja: 0, socso_majikan: 0, socso_pekerja: 0,
-            sip_majikan: 0, sip_pekerja: 0, pcb: 0,
+            gaji: 0,
+            ot: 0,
+            bonus: 0,
+            comm: emp.cuti_tahunan_amount,
+            epf_majikan: 0,
+            epf_pekerja: 0,
+            socso_majikan: 0,
+            socso_pekerja: 0,
+            sip_majikan: 0,
+            sip_pekerja: 0,
+            pcb: 0,
             gaji_kasar: emp.cuti_tahunan_amount,
             gaji_bersih: emp.cuti_tahunan_amount,
-            jumlah: emp.cuti_tahunan_amount
+            jumlah: emp.cuti_tahunan_amount,
           });
           locationData["23"].totals.comm += emp.cuti_tahunan_amount;
           locationData["23"].totals.gaji_kasar += emp.cuti_tahunan_amount;
@@ -1195,21 +1377,21 @@ export default function (pool) {
       });
 
       // Convert locationData object to array for response
-      const locationsArray = allLocations.map(loc => locationData[loc]);
+      const locationsArray = allLocations.map((loc) => locationData[loc]);
 
       // Get unique employees for Bank/Pinjam tabs
       const uniqueEmployeesForBankPinjam = (() => {
         const seen = new Set();
         const result = [];
 
-        processedData.forEach(emp => {
+        processedData.forEach((emp) => {
           if (!seen.has(emp.staff_id)) {
             seen.add(emp.staff_id);
             result.push(emp);
           }
         });
 
-        commissionOnlyEmployees.forEach(emp => {
+        commissionOnlyEmployees.forEach((emp) => {
           if (!seen.has(emp.staff_id)) {
             seen.add(emp.staff_id);
             result.push(emp);
@@ -1237,37 +1419,48 @@ export default function (pool) {
         })),
         total_records: uniqueEmployeesForBankPinjam.length,
         summary: {
-          total_gaji_genap: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.gaji_genap, 0),
-          total_pinjam: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.total_pinjam, 0),
-          total_final: uniqueEmployeesForBankPinjam.reduce((sum, item) => sum + item.final_total, 0),
+          total_gaji_genap: uniqueEmployeesForBankPinjam.reduce(
+            (sum, item) => sum + item.gaji_genap,
+            0,
+          ),
+          total_pinjam: uniqueEmployeesForBankPinjam.reduce(
+            (sum, item) => sum + item.total_pinjam,
+            0,
+          ),
+          total_final: uniqueEmployeesForBankPinjam.reduce(
+            (sum, item) => sum + item.final_total,
+            0,
+          ),
         },
         // Comprehensive salary data for the new Salary tab
         comprehensive: {
           year: yearInt,
           month: null,
           locations: locationsArray,
-          grand_totals: grandTotals
+          grand_totals: grandTotals,
         },
         // Individual employees data for Employee tab (deduplicated, sorted by name)
         employees: (() => {
           const seenEmployees = new Set();
           const result = [];
 
-          processedData.forEach(emp => {
+          processedData.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id)) {
               seenEmployees.add(emp.staff_id);
               result.push(emp);
             }
           });
 
-          commissionOnlyEmployees.forEach(emp => {
+          commissionOnlyEmployees.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id)) {
               seenEmployees.add(emp.staff_id);
               result.push(emp);
             }
           });
 
-          result.sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
+          result.sort((a, b) =>
+            (a.staff_name || "").localeCompare(b.staff_name || ""),
+          );
 
           return result.map((emp, index) => ({
             no: index + 1,
@@ -1300,7 +1493,7 @@ export default function (pool) {
           const seenEmployees = new Set();
           const result = [];
 
-          processedData.forEach(emp => {
+          processedData.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id) && emp.final_total > 0) {
               seenEmployees.add(emp.staff_id);
               result.push({
@@ -1314,7 +1507,7 @@ export default function (pool) {
             }
           });
 
-          commissionOnlyEmployees.forEach(emp => {
+          commissionOnlyEmployees.forEach((emp) => {
             if (!seenEmployees.has(emp.staff_id) && emp.final_total > 0) {
               seenEmployees.add(emp.staff_id);
               result.push({
@@ -1336,7 +1529,7 @@ export default function (pool) {
             total: emp.total,
             payment_preference: emp.payment_preference,
           }));
-        })()
+        })(),
       });
     } catch (error) {
       console.error("Error fetching yearly salary report:", error);
