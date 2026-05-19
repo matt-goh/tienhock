@@ -5,17 +5,20 @@ import {
   IconLogout,
   IconMoon,
   IconDatabaseExport,
+  IconHistory,
 } from "@tabler/icons-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useState, useRef, useEffect } from "react";
 import BackupModal from "../BackupModal";
+import ChangelogModal from "../ChangelogModal";
 
 export default function NavbarUserMenu() {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -60,6 +63,13 @@ export default function NavbarUserMenu() {
     setIsOpen(false);
     setTimeout(() => {
       setIsBackupModalOpen(true);
+    }, 0);
+  };
+
+  const handleChangelogClick = () => {
+    setIsOpen(false);
+    setTimeout(() => {
+      setIsChangelogOpen(true);
     }, 0);
   };
 
@@ -109,6 +119,15 @@ export default function NavbarUserMenu() {
                 </Switch>
               </div>
 
+              {/* Changelog Option */}
+              <button
+                className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200"
+                onClick={handleChangelogClick}
+              >
+                <IconHistory className="mr-2 h-5 w-5" stroke={1.5} />
+                Log Perubahan
+              </button>
+
               {/* Backup Option */}
               <button
                 className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200"
@@ -137,6 +156,11 @@ export default function NavbarUserMenu() {
       <BackupModal
         isOpen={isBackupModalOpen}
         onClose={() => setIsBackupModalOpen(false)}
+      />
+
+      <ChangelogModal
+        isOpen={isChangelogOpen}
+        onClose={() => setIsChangelogOpen(false)}
       />
     </>
   );
