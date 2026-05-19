@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-19",
+    ms: "Pembetulan: Gaji Genap sebelum pinjam kini mengikut jumlah akhir gaji yang telah digenapkan.",
+    en: "Fix: Gaji Genap before pinjam now matches the final rounded payroll amount.",
+  },
+  {
     date: "2026-05-18",
     ms: "Eksport PDF untuk gaji pertengahan bulan kini tersedia.",
     en: "Mid-month payroll PDF export is now available.",
