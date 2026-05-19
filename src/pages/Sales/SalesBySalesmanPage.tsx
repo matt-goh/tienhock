@@ -23,6 +23,7 @@ import Button from "../../components/Button";
 import { FormCombobox } from "../../components/FormComponents";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
+import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
 
 // Define interfaces
 interface SalesmanData {
@@ -48,11 +49,13 @@ interface SalesTrendData {
 interface SalesBySalesmanPageProps {
   activeTab: number;
   onTabChange: (tab: number) => void;
+  scope?: SalesSummaryScope;
 }
 
 const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   activeTab,
   onTabChange,
+  scope = "tienhock",
 }) => {
   // Initialize dates
   const today = new Date();
@@ -175,7 +178,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
       // Use the new dedicated trends endpoint
       const url = `/api/invoices/sales/trends?type=salesmen&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartSalesmen.join(
         ","
-      )}`;
+      )}&scope=${scope}`;
 
       const chartData = await api.get(url);
 
@@ -213,7 +216,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
 
         // Use the new dedicated endpoint
         const data = await api.get(
-          `/api/invoices/sales/salesmen?startDate=${startTimestamp}&endDate=${endTimestamp}`
+          `/api/invoices/sales/salesmen?startDate=${startTimestamp}&endDate=${endTimestamp}&scope=${scope}`
         );
 
         if (Array.isArray(data)) {
@@ -231,7 +234,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
     };
 
     fetchSalesData();
-  }, [dateRange]);
+  }, [dateRange, scope]);
 
   useEffect(() => {
     // Clear chart data if it exists when selection changes
@@ -410,7 +413,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
             <div className="h-5 w-px bg-default-300 dark:bg-gray-600" />
 
             {/* Generate PDF Summary Button */}
-            <SalesSummarySelectionTooltip activeTab={activeTab} />
+            <SalesSummarySelectionTooltip activeTab={activeTab} scope={scope} />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">

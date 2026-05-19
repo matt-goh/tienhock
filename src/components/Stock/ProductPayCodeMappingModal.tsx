@@ -16,11 +16,12 @@ import { IconSearch, IconPackage, IconX, IconCheck, IconPlus, IconMinus, IconSpa
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { SPECIAL_ITEMS, isSpecialItem } from "../../config/specialItems";
+import { isOthProductionProduct } from "../../config/othProductionProducts";
 
 interface Product {
   id: string;
   description: string;
-  type: "MEE" | "BH" | "BUNDLE";
+  type: "MEE" | "BH" | "BUNDLE" | "OTH";
   isSpecial?: boolean;
 }
 
@@ -56,18 +57,28 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   const [productSearch, setProductSearch] = useState("");
   const [payCodeSearch, setPayCodeSearch] = useState("");
 
-  // Get products from cache (MEE, BH, and BUNDLE types for packing)
-  const { products: cachedProducts, isLoading } = useProductsCache(["MEE", "BH", "BUNDLE"]);
+  // Get products from cache (MEE, BH, BUNDLE for packing; OTH for production-enabled extras)
+  const { products: cachedProducts, isLoading } = useProductsCache([
+    "MEE",
+    "BH",
+    "BUNDLE",
+    "OTH",
+  ]);
 
-  // Map cached products and add special items
+  // Map cached products and add special items.
+  // For OTH, only keep the ones whitelisted for production entry.
   const products: Product[] = useMemo(() => {
     // Regular products (exclude special items that might be in the DB)
     const regularProducts = cachedProducts
-      .filter((p) => !isSpecialItem(p.id))
+      .filter(
+        (p) =>
+          !isSpecialItem(p.id) &&
+          (p.type !== "OTH" || isOthProductionProduct(p.id))
+      )
       .map((p) => ({
         id: p.id,
         description: p.description,
-        type: p.type as "MEE" | "BH" | "BUNDLE",
+        type: p.type as "MEE" | "BH" | "BUNDLE" | "OTH",
         isSpecial: false,
       }));
 
@@ -90,8 +101,10 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   const availablePayCodes = useMemo((): PayCodeOption[] => {
     if (!selectedProduct) return [];
 
-    // For special items, show ALL pay codes (they may have unique pay codes not mapped to jobs)
-    if (selectedProduct.isSpecial) {
+    // For special items, show ALL pay codes (they may have unique pay codes not mapped to jobs).
+    // Same for OTH production products (EMPTY_BAG / EMPTY_BAG(S) / SBH / SMEE) — pay-code
+    // mappings haven't been decided yet, so don't pre-filter.
+    if (selectedProduct.isSpecial || isOthProductionProduct(selectedProduct.id)) {
       return payCodes.map((pc) => ({
         id: pc.id,
         description: pc.description,
@@ -428,6 +441,8 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                             ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
                                             : product.type === "BUNDLE"
                                             ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                                            : product.type === "OTH"
+                                            ? "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
                                             : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                         }`}
                                       >

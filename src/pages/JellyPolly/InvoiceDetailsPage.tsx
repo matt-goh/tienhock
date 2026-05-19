@@ -62,8 +62,8 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg">
-      <table className="min-w-full divide-y divide-gray-200">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
             <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
@@ -92,13 +92,13 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           {(items || []).map((item, index) => {
             const isSubtotal = item.issubtotal;
             return (
               <tr
                 key={item.uid || item.id || index} // Use available unique key
-                className={`${isSubtotal ? "bg-gray-100 font-semibold" : ""}`}
+                className={`${isSubtotal ? "bg-gray-100 dark:bg-gray-700 font-semibold" : ""}`}
               >
                 <td
                   className={`px-4 py-2 whitespace-nowrap text-sm ${
@@ -1290,15 +1290,15 @@ const InvoiceDetailsPage: React.FC = () => {
       status?.toLowerCase() // Use toLowerCase for safety
     ) {
       case "paid":
-        return "bg-green-100 text-green-700";
+        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
       case "cancelled":
-        return "bg-rose-100 text-rose-700";
+        return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300";
       case "overdue":
-        return "bg-red-100 text-red-700";
+        return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
       case "active":
       case "unpaid":
       default:
-        return "bg-amber-100 text-amber-700";
+        return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300";
     }
   };
 
@@ -1309,23 +1309,23 @@ const InvoiceDetailsPage: React.FC = () => {
       case "valid":
         return {
           text: "Valid",
-          color: "text-green-600",
+          color: "text-green-600 dark:text-green-400",
           icon: IconCircleCheck,
         };
       case "pending":
         return {
           text: "Pending",
-          color: "text-yellow-600",
+          color: "text-yellow-600 dark:text-yellow-400",
           icon: IconClockHour4,
         };
       case "invalid":
         return {
           text: "Invalid",
-          color: "text-red-600",
+          color: "text-red-600 dark:text-red-400",
           icon: IconAlertTriangle,
         };
       case "cancelled":
-        return { text: "Cancelled", color: "text-rose-600", icon: IconBan };
+        return { text: "Cancelled", color: "text-rose-600 dark:text-rose-400", icon: IconBan };
       default:
         return null;
     }
@@ -1339,8 +1339,8 @@ const InvoiceDetailsPage: React.FC = () => {
 
     return {
       text: "Consolidated",
-      color: "text-indigo-600",
-      border: "border-indigo-200",
+      color: "text-indigo-600 dark:text-indigo-400",
+      border: "border-indigo-200 dark:border-indigo-800",
       icon: IconFiles,
       info: consolidatedInfo,
     };
@@ -1361,12 +1361,12 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
-          <div className="h-6 w-px bg-default-300"></div>
+          <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Invoice Details
           </h1>
         </div>
-        <div className="p-4 text-center text-rose-600 bg-rose-50 rounded-lg">
+        <div className="p-4 text-center text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
           Error: {error}
         </div>
       </div>
@@ -1378,7 +1378,7 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/jellypolly/sales/invoice")} />
-          <div className="h-6 w-px bg-default-300"></div>
+          <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
             Invoice Details
           </h1>
@@ -1437,7 +1437,7 @@ const InvoiceDetailsPage: React.FC = () => {
             }}
             disabled={isLoading}
           />
-          <div className="h-6 w-px bg-default-300"></div>
+          <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 dark:text-gray-100 flex-shrink-0 flex-wrap">
             <span className="flex items-center">
               <IconFileInvoice size={26} className="mr-2 text-gray-500 dark:text-gray-400" />
@@ -1593,8 +1593,8 @@ const InvoiceDetailsPage: React.FC = () => {
         </div>
         {/* Payment form */}
         {showPaymentForm && !isCancelled && !isPaid && (
-          <div className="bg-sky-50 p-4 md:p-6 rounded-lg mb-6 border border-sky-200 shadow-sm transition-all duration-300 ease-out">
-            <h2 className="text-lg font-semibold text-sky-800 mb-4">
+          <div className="bg-sky-50 dark:bg-sky-900/20 p-4 md:p-6 rounded-lg mb-6 border border-sky-200 dark:border-sky-800 shadow-sm transition-all duration-300 ease-out">
+            <h2 className="text-lg font-semibold text-sky-800 dark:text-sky-300 mb-4">
               Record Payment
             </h2>
             <form onSubmit={handleSubmitPayment}>
@@ -1676,8 +1676,8 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* Main Content Sections */}
         <div className="space-y-5">
           {/* Invoice Header Display */}
-          <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+          <section className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">
               Invoice Details
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
@@ -1687,7 +1687,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 </span>
                 <div className="flex items-center">
                   <span
-                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 dark:hover:text-sky-300 hover:underline cursor-pointer"
                     title={`${invoiceData.customerName} (${invoiceData.customerid})`}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1697,7 +1697,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     {invoiceData.customerName || invoiceData.customerid}
                   </span>
                   <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenCustomerEdit();
@@ -1715,7 +1715,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 </span>
                 <div className="flex items-center">
                   <span
-                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 hover:underline cursor-pointer"
+                    className="text-gray-900 dark:text-gray-100 font-medium hover:text-sky-900 dark:hover:text-sky-300 hover:underline cursor-pointer"
                     title={invoiceData.salespersonid}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1726,7 +1726,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       ?.name || invoiceData.salespersonid}
                   </span>
                   <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenSalesmanEdit();
@@ -1745,7 +1745,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <div className="flex items-center">
                   <span className="flex text-gray-900 dark:text-gray-100 font-medium gap-2">
                     <span>{formatDisplayDate(createdDate)}</span>
-                    <span className="text-gray-600">
+                    <span className="text-gray-600 dark:text-gray-400">
                       {parseDatabaseTimestamp(
                         invoiceData.createddate
                       ).date?.toLocaleTimeString("en-US", {
@@ -1756,7 +1756,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     </span>
                   </span>
                   <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenDateTimeEdit();
@@ -1779,7 +1779,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     {invoiceData.paymenttype.toLowerCase()}
                   </span>
                   <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleOpenPaymentTypeEdit();
@@ -1799,21 +1799,21 @@ const InvoiceDetailsPage: React.FC = () => {
                   <span
                     className={`font-semibold text-base ${
                       isPaid || isCancelled
-                        ? "text-green-600"
+                        ? "text-green-600 dark:text-green-400"
                         : invoiceData.invoice_status === "Overdue"
-                        ? "text-red-600"
-                        : "text-amber-600"
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-amber-600 dark:text-amber-400"
                     }`}
                   >
                     {formatCurrency(invoiceData.balance_due)}
                   </span>
                   {isPaid && !isCancelled && (
-                    <span className="ml-2 text-green-600 text-sm font-medium px-2 py-0.5 bg-green-50 rounded-full">
+                    <span className="ml-2 text-green-600 dark:text-green-400 text-sm font-medium px-2 py-0.5 bg-green-50 dark:bg-green-900/20 rounded-full">
                       Paid in Full
                     </span>
                   )}
                   {isCancelled && (
-                    <span className="ml-2 text-rose-600 text-sm font-medium px-2 py-0.5 bg-rose-50 rounded-full">
+                    <span className="ml-2 text-rose-600 dark:text-rose-400 text-sm font-medium px-2 py-0.5 bg-rose-50 dark:bg-rose-900/20 rounded-full">
                       Cancelled
                     </span>
                   )}
@@ -1822,15 +1822,15 @@ const InvoiceDetailsPage: React.FC = () => {
               {/* Manual UUID Input - Only show for null einvoice_status and on hover */}
               {invoiceData.einvoice_status === null && (
                 <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300">
-                  <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
+                  <span className="text-gray-400 dark:text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
                     Manual UUID
                   </span>
                   <div className="flex items-center">
-                    <span className="text-gray-600 font-mono text-sm break-all">
+                    <span className="text-gray-600 dark:text-gray-400 font-mono text-sm break-all">
                       {invoiceData.uuid || "No UUID set"}
                     </span>
                     <button
-                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenUUIDEdit();
@@ -1841,7 +1841,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     Use this to manually set UUID if e-invoice submission didn't
                     record it properly
                   </p>
@@ -1851,13 +1851,13 @@ const InvoiceDetailsPage: React.FC = () => {
           </section>
 
           {/* Line Items Display */}
-          <section className="p-4 group border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+          <section className="p-4 group border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center">
                 Line Items
               </h2>
               <button
-                className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleOpenOrderDetailsEdit();
@@ -1872,7 +1872,7 @@ const InvoiceDetailsPage: React.FC = () => {
           </section>
 
           {/* Totals Display */}
-          <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+          <section className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <InvoiceTotals
               subtotal={invoiceData.total_excluding_tax}
               taxTotal={invoiceData.tax_amount}
@@ -1887,8 +1887,8 @@ const InvoiceDetailsPage: React.FC = () => {
           {(invoiceData.uuid ||
             invoiceData.einvoice_status ||
             invoiceData.consolidated_part_of) && (
-            <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
-              <h2 className="text-lg font-semibold mb-3 text-gray-800">
+            <section className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+              <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
                 {(invoiceData.einvoice_status === "valid" ||
                   invoiceData.einvoice_status === "cancelled") &&
                 invoiceData.long_id ? (
@@ -2006,15 +2006,15 @@ const InvoiceDetailsPage: React.FC = () => {
               {/* Manual UUID Input - Only show for null einvoice_status and on hover */}
               {invoiceData.einvoice_status === null && (
                 <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300 mt-4">
-                  <span className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">
+                  <span className="text-gray-400 dark:text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
                     Manual UUID
                   </span>
                   <div className="flex items-center">
-                    <span className="text-gray-600 font-mono text-sm break-all">
+                    <span className="text-gray-600 dark:text-gray-400 font-mono text-sm break-all">
                       {invoiceData.uuid || "No UUID set"}
                     </span>
                     <button
-                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 rounded"
+                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenUUIDEdit();
@@ -2025,7 +2025,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     Use this to manually set UUID if e-invoice submission didn't
                     record it properly
                   </p>
@@ -2035,8 +2035,8 @@ const InvoiceDetailsPage: React.FC = () => {
           )}
 
           {/* Payment History */}
-          <section className="p-4 border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
-            <h2 className="text-lg font-semibold mb-3 text-gray-800">
+          <section className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
+            <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
               Payment History
             </h2>
             {payments.length === 0 ? (
@@ -2044,8 +2044,8 @@ const InvoiceDetailsPage: React.FC = () => {
                 No payments recorded yet.
               </p>
             ) : (
-              <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
@@ -2071,15 +2071,15 @@ const InvoiceDetailsPage: React.FC = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {payments.map((p) => (
                       <tr
                         key={p.payment_id}
-                        className={`hover:bg-gray-50 transition-colors ${
+                        className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                           p.status === "cancelled"
-                            ? "bg-gray-50 text-gray-400 line-through"
+                            ? "bg-gray-50 dark:bg-gray-900/30 text-gray-400 dark:text-gray-500 line-through"
                             : p.status === "pending"
-                            ? "bg-yellow-50"
+                            ? "bg-yellow-50 dark:bg-yellow-900/20"
                             : ""
                         }`}
                         title={
@@ -2100,21 +2100,21 @@ const InvoiceDetailsPage: React.FC = () => {
                           {formatDisplayDate(new Date(p.payment_date))}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-sm font-medium rounded-full bg-blue-50 text-blue-700 capitalize">
+                          <span className="inline-flex px-2 py-1 text-sm font-medium rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
                             {p.payment_method.replace("_", " ")}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600">
+                        <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
                           {p.payment_reference || "-"}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                               p.status === "cancelled"
-                                ? "bg-red-100 text-red-700"
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
                                 : p.status === "pending"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-green-100 text-green-700"
+                                ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
+                                : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
                             }`}
                           >
                             {p.status === "cancelled"
@@ -2124,10 +2124,10 @@ const InvoiceDetailsPage: React.FC = () => {
                               : "Paid"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 truncate max-w-xs">
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                           {p.notes || "-"}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-green-600">
+                        <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-green-600 dark:text-green-400">
                           {formatCurrency(p.amount_paid)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-center">
@@ -2256,7 +2256,7 @@ const InvoiceDetailsPage: React.FC = () => {
         {isEditingOrderDetails && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
-              <div className="flex justify-between items-center p-6 border-b">
+              <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Edit Line Items
                 </h3>
@@ -2265,7 +2265,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     setIsEditingOrderDetails(false);
                     setEditedProducts([]);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   disabled={isUpdatingOrderDetails}
                 >
                   <IconX size={20} />
@@ -2273,7 +2273,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
               <div className="flex-1 px-6 py-4">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
                     Modify the line items for this invoice
                   </span>
                   <div>
@@ -2317,7 +2317,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   readOnly={isUpdatingOrderDetails}
                 />
               </div>
-              <div className="flex justify-end gap-3 p-6 border-t bg-gray-50 dark:bg-gray-900/50">
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -2356,7 +2356,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     setSelectedCustomer(null);
                     setCustomerQuery("");
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   disabled={isUpdatingCustomer}
                 >
                   <IconX size={20} />
@@ -2417,7 +2417,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     setIsEditingSalesman(false);
                     setSelectedSalesman("");
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   disabled={isUpdatingSalesman}
                 >
                   <IconX size={20} />
@@ -2475,7 +2475,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     setIsEditingPaymentType(false);
                     setSelectedPaymentType("INVOICE");
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   disabled={isUpdatingPaymentType}
                 >
                   <IconX size={20} />
@@ -2501,13 +2501,13 @@ const InvoiceDetailsPage: React.FC = () => {
 
               {/* Warning message about automatic payment handling */}
               {selectedPaymentType !== invoiceData?.paymenttype && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                   <div className="flex items-start">
                     <IconAlertTriangle
                       size={16}
-                      className="text-amber-600 mt-0.5 mr-2 flex-shrink-0"
+                      className="text-amber-600 dark:text-amber-400 mt-0.5 mr-2 flex-shrink-0"
                     />
-                    <div className="text-sm text-amber-800">
+                    <div className="text-sm text-amber-800 dark:text-amber-300">
                       {selectedPaymentType === "CASH" ? (
                         <span>
                           <strong>Note:</strong> Changing to CASH will
@@ -2568,7 +2568,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     setIsEditingDateTime(false);
                     setSelectedDateTime("");
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   disabled={isUpdatingDateTime}
                 >
                   <IconX size={20} />
@@ -2622,7 +2622,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     setIsEditingUUID(false);
                     setSelectedUUID("");
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                   disabled={isUpdatingUUID}
                 >
                   <IconX size={20} />
@@ -2646,13 +2646,13 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
 
               {/* Warning message */}
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                 <div className="flex items-start">
                   <IconAlertTriangle
                     size={16}
-                    className="text-amber-600 mt-0.5 mr-2 flex-shrink-0"
+                    className="text-amber-600 dark:text-amber-400 mt-0.5 mr-2 flex-shrink-0"
                   />
-                  <div className="text-sm text-amber-800">
+                  <div className="text-sm text-amber-800 dark:text-amber-300">
                     <strong>Warning:</strong> Only use this if the e-invoice was
                     successfully submitted to MyInvois but the UUID wasn't
                     recorded. Setting an incorrect UUID may cause issues with

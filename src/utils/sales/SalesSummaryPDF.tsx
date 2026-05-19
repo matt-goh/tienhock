@@ -430,12 +430,20 @@ const sortProductsByCategory = (products: any[]): any[] => {
   });
 };
 
+export type SalesSummaryScope = "tienhock" | "jp";
+
+const COMPANY_NAME_BY_SCOPE: Record<SalesSummaryScope, string> = {
+  tienhock: "TIEN HOCK FOOD INDUSTRIES S/B",
+  jp: "JELLY POLLY FOOD INDUSTRIES",
+};
+
 export const generateSalesSummaryPDF = async (
   data: SummaryData,
   month: number,
   year: number,
   action: "download" | "print",
-  allProducts: any[] = []
+  allProducts: any[] = [],
+  scope: SalesSummaryScope = "tienhock"
 ) => {
   try {
     const dateForMonthName = new Date(year, month);
@@ -461,6 +469,7 @@ export const generateSalesSummaryPDF = async (
                       data={section.data}
                       monthFormat={monthYearFormatted}
                       allProducts={allProducts}
+                      scope={scope}
                     />
                   )}
 
@@ -469,6 +478,7 @@ export const generateSalesSummaryPDF = async (
                       data={section.data}
                       title="Monthly Summary of Sales by Salesmen"
                       monthFormat={monthYearFormatted}
+                      scope={scope}
                     />
                   )}
 
@@ -478,6 +488,7 @@ export const generateSalesSummaryPDF = async (
                       title="Monthly Summary of Mee Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                       productType="MEE"
+                      scope={scope}
                     />
                   )}
 
@@ -487,15 +498,21 @@ export const generateSalesSummaryPDF = async (
                       title="Monthly Summary of Bihun Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                       productType="BIHUN"
+                      scope={scope}
                     />
                   )}
 
                   {section.type === "jp_salesmen" && (
                     <SalesmenSection
                       data={section.data}
-                      title="Monthly Summary of JellyPolly Sales by Salesmen"
+                      title={
+                        scope === "jp"
+                          ? "Monthly Summary of Sales by Salesmen"
+                          : "Monthly Summary of JellyPolly Sales by Salesmen"
+                      }
                       monthFormat={monthYearFormatted}
                       productType="JP"
+                      scope={scope}
                     />
                   )}
 
@@ -503,6 +520,7 @@ export const generateSalesSummaryPDF = async (
                     <SisaSalesSection
                       data={section.data}
                       monthFormat={monthYearFormatted}
+                      scope={scope}
                     />
                   )}
                 </React.Fragment>
@@ -571,8 +589,10 @@ const AllSalesSection: React.FC<{
   data: any;
   monthFormat: string;
   allProducts: any[];
-}> = ({ data, monthFormat, allProducts }) => {
+  scope: SalesSummaryScope;
+}> = ({ data, monthFormat, allProducts, scope }) => {
   const { categories, totals } = data;
+  const isJp = scope === "jp";
 
   // Calculate breakdown totals using product types from cache
   const calculateBreakdownTotals = () => {
@@ -705,6 +725,7 @@ const AllSalesSection: React.FC<{
     SBH: "SBH Products",
     SMEE: "SMEE Products",
     "WE-360": "WE-360 Series Products",
+    "AQ-": "AQ Products",
     less: "Less/Deductions",
     returns: "Return Products",
     total_rounding: "Rounding Adjustments",
@@ -712,7 +733,7 @@ const AllSalesSection: React.FC<{
 
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
+      <Text style={styles.companyHeader}>{COMPANY_NAME_BY_SCOPE[scope]}</Text>
       <Text style={styles.reportTitle}>
         Monthly Summary of Sales in {monthFormat}
       </Text>
@@ -857,55 +878,60 @@ const AllSalesSection: React.FC<{
       <View style={styles.breakdownSection} wrap={false}>
         <View style={styles.leftBreakdownColumn}>
           <Text style={styles.sectionTitle}>Quantity</Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.meeQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Bihun</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.bihunQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownSeparator} />
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee + Bihun</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.meeBihunQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Jelly Polly</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.jpQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Empty Bag</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.emptyBagQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Sisa</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.sisaQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Others</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.othersQuantity)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Less</Text>
-            <Text style={styles.breakdownValue}>
-              {formatNumber(breakdownTotals.lessQuantity)}
-            </Text>
-          </View>
+          {isJp ? (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Jelly Polly</Text>
+              <Text style={styles.breakdownValue}>
+                {formatNumber(breakdownTotals.jpQuantity)}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Mee</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.meeQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Bihun</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.bihunQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownSeparator} />
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Mee + Bihun</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.meeBihunQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Empty Bag</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.emptyBagQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Sisa</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.sisaQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Others</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.othersQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Less</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.lessQuantity)}
+                </Text>
+              </View>
+            </>
+          )}
           <View style={styles.breakdownSeparator} />
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Cash Sales</Text>
@@ -923,55 +949,60 @@ const AllSalesSection: React.FC<{
         </View>
         <View style={styles.rightBreakdownColumn} wrap={false}>
           <Text style={styles.sectionTitle}>Amount</Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.meeAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Bihun</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.bihunAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownSeparator} />
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Mee + Bihun </Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.meeBihunAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Jelly Polly</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.jpAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Empty Bag</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.emptyBagAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Sisa</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.sisaAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Others</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.othersAmount)}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Less</Text>
-            <Text style={styles.breakdownValue}>
-              {formatCurrency(breakdownTotals.lessAmount)}
-            </Text>
-          </View>
+          {isJp ? (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Jelly Polly</Text>
+              <Text style={styles.breakdownValue}>
+                {formatCurrency(breakdownTotals.jpAmount)}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Mee</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.meeAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Bihun</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.bihunAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownSeparator} />
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Mee + Bihun </Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.meeBihunAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Empty Bag</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.emptyBagAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Sisa</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.sisaAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Others</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.othersAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Less</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.lessAmount)}
+                </Text>
+              </View>
+            </>
+          )}
           {/* Add Tax row only if not zero */}
           {breakdownTotals.totalTax !== 0 && (
             <View style={styles.breakdownRow}>
@@ -1024,12 +1055,13 @@ const SalesmenSection: React.FC<{
   title: string;
   monthFormat: string;
   productType?: string;
-}> = ({ data, title, monthFormat }) => {
+  scope: SalesSummaryScope;
+}> = ({ data, title, monthFormat, scope }) => {
   const { salesmen, foc, returns } = data;
 
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
+      <Text style={styles.companyHeader}>{COMPANY_NAME_BY_SCOPE[scope]}</Text>
       <Text style={styles.reportTitle}>
         {title} in {monthFormat}
       </Text>
@@ -1277,10 +1309,11 @@ const SalesmenSection: React.FC<{
 };
 
 // Component for Sisa Sales Summary
-const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
-  data,
-  monthFormat,
-}) => {
+const SisaSalesSection: React.FC<{
+  data: any;
+  monthFormat: string;
+  scope: SalesSummaryScope;
+}> = ({ data, monthFormat, scope }) => {
   const categories = [
     { key: "empty_bag", data: data.empty_bag, label: "EMPTY BAG" },
     { key: "sbh", data: data.sbh, label: "SISA BIHUN" },
@@ -1298,7 +1331,7 @@ const SisaSalesSection: React.FC<{ data: any; monthFormat: string }> = ({
 
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.companyHeader}>TIEN HOCK FOOD INDUSTRIES S/B</Text>
+      <Text style={styles.companyHeader}>{COMPANY_NAME_BY_SCOPE[scope]}</Text>
       <Text style={styles.reportTitle}>
         Monthly Summary of Sisa Sales in {monthFormat}
       </Text>

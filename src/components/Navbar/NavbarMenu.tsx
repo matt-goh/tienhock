@@ -13,6 +13,8 @@ interface NavbarMenuProps {
   onNavigate?: () => void;
 }
 
+type NavigableSidebarItem = SidebarItem & { path: string };
+
 export default function NavbarMenu({
   items,
   bookmarkedItems = new Set(),
@@ -21,7 +23,7 @@ export default function NavbarMenu({
   onNavigate,
 }: NavbarMenuProps) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLButtonElement> }>({});
+  const buttonRefs = useRef<{ [key: string]: React.RefObject<HTMLAnchorElement> }>({});
   const location = useLocation();
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -33,18 +35,18 @@ export default function NavbarMenu({
   // Filter out the Bookmarks category (handled separately)
   const menuItems = items.filter((item) => item.name !== "Bookmarks");
 
-  // Helper function to check if item has navigable sub-items
+  // Helper function to find the first navigable sub-item
   // (excludes showInPopover items and items with route parameters)
-  const hasNavigableSubItems = (item: SidebarItem): boolean => {
-    if (!item.subItems || item.subItems.length === 0) return false;
-    return item.subItems.some(
-      (subItem) => subItem.path && !subItem.showInPopover && !subItem.path.includes(":")
+  const getFirstNavigableSubItem = (item: SidebarItem): NavigableSidebarItem | undefined => {
+    return item.subItems?.find(
+      (subItem): subItem is NavigableSidebarItem =>
+        Boolean(subItem.path && !subItem.showInPopover && !subItem.path.includes(":"))
     );
   };
 
-  const getButtonRef = (name: string) => {
+  const getButtonRef = (name: string): React.RefObject<HTMLAnchorElement> => {
     if (!buttonRefs.current[name]) {
-      buttonRefs.current[name] = React.createRef<HTMLButtonElement>();
+      buttonRefs.current[name] = React.createRef<HTMLAnchorElement>();
     }
     return buttonRefs.current[name];
   };
@@ -106,12 +108,12 @@ export default function NavbarMenu({
   };
 
   const renderMenuItem = (item: SidebarItem) => {
-    const hasSubItems = hasNavigableSubItems(item);
+    const firstNavigableSubItem = getFirstNavigableSubItem(item);
     const isActive = isMenuActive(item);
     const buttonRef = getButtonRef(item.name);
 
     // Items with navigable subItems show dropdown
-    if (hasSubItems) {
+    if (firstNavigableSubItem) {
       return (
         <div
           key={item.name}
@@ -119,7 +121,8 @@ export default function NavbarMenu({
           onMouseEnter={() => handleMouseEnter(item.name)}
           onMouseLeave={() => handleMouseLeave(item.name)}
         >
-          <button
+          <Link
+            to={firstNavigableSubItem.path}
             ref={buttonRef}
             onClick={() => handleButtonClick(item.name)}
             className={`
@@ -139,7 +142,7 @@ export default function NavbarMenu({
                 openDropdown === item.name ? "rotate-180" : ""
               }`}
             />
-          </button>
+          </Link>
 
           <NavbarDropdown
             items={item.subItems!}
