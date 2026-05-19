@@ -19,6 +19,7 @@ If unsure why existing code is structured a certain way, ask.
 13. Anytime any changes need to be made to the database, please update the Database Schema in AGENTS.md and CLAUDE.md.
 14. After you have implemented any changes in a system that intertwines with other parts of the system, briefly check and notice the user if you find any changes needed in those connected parts.
 15. After you're done implementing a new moderately to extremely complex system, ask me if I want you to scan through all the files/code you have created or modified, and find any bugs, limitations, or holes that you can improve upon/fix.
+16. Update the changelog (`CHANGELOG_ENTRIES` in `src/components/ChangelogModal.tsx`) when you ship a change big enough for users to notice. **Add an entry for:** new pages/features, renamed or removed user-facing fields/buttons/menus, changes to how data is calculated, processed, stored, imported, or exported, bug fixes that change visible numbers/behaviour, and anything that changes a workflow the user already knows. **Do not add an entry for:** spacing/padding/colour tweaks, dark-mode-only adjustments, refactors with no behavioural change, internal renames, comment/typo edits, dependency bumps, or other purely cosmetic/internal work. Each entry must have a `date` (ISO `yyyy-mm-dd`, the date the change is implemented), an `ms` (Bahasa Melayu) field, and an `en` (English) field, be written from the end-user's perspective with no technical jargon, and be **prepended** to the array (newest first).
 
 ## Architecture Overview
 
