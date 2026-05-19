@@ -18,6 +18,7 @@ import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 
 // Exporting for reuse, includes optional phone_number
 export interface SelectOption {
+  job: import("react/jsx-runtime").JSX.Element;
   id: string | number;
   name: string;
   phone_number?: string | null;
