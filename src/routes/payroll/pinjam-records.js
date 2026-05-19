@@ -155,7 +155,7 @@ export default function (pool) {
 
         // 4. Monthly Payrolls with Employee Payrolls
         pool.query(`
-          SELECT mp.*, ep.employee_id, s.name as employee_name, ep.net_pay
+          SELECT mp.*, ep.employee_id, s.name as employee_name, ep.net_pay, ep.setelah_digenapkan
           FROM monthly_payrolls mp
           LEFT JOIN employee_payrolls ep ON mp.id = ep.monthly_payroll_id
           LEFT JOIN staffs s ON ep.employee_id = s.id
@@ -191,7 +191,10 @@ export default function (pool) {
           employeePayrolls.push({
             employee_id: row.employee_id,
             employee_name: row.employee_name,
-            net_pay: parseFloat(row.net_pay || 0)
+            net_pay: parseFloat(row.net_pay || 0),
+            setelah_digenapkan: row.setelah_digenapkan == null
+              ? undefined
+              : parseFloat(row.setelah_digenapkan)
           });
         }
       });

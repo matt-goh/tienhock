@@ -285,7 +285,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 p-6 shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
@@ -311,7 +311,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
 
                   {/* Pay Code Selection - Now using Combobox instead of FormListbox */}
                   <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Pay Code
                     </label>
                     <div className="relative">
@@ -324,7 +324,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                       >
                         <div className="relative">
                           <ComboboxInput
-                            className="w-full cursor-default rounded-lg border border-default-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                            className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-3 pr-10 text-left text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 disabled:bg-gray-50 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 sm:text-sm"
                             displayValue={(code: string) => {
                               const selected = availablePayCodes.find(
                                 (pc) => pc.id === code
@@ -339,7 +339,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
                               size={20}
-                              className="text-gray-400"
+                              className="text-gray-400 dark:text-gray-500"
                               aria-hidden="true"
                             />
                           </ComboboxButton>
@@ -351,9 +351,9 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                           leaveTo="opacity-0"
                           afterLeave={() => setQuery("")}
                         >
-                          <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                          <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none sm:text-sm">
                             {sortedPayCodes.length === 0 ? (
-                              <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                              <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                                 Nothing found.
                               </div>
                             ) : (
@@ -364,8 +364,8 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                                   className={({ active }) =>
                                     `relative cursor-default select-none py-2 pl-10 pr-4 ${
                                       active
-                                        ? "bg-sky-100 text-sky-900"
-                                        : "text-gray-900"
+                                        ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                                        : "text-gray-900 dark:text-gray-100"
                                     }`
                                   }
                                 >
@@ -381,7 +381,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                                         {code.id} - {code.description}
                                       </span>
                                       {selected ? (
-                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600">
+                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
                                           <IconCheck
                                             size={20}
                                             aria-hidden="true"
@@ -395,11 +395,11 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                             )}
                             {/* Load More Button */}
                             {hasMoreItems && (
-                              <div className="border-t border-gray-200 p-2">
+                              <div className="border-t border-gray-200 dark:border-gray-700 p-2">
                                 <button
                                   type="button"
                                   onClick={handleLoadMore}
-                                  className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 bg-sky-50 rounded-md hover:bg-sky-100 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
+                                  className="w-full text-center py-1.5 px-4 text-sm font-medium text-sky-600 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center"
                                   disabled={isSaving}
                                 >
                                   <IconChevronDown
@@ -432,15 +432,15 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   />
 
                   {selectedPayCodeDetails && (
-                    <div className="mt-2 bg-default-50 border border-default-200 rounded-lg p-3">
-                      <div className="text-sm text-default-700">
+                    <div className="mt-2 bg-default-50 dark:bg-gray-900/50 border border-default-200 dark:border-gray-700 rounded-lg p-3">
+                      <div className="text-sm text-default-700 dark:text-gray-200">
                         <p className="font-medium">Pay Code Details:</p>
                         <p className="mt-1">
-                          <span className="text-default-500">Rate Unit:</span>{" "}
+                          <span className="text-default-500 dark:text-gray-400">Rate Unit:</span>{" "}
                           {selectedPayCodeDetails.rate_unit}
                         </p>
                         <p>
-                          <span className="text-default-500">
+                          <span className="text-default-500 dark:text-gray-400">
                             Default Rate:
                           </span>{" "}
                           {formatCurrency(selectedPayCodeDetails.rate_biasa)}
@@ -480,26 +480,26 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   />
 
                   {/* Calculated Amount */}
-                  <div className="bg-default-50 border border-default-200 rounded-lg p-4">
+                  <div className="bg-default-50 dark:bg-gray-900/50 border border-default-200 dark:border-gray-700 rounded-lg p-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-default-700">
+                      <span className="text-sm font-medium text-default-700 dark:text-gray-200">
                         Calculated Amount:
                       </span>
-                      <span className="text-lg font-semibold text-default-800 flex items-center">
+                      <span className="text-lg font-semibold text-default-800 dark:text-gray-100 flex items-center">
                         <IconCurrencyDollar
-                          className="text-emerald-500 mr-1"
+                          className="text-emerald-500 dark:text-emerald-400 mr-1"
                           size={20}
                         />
                         {formatCurrency(calculatedAmount)}
                       </span>
                     </div>
-                    <p className="text-xs text-default-500 mt-1">
+                    <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
                       Formula: Rate × Quantity = Amount
                     </p>
                   </div>
 
                   {error && (
-                    <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-600">
+                    <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/50 rounded-lg p-3 text-sm text-rose-600 dark:text-rose-300">
                       {error}
                     </div>
                   )}

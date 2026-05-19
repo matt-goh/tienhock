@@ -804,20 +804,20 @@ const CustomerFormPage: React.FC = () => {
                   </div>
 
                   {isEditMode && branchInfo && (
-                    <div className="mt-6 p-4 border border-indigo-100 rounded-lg bg-indigo-50/30">
+                    <div className="mt-6 p-4 border border-indigo-100 dark:border-indigo-900/50 rounded-lg bg-indigo-50/30 dark:bg-indigo-900/20">
                       <div className="flex items-center mb-3">
                         {branchInfo.isMainBranch ? (
                           <IconBuildingSkyscraper
                             size={20}
-                            className="text-indigo-600 mr-2"
+                            className="text-indigo-600 dark:text-indigo-400 mr-2"
                           />
                         ) : (
                           <IconBuildingStore
                             size={20}
-                            className="text-indigo-500 mr-2"
+                            className="text-indigo-500 dark:text-indigo-400 mr-2"
                           />
                         )}
-                        <h3 className="text-base font-medium text-indigo-700">
+                        <h3 className="text-base font-medium text-indigo-700 dark:text-indigo-300">
                           {branchInfo.isMainBranch
                             ? "Main Branch"
                             : "Branch Location"}{" "}
@@ -825,7 +825,7 @@ const CustomerFormPage: React.FC = () => {
                         </h3>
                       </div>
 
-                      <p className="text-sm text-indigo-600 mb-2">
+                      <p className="text-sm text-indigo-600 dark:text-indigo-300 mb-2">
                         {branchInfo.isMainBranch
                           ? "This is the main branch. Changes to pricing, phone number, and e-Invoice information will affect all branches."
                           : "This is a branch location. Pricing, phone number, and e-Invoice information are synchronized with the main branch."}
@@ -833,7 +833,7 @@ const CustomerFormPage: React.FC = () => {
 
                       {branchInfo.branches.length > 1 && (
                         <div className="mt-2">
-                          <p className="text-xs font-medium text-indigo-500 mb-1">
+                          <p className="text-xs font-medium text-indigo-500 dark:text-indigo-400 mb-1">
                             Connected branches:
                           </p>
                           <div className="flex flex-wrap gap-1.5">
@@ -842,7 +842,7 @@ const CustomerFormPage: React.FC = () => {
                               .map((branch) => (
                                 <span
                                   key={branch.id}
-                                  className="inline-flex items-center text-xs bg-white dark:bg-gray-800 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full"
+                                  className="inline-flex items-center text-xs bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full"
                                 >
                                   {branch.isMain && (
                                     <IconBuildingSkyscraper

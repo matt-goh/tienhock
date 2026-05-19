@@ -13,16 +13,20 @@ import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
 import { api } from "../../../routes/utils/api";
 import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
-import { getJobConfig, getJobIds, getContextLinkedPayCodes } from "../../../configs/payrollJobConfigs";
+import {
+  getJobConfig,
+  getJobIds,
+  getContextLinkedPayCodes,
+} from "../../../configs/payrollJobConfigs";
 import StyledListbox from "../../../components/StyledListbox";
 import MonthNavigator from "../../../components/MonthNavigator";
 import YearNavigator from "../../../components/YearNavigator";
 import { Link } from "react-router-dom";
-import ManageActivitiesModal, { ActivityItem } from "../../../components/Payroll/ManageActivitiesModal";
+import ManageActivitiesModal, {
+  ActivityItem,
+} from "../../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
-import {
-  calculateActivityAmount,
-} from "../../../utils/payroll/calculateActivityAmount";
+import { calculateActivityAmount } from "../../../utils/payroll/calculateActivityAmount";
 import {
   Dialog,
   DialogPanel,
@@ -55,8 +59,40 @@ interface EmployeeEntry {
   jobName: string;
   totalHours: number;
   overtimeHours: number;
+  ahadHours: number;
+  ahadOvertimeHours: number;
+  umumHours: number;
+  umumOvertimeHours: number;
   selected: boolean;
 }
+
+type EmployeeHourField =
+  | "totalHours"
+  | "overtimeHours"
+  | "ahadHours"
+  | "ahadOvertimeHours"
+  | "umumHours"
+  | "umumOvertimeHours";
+
+const getActivityIdentity = (
+  activity: Pick<
+    ActivityItem,
+    | "payCodeId"
+    | "description"
+    | "payType"
+    | "rateUnit"
+    | "rate"
+    | "hoursApplied"
+  >,
+): string =>
+  [
+    activity.payCodeId,
+    activity.description,
+    activity.payType,
+    activity.rateUnit,
+    activity.rate,
+    activity.hoursApplied ?? "",
+  ].join("|");
 
 interface LeaveEntry {
   id?: number;
@@ -74,8 +110,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   jobType = "MAINTENANCE",
 }) => {
   const navigate = useNavigate();
-  const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
-  const { refreshJobs } = useJobsCache();
+  const {
+    staffs: allStaffs,
+    loading: loadingStaffs,
+    refreshStaffs,
+  } = useStaffsCache();
+  const { jobs: allJobs, refreshJobs } = useJobsCache();
   const { isHoliday, getHolidayDescription } = useHolidayCache();
   const {
     detailedMappings: jobPayCodeDetails,
@@ -88,26 +128,54 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const contextLinkedPayCodes = jobConfig
     ? getContextLinkedPayCodes(jobConfig)
     : {};
+  const supportsDayTypeHours = jobType !== "OFFICE";
+  const jobNameById = useMemo<Record<string, string>>(() => {
+    return allJobs.reduce((acc: Record<string, string>, job) => {
+      acc[job.id] = job.name;
+      return acc;
+    }, {});
+  }, [allJobs]);
+
+  const getJobDisplayName = useCallback(
+    (jobId?: string, fallbackName?: string): string => {
+      if (!jobId) return fallbackName || "";
+      return jobNameById[jobId] || fallbackName || jobId;
+    },
+    [jobNameById],
+  );
 
   // Form state
   const currentDate = new Date();
   const [formData, setFormData] = useState({
-    logMonth: mode === "edit" && existingWorkLog ? existingWorkLog.log_month : currentDate.getMonth() + 1,
-    logYear: mode === "edit" && existingWorkLog ? existingWorkLog.log_year : currentDate.getFullYear(),
+    logMonth:
+      mode === "edit" && existingWorkLog
+        ? existingWorkLog.log_month
+        : currentDate.getMonth() + 1,
+    logYear:
+      mode === "edit" && existingWorkLog
+        ? existingWorkLog.log_year
+        : currentDate.getFullYear(),
   });
 
   // Employee state
-  const [employeeEntries, setEmployeeEntries] = useState<Record<string, EmployeeEntry>>({});
+  const [employeeEntries, setEmployeeEntries] = useState<
+    Record<string, EmployeeEntry>
+  >({});
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
   // Activities state
   const [showActivitiesModal, setShowActivitiesModal] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeEntry | null>(null);
-  const [employeeActivities, setEmployeeActivities] = useState<Record<string, ActivityItem[]>>({});
+  const [selectedEmployee, setSelectedEmployee] =
+    useState<EmployeeEntry | null>(null);
+  const [employeeActivities, setEmployeeActivities] = useState<
+    Record<string, ActivityItem[]>
+  >({});
 
   // Leave state
-  const [existingLeaveRecords, setExistingLeaveRecords] = useState<LeaveEntry[]>([]);
+  const [existingLeaveRecords, setExistingLeaveRecords] = useState<
+    LeaveEntry[]
+  >([]);
   const [newLeaveEntries, setNewLeaveEntries] = useState<LeaveEntry[]>([]);
   const [deletedLeaveIds, setDeletedLeaveIds] = useState<number[]>([]);
   const [showAddLeaveModal, setShowAddLeaveModal] = useState(false);
@@ -116,7 +184,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     leaveType: "cuti_sakit" as "cuti_sakit" | "cuti_tahunan" | "cuti_umum",
   });
   // Multi-employee selection state for the Add Leave modal
-  const [leaveEmployeeSelections, setLeaveEmployeeSelections] = useState<Record<string, boolean>>({});
+  const [leaveEmployeeSelections, setLeaveEmployeeSelections] = useState<
+    Record<string, boolean>
+  >({});
   const [leaveEmployeeSearch, setLeaveEmployeeSearch] = useState("");
 
   // Ref to track which employee IDs were originally saved in the work log
@@ -124,23 +194,28 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const savedEmployeeIdsRef = React.useRef<Set<string>>(new Set());
   // Ref to store the original saved activities from the work log
   // This preserves the original state even if the employee is deselected and re-selected
-  const savedEmployeeActivitiesRef = React.useRef<Record<string, ActivityItem[]>>({});
+  const savedEmployeeActivitiesRef = React.useRef<
+    Record<string, ActivityItem[]>
+  >({});
 
   // Month/Year options (kept for leave records display)
-  const monthOptions = useMemo(() => [
-    { id: 1, name: "January" },
-    { id: 2, name: "February" },
-    { id: 3, name: "March" },
-    { id: 4, name: "April" },
-    { id: 5, name: "May" },
-    { id: 6, name: "June" },
-    { id: 7, name: "July" },
-    { id: 8, name: "August" },
-    { id: 9, name: "September" },
-    { id: 10, name: "October" },
-    { id: 11, name: "November" },
-    { id: 12, name: "December" },
-  ], []);
+  const monthOptions = useMemo(
+    () => [
+      { id: 1, name: "January" },
+      { id: 2, name: "February" },
+      { id: 3, name: "March" },
+      { id: 4, name: "April" },
+      { id: 5, name: "May" },
+      { id: 6, name: "June" },
+      { id: 7, name: "July" },
+      { id: 8, name: "August" },
+      { id: 9, name: "September" },
+      { id: 10, name: "October" },
+      { id: 11, name: "November" },
+      { id: 12, name: "December" },
+    ],
+    [],
+  );
 
   // Computed date for MonthNavigator
   const selectedMonthDate = useMemo(() => {
@@ -202,9 +277,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           employeeId: savedEntry.employee_id,
           employeeName: savedEntry.employee_name,
           jobType: savedEntry.job_id,
-          jobName: savedEntry.job_name,
+          jobName: getJobDisplayName(savedEntry.job_id, savedEntry.job_name),
           totalHours: savedEntry.total_hours,
           overtimeHours: savedEntry.overtime_hours || 0,
+          ahadHours: savedEntry.ahad_hours || 0,
+          ahadOvertimeHours: savedEntry.ahad_overtime_hours || 0,
+          umumHours: savedEntry.umum_hours || 0,
+          umumOvertimeHours: savedEntry.umum_overtime_hours || 0,
           selected: true,
         };
       } else {
@@ -215,29 +294,52 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           employeeId: emp.id,
           employeeName: emp.name,
           jobType: matchingJob || JOB_IDS[0],
-          jobName: matchingJob || JOB_IDS[0],
+          jobName: getJobDisplayName(matchingJob || JOB_IDS[0]),
           totalHours: jobConfig?.defaultHours || 176,
           overtimeHours: 0,
+          ahadHours: 0,
+          ahadOvertimeHours: 0,
+          umumHours: 0,
+          umumOvertimeHours: 0,
           selected: mode === "create",
         };
       }
     });
 
     setEmployeeEntries(entries);
-  }, [eligibleEmployees, loadingStaffs, mode, existingWorkLog, JOB_IDS, jobConfig]);
+  }, [
+    eligibleEmployees,
+    loadingStaffs,
+    mode,
+    existingWorkLog,
+    JOB_IDS,
+    jobConfig,
+    getJobDisplayName,
+  ]);
 
   // Fetch and apply activities for selected employees
   const fetchAndApplyActivities = useCallback(
     (currentActivities: Record<string, ActivityItem[]>) => {
       if (loadingPayCodeMappings) return;
 
-      const selectedEntries = Object.values(employeeEntries).filter((e) => e.selected);
+      const selectedEntries = Object.values(employeeEntries).filter(
+        (e) => e.selected,
+      );
       if (selectedEntries.length === 0) return;
 
       const newEmployeeActivities: Record<string, ActivityItem[]> = {};
 
       selectedEntries.forEach((entry) => {
-        const { employeeId, jobType: entryJobType, totalHours, overtimeHours } = entry;
+        const {
+          employeeId,
+          jobType: entryJobType,
+          totalHours,
+          overtimeHours,
+          ahadHours,
+          ahadOvertimeHours,
+          umumHours,
+          umumOvertimeHours,
+        } = entry;
 
         // Get job pay codes from cache
         const jobPayCodes = jobPayCodeDetails[entryJobType] || [];
@@ -266,89 +368,117 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
         // Get existing activities for this employee if in edit mode
         // For originally saved employees, use the preserved ref to handle deselect/re-select cycles
+        const currentActivitiesForEmployee =
+          currentActivities[employeeId] || [];
+        const savedActivitiesForEmployee =
+          savedEmployeeActivitiesRef.current[employeeId] || [];
         const existingActivitiesForEmployee = wasOriginallySaved
-          ? savedEmployeeActivitiesRef.current[employeeId] || []
-          : currentActivities[employeeId] || [];
+          ? [
+              ...currentActivitiesForEmployee,
+              ...savedActivitiesForEmployee.filter(
+                (savedActivity) =>
+                  !currentActivitiesForEmployee.some(
+                    (currentActivity) =>
+                      getActivityIdentity(currentActivity) ===
+                      getActivityIdentity(savedActivity),
+                  ),
+              ),
+            ]
+          : currentActivitiesForEmployee;
 
-        // Filter out overtime codes if no overtime hours entered
-        const hasOvertimeHours = overtimeHours > 0;
+        const ahadHrs = supportsDayTypeHours ? ahadHours || 0 : 0;
+        const ahadOtHrs = supportsDayTypeHours ? ahadOvertimeHours || 0 : 0;
+        const umumHrs = supportsDayTypeHours ? umumHours || 0 : 0;
+        const umumOtHrs = supportsDayTypeHours ? umumOvertimeHours || 0 : 0;
+        const biasaHrs = totalHours || 0;
+        const biasaOtHrs = overtimeHours || 0;
+
+        const hasOvertimeHours =
+          biasaOtHrs > 0 || ahadOtHrs > 0 || umumOtHrs > 0;
         const filteredPayCodes = hasOvertimeHours
           ? mergedPayCodes
           : mergedPayCodes.filter((pc: any) => pc.pay_type !== "Overtime");
 
-        // Convert to activity format
-        const activities: ActivityItem[] = filteredPayCodes.map((payCode: any) => {
-          const isContextLinked = !!contextLinkedPayCodes[payCode.id];
+        // Helper to determine default selection state for a pay code
+        const computeDefaultSelection = (
+          payCode: any,
+          isContextLinked: boolean,
+        ): boolean => {
+          let isSelected: boolean;
+          if (payCode.pay_type === "Tambahan") {
+            isSelected = false;
+          } else if (payCode.pay_type === "Overtime") {
+            isSelected = hasOvertimeHours && payCode.is_default_setting;
+          } else if (payCode.pay_type === "Base") {
+            isSelected = payCode.is_default_setting;
+          } else {
+            isSelected = payCode.is_default_setting;
+          }
+          if (
+            isContextLinked ||
+            payCode.rate_unit === "Bag" ||
+            payCode.rate_unit === "Trip" ||
+            payCode.rate_unit === "Day"
+          ) {
+            isSelected = false;
+          }
+          return isSelected;
+        };
 
-          // Find existing activity for this pay code if in edit mode
+        // Build a single activity entry, applying selection rules and existing-state lookup
+        const buildActivity = (
+          payCode: any,
+          rate: number,
+          hoursToApply: number,
+          descriptionSuffix: string,
+          isContextLinked: boolean,
+        ): ActivityItem => {
+          const description = `${payCode.description}${descriptionSuffix}`;
+          const activityIdentity = getActivityIdentity({
+            payCodeId: payCode.id,
+            description,
+            payType: payCode.pay_type,
+            rateUnit: payCode.rate_unit,
+            rate,
+            hoursApplied: hoursToApply,
+          });
+
+          // Match exact variants so Biasa/Ahad/Umum and OT variants stay independent.
           const existingActivity =
             mode === "edit"
-              ? existingActivitiesForEmployee.find((ea) => ea.payCodeId === payCode.id)
+              ? existingActivitiesForEmployee.find(
+                  (ea) => getActivityIdentity(ea) === activityIdentity,
+                )
               : null;
 
-          // Use Biasa rate for monthly (default rate)
-          const rate = payCode.override_rate_biasa || payCode.rate_biasa;
-
-          // Determine if selected based on specific rules
-          let isSelected = false;
-
-          // wasOriginallySaved is already defined above for existingActivitiesForEmployee lookup
-
+          let isSelected: boolean;
           if (mode === "edit" && wasOriginallySaved) {
-            // EDIT mode for originally saved employees:
-            // If existingActivity exists, use its saved state
-            // If not, the activity was deselected - keep it deselected
             if (existingActivity) {
               isSelected = existingActivity.isSelected;
             } else {
-              isSelected = false;
+              isSelected = computeDefaultSelection(payCode, isContextLinked);
             }
           } else {
-            // CREATE mode OR employee wasn't in original work log:
-            // Apply auto-selection rules for new activities
-            if (payCode.pay_type === "Tambahan") {
-              isSelected = false;
-            } else if (payCode.pay_type === "Overtime") {
-              // Only auto-select OT codes if overtime hours exist AND is_default_setting is true
-              isSelected = hasOvertimeHours && payCode.is_default_setting;
-            } else if (payCode.pay_type === "Base") {
-              isSelected = payCode.is_default_setting;
-            } else {
-              isSelected = payCode.is_default_setting;
-            }
-
-            // Special rules for specific rate units
-            if (
-              isContextLinked ||
-              payCode.rate_unit === "Bag" ||
-              payCode.rate_unit === "Trip" ||
-              payCode.rate_unit === "Day"
-            ) {
-              isSelected = false;
-            }
+            isSelected = computeDefaultSelection(payCode, isContextLinked);
           }
 
-          // Determine units produced
           const unitsProduced = existingActivity
             ? existingActivity.unitsProduced
             : payCode.requires_units_input
-            ? 0
-            : undefined;
-
-          // For overtime activities, use overtime hours; otherwise use total hours
-          const hoursToApply = payCode.pay_type === "Overtime" ? overtimeHours : totalHours;
+              ? 0
+              : undefined;
 
           return {
             payCodeId: payCode.id,
-            description: payCode.description,
+            description,
             payType: payCode.pay_type,
             rateUnit: payCode.rate_unit,
-            rate: rate,
+            rate,
             isDefault: payCode.is_default_setting,
-            isSelected: isSelected,
-            unitsProduced: unitsProduced,
+            isSelected,
+            unitsProduced,
             hoursApplied: hoursToApply,
-            isContextLinked: isContextLinked,
+            isContextLinked,
             source: payCode.source,
             calculatedAmount: calculateActivityAmount(
               {
@@ -360,19 +490,133 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 hoursApplied: hoursToApply,
               },
               hoursToApply,
-              {}
+              {},
             ),
           };
-        });
+        };
+
+        const getBiasaRate = (payCode: any): number =>
+          payCode.override_rate_biasa ?? payCode.rate_biasa;
+
+        const getAhadRate = (payCode: any, biasaRate: number): number =>
+          payCode.override_rate_ahad ?? payCode.rate_ahad ?? biasaRate;
+
+        const getUmumRate = (payCode: any, biasaRate: number): number =>
+          payCode.override_rate_umum ?? payCode.rate_umum ?? biasaRate;
+
+        // Convert to activity format - Hour pay codes split into Biasa/Ahad/Umum variants
+        const activities: ActivityItem[] = filteredPayCodes.flatMap(
+          (payCode: any) => {
+            const isContextLinked = !!contextLinkedPayCodes[payCode.id];
+
+            // Split Base+Hour pay codes into Biasa/Ahad/Umum variants with day-type-specific rates
+            if (payCode.pay_type === "Base" && payCode.rate_unit === "Hour") {
+              const biasaRate = getBiasaRate(payCode);
+              const ahadRate = getAhadRate(payCode, biasaRate);
+              const umumRate = getUmumRate(payCode, biasaRate);
+
+              const variants: ActivityItem[] = [];
+              if (biasaHrs > 0) {
+                variants.push(
+                  buildActivity(
+                    payCode,
+                    biasaRate,
+                    biasaHrs,
+                    "",
+                    isContextLinked,
+                  ),
+                );
+              }
+              if (ahadHrs > 0) {
+                variants.push(
+                  buildActivity(
+                    payCode,
+                    ahadRate,
+                    ahadHrs,
+                    " (Ahad)",
+                    isContextLinked,
+                  ),
+                );
+              }
+              if (umumHrs > 0) {
+                variants.push(
+                  buildActivity(
+                    payCode,
+                    umumRate,
+                    umumHrs,
+                    " (Umum)",
+                    isContextLinked,
+                  ),
+                );
+              }
+              return variants;
+            }
+
+            // Split Overtime+Hour pay codes too, because jobs such as OFFICE can
+            // configure distinct OT rates for Biasa, Ahad, and Umum.
+            if (
+              payCode.pay_type === "Overtime" &&
+              payCode.rate_unit === "Hour"
+            ) {
+              const biasaRate = getBiasaRate(payCode);
+              const ahadRate = getAhadRate(payCode, biasaRate);
+              const umumRate = getUmumRate(payCode, biasaRate);
+
+              const variants: ActivityItem[] = [];
+              if (biasaOtHrs > 0) {
+                variants.push(
+                  buildActivity(
+                    payCode,
+                    biasaRate,
+                    biasaOtHrs,
+                    "",
+                    isContextLinked,
+                  ),
+                );
+              }
+              if (ahadOtHrs > 0) {
+                variants.push(
+                  buildActivity(
+                    payCode,
+                    ahadRate,
+                    ahadOtHrs,
+                    " (Ahad)",
+                    isContextLinked,
+                  ),
+                );
+              }
+              if (umumOtHrs > 0) {
+                variants.push(
+                  buildActivity(
+                    payCode,
+                    umumRate,
+                    umumOtHrs,
+                    " (Umum)",
+                    isContextLinked,
+                  ),
+                );
+              }
+              return variants;
+            }
+
+            // All other pay codes (Tambahan, non-Hour Base/Overtime) - single activity at Biasa rate
+            const rate = getBiasaRate(payCode);
+            const hoursToApply =
+              payCode.pay_type === "Overtime" ? biasaOtHrs : totalHours;
+            return [
+              buildActivity(payCode, rate, hoursToApply, "", isContextLinked),
+            ];
+          },
+        );
 
         // Apply calculation logic to all activities with proper hours for each activity type
-        const processedActivities = activities.map(activity => ({
+        const processedActivities = activities.map((activity) => ({
           ...activity,
           calculatedAmount: calculateActivityAmount(
             activity,
             activity.hoursApplied || totalHours,
-            {}
-          )
+            {},
+          ),
         }));
         newEmployeeActivities[employeeId] = processedActivities;
       });
@@ -386,7 +630,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       employeeMappings,
       contextLinkedPayCodes,
       mode,
-    ]
+      supportsDayTypeHours,
+    ],
   );
 
   // Effect to fetch activities when employee selection changes
@@ -395,7 +640,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       fetchAndApplyActivities(employeeActivities);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeEntries, loadingPayCodeMappings, jobPayCodeDetails, employeeMappings, mode]);
+  }, [
+    employeeEntries,
+    loadingPayCodeMappings,
+    jobPayCodeDetails,
+    employeeMappings,
+    mode,
+  ]);
 
   // Restore activities from existing work log in edit mode
   useEffect(() => {
@@ -406,24 +657,22 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
       existingWorkLog.employeeEntries.forEach((entry: any) => {
         if (entry.activities && entry.activities.length > 0) {
-          const activities = entry.activities.map(
-            (activity: any) => ({
-              payCodeId: activity.pay_code_id,
-              description: activity.description,
-              payType: activity.pay_type,
-              rateUnit: activity.rate_unit,
-              rate: parseFloat(activity.rate_used),
-              unitsProduced: activity.units_produced
-                ? parseFloat(activity.units_produced)
-                : undefined,
-              hoursApplied: activity.hours_applied
-                ? parseFloat(activity.hours_applied)
-                : undefined,
-              calculatedAmount: parseFloat(activity.calculated_amount),
-              isSelected: true,
-              isDefault: false,
-            })
-          );
+          const activities = entry.activities.map((activity: any) => ({
+            payCodeId: activity.pay_code_id,
+            description: activity.description,
+            payType: activity.pay_type,
+            rateUnit: activity.rate_unit,
+            rate: parseFloat(activity.rate_used),
+            unitsProduced: activity.units_produced
+              ? parseFloat(activity.units_produced)
+              : undefined,
+            hoursApplied: activity.hours_applied
+              ? parseFloat(activity.hours_applied)
+              : undefined,
+            calculatedAmount: parseFloat(activity.calculated_amount),
+            isSelected: true,
+            isDefault: false,
+          }));
           restoredActivities[entry.employee_id] = activities;
           // Also store in ref to preserve original state for deselect/re-select cycles
           savedEmployeeActivitiesRef.current[entry.employee_id] = activities;
@@ -444,7 +693,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       try {
         const section = jobConfig?.section?.[0] || "";
         const response = await api.get(
-          `/api/monthly-work-logs/leave/${formData.logYear}/${formData.logMonth}?section=${section}`
+          `/api/monthly-work-logs/leave/${formData.logYear}/${formData.logMonth}?section=${section}`,
         );
 
         const leaveRecords = response.map((record: any) => ({
@@ -486,7 +735,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     });
   };
 
-  const handleHoursChange = (employeeId: string, field: "totalHours" | "overtimeHours", value: string) => {
+  const handleHoursChange = (
+    employeeId: string,
+    field: EmployeeHourField,
+    value: string,
+  ) => {
     const numValue = parseFloat(value) || 0;
     setEmployeeEntries((prev) => ({
       ...prev,
@@ -548,7 +801,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
     // Collect selected employee IDs, excluding those that already have leave on this date
     const targetEmployeeIds = Object.entries(leaveEmployeeSelections)
-      .filter(([id, selected]) => selected && !employeesWithLeaveOnSelectedDate[id])
+      .filter(
+        ([id, selected]) => selected && !employeesWithLeaveOnSelectedDate[id],
+      )
       .map(([id]) => id);
 
     if (targetEmployeeIds.length === 0) {
@@ -560,7 +815,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     const leaveDate = leaveFormData.leaveDate;
 
     const additions: LeaveEntry[] = targetEmployeeIds.map((employeeId) => {
-      const employee = eligibleEmployees.find((e: Employee) => e.id === employeeId);
+      const employee = eligibleEmployees.find(
+        (e: Employee) => e.id === employeeId,
+      );
       return {
         employeeId,
         employeeName: employee?.name || "",
@@ -574,7 +831,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     toast.success(
       additions.length === 1
         ? "Leave entry added"
-        : `Added leave for ${additions.length} employees`
+        : `Added leave for ${additions.length} employees`,
     );
     closeAddLeaveModal();
   };
@@ -593,9 +850,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const leaveSelectedCount = useMemo(
     () =>
       Object.entries(leaveEmployeeSelections).filter(
-        ([id, selected]) => selected && !employeesWithLeaveOnSelectedDate[id]
+        ([id, selected]) => selected && !employeesWithLeaveOnSelectedDate[id],
       ).length,
-    [leaveEmployeeSelections, employeesWithLeaveOnSelectedDate]
+    [leaveEmployeeSelections, employeesWithLeaveOnSelectedDate],
   );
 
   const handleRemoveNewLeave = (index: number) => {
@@ -606,7 +863,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     // Add to deleted list
     setDeletedLeaveIds((prev) => [...prev, leaveId]);
     // Remove from existing records display
-    setExistingLeaveRecords((prev) => prev.filter((leave) => leave.id !== leaveId));
+    setExistingLeaveRecords((prev) =>
+      prev.filter((leave) => leave.id !== leaveId),
+    );
   };
 
   // Activities handlers
@@ -619,13 +878,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     if (!selectedEmployee) return;
 
     // Recalculate amounts with proper hours for each activity type
-    const recalculatedActivities = activities.map(activity => ({
+    const recalculatedActivities = activities.map((activity) => ({
       ...activity,
       calculatedAmount: calculateActivityAmount(
         activity,
         activity.hoursApplied || selectedEmployee.totalHours,
-        {}
-      )
+        {},
+      ),
     }));
 
     setEmployeeActivities((prev) => ({
@@ -635,7 +894,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   };
 
   const handleSave = async () => {
-    const selectedEmployees = Object.values(employeeEntries).filter((e) => e.selected);
+    const selectedEmployees = Object.values(employeeEntries).filter(
+      (e) => e.selected,
+    );
 
     if (selectedEmployees.length === 0) {
       toast.error("Please select at least one employee");
@@ -644,7 +905,31 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
     // Validate hours
     for (const emp of selectedEmployees) {
-      if (emp.totalHours <= 0) {
+      const regularHours = emp.totalHours || 0;
+      const overtimeHours = emp.overtimeHours || 0;
+      const ahadHours = supportsDayTypeHours ? emp.ahadHours || 0 : 0;
+      const ahadOvertimeHours = supportsDayTypeHours
+        ? emp.ahadOvertimeHours || 0
+        : 0;
+      const umumHours = supportsDayTypeHours ? emp.umumHours || 0 : 0;
+      const umumOvertimeHours = supportsDayTypeHours
+        ? emp.umumOvertimeHours || 0
+        : 0;
+      const hourValues = [
+        regularHours,
+        overtimeHours,
+        ahadHours,
+        ahadOvertimeHours,
+        umumHours,
+        umumOvertimeHours,
+      ];
+
+      if (hourValues.some((hours) => hours < 0)) {
+        toast.error(`Hours cannot be negative for ${emp.employeeName}`);
+        return;
+      }
+
+      if (hourValues.reduce((sum, hours) => sum + hours, 0) <= 0) {
         toast.error(`Please enter valid hours for ${emp.employeeName}`);
         return;
       }
@@ -664,8 +949,16 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           jobType: emp.jobType,
           totalHours: emp.totalHours,
           overtimeHours: emp.overtimeHours,
+          ahadHours: supportsDayTypeHours ? emp.ahadHours || 0 : 0,
+          ahadOvertimeHours: supportsDayTypeHours
+            ? emp.ahadOvertimeHours || 0
+            : 0,
+          umumHours: supportsDayTypeHours ? emp.umumHours || 0 : 0,
+          umumOvertimeHours: supportsDayTypeHours
+            ? emp.umumOvertimeHours || 0
+            : 0,
           activities: (employeeActivities[emp.employeeId] || []).filter(
-            (a) => a.isSelected
+            (a) => a.isSelected,
           ),
         })),
         leaveEntries: newLeaveEntries.map((leave) => ({
@@ -691,7 +984,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       console.error("Error saving monthly work log:", error);
       console.error("Error details:", error?.data);
       // Handle specific error messages from API
-      const errorMessage = error?.data?.message || error?.message || "Failed to save monthly work log";
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to save monthly work log";
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -709,7 +1005,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const handleRefreshCache = async () => {
     setIsRefreshingCache(true);
     try {
-      await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
+      await Promise.all([
+        refreshJobs(),
+        refreshStaffs(),
+        refreshPayCodeMappings(),
+      ]);
       toast.success("Data refreshed");
     } catch (err) {
       toast.error("Failed to refresh data");
@@ -757,8 +1057,84 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     }
   };
 
-  const allSelected = Object.values(employeeEntries).length > 0 &&
+  const allSelected =
+    Object.values(employeeEntries).length > 0 &&
     Object.values(employeeEntries).every((e) => e.selected);
+
+  // Block save when any selected employee has negative hours
+  const hasHoursValidationError = Object.values(employeeEntries).some(
+    (e) =>
+      e.selected &&
+      [
+        e.totalHours || 0,
+        e.overtimeHours || 0,
+        ...(supportsDayTypeHours
+          ? [
+              e.ahadHours || 0,
+              e.ahadOvertimeHours || 0,
+              e.umumHours || 0,
+              e.umumOvertimeHours || 0,
+            ]
+          : []),
+      ].some((hours) => hours < 0),
+  );
+
+  const renderHourInput = (
+    entry: EmployeeEntry,
+    field: EmployeeHourField,
+    ariaLabel: string,
+  ) => {
+    const value = entry[field] || 0;
+    const hasInvalidHours = entry.selected && value < 0;
+
+    return (
+      <input
+        type="number"
+        value={entry.selected ? value : ""}
+        onChange={(e) =>
+          handleHoursChange(entry.employeeId, field, e.target.value)
+        }
+        onClick={(e) => e.stopPropagation()}
+        disabled={!entry.selected || isSaving}
+        title={hasInvalidHours ? "Hours cannot be negative" : ariaLabel}
+        aria-label={ariaLabel}
+        className={`w-full min-w-[4.25rem] pl-3 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 ${
+          hasInvalidHours
+            ? "border-rose-500 focus:ring-rose-500 focus:border-rose-500 text-rose-700 dark:text-rose-400"
+            : "border-default-300 dark:border-gray-600 focus:ring-sky-500 focus:border-sky-500"
+        }`}
+        min="0"
+        step="0.5"
+      />
+    );
+  };
+
+  const renderHourGroup = (
+    entry: EmployeeEntry,
+    hoursField: EmployeeHourField,
+    overtimeField: EmployeeHourField,
+    label: string,
+  ) => (
+    <div className="min-w-[9.5rem] rounded-md border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
+      <div className="mb-1 text-center text-[11px] font-semibold uppercase text-default-500 dark:text-gray-400">
+        {label}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <div>
+          <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
+            Hrs
+          </div>
+          {renderHourInput(entry, hoursField, `${label} hours`)}
+        </div>
+        <div>
+          <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
+            OT
+          </div>
+          {renderHourInput(entry, overtimeField, `${label} overtime hours`)}
+        </div>
+      </div>
+    </div>
+  );
 
   const allLeaveRecords = [...existingLeaveRecords, ...newLeaveEntries];
 
@@ -784,14 +1160,17 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             <div className="w-px h-6 bg-default-300 dark:bg-gray-600" />
             {mode === "edit" ? (
               <div className="px-4 py-2 bg-default-100 dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg text-sm font-medium text-default-700 dark:text-gray-200">
-                {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
+                {monthOptions.find((m) => m.id === formData.logMonth)?.name}{" "}
+                {formData.logYear}
               </div>
             ) : (
               <div className="flex gap-4 items-center">
                 <MonthNavigator
                   selectedMonth={selectedMonthDate}
                   onChange={handleMonthNavigatorChange}
-                  formatDisplay={(date) => date.toLocaleDateString("en-MY", { month: "long" })}
+                  formatDisplay={(date) =>
+                    date.toLocaleDateString("en-MY", { month: "long" })
+                  }
                   showGoToCurrentButton={false}
                 />
                 <YearNavigator
@@ -815,10 +1194,25 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               />
               Refresh
             </button>
-            <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button color="sky" size="sm" onClick={handleSave} disabled={isSaving}>
+            <Button
+              color="sky"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving || hasHoursValidationError}
+              title={
+                hasHoursValidationError
+                  ? "Some employees have negative hours"
+                  : ""
+              }
+            >
               {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
             </Button>
           </div>
@@ -850,12 +1244,19 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   Job
                 </th>
-                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-32">
-                  Regular Hours
+                <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
+                  Biasa
                 </th>
-                <th className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-32">
-                  Overtime
-                </th>
+                {supportsDayTypeHours && (
+                  <>
+                    <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
+                      Ahad
+                    </th>
+                    <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
+                      Umum
+                    </th>
+                  </>
+                )}
                 <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
                   Activities
                 </th>
@@ -866,7 +1267,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <tr
                   key={entry.employeeId}
                   className={`${
-                    entry.selected ? "bg-sky-50 dark:bg-sky-900/20" : "bg-white dark:bg-gray-800"
+                    entry.selected
+                      ? "bg-sky-50 dark:bg-sky-900/20"
+                      : "bg-white dark:bg-gray-800"
                   } hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer`}
                   onClick={() => handleEmployeeSelect(entry.employeeId)}
                 >
@@ -909,34 +1312,34 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       {entry.jobName}
                     </Link>
                   </td>
-                  <td className="px-6 py-2 whitespace-nowrap">
-                    <input
-                      type="number"
-                      value={entry.selected ? entry.totalHours : ""}
-                      onChange={(e) =>
-                        handleHoursChange(entry.employeeId, "totalHours", e.target.value)
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      disabled={!entry.selected || isSaving}
-                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500"
-                      min="0"
-                      step="0.5"
-                    />
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    {renderHourGroup(
+                      entry,
+                      "totalHours",
+                      "overtimeHours",
+                      "Biasa",
+                    )}
                   </td>
-                  <td className="px-6 py-2 whitespace-nowrap">
-                    <input
-                      type="number"
-                      value={entry.selected ? entry.overtimeHours : ""}
-                      onChange={(e) =>
-                        handleHoursChange(entry.employeeId, "overtimeHours", e.target.value)
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      disabled={!entry.selected || isSaving}
-                      className="w-full pl-5 pr-1 py-1 text-center text-sm border border-default-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-sky-500 focus:border-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500"
-                      min="0"
-                      step="0.5"
-                    />
-                  </td>
+                  {supportsDayTypeHours && (
+                    <>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {renderHourGroup(
+                          entry,
+                          "ahadHours",
+                          "ahadOvertimeHours",
+                          "Ahad",
+                        )}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {renderHourGroup(
+                          entry,
+                          "umumHours",
+                          "umumOvertimeHours",
+                          "Umum",
+                        )}
+                      </td>
+                    </>
+                  )}
                   <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                     <ActivitiesTooltip
                       activities={(
@@ -971,7 +1374,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         <div className="p-4 border-b border-default-200 dark:border-gray-700 flex justify-between items-center">
           <div>
             <h2 className="text-sm font-medium text-default-700 dark:text-gray-200">
-              Leave Records for {monthOptions.find((m) => m.id === formData.logMonth)?.name} {formData.logYear}
+              Leave Records for{" "}
+              {monthOptions.find((m) => m.id === formData.logMonth)?.name}{" "}
+              {formData.logYear}
             </h2>
             <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
               View existing leave and add new leave entries for this month
@@ -1012,10 +1417,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               </thead>
               <tbody className="divide-y divide-default-200 dark:divide-gray-700">
                 {allLeaveRecords.map((leave, index) => (
-                  <tr key={`${leave.employeeId}-${leave.leaveDate}-${index}`} className="bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700">
+                  <tr
+                    key={`${leave.employeeId}-${leave.leaveDate}-${index}`}
+                    className="bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700"
+                  >
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       <span className="font-medium">{leave.employeeName}</span>
-                      <span className="text-default-400 dark:text-gray-500 ml-2">({leave.employeeId})</span>
+                      <span className="text-default-400 dark:text-gray-500 ml-2">
+                        ({leave.employeeId})
+                      </span>
                     </td>
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
                       {format(new Date(leave.leaveDate), "dd MMM yyyy")}
@@ -1023,7 +1433,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     <td className="px-4 py-2">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(
-                          leave.leaveType
+                          leave.leaveType,
                         )}`}
                       >
                         {getLeaveTypeLabel(leave.leaveType)}
@@ -1044,7 +1454,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       <button
                         onClick={() => {
                           if (leave.isNew) {
-                            handleRemoveNewLeave(newLeaveEntries.indexOf(leave as any));
+                            handleRemoveNewLeave(
+                              newLeaveEntries.indexOf(leave as any),
+                            );
                           } else if (leave.id) {
                             handleRemoveExistingLeave(leave.id);
                           }
@@ -1063,9 +1475,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           </div>
         ) : (
           <div className="p-8 text-center text-default-500 dark:text-gray-400">
-            <IconCalendar size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
+            <IconCalendar
+              size={32}
+              className="mx-auto mb-2 text-default-300 dark:text-gray-600"
+            />
             <p>No leave records for this month.</p>
-            <p className="text-xs mt-1">Click "Add Leave" to record leave entries.</p>
+            <p className="text-xs mt-1">
+              Click "Add Leave" to record leave entries.
+            </p>
           </div>
         )}
       </div>
@@ -1090,7 +1507,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               <div className="fixed inset-0 bg-black opacity-30 z-40" />
             </TransitionChild>
 
-            <span className="inline-block h-screen align-middle" aria-hidden="true">
+            <span
+              className="inline-block h-screen align-middle"
+              aria-hidden="true"
+            >
               &#8203;
             </span>
 
@@ -1107,8 +1527,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 className="relative z-50 inline-block w-full max-w-2xl p-6 my-8 overflow-visible text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
-                <DialogTitle as="h3" className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100 flex items-center gap-2">
-                  <IconUsers size={20} className="text-sky-600 dark:text-sky-400" />
+                <DialogTitle
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100 flex items-center gap-2"
+                >
+                  <IconUsers
+                    size={20}
+                    className="text-sky-600 dark:text-sky-400"
+                  />
                   Add Leave
                 </DialogTitle>
                 <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
@@ -1145,7 +1571,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       onChange={(value) =>
                         setLeaveFormData({
                           ...leaveFormData,
-                          leaveType: value as "cuti_sakit" | "cuti_tahunan" | "cuti_umum",
+                          leaveType: value as
+                            | "cuti_sakit"
+                            | "cuti_tahunan"
+                            | "cuti_umum",
                         })
                       }
                       options={[
@@ -1158,14 +1587,18 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   </div>
                 </div>
 
-                {leaveFormData.leaveDate && isHoliday(new Date(leaveFormData.leaveDate)) && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-sky-600 dark:text-sky-400">
-                    <IconAlertCircle size={14} />
-                    <span>
-                      Public holiday: {getHolidayDescription(new Date(leaveFormData.leaveDate))}
-                    </span>
-                  </div>
-                )}
+                {leaveFormData.leaveDate &&
+                  isHoliday(new Date(leaveFormData.leaveDate)) && (
+                    <div className="flex items-center gap-1 mt-2 text-xs text-sky-600 dark:text-sky-400">
+                      <IconAlertCircle size={14} />
+                      <span>
+                        Public holiday:{" "}
+                        {getHolidayDescription(
+                          new Date(leaveFormData.leaveDate),
+                        )}
+                      </span>
+                    </div>
+                  )}
 
                 {/* Employee picker */}
                 <div className="mt-5">
@@ -1180,17 +1613,23 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       type="button"
                       onClick={() => {
                         // Toggle select-all among currently-visible+selectable employees
-                        const visibleSelectable = eligibleEmployees.filter((emp: Employee) => {
-                          if (employeesWithLeaveOnSelectedDate[emp.id]) return false;
-                          if (!leaveEmployeeSearch.trim()) return true;
-                          const q = leaveEmployeeSearch.trim().toLowerCase();
-                          return (
-                            emp.name.toLowerCase().includes(q) ||
-                            emp.id.toLowerCase().includes(q)
+                        const visibleSelectable = eligibleEmployees.filter(
+                          (emp: Employee) => {
+                            if (employeesWithLeaveOnSelectedDate[emp.id])
+                              return false;
+                            if (!leaveEmployeeSearch.trim()) return true;
+                            const q = leaveEmployeeSearch.trim().toLowerCase();
+                            return (
+                              emp.name.toLowerCase().includes(q) ||
+                              emp.id.toLowerCase().includes(q)
+                            );
+                          },
+                        );
+                        const allOn =
+                          visibleSelectable.length > 0 &&
+                          visibleSelectable.every(
+                            (emp: Employee) => leaveEmployeeSelections[emp.id],
                           );
-                        });
-                        const allOn = visibleSelectable.length > 0 &&
-                          visibleSelectable.every((emp: Employee) => leaveEmployeeSelections[emp.id]);
                         const next = { ...leaveEmployeeSelections };
                         visibleSelectable.forEach((emp: Employee) => {
                           next[emp.id] = !allOn;
@@ -1200,17 +1639,23 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 font-medium"
                     >
                       {(() => {
-                        const visibleSelectable = eligibleEmployees.filter((emp: Employee) => {
-                          if (employeesWithLeaveOnSelectedDate[emp.id]) return false;
-                          if (!leaveEmployeeSearch.trim()) return true;
-                          const q = leaveEmployeeSearch.trim().toLowerCase();
-                          return (
-                            emp.name.toLowerCase().includes(q) ||
-                            emp.id.toLowerCase().includes(q)
+                        const visibleSelectable = eligibleEmployees.filter(
+                          (emp: Employee) => {
+                            if (employeesWithLeaveOnSelectedDate[emp.id])
+                              return false;
+                            if (!leaveEmployeeSearch.trim()) return true;
+                            const q = leaveEmployeeSearch.trim().toLowerCase();
+                            return (
+                              emp.name.toLowerCase().includes(q) ||
+                              emp.id.toLowerCase().includes(q)
+                            );
+                          },
+                        );
+                        const allOn =
+                          visibleSelectable.length > 0 &&
+                          visibleSelectable.every(
+                            (emp: Employee) => leaveEmployeeSelections[emp.id],
                           );
-                        });
-                        const allOn = visibleSelectable.length > 0 &&
-                          visibleSelectable.every((emp: Employee) => leaveEmployeeSelections[emp.id]);
                         return allOn ? "Deselect All" : "Select All";
                       })()}
                     </button>
@@ -1235,10 +1680,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   <div className="max-h-72 overflow-y-auto border border-default-200 dark:border-gray-700 rounded-lg divide-y divide-default-100 dark:divide-gray-700">
                     {(() => {
                       const q = leaveEmployeeSearch.trim().toLowerCase();
-                      const filtered = eligibleEmployees.filter((emp: Employee) =>
-                        !q ||
-                        emp.name.toLowerCase().includes(q) ||
-                        emp.id.toLowerCase().includes(q)
+                      const filtered = eligibleEmployees.filter(
+                        (emp: Employee) =>
+                          !q ||
+                          emp.name.toLowerCase().includes(q) ||
+                          emp.id.toLowerCase().includes(q),
                       );
                       if (filtered.length === 0) {
                         return (
@@ -1248,9 +1694,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         );
                       }
                       return filtered.map((emp: Employee) => {
-                        const existingType = employeesWithLeaveOnSelectedDate[emp.id];
+                        const existingType =
+                          employeesWithLeaveOnSelectedDate[emp.id];
                         const isDisabled = !!existingType;
-                        const isChecked = !!leaveEmployeeSelections[emp.id] && !isDisabled;
+                        const isChecked =
+                          !!leaveEmployeeSelections[emp.id] && !isDisabled;
                         return (
                           <div
                             key={emp.id}
@@ -1258,8 +1706,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                               isDisabled
                                 ? "bg-default-50 dark:bg-gray-900/40 cursor-not-allowed"
                                 : isChecked
-                                ? "bg-sky-50 dark:bg-sky-900/30 cursor-pointer"
-                                : "hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
+                                  ? "bg-sky-50 dark:bg-sky-900/30 cursor-pointer"
+                                  : "hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
                             }`}
                             onClick={() => handleLeaveEmployeeToggle(emp.id)}
                           >
@@ -1272,15 +1720,21 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                             />
                             <div className="ml-3 flex-1 flex items-center justify-between">
                               <div className="text-sm">
-                                <span className={`font-medium ${isDisabled ? "text-default-400 dark:text-gray-500" : "text-default-700 dark:text-gray-200"}`}>
+                                <span
+                                  className={`font-medium ${isDisabled ? "text-default-400 dark:text-gray-500" : "text-default-700 dark:text-gray-200"}`}
+                                >
                                   {emp.name}
                                 </span>
-                                <span className={`ml-2 ${isDisabled ? "text-default-300 dark:text-gray-600" : "text-default-400 dark:text-gray-500"}`}>
+                                <span
+                                  className={`ml-2 ${isDisabled ? "text-default-300 dark:text-gray-600" : "text-default-400 dark:text-gray-500"}`}
+                                >
                                   ({emp.id})
                                 </span>
                               </div>
                               {isDisabled && (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(existingType)}`}>
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(existingType)}`}
+                                >
                                   <IconCheck size={12} />
                                   {getLeaveTypeLabel(existingType)}
                                 </span>

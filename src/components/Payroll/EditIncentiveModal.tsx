@@ -35,6 +35,7 @@ interface EditIncentiveModalProps {
   onClose: () => void;
   onSuccess: () => void;
   incentive: Incentive | null;
+  displayLabel?: string;
 }
 
 const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
@@ -42,6 +43,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   onClose,
   onSuccess,
   incentive,
+  displayLabel = "Incentive",
 }) => {
   const { locations } = useLocationMappingsCache();
   const [amount, setAmount] = useState("");
@@ -49,6 +51,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   const [incentiveDate, setIncentiveDate] = useState("");
   const [locationCode, setLocationCode] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const displayLabelLower: string = displayLabel.toLowerCase();
 
   // Filter locations to only show 16-24 for commission entries
   const commissionLocationOptions = useMemo(() => {
@@ -61,9 +64,12 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   }, [locations]);
 
   // Check if this is a commission entry (has location_code or description contains "Commission")
-  const isCommissionEntry = useMemo(() => {
+  const isCommissionEntry = useMemo((): boolean => {
     if (!incentive) return false;
-    return incentive.location_code || incentive.description?.toUpperCase().includes("COMMISSION");
+    return Boolean(
+      incentive.location_code ||
+        incentive.description?.toUpperCase().includes("COMMISSION")
+    );
   }, [incentive]);
 
   useEffect(() => {
@@ -75,7 +81,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
     }
   }, [incentive]);
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!incentive) return;
 
     if (!amount || parseFloat(amount) <= 0) {
@@ -90,7 +96,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
 
     // For commission entries, validate location
     if (isCommissionEntry && !locationCode) {
-      toast.error("Please select a location for commission entries.");
+      toast.error(`Please select a location for ${displayLabelLower} entries.`);
       return;
     }
 
@@ -104,20 +110,20 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
         location_code: isCommissionEntry ? locationCode : null,
       });
 
-      toast.success("Incentive updated successfully!");
+      toast.success(`${displayLabel} updated successfully!`);
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error("Failed to update incentive:", error);
       toast.error(
-        error.response?.data?.message || "Failed to update incentive."
+        error.response?.data?.message || `Failed to update ${displayLabelLower}.`
       );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     if (!isSaving) {
       onClose();
     }
@@ -151,13 +157,13 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-default-900 p-0 text-left align-middle shadow-xl transition-all">
-                <div className="px-6 py-4 border-b border-default-200 dark:border-default-700">
+              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl border border-default-200 bg-white p-0 text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
+                <div className="px-6 py-4 border-b border-default-200 bg-default-50 dark:border-gray-700 dark:bg-gray-900/60">
                   <DialogTitle
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
-                    Edit Incentive
+                    Edit {displayLabel}
                   </DialogTitle>
                   <p className="text-sm text-default-600 dark:text-default-400 mt-1">
                     Employee: {incentive.employee_name} ({incentive.employee_id}
@@ -165,11 +171,11 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                   </p>
                 </div>
 
-                <div className="px-6 py-4">
+                <div className="px-6 py-4 text-default-800 dark:text-gray-100">
                   <div className="space-y-4">
                     <FormInput
                       name="incentiveDate"
-                      label="Incentive Date"
+                      label={`${displayLabel} Date`}
                       type="date"
                       value={incentiveDate}
                       onChange={(e) => setIncentiveDate(e.target.value)}
@@ -204,12 +210,12 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       type="text"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="e.g., Commission, Bonus"
+                      placeholder={`e.g., ${displayLabel}, Bonus`}
                       required
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 dark:border-default-700 pt-6">
+                  <div className="flex justify-end space-x-3 mt-6 border-t border-default-200 pt-6 dark:border-gray-700">
                     <Button
                       variant="outline"
                       onClick={handleClose}
@@ -223,7 +229,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       disabled={isSaving}
                       icon={IconDeviceFloppy}
                     >
-                      {isSaving ? "Updating..." : "Update Incentive"}
+                      {isSaving ? "Updating..." : `Update ${displayLabel}`}
                     </Button>
                   </div>
                 </div>
