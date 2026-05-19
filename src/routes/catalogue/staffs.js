@@ -7,7 +7,7 @@ export default function (pool) {
 
   // Helper functions
   async function checkDuplicateStaffId(id) {
-    const query = "SELECT * FROM staffs WHERE id = $1";
+    const query = "SELECT * FROM staffs WHERE btrim(id) = btrim($1)";
     const result = await pool.query(query, [id]);
     return result.rows.length > 0;
   }
@@ -17,6 +17,18 @@ export default function (pool) {
     if (!job) return false;
     const jobArray = Array.isArray(job) ? job : JSON.parse(job);
     return jobArray.includes("OFFICE");
+  }
+
+  function getStaffIdValidationError(id, fieldName = "Staff ID") {
+    if (!id || typeof id !== "string") {
+      return `${fieldName} is required`;
+    }
+
+    if (/\s/.test(id)) {
+      return `${fieldName} cannot contain whitespace`;
+    }
+
+    return null;
   }
 
   // Default password hash for OFFICE staff
@@ -149,6 +161,11 @@ export default function (pool) {
     } = req.body;
 
     try {
+      const idValidationError = getStaffIdValidationError(id);
+      if (idValidationError) {
+        return res.status(400).json({ message: idValidationError });
+      }
+
       // Check for duplicate ID
       const isDuplicateId = await checkDuplicateStaffId(id);
       if (isDuplicateId) {
@@ -336,6 +353,14 @@ export default function (pool) {
     }
 
     try {
+      const headStaffIdValidationError = getStaffIdValidationError(
+        headStaffId,
+        "Head staff ID"
+      );
+      if (headStaffIdValidationError) {
+        return res.status(400).json({ message: headStaffIdValidationError });
+      }
+
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -647,6 +672,18 @@ export default function (pool) {
     } = req.body;
 
     try {
+      const idValidationError = getStaffIdValidationError(id);
+      if (idValidationError) {
+        return res.status(400).json({ message: idValidationError });
+      }
+
+      const newIdValidationError = newId
+        ? getStaffIdValidationError(newId, "New staff ID")
+        : null;
+      if (newIdValidationError) {
+        return res.status(400).json({ message: newIdValidationError });
+      }
+
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -654,7 +691,7 @@ export default function (pool) {
         let updateId = id;
         if (newId && newId !== id) {
           // Check if the new ID already exists
-          const checkIdQuery = "SELECT id FROM staffs WHERE id = $1";
+          const checkIdQuery = "SELECT id FROM staffs WHERE btrim(id) = btrim($1)";
           const checkIdResult = await client.query(checkIdQuery, [newId]);
           if (checkIdResult.rows.length > 0) {
             throw new Error("A staff member with the new ID already exists");

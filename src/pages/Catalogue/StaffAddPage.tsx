@@ -22,6 +22,8 @@ interface SelectOption {
   name: string;
 }
 
+const STAFF_ID_WHITESPACE_REGEX: RegExp = /\s/;
+
 const StaffAddPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -199,6 +201,11 @@ const StaffAddPage: React.FC = () => {
         ...prevData,
         [name]: formattedValue,
       }));
+    } else if (name === "id") {
+      setFormData((prevData) => ({
+        ...prevData,
+        [name]: value.replace(/\s/g, ""),
+      }));
     } else {
       setFormData((prevData) => ({
         ...prevData,
@@ -230,7 +237,7 @@ const StaffAddPage: React.FC = () => {
 
   const checkDuplicateId = async (id: string): Promise<Employee | null> => {
     try {
-      const existingStaff = allStaffs.find((staff) => staff.id === id);
+      const existingStaff = allStaffs.find((staff) => staff.id.trim() === id);
       return existingStaff || null;
     } catch (error) {
       console.error("Error checking ID:", error);
@@ -248,6 +255,15 @@ const StaffAddPage: React.FC = () => {
         );
         return false;
       }
+    }
+
+    if (STAFF_ID_WHITESPACE_REGEX.test(formData.id)) {
+      toast.error("Staff ID cannot contain whitespace.");
+      const idField = document.getElementById("id");
+      if (idField) {
+        idField.focus();
+      }
+      return false;
     }
 
     // Check for duplicate ID before submission
