@@ -27,7 +27,10 @@ import ManageActivitiesModal, {
 } from "../../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import { calculateActivityAmount } from "../../../utils/payroll/calculateActivityAmount";
-import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
+import {
+  getGroupedStaffIdsByEmployeeId,
+  groupStaffsByName,
+} from "../../../utils/payroll/groupStaffsByName";
 import {
   Dialog,
   DialogPanel,
@@ -258,6 +261,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const leaveEligibleEmployees = useMemo(
     () => groupStaffsByName(eligibleEmployees),
     [eligibleEmployees],
+  );
+  const groupedStaffIdsByEmployeeId = useMemo(
+    () => getGroupedStaffIdsByEmployeeId(allStaffs || []),
+    [allStaffs],
   );
 
   // Initialize employee entries
@@ -1721,10 +1728,19 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     {(() => {
                       const q = leaveEmployeeSearch.trim().toLowerCase();
                       const filtered = leaveEligibleEmployees.filter(
-                        (emp: Employee) =>
-                          !q ||
-                          emp.name.toLowerCase().includes(q) ||
-                          emp.id.toLowerCase().includes(q),
+                        (emp: Employee) => {
+                          const groupedIds: string[] =
+                            groupedStaffIdsByEmployeeId.get(emp.id) || [emp.id];
+                          const groupedIdsText: string = groupedIds
+                            .join(" ")
+                            .toLowerCase();
+
+                          return (
+                            !q ||
+                            emp.name.toLowerCase().includes(q) ||
+                            groupedIdsText.includes(q)
+                          );
+                        },
                       );
                       if (filtered.length === 0) {
                         return (
@@ -1739,6 +1755,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                         const isDisabled = !!existingType;
                         const isChecked =
                           !!leaveEmployeeSelections[emp.id] && !isDisabled;
+                        const groupedIds: string[] =
+                          groupedStaffIdsByEmployeeId.get(emp.id) || [emp.id];
+                        const hasCollapsedIds: boolean = groupedIds.length > 1;
+                        const groupedIdsText: string = groupedIds.join(", ");
                         return (
                           <div
                             key={emp.id}
@@ -1758,8 +1778,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                               checkedColor="text-sky-600"
                               disabled={isDisabled}
                             />
-                            <div className="ml-3 flex-1 flex items-center justify-between">
-                              <div className="text-sm">
+                            <div className="ml-3 flex-1 min-w-0 flex items-center justify-between gap-3">
+                              <div className="text-sm min-w-0">
                                 <span
                                   className={`font-medium ${isDisabled ? "text-default-400 dark:text-gray-500" : "text-default-700 dark:text-gray-200"}`}
                                 >
@@ -1770,10 +1790,17 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                                 >
                                   ({emp.id})
                                 </span>
+                                {hasCollapsedIds && (
+                                  <div
+                                    className={`text-xs mt-0.5 break-words ${isDisabled ? "text-default-300 dark:text-gray-600" : "text-sky-600 dark:text-sky-400"}`}
+                                  >
+                                    Collapsed IDs: {groupedIdsText}
+                                  </div>
+                                )}
                               </div>
                               {isDisabled && (
                                 <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(existingType)}`}
+                                  className={`inline-flex flex-shrink-0 items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(existingType)}`}
                                 >
                                   <IconCheck size={12} />
                                   {getLeaveTypeLabel(existingType)}

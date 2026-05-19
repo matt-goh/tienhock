@@ -1,5 +1,41 @@
 import { Employee } from "../../types/types";
 
+const getSortableJoinedDate = (dateJoined: string): number => {
+  const parsedDate: number = Date.parse(dateJoined);
+  return Number.isNaN(parsedDate) ? Number.POSITIVE_INFINITY : parsedDate;
+};
+
+const compareStaffByCanonicalOrder = <T extends Employee>(
+  firstStaff: T,
+  secondStaff: T,
+): number => {
+  const firstJoined: number = getSortableJoinedDate(firstStaff.dateJoined);
+  const secondJoined: number = getSortableJoinedDate(secondStaff.dateJoined);
+
+  if (firstJoined !== secondJoined) {
+    return firstJoined - secondJoined;
+  }
+
+  return firstStaff.id.localeCompare(secondStaff.id);
+};
+
+const groupStaffRowsByName = <T extends Employee>(
+  staffs: T[],
+): Map<string, T[]> => {
+  const byName: Map<string, T[]> = new Map<string, T[]>();
+
+  for (const staff of staffs) {
+    const current: T[] | undefined = byName.get(staff.name);
+    if (current) {
+      current.push(staff);
+    } else {
+      byName.set(staff.name, [staff]);
+    }
+  }
+
+  return byName;
+};
+
 /**
  * Collapses staff rows so each employee `name` appears only once.
  * Multi-ID employees share a single leave entitlement (the backend
@@ -9,32 +45,37 @@ import { Employee } from "../../types/types";
  * tie-broken by `id` ASC. Matches the backend's canonical pick.
  */
 export const groupStaffsByName = <T extends Employee>(staffs: T[]): T[] => {
-  const byName = new Map<string, T>();
+  const groupedStaffs: Map<string, T[]> = groupStaffRowsByName(staffs);
+  const canonicalStaffs: T[] = [];
 
-  for (const staff of staffs) {
-    const current = byName.get(staff.name);
-    if (!current) {
-      byName.set(staff.name, staff);
-      continue;
-    }
+  for (const staffGroup of groupedStaffs.values()) {
+    const canonicalStaff: T | undefined = [...staffGroup].sort(
+      compareStaffByCanonicalOrder,
+    )[0];
+    if (canonicalStaff) canonicalStaffs.push(canonicalStaff);
+  }
 
-    const currentJoined = Date.parse(current.dateJoined);
-    const candidateJoined = Date.parse(staff.dateJoined);
+  return canonicalStaffs;
+};
 
-    const currentSortable = Number.isNaN(currentJoined)
-      ? Number.POSITIVE_INFINITY
-      : currentJoined;
-    const candidateSortable = Number.isNaN(candidateJoined)
-      ? Number.POSITIVE_INFINITY
-      : candidateJoined;
+export const getGroupedStaffIdsByEmployeeId = <T extends Employee>(
+  staffs: T[],
+): Map<string, string[]> => {
+  const groupedStaffs: Map<string, T[]> = groupStaffRowsByName(staffs);
+  const groupedIdsByEmployeeId: Map<string, string[]> = new Map<
+    string,
+    string[]
+  >();
 
-    if (
-      candidateSortable < currentSortable ||
-      (candidateSortable === currentSortable && staff.id < current.id)
-    ) {
-      byName.set(staff.name, staff);
+  for (const staffGroup of groupedStaffs.values()) {
+    const groupedIds: string[] = [...staffGroup]
+      .sort(compareStaffByCanonicalOrder)
+      .map((staff: T) => staff.id);
+
+    for (const staff of staffGroup) {
+      groupedIdsByEmployeeId.set(staff.id, groupedIds);
     }
   }
 
-  return Array.from(byName.values());
+  return groupedIdsByEmployeeId;
 };
