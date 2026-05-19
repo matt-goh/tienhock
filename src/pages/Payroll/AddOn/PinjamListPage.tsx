@@ -51,6 +51,7 @@ interface EmployeePayrollSummary {
   employee_id: string;
   employee_name: string;
   net_pay: number;
+  setelah_digenapkan?: number;
 }
 
 interface PinjamSummary {
@@ -170,6 +171,7 @@ const PinjamListPage: React.FC = () => {
         employee_name: string;
         midMonthPay: number;
         netPay: number;
+        setelahDigenapkan?: number;
         midMonthPinjam: number;
         midMonthPinjamDetails: string[];
         monthlyPinjam: number;
@@ -194,6 +196,7 @@ const PinjamListPage: React.FC = () => {
         employee_name: pinjamRecord.employee_name,
         midMonthPay: midMonthRecord?.amount || 0,
         netPay: payrollRecord?.net_pay || 0,
+        setelahDigenapkan: payrollRecord?.setelah_digenapkan,
         midMonthPinjam: pinjamRecord.mid_month.total_amount || 0,
         midMonthPinjamDetails: pinjamRecord.mid_month.details || [],
         monthlyPinjam: pinjamRecord.monthly.total_amount || 0,
@@ -205,7 +208,8 @@ const PinjamListPage: React.FC = () => {
     return Array.from(employeeMap.values())
       .map((emp) => ({
         ...emp,
-        gajiGenap: emp.netPay - emp.midMonthPay,
+        gajiGenap:
+          emp.setelahDigenapkan ?? Math.ceil(emp.netPay - emp.midMonthPay),
       }))
       .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
   }, [midMonthPayrolls, pinjamSummary, employeePayrolls]);
@@ -762,7 +766,7 @@ const PinjamListPage: React.FC = () => {
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                           record.pinjam_type === "mid_month"
                             ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                            : "bg-green-100 text-green-800"
+                            : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
                         }`}
                       >
                         {record.pinjam_type === "mid_month"
@@ -793,7 +797,7 @@ const PinjamListPage: React.FC = () => {
                             setDeletingId(record.id);
                             setShowDeleteDialog(true);
                           }}
-                          className="text-rose-600 hover:text-rose-800"
+                          className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
                           title="Delete"
                         >
                           <IconTrash size={18} />
