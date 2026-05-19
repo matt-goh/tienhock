@@ -164,6 +164,8 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
         return "Annual Leave";
       case "cuti_umum":
         return "Public Holiday";
+      case "cuti_rawatan":
+        return "Hospital Leave";
       default:
         return type;
     }
@@ -177,6 +179,8 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
         return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
       case "cuti_umum":
         return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+      case "cuti_rawatan":
+        return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300";
       default:
         return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
     }

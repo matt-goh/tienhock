@@ -27,7 +27,7 @@ const calculateYearsOfService = (dateJoined) => {
  * Calculates leave allocation based on years of service.
  * These values are based on standard Malaysian labor law.
  * @param {number} yearsOfService - The employee's years of service.
- * @returns {{cuti_tahunan_total: number, cuti_sakit_total: number}}
+ * @returns {{cuti_tahunan_total: number, cuti_sakit_total: number, cuti_rawatan_total: number}}
  */
 const calculateLeaveAllocation = (yearsOfService) => {
   let cuti_tahunan_total;
@@ -44,7 +44,7 @@ const calculateLeaveAllocation = (yearsOfService) => {
     cuti_sakit_total = 22;
   }
 
-  return { cuti_tahunan_total, cuti_sakit_total };
+  return { cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total: 60 };
 };
 
 const getCutiUmumTotal = async (client, year) => {
@@ -115,12 +115,12 @@ export default function (pool) {
             const yearsOfService = calculateYearsOfService(
               staffResult.rows[0].date_joined
             );
-            const { cuti_tahunan_total, cuti_sakit_total } =
+            const { cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total } =
               calculateLeaveAllocation(yearsOfService);
 
             const insertQuery = `
-              INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total)
-              VALUES ($1, $2, $3, $4)
+              INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+              VALUES ($1, $2, $3, $4, $5)
               RETURNING *;
             `;
             balanceResult = await client.query(insertQuery, [
@@ -128,6 +128,7 @@ export default function (pool) {
               parseInt(year),
               cuti_tahunan_total,
               cuti_sakit_total,
+              cuti_rawatan_total,
             ]);
           }
 
@@ -205,12 +206,12 @@ export default function (pool) {
           const yearsOfService = calculateYearsOfService(
             staffResult.rows[0].date_joined
           );
-          const { cuti_tahunan_total, cuti_sakit_total } =
+          const { cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total } =
             calculateLeaveAllocation(yearsOfService);
 
           const insertQuery = `
-            INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *;
           `;
           balanceResult = await client.query(insertQuery, [
@@ -218,6 +219,7 @@ export default function (pool) {
             parseInt(year),
             cuti_tahunan_total,
             cuti_sakit_total,
+            cuti_rawatan_total,
           ]);
         }
 
@@ -473,10 +475,11 @@ export default function (pool) {
             WHERE s.id = ANY($1::text[])
           ),
           leave_balances AS (
-            SELECT 
+            SELECT
               lb.employee_id,
               lb.cuti_tahunan_total,
-              lb.cuti_sakit_total
+              lb.cuti_sakit_total,
+              lb.cuti_rawatan_total
             FROM employee_leave_balances lb
             WHERE lb.employee_id = ANY($1::text[]) AND lb.year = $2
           ),
@@ -500,11 +503,12 @@ export default function (pool) {
               AND lr.status = 'approved'
           ),
           leave_taken AS (
-            SELECT 
+            SELECT
               employee_id,
               SUM(CASE WHEN leave_type = 'cuti_umum' THEN days_taken ELSE 0 END) as cuti_umum,
               SUM(CASE WHEN leave_type = 'cuti_sakit' THEN days_taken ELSE 0 END) as cuti_sakit,
-              SUM(CASE WHEN leave_type = 'cuti_tahunan' THEN days_taken ELSE 0 END) as cuti_tahunan
+              SUM(CASE WHEN leave_type = 'cuti_tahunan' THEN days_taken ELSE 0 END) as cuti_tahunan,
+              SUM(CASE WHEN leave_type = 'cuti_rawatan' THEN days_taken ELSE 0 END) as cuti_rawatan
             FROM leave_records
             GROUP BY employee_id
           )
@@ -519,15 +523,17 @@ export default function (pool) {
               END
             ) as cuti_tahunan_total,
             COALESCE(lb.cuti_sakit_total,
-              CASE 
+              CASE
                 WHEN ei.years_of_service < 2 THEN 14
                 WHEN ei.years_of_service < 5 THEN 18
                 ELSE 22
               END
             ) as cuti_sakit_total,
+            COALESCE(lb.cuti_rawatan_total, 60) as cuti_rawatan_total,
             COALESCE(lt.cuti_umum, 0) as cuti_umum_taken,
             COALESCE(lt.cuti_sakit, 0) as cuti_sakit_taken,
             COALESCE(lt.cuti_tahunan, 0) as cuti_tahunan_taken,
+            COALESCE(lt.cuti_rawatan, 0) as cuti_rawatan_taken,
             COALESCE(
               JSON_AGG(
                 CASE WHEN lr.employee_id IS NOT NULL THEN
@@ -545,10 +551,10 @@ export default function (pool) {
           LEFT JOIN leave_balances lb ON ei.id = lb.employee_id
           LEFT JOIN leave_taken lt ON ei.id = lt.employee_id
           LEFT JOIN leave_records lr ON ei.id = lr.employee_id
-          GROUP BY 
+          GROUP BY
             ei.id, ei.name, ei.job, ei."dateJoined", ei."icNo", ei.nationality, ei.years_of_service,
-            lb.cuti_tahunan_total, lb.cuti_sakit_total,
-            lt.cuti_umum, lt.cuti_sakit, lt.cuti_tahunan
+            lb.cuti_tahunan_total, lb.cuti_sakit_total, lb.cuti_rawatan_total,
+            lt.cuti_umum, lt.cuti_sakit, lt.cuti_tahunan, lt.cuti_rawatan
           ORDER BY ei.name
         `;
 
@@ -563,6 +569,7 @@ export default function (pool) {
               cuti_umum: { days: 0, amount: 0 },
               cuti_sakit: { days: 0, amount: 0 },
               cuti_tahunan: { days: 0, amount: 0 },
+              cuti_rawatan: { days: 0, amount: 0 },
             };
           }
 
@@ -602,11 +609,13 @@ export default function (pool) {
               cuti_umum_total: Number(row.cuti_umum_total || 0),
               cuti_tahunan_total: Number(row.cuti_tahunan_total || 8),
               cuti_sakit_total: Number(row.cuti_sakit_total || 14),
+              cuti_rawatan_total: Number(row.cuti_rawatan_total || 60),
             },
             leaveTaken: {
               cuti_umum: Number(row.cuti_umum_taken || 0),
               cuti_sakit: Number(row.cuti_sakit_taken || 0),
               cuti_tahunan: Number(row.cuti_tahunan_taken || 0),
+              cuti_rawatan: Number(row.cuti_rawatan_taken || 0),
             },
             monthlySummary: monthlySummary,
           };
@@ -643,6 +652,15 @@ export default function (pool) {
                 ),
               0
             ),
+            cuti_rawatan: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_rawatan.days,
+                  0
+                ),
+              0
+            ),
           },
           totalAmountPaid: {
             cuti_tahunan: employees.reduce(
@@ -668,6 +686,15 @@ export default function (pool) {
                 sum +
                 Object.values(emp.monthlySummary).reduce(
                   (monthSum, month) => monthSum + month.cuti_umum.amount,
+                  0
+                ),
+              0
+            ),
+            cuti_rawatan: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_rawatan.amount,
                   0
                 ),
               0

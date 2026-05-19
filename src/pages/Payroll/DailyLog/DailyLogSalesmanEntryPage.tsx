@@ -76,7 +76,7 @@ interface DailyLogSalesmanEntryPageProps {
   onCancel?: () => void;
 }
 
-type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan";
+type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan" | "cuti_rawatan";
 type BulkLeaveTypeValue = LeaveType | "mixed";
 
 interface LeaveEntry {
@@ -94,9 +94,11 @@ interface LeaveBalance {
   cuti_tahunan_total: number;
   cuti_sakit_total: number;
   cuti_umum_total: number;
+  cuti_rawatan_total: number;
   cuti_tahunan_taken: number;
   cuti_sakit_taken: number;
   cuti_umum_taken: number;
+  cuti_rawatan_taken: number;
 }
 
 interface LeaveAvailability {
@@ -515,6 +517,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     const options: LeaveOption[] = [
       { id: "cuti_sakit", name: "Cuti Sakit" },
       { id: "cuti_tahunan", name: "Cuti Tahunan" },
+      { id: "cuti_rawatan", name: "Cuti Rawatan" },
     ];
 
     if (formData.dayType === "Umum") {
@@ -706,9 +709,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           cuti_tahunan_total: balance.cuti_tahunan_total || 0,
           cuti_sakit_total: balance.cuti_sakit_total || 0,
           cuti_umum_total: balance.cuti_umum_total || 0,
+          cuti_rawatan_total: balance.cuti_rawatan_total ?? 60,
           cuti_tahunan_taken: taken.cuti_tahunan || 0,
           cuti_sakit_taken: taken.cuti_sakit || 0,
           cuti_umum_taken: taken.cuti_umum || 0,
+          cuti_rawatan_taken: taken.cuti_rawatan || 0,
         };
       });
 
@@ -763,19 +768,18 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         taken = balance.cuti_umum_taken;
         remaining = totalAllowed - taken;
         break;
+      case "cuti_rawatan":
+        totalAllowed = balance.cuti_rawatan_total;
+        taken = balance.cuti_rawatan_taken;
+        remaining = totalAllowed - taken;
+        break;
     }
 
     const available = remaining > 0;
     let message = "";
 
     if (!available) {
-      const leaveTypeName =
-        leaveType === "cuti_tahunan"
-          ? "Annual Leave"
-          : leaveType === "cuti_sakit"
-          ? "Sick Leave"
-          : "Public Holiday Leave";
-      message = `${leaveTypeName} balance exhausted (${taken}/${totalAllowed} days used)`;
+      message = `${getLeaveTypeDisplayName(leaveType)} balance exhausted (${taken}/${totalAllowed} days used)`;
     }
 
     return { available, remaining, message, taken, totalAllowed };
@@ -789,6 +793,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         return "Sick Leave";
       case "cuti_umum":
         return "Public Holiday Leave";
+      case "cuti_rawatan":
+        return "Hospital Leave";
     }
   };
 
@@ -814,6 +820,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       case "cuti_umum":
         totalAllowed = balanceData.cuti_umum_total || 0;
         taken = balanceData.cuti_umum_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
+      case "cuti_rawatan":
+        totalAllowed = balanceData.cuti_rawatan_total || 0;
+        taken = balanceData.cuti_rawatan_taken || 0;
         remaining = totalAllowed - taken;
         break;
     }
@@ -1016,6 +1027,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       const possibleLeaveTypes: LeaveType[] = [
         "cuti_sakit",
         "cuti_tahunan",
+        "cuti_rawatan",
         ...(formData.dayType === "Umum" ? ["cuti_umum" as LeaveType] : []),
       ];
 
@@ -1046,12 +1058,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       );
 
       // Show available balance when selecting
-      const leaveTypeName =
-        selectedLeaveType === "cuti_tahunan"
-          ? "Annual Leave"
-          : selectedLeaveType === "cuti_sakit"
-          ? "Sick Leave"
-          : "Public Holiday Leave";
+      const leaveTypeName = getLeaveTypeDisplayName(selectedLeaveType);
 
       toast.success(
         `${leaveTypeName} selected - ${availability.remaining} days remaining`
@@ -1059,10 +1066,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
       // If we're not using the default leave type, inform the user
       if (selectedLeaveType !== defaultLeaveType) {
-        const defaultTypeName =
-          defaultLeaveType === "cuti_umum"
-            ? "Public Holiday Leave"
-            : "Sick Leave";
+        const defaultTypeName = getLeaveTypeDisplayName(defaultLeaveType);
         toast(
           `${defaultTypeName} is exhausted, using ${leaveTypeName} instead`
         );
@@ -1098,6 +1102,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         const possibleLeaveTypes: LeaveType[] = [
           "cuti_sakit",
           "cuti_tahunan",
+          "cuti_rawatan",
           ...(formData.dayType === "Umum" ? ["cuti_umum" as LeaveType] : []),
         ];
 
@@ -1277,18 +1282,17 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         taken = balanceData.cuti_umum_taken || 0;
         remaining = totalAllowed - taken;
         break;
+      case "cuti_rawatan":
+        totalAllowed = balanceData.cuti_rawatan_total || 0;
+        taken = balanceData.cuti_rawatan_taken || 0;
+        remaining = totalAllowed - taken;
+        break;
     }
 
     const available = remaining > 0;
 
     if (!available) {
-      const leaveTypeName =
-        leaveType === "cuti_tahunan"
-          ? "Annual Leave"
-          : leaveType === "cuti_sakit"
-          ? "Sick Leave"
-          : "Public Holiday Leave";
-      toast.error(`${leaveTypeName} balance exhausted (${taken}/${totalAllowed} days used)`);
+      toast.error(`${getLeaveTypeDisplayName(leaveType)} balance exhausted (${taken}/${totalAllowed} days used)`);
       return; // Don't allow the change
     }
 
@@ -4416,6 +4420,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                                       ? "Annual"
                                       : currentLeaveType === "cuti_sakit"
                                       ? "Sick"
+                                      : currentLeaveType === "cuti_rawatan"
+                                      ? "Hospital"
                                       : "Public Holiday";
                                   return (
                                     <span

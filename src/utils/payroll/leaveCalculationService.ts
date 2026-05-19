@@ -4,6 +4,7 @@ export interface LeaveAllocation {
   cutiUmum: number;
   cutiTahunan: number;
   cutiSakit: number;
+  cutiRawatan: number;
 }
 
 /**
@@ -57,6 +58,7 @@ export const calculateLeaveAllocation = (
     cutiUmum: 14, // Fixed for all employees
     cutiTahunan,
     cutiSakit,
+    cutiRawatan: 60, // Fixed for all employees
   };
 };
 
