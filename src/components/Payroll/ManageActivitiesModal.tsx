@@ -135,10 +135,11 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     return activities1.every((act1, index) => {
       const act2 = activities2[index];
       return (
-        act1.payCodeId === act2.payCodeId &&
+        getActivityIdentity(act1) === getActivityIdentity(act2) &&
         act1.isSelected === act2.isSelected &&
         act1.calculatedAmount === act2.calculatedAmount &&
-        act1.unitsProduced === act2.unitsProduced
+        act1.unitsProduced === act2.unitsProduced &&
+        act1.unitsFOC === act2.unitsFOC
       );
     });
   };
@@ -344,9 +345,20 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
     onClose();
   };
 
+  const getActivityIdentity = (activity: ActivityItem): string =>
+    [
+      activity.payCodeId,
+      activity.description,
+      activity.payType,
+      activity.rateUnit,
+      activity.rate,
+      activity.hoursApplied ?? "",
+    ].join("|");
+
   // Get original index for an activity
-  const getOriginalIndex = (payCodeId: string) => {
-    return activities.findIndex(a => a.payCodeId === payCodeId);
+  const getOriginalIndex = (activity: ActivityItem) => {
+    const identity = getActivityIdentity(activity);
+    return activities.findIndex((candidate) => getActivityIdentity(candidate) === identity);
   };
 
   // Select all unselected activities (move all from right to left panel)
@@ -543,10 +555,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             </div>
                           ) : (
                             selectedActivities.map((activity) => {
-                              const originalIndex = getOriginalIndex(activity.payCodeId);
+                              const originalIndex = getOriginalIndex(activity);
                               return (
                                 <div
-                                  key={activity.payCodeId}
+                                  key={getActivityIdentity(activity)}
                                   className="py-2.5 px-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer group"
                                   onClick={() => handleToggleActivity(originalIndex)}
                                 >
@@ -718,10 +730,10 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             </div>
                           ) : (
                             unselectedActivities.map((activity) => {
-                              const originalIndex = getOriginalIndex(activity.payCodeId);
+                              const originalIndex = getOriginalIndex(activity);
                               return (
                                 <div
-                                  key={activity.payCodeId}
+                                  key={getActivityIdentity(activity)}
                                   className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors cursor-pointer group"
                                   onClick={() => handleToggleActivity(originalIndex)}
                                 >

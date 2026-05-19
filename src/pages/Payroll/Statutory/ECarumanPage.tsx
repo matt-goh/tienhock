@@ -587,7 +587,7 @@ const ECarumanPage: React.FC = () => {
               {/* EPF Detailed Tooltip */}
               {hoveredCard === "epf" && preview.epf && preview.epf.data.length > 0 && (
                 <div
-                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[600px]"
+                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[600px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -597,7 +597,7 @@ const ECarumanPage: React.FC = () => {
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Member No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
@@ -625,7 +625,7 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-blue-50 dark:bg-blue-900/30 sticky bottom-0">
+                      <tfoot className="bg-blue-50 dark:bg-gray-900 sticky bottom-0 z-10">
                         <tr className="font-medium">
                           <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
                           <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
@@ -697,7 +697,7 @@ const ECarumanPage: React.FC = () => {
               {/* SOCSO Detailed Tooltip */}
               {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
                 <div
-                  className="absolute left-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[550px]"
+                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[550px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -707,7 +707,7 @@ const ECarumanPage: React.FC = () => {
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
@@ -733,7 +733,7 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-green-50 dark:bg-green-900/30 sticky bottom-0">
+                      <tfoot className="bg-green-50 dark:bg-gray-900 sticky bottom-0 z-10">
                         <tr className="font-medium">
                           <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
                           <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
@@ -805,7 +805,7 @@ const ECarumanPage: React.FC = () => {
               {/* SIP Detailed Tooltip */}
               {hoveredCard === "sip" && preview.sip && preview.sip.data.length > 0 && (
                 <div
-                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -815,7 +815,7 @@ const ECarumanPage: React.FC = () => {
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
@@ -841,7 +841,7 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-purple-50 dark:bg-purple-900/30 sticky bottom-0">
+                      <tfoot className="bg-purple-50 dark:bg-gray-900 sticky bottom-0 z-10">
                         <tr className="font-medium">
                           <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
                           <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
@@ -901,7 +901,7 @@ const ECarumanPage: React.FC = () => {
               {/* Income Tax Detailed Tooltip */}
               {hoveredCard === "income_tax" && preview.income_tax && preview.income_tax.data.length > 0 && (
                 <div
-                  className="absolute right-0 bottom-full mb-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -911,7 +911,7 @@ const ECarumanPage: React.FC = () => {
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                         <tr>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Tax No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
@@ -931,7 +931,7 @@ const ECarumanPage: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-amber-50 dark:bg-amber-900/30 sticky bottom-0">
+                      <tfoot className="bg-amber-50 dark:bg-gray-900 sticky bottom-0 z-10">
                         <tr className="font-medium">
                           <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
                           <td className="px-2 py-1.5 text-right text-amber-600 dark:text-amber-400 font-mono border-t border-gray-200 dark:border-gray-700">

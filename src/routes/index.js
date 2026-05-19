@@ -61,6 +61,7 @@ import holidaysRouter from "./payroll/holidays.js";
 import monthlyPayrollsRouter from "./payroll/monthly-payrolls.js";
 import leaveManagementRoutes from "./payroll/leave-management.js";
 import incentivesRoutes from "./payroll/incentives.js";
+import othersRecordsRouter from "./payroll/others-records.js";
 import employeePayrollsRouter from "./payroll/employee-payrolls.js";
 import contributionRatesRouter from "./payroll/contribution-rates.js";
 import midMonthPayrollsRouter from "./payroll/mid-month-payrolls.js";
@@ -194,6 +195,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/employee-payrolls", employeePayrollsRouter(pool));
   app.use("/api/leave-management", leaveManagementRoutes(pool));
   app.use("/api/incentives", incentivesRoutes(pool));
+  app.use("/api/others-records", othersRecordsRouter(pool));
   app.use("/api/contribution-rates", contributionRatesRouter(pool));
   app.use("/api/mid-month-payrolls", midMonthPayrollsRouter(pool));
   app.use("/api/pinjam-records", pinjamRecordsRouter(pool));

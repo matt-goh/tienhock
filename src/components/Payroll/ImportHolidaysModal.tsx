@@ -167,6 +167,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
       const batchData = holidaysToImport.map((holiday) => ({
         holiday_date: format(holiday.date, "yyyy-MM-dd"),
         description: holiday.description,
+        is_cuti_umum: true,
       }));
 
       // Make a single batch API call

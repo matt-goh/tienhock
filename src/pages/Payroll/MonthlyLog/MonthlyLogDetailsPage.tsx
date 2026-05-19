@@ -45,6 +45,10 @@ interface EmployeeEntry {
   job_name: string;
   total_hours: number;
   overtime_hours: number;
+  ahad_hours: number;
+  ahad_overtime_hours: number;
+  umum_hours: number;
+  umum_overtime_hours: number;
   activities: Activity[];
 }
 
@@ -76,6 +80,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const jobConfig = getJobConfig(jobType);
+  const supportsDayTypeHours = jobType !== "OFFICE";
 
   const [workLog, setWorkLog] = useState<MonthlyWorkLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -234,6 +239,22 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
     (sum, entry) => sum + entry.overtime_hours,
     0
   );
+  const totalAhadHours = workLog.employeeEntries.reduce(
+    (sum, entry) => sum + (entry.ahad_hours || 0),
+    0
+  );
+  const totalAhadOvertimeHours = workLog.employeeEntries.reduce(
+    (sum, entry) => sum + (entry.ahad_overtime_hours || 0),
+    0
+  );
+  const totalUmumHours = workLog.employeeEntries.reduce(
+    (sum, entry) => sum + (entry.umum_hours || 0),
+    0
+  );
+  const totalUmumOvertimeHours = workLog.employeeEntries.reduce(
+    (sum, entry) => sum + (entry.umum_overtime_hours || 0),
+    0
+  );
   const totalAmount = workLog.employeeEntries.reduce(
     (sum, entry) =>
       sum +
@@ -291,6 +312,26 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                 </span>
                 <span className="text-default-400 dark:text-gray-400">OT hrs</span>
               </div>
+              {supportsDayTypeHours && (
+                <>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <div className="flex items-center gap-1.5">
+                    <IconClock size={16} className="text-amber-600 dark:text-amber-400" />
+                    <span className="font-medium text-default-700 dark:text-gray-200">
+                      {totalAhadHours.toFixed(1)}
+                    </span>
+                    <span className="text-default-400 dark:text-gray-400">Ahad</span>
+                  </div>
+                  <span className="text-default-300 dark:text-gray-600">•</span>
+                  <div className="flex items-center gap-1.5">
+                    <IconClock size={16} className="text-rose-600 dark:text-rose-400" />
+                    <span className="font-medium text-default-700 dark:text-gray-200">
+                      {totalUmumHours.toFixed(1)}
+                    </span>
+                    <span className="text-default-400 dark:text-gray-400">Umum</span>
+                  </div>
+                </>
+              )}
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
                 <IconBeach size={16} className="text-rose-500 dark:text-rose-400" />
@@ -355,6 +396,18 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
               <span className="font-medium">
                 {totalOvertimeHours.toFixed(1)} OT hrs
               </span>
+              {supportsDayTypeHours && (
+                <>
+                  <span className="text-sky-300 dark:text-sky-600">•</span>
+                  <span className="font-medium">
+                    {totalAhadHours.toFixed(1)} Ahad / {totalAhadOvertimeHours.toFixed(1)} OT
+                  </span>
+                  <span className="text-sky-300 dark:text-sky-600">•</span>
+                  <span className="font-medium">
+                    {totalUmumHours.toFixed(1)} Umum / {totalUmumOvertimeHours.toFixed(1)} OT
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -431,14 +484,40 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                         </p>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="text-sm">
-                          <p className="font-medium text-default-800 dark:text-gray-100">
-                            {entry.total_hours.toFixed(1)}
-                          </p>
-                          {entry.overtime_hours > 0 && (
-                            <p className="text-default-500 dark:text-gray-400 text-xs">
-                              +{entry.overtime_hours.toFixed(1)} OT
+                        <div className="space-y-1 text-sm">
+                          <div>
+                            <p className="font-medium text-default-800 dark:text-gray-100">
+                              {entry.total_hours.toFixed(1)} Biasa
                             </p>
+                            {entry.overtime_hours > 0 && (
+                              <p className="text-default-500 dark:text-gray-400 text-xs">
+                                +{entry.overtime_hours.toFixed(1)} OT
+                              </p>
+                            )}
+                          </div>
+                          {supportsDayTypeHours && (entry.ahad_hours > 0 || entry.ahad_overtime_hours > 0) && (
+                            <div>
+                              <p className="font-medium text-amber-700 dark:text-amber-300">
+                                {entry.ahad_hours.toFixed(1)} Ahad
+                              </p>
+                              {entry.ahad_overtime_hours > 0 && (
+                                <p className="text-default-500 dark:text-gray-400 text-xs">
+                                  +{entry.ahad_overtime_hours.toFixed(1)} OT
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {supportsDayTypeHours && (entry.umum_hours > 0 || entry.umum_overtime_hours > 0) && (
+                            <div>
+                              <p className="font-medium text-rose-700 dark:text-rose-300">
+                                {entry.umum_hours.toFixed(1)} Umum
+                              </p>
+                              {entry.umum_overtime_hours > 0 && (
+                                <p className="text-default-500 dark:text-gray-400 text-xs">
+                                  +{entry.umum_overtime_hours.toFixed(1)} OT
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>

@@ -82,6 +82,7 @@ import ECarumanPage from "./Payroll/Statutory/ECarumanPage";
 import CommissionPage from "./Payroll/AddOn/CommissionPage";
 import BonusPage from "./Payroll/AddOn/BonusPage";
 import PinjamListPage from "./Payroll/AddOn/PinjamListPage";
+import OthersListPage from "./Payroll/AddOn/OthersListPage";
 import MidMonthPayrollPage from "./Payroll/AddOn/MidMonthPayrollPage";
 
 // Payroll - Root
@@ -189,9 +190,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           {
             name: `New ${jobConfig.name} Entry`,
             path: `/payroll/${jobTypeLower}-entry`,
-            component: (props: any) => (
-              <DailyLogSalesmanEntryPage {...props} />
-            ),
+            component: (props: any) => <DailyLogSalesmanEntryPage {...props} />,
             showInPopover: true,
           },
           {
@@ -204,9 +203,7 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           {
             name: "Edit Log",
             path: `/payroll/${jobTypeLower}-production/:id/edit`,
-            component: (props: any) => (
-              <DailyLogSalesmanEditPage {...props} />
-            ),
+            component: (props: any) => <DailyLogSalesmanEditPage {...props} />,
           },
         ],
       });
@@ -253,9 +250,15 @@ const generatePayrollSubItems = (): SidebarItem[] => {
   });
 
   payrollSubItems.push({
-    name: "Commission",
+    name: "Others (Advance)",
     path: "/payroll/commission",
     component: CommissionPage,
+  });
+
+  payrollSubItems.push({
+    name: "Others (Kerja Luar OT)",
+    path: "/payroll/others",
+    component: OthersListPage,
   });
 
   payrollSubItems.push({

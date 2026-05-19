@@ -14,7 +14,8 @@ export default function (pool) {
           id,
           TO_CHAR(holiday_date, 'YYYY-MM-DD') as holiday_date,
           description,
-          is_active
+          is_active,
+          is_cuti_umum
         FROM holiday_calendar
         WHERE is_active = true
       `;
@@ -40,7 +41,7 @@ export default function (pool) {
 
   // Create a new holiday
   router.post("/", async (req, res) => {
-    const { holiday_date, description } = req.body;
+    const { holiday_date, description, is_cuti_umum = true } = req.body;
 
     if (!holiday_date) {
       return res.status(400).json({ message: "Holiday date is required" });
@@ -48,14 +49,15 @@ export default function (pool) {
 
     try {
       const query = `
-      INSERT INTO holiday_calendar (holiday_date, description, is_active)
-      VALUES ($1, $2, true)
+      INSERT INTO holiday_calendar (holiday_date, description, is_active, is_cuti_umum)
+      VALUES ($1, $2, true, $3)
       RETURNING *
     `;
 
       const result = await pool.query(query, [
         holiday_date,
         description || null,
+        is_cuti_umum,
       ]);
       res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -85,7 +87,7 @@ export default function (pool) {
       let skippedCount = 0;
 
       for (const holiday of holidays) {
-        const { holiday_date, description } = holiday;
+        const { holiday_date, description, is_cuti_umum = true } = holiday;
 
         // Check if holiday already exists
         const checkQuery = `SELECT id FROM holiday_calendar WHERE holiday_date = $1`;
@@ -96,10 +98,14 @@ export default function (pool) {
             // Update existing holiday
             const updateQuery = `
             UPDATE holiday_calendar
-            SET description = $1
-            WHERE holiday_date = $2
+            SET description = $1, is_cuti_umum = $2
+            WHERE holiday_date = $3
           `;
-            await pool.query(updateQuery, [description, holiday_date]);
+            await pool.query(updateQuery, [
+              description,
+              is_cuti_umum,
+              holiday_date,
+            ]);
             updatedCount++;
           } else {
             // Skip duplicate
@@ -108,10 +114,14 @@ export default function (pool) {
         } else {
           // Insert new holiday
           const insertQuery = `
-          INSERT INTO holiday_calendar (holiday_date, description, is_active)
-          VALUES ($1, $2, true)
+          INSERT INTO holiday_calendar (holiday_date, description, is_active, is_cuti_umum)
+          VALUES ($1, $2, true, $3)
         `;
-          await pool.query(insertQuery, [holiday_date, description]);
+          await pool.query(insertQuery, [
+            holiday_date,
+            description,
+            is_cuti_umum,
+          ]);
           insertedCount++;
         }
       }
@@ -137,7 +147,7 @@ export default function (pool) {
   // Update a holiday
   router.put("/:id", async (req, res) => {
     const { id } = req.params;
-    const { holiday_date, description } = req.body;
+    const { holiday_date, description, is_cuti_umum = true } = req.body;
 
     if (!holiday_date) {
       return res.status(400).json({ message: "Holiday date is required" });
@@ -159,14 +169,15 @@ export default function (pool) {
 
       const query = `
         UPDATE holiday_calendar
-        SET holiday_date = $1, description = $2
-        WHERE id = $3
+        SET holiday_date = $1, description = $2, is_cuti_umum = $3
+        WHERE id = $4
         RETURNING *
       `;
 
       const result = await pool.query(query, [
         holiday_date,
         description || null,
+        is_cuti_umum,
         id,
       ]);
 

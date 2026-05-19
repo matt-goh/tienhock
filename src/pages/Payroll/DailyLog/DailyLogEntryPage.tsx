@@ -79,6 +79,7 @@ type BulkLeaveTypeValue = LeaveType | "mixed";
 interface LeaveEntry {
   selected: boolean;
   leaveType: LeaveType;
+  customAmount?: string;
 }
 
 interface LeaveOption {
@@ -1246,6 +1247,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         [employeeId]: {
           selected: newSelectedState,
           leaveType: leaveTypeToUse,
+          customAmount: prev[employeeId]?.customAmount,
         },
       };
     });
@@ -1277,6 +1279,88 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       [employeeId]: recalculatedActivities,
     }));
     toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
+  };
+
+  const getSelectedLeaveActivities = (employeeId: string): ActivityItem[] => {
+    return (leaveEmployeeActivities[employeeId] || []).filter(
+      (activity: ActivityItem) => activity.isSelected
+    );
+  };
+
+  const getLeaveActivityAmount = (employeeId: string): number => {
+    return getSelectedLeaveActivities(employeeId).reduce(
+      (sum: number, activity: ActivityItem) =>
+        sum + Number(activity.calculatedAmount || 0),
+      0
+    );
+  };
+
+  const formatLeaveAmount = (amount: number): string => {
+    return (Math.round(amount * 100) / 100).toFixed(2);
+  };
+
+  const getLeaveAmountInputValue = (employeeId: string): string => {
+    const customAmount: string | undefined =
+      leaveEmployees[employeeId]?.customAmount;
+    if (customAmount !== undefined) {
+      return customAmount;
+    }
+
+    return formatLeaveAmount(getLeaveActivityAmount(employeeId));
+  };
+
+  const handleLeaveAmountChange = (
+    employeeId: string,
+    value: string
+  ): void => {
+    const defaultLeaveType: LeaveType =
+      formData.dayType === "Umum" ? "cuti_umum" : "cuti_sakit";
+
+    setLeaveEmployees((prev) => ({
+      ...prev,
+      [employeeId]: {
+        selected: prev[employeeId]?.selected || false,
+        leaveType: prev[employeeId]?.leaveType || defaultLeaveType,
+        customAmount: value,
+      },
+    }));
+  };
+
+  const handleLeaveAmountBlur = (employeeId: string): void => {
+    const currentEntry: LeaveEntry | undefined = leaveEmployees[employeeId];
+    if (!currentEntry || currentEntry.customAmount === undefined) return;
+
+    const trimmedAmount: string = currentEntry.customAmount.trim();
+    if (trimmedAmount === "") {
+      setLeaveEmployees((prev) => {
+        const existingEntry: LeaveEntry | undefined = prev[employeeId];
+        if (!existingEntry) return prev;
+
+        const { customAmount: _customAmount, ...entryWithoutCustomAmount } =
+          existingEntry;
+        return {
+          ...prev,
+          [employeeId]: entryWithoutCustomAmount,
+        };
+      });
+      return;
+    }
+
+    const parsedAmount: number = Number(trimmedAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return;
+
+    setLeaveEmployees((prev) => {
+      const existingEntry: LeaveEntry | undefined = prev[employeeId];
+      if (!existingEntry) return prev;
+
+      return {
+        ...prev,
+        [employeeId]: {
+          ...existingEntry,
+          customAmount: formatLeaveAmount(parsedAmount),
+        },
+      };
+    });
   };
 
   const handleLeaveTypeChange = async (
@@ -1408,6 +1492,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         newLeaveEmployees[emp.id] = {
           selected: true,
           leaveType,
+          customAmount: prev[emp.id]?.customAmount,
         };
       });
       return newLeaveEmployees;
@@ -1557,21 +1642,36 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   };
 
   const handleSaveForm = async () => {
-    const leaveEntries = Object.entries(leaveEmployees)
-      .filter(([_, leaveData]) => leaveData.selected)
-      .map(([employeeId, leaveData]) => {
-        const activities = leaveEmployeeActivities[employeeId] || [];
-        const amount_paid = activities
-          .filter((a) => a.isSelected)
-          .reduce((sum, a) => sum + a.calculatedAmount, 0);
+    const leaveEntries: Array<{
+      employeeId: string;
+      leaveType: LeaveType;
+      amount_paid: number;
+      activities: ActivityItem[];
+    }> = [];
+    for (const [employeeId, leaveData] of Object.entries(leaveEmployees)) {
+      if (!leaveData.selected) continue;
 
-        return {
-          employeeId: employeeId,
-          leaveType: leaveData.leaveType,
-          amount_paid: amount_paid,
-          activities: activities.filter((a) => a.isSelected),
-        };
+      const activities: ActivityItem[] = getSelectedLeaveActivities(employeeId);
+      const defaultAmount: number = getLeaveActivityAmount(employeeId);
+      let amountPaid: number = defaultAmount;
+      const customAmount: string | undefined = leaveData.customAmount?.trim();
+
+      if (customAmount) {
+        const parsedAmount: number = Number(customAmount);
+        if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+          toast.error("Please enter a valid non-negative leave amount.");
+          return;
+        }
+        amountPaid = Math.round(parsedAmount * 100) / 100;
+      }
+
+      leaveEntries.push({
+        employeeId: employeeId,
+        leaveType: leaveData.leaveType,
+        amount_paid: amountPaid,
+        activities,
       });
+    }
 
     // Filter out excluded employees directly when building selected employees list
     const allSelectedEmployees = Object.entries(
@@ -1883,6 +1983,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           newLeaveEmployees[emp.id] = {
             selected: true,
             leaveType: prev[emp.id]?.leaveType || defaultLeaveType,
+            customAmount: prev[emp.id]?.customAmount,
           };
 
           // Fetch activities if not already available
@@ -2651,6 +2752,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           newLeaveEmployees[employeeId] = {
             selected: true,
             leaveType: leaveRecord.leave_type as LeaveType,
+            customAmount: formatLeaveAmount(
+              Number(leaveRecord.amount_paid || 0)
+            ),
           };
 
           // Store saved activities for later processing
@@ -3300,6 +3404,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                     </th>
                     <th
                       scope="col"
+                      className="w-36 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
+                      Amount
+                    </th>
+                    <th
+                      scope="col"
                       className="w-48 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
                       Actions
@@ -3489,6 +3599,28 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               </div>
                             </Listbox>
                           </div>
+                        </td>
+                        <td className="w-36 px-6 py-2 whitespace-nowrap text-right">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={getLeaveAmountInputValue(employee.id)}
+                            disabled={!isSelected || isSaving}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) =>
+                              handleLeaveAmountChange(
+                                employee.id,
+                                e.target.value
+                              )
+                            }
+                            onBlur={() => handleLeaveAmountBlur(employee.id)}
+                            className={`w-28 rounded-md border px-2 py-1.5 text-right text-sm ${
+                              !isSelected || isSaving
+                                ? "bg-default-100 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed border-default-200 dark:border-gray-600"
+                                : "bg-white dark:bg-gray-700 text-default-800 dark:text-gray-100 border-default-300 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            }`}
+                          />
                         </td>
                         <td className="w-48 px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
                           <ActivitiesTooltip
