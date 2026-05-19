@@ -623,29 +623,49 @@ const buildMainPayrollPage = (
 
   // Base subtotal row (only for single-job payrolls; combined payrolls show per-job subtotals)
   if (consolidatedBaseItems.length > 0 && !isGroupedPayroll) {
-    tableBody.push([
-      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      {
-        text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: formatCurrency(baseTotalAmount),
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-    ]);
+    tableBody.push(
+      isBagBased
+        ? [
+            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+            {
+              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
+              alignment: "right",
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+            {
+              text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+            {
+              text: formatCurrency(baseTotalAmount),
+              alignment: "right",
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+          ]
+        : [
+            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+            {
+              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+            {
+              text: formatCurrency(baseTotalAmount),
+              alignment: "right",
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+          ],
+    );
   }
 
   // Tambahan Items - Using consolidated items
@@ -1137,7 +1157,9 @@ const buildMainPayrollPage = (
             // Add border below Rate/ subtotal and Jumlah Gaji Kasar rows
             if (
               typeof descText === "string" &&
-              (descText.includes("Rate/") || descText === "Jumlah Gaji Kasar")
+              (descText.includes("Rate/") ||
+                descText.includes("Jumlah Bag") ||
+                descText === "Jumlah Gaji Kasar")
             ) {
               return 0.5;
             }
@@ -1353,29 +1375,49 @@ const buildIndividualJobPage = (
 
   // Base subtotal
   if (consolidatedBaseItems.length > 0) {
-    tableBody.push([
-      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      {
-        text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-      {
-        text: formatCurrency(baseTotalAmount),
-        alignment: "right",
-        bold: true,
-        fillColor: "#f8f9fa",
-        fontSize: 8,
-      },
-    ]);
+    tableBody.push(
+      isBagBased
+        ? [
+            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+            {
+              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
+              alignment: "right",
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+            {
+              text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+            {
+              text: formatCurrency(baseTotalAmount),
+              alignment: "right",
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+          ]
+        : [
+            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+            {
+              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+            {
+              text: formatCurrency(baseTotalAmount),
+              alignment: "right",
+              bold: true,
+              fillColor: "#f8f9fa",
+              fontSize: 8,
+            },
+          ],
+    );
   }
 
   // Tambahan Items - Using consolidated items
@@ -1587,6 +1629,7 @@ const buildIndividualJobPage = (
             if (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
+                descText.includes("Jumlah Bag") ||
                 descText.includes("Gross Pay") ||
                 descText === "Jumlah Gaji Kasar")
             ) {

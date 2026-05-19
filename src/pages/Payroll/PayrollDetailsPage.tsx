@@ -2162,6 +2162,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           return "Cuti Sakit";
                         case "cuti_tahunan":
                           return "Cuti Tahunan";
+                        case "cuti_rawatan":
+                          return "Cuti Rawatan";
                         default:
                           return leaveType;
                       }
@@ -2190,6 +2192,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
                         case "cuti_tahunan":
                           return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+                        case "cuti_rawatan":
+                          return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300";
                         default:
                           return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
                       }

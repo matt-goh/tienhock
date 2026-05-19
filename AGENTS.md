@@ -159,8 +159,8 @@ This is a comprehensive ERP system supporting three companies:
 
 **Leave Management:**
 
-- `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at
-- `leave_records` - id, employee_id, leave_date, leave_type, work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
+- `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total (default 60, fixed for all employees - Hospital Leave), created_at, updated_at
+- `leave_records` - id, employee_id, leave_date, leave_type ('cuti_umum' | 'cuti_sakit' | 'cuti_tahunan' | 'cuti_rawatan'), work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
 - `holiday_calendar` - id, holiday_date, description, is_active, is_cuti_umum (checked holidays count toward yearly Cuti Umum entitlement)
 
 **Reference Data:**

@@ -99,7 +99,7 @@ interface LeaveEntry {
   employeeId: string;
   employeeName: string;
   leaveDate: string;
-  leaveType: "cuti_sakit" | "cuti_tahunan" | "cuti_umum";
+  leaveType: "cuti_sakit" | "cuti_tahunan" | "cuti_umum" | "cuti_rawatan";
   isNew: boolean; // true = to be created, false = existing from DB
 }
 
@@ -181,7 +181,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const [showAddLeaveModal, setShowAddLeaveModal] = useState(false);
   const [leaveFormData, setLeaveFormData] = useState({
     leaveDate: format(new Date(), "yyyy-MM-dd"),
-    leaveType: "cuti_sakit" as "cuti_sakit" | "cuti_tahunan" | "cuti_umum",
+    leaveType: "cuti_sakit" as
+      | "cuti_sakit"
+      | "cuti_tahunan"
+      | "cuti_umum"
+      | "cuti_rawatan",
   });
   // Multi-employee selection state for the Add Leave modal
   const [leaveEmployeeSelections, setLeaveEmployeeSelections] = useState<
@@ -1039,6 +1043,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         return "Annual Leave";
       case "cuti_umum":
         return "Public Holiday";
+      case "cuti_rawatan":
+        return "Hospital Leave";
       default:
         return type;
     }
@@ -1052,6 +1058,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         return "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300";
       case "cuti_umum":
         return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+      case "cuti_rawatan":
+        return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300";
       default:
         return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
     }
@@ -1574,13 +1582,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           leaveType: value as
                             | "cuti_sakit"
                             | "cuti_tahunan"
-                            | "cuti_umum",
+                            | "cuti_umum"
+                            | "cuti_rawatan",
                         })
                       }
                       options={[
                         { id: "cuti_sakit", name: "Sick Leave" },
                         { id: "cuti_tahunan", name: "Annual Leave" },
                         { id: "cuti_umum", name: "Public Holiday" },
+                        { id: "cuti_rawatan", name: "Hospital Leave" },
                       ]}
                       rounded="lg"
                     />

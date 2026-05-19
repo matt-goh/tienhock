@@ -20,8 +20,8 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-05-19",
-    ms: "Pembetulan: Slip gaji kini memaparkan Rate/Jam atau Rate/Bag pada lajur kadar, bersama jumlah Jam atau Bag pekerja.",
-    en: "Fix: Payslips now show Rate/Jam or Rate/Bag in the rate column, together with the worker's total Jam or Bag.",
+    ms: "Jenis cuti baru ditambah: Cuti Rawatan (60 hari setahun) — boleh dipilih dalam Log Harian dan Log Bulanan, dan dipaparkan dalam Laporan Cuti.",
+    en: "New leave type added: Cuti Rawatan / Hospital Leave (60 days per year) — selectable in Daily Log and Monthly Log, and shown in the Leave Report.",
   },
   {
     date: "2026-05-19",
