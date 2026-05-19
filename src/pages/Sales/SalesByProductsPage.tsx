@@ -25,6 +25,7 @@ import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import Button from "../../components/Button";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 import HoverTooltip from "../../components/HoverTooltip";
+import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
 
 interface ProductSalesData {
   id: string;
@@ -63,6 +64,7 @@ interface DateRange {
 interface SalesByProductsPageProps {
   activeTab: number;
   onTabChange: (tab: number) => void;
+  scope?: SalesSummaryScope;
 }
 
 const today = new Date();
@@ -76,7 +78,9 @@ const currentYear = currentDate.getFullYear();
 const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   activeTab,
   onTabChange,
+  scope = "tienhock",
 }) => {
+  const isJp = scope === "jp";
   // Month selection - uses Date object for MonthNavigator
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     return new Date(currentYear, currentMonth, 1);
@@ -180,12 +184,13 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   };
 
   const productOptions = useMemo(() => {
-    const options = [
-      { id: "MEE", name: "Mee Products" },
-      { id: "BH", name: "Bihun Products" },
-      { id: "JP", name: "JellyPolly Products" },
-      { id: "OTH", name: "Other Products" },
-    ];
+    const options = isJp
+      ? [{ id: "JP", name: "All Jelly Polly Products" }]
+      : [
+          { id: "MEE", name: "Mee Products" },
+          { id: "BH", name: "Bihun Products" },
+          { id: "OTH", name: "Other Products" },
+        ];
 
     // Add individual products from cache
     products.forEach((product) => {
@@ -196,7 +201,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     });
 
     return options;
-  }, [products]);
+  }, [products, isJp]);
 
   useEffect(() => {
     // Dispatch month selection event when it changes
@@ -220,10 +225,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   // Initialize selected products when product options are available
   useEffect(() => {
     if (productOptions.length > 0) {
-      // Take the first few products up to the maximum limit
-      // Start with categories (MEE, BH, JP, OTH) if available
+      const categoryIds = isJp ? ["JP"] : ["MEE", "BH", "OTH"];
       const categoryOptions = productOptions
-        .filter((option) => ["MEE", "BH", "JP", "OTH"].includes(option.id))
+        .filter((option) => categoryIds.includes(option.id))
         .map((option) => option.id);
 
       // Take up to the limit
@@ -232,7 +236,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       // If we still have room, add some individual products
       if (initialSelection.length < maxChartProducts) {
         const individualProducts = productOptions
-          .filter((option) => !["MEE", "BH", "JP", "OTH"].includes(option.id))
+          .filter((option) => !categoryIds.includes(option.id))
           .slice(0, maxChartProducts - initialSelection.length)
           .map((option) => option.id);
 
@@ -241,7 +245,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
 
       setSelectedChartProducts(initialSelection);
     }
-  }, [productOptions, maxChartProducts]);
+  }, [productOptions, maxChartProducts, isJp]);
 
   // Get product type from product ID using cache
   const getProductType = (productId: string): string => {
@@ -314,7 +318,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       // Use new trends endpoint with product type
       const url = `/api/invoices/sales/trends?type=products&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartProducts.join(
         ","
-      )}`;
+      )}&scope=${scope}`;
 
       const chartData = await api.get(url);
 
@@ -351,7 +355,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         const endTimestamp = dateRange.end.getTime().toString();
 
         // Use the dedicated endpoint
-        const url = `/api/invoices/sales/products?startDate=${startTimestamp}&endDate=${endTimestamp}`;
+        const url = `/api/invoices/sales/products?startDate=${startTimestamp}&endDate=${endTimestamp}&scope=${scope}`;
 
         const data = await api.get(url);
 
@@ -370,7 +374,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     };
 
     fetchSalesData();
-  }, [dateRange]);
+  }, [dateRange, scope]);
 
   // Fetch products-by-salesman data for individual salesman tables
   useEffect(() => {
@@ -381,7 +385,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         const startTimestamp = dateRange.start.getTime().toString();
         const endTimestamp = dateRange.end.getTime().toString();
 
-        const url = `/api/invoices/sales/products-by-salesman?startDate=${startTimestamp}&endDate=${endTimestamp}`;
+        const url = `/api/invoices/sales/products-by-salesman?startDate=${startTimestamp}&endDate=${endTimestamp}&scope=${scope}`;
 
         const data = await api.get(url);
 
@@ -398,7 +402,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     };
 
     fetchSalesmanProductsData();
-  }, [dateRange]);
+  }, [dateRange, scope]);
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
@@ -540,8 +544,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         bhProducts.push(product);
       } else if (product.type === "MEE") {
         meeProducts.push(product);
-      } else if (product.type === "OTH" || product.type === "JP") {
-        // Include both OTH and JP products in the "Other Products" category
+      } else if (product.type === "JP") {
+        if (isJp) othProducts.push(product);
+        // In tienhock scope, JP products are excluded
+      } else if (product.type === "OTH") {
         othProducts.push(product);
       }
     });
@@ -616,13 +622,13 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       ),
       othPieData: createPieData(
         othProducts,
-        categoryColors["OTH"] || "#9f7aea"
+        categoryColors[isJp ? "JP" : "OTH"] || (isJp ? "#ed8936" : "#9f7aea")
       ),
       bhTotal,
       meeTotal,
       othTotal,
     };
-  }, [salesData, categoryColors]);
+  }, [salesData, categoryColors, isJp]);
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -712,47 +718,91 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             <div className="h-5 w-px bg-default-300 dark:bg-gray-600" />
 
             {/* Generate PDF Summary Button */}
-            <SalesSummarySelectionTooltip activeTab={activeTab} />
+            <SalesSummarySelectionTooltip activeTab={activeTab} scope={scope} />
           </div>
         </div>
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${isJp ? "lg:grid-cols-2" : "lg:grid-cols-4"} gap-3`}>
           {/* Total Sales */}
-          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-sky-500 p-3">
-            <div className="text-sm text-default-500 dark:text-gray-400">Total</div>
-            <div className="text-xl font-bold">
-              {formatCurrency(summary.totalSales)}
-              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
-              <span className="text-sky-600 dark:text-sky-400">{salesData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+            <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold truncate">Total</h3>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                All Products
+              </span>
+            </div>
+            <div className="px-4 py-3">
+              <div className="text-xl font-bold">{formatCurrency(summary.totalSales)}</div>
+              <div className="mt-1 text-sm font-bold text-sky-600 dark:text-sky-400">
+                {salesData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+              </div>
             </div>
           </div>
-          {/* BH Products */}
-          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-blue-500 p-3">
-            <div className="text-sm text-default-500 dark:text-gray-400">BH Products</div>
-            <div className="text-xl font-bold">
-              {formatCurrency(summary.bhTotal)}
-              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
-              <span className="text-blue-600 dark:text-blue-400">{salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
+          {isJp ? (
+            /* JP Products */
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+              <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold truncate">Jelly Polly Products</h3>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                  JP
+                </span>
+              </div>
+              <div className="px-4 py-3">
+                <div className="text-xl font-bold">{formatCurrency(summary.othTotal)}</div>
+                <div className="mt-1 text-sm font-bold text-orange-600 dark:text-orange-400">
+                  {salesData.filter(p => p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                </div>
+              </div>
             </div>
-          </div>
-          {/* MEE Products */}
-          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-green-500 p-3">
-            <div className="text-sm text-default-500 dark:text-gray-400">MEE Products</div>
-            <div className="text-xl font-bold">
-              {formatCurrency(summary.meeTotal)}
-              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
-              <span className="text-green-600 dark:text-green-400">{salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
-            </div>
-          </div>
-          {/* OTH Products */}
-          <div className="bg-default-100 dark:bg-gray-800/75 rounded-lg border-l-4 border-purple-500 p-3">
-            <div className="text-sm text-default-500 dark:text-gray-400">Other Products</div>
-            <div className="text-xl font-bold">
-              {formatCurrency(summary.othTotal)}
-              <span className="text-default-400 dark:text-gray-500 mx-2">·</span>
-              <span className="text-purple-600 dark:text-purple-400">{salesData.filter(p => p.type === "OTH" || p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* BH Products */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+                <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold truncate">BH Products</h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                    BH
+                  </span>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xl font-bold">{formatCurrency(summary.bhTotal)}</div>
+                  <div className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                  </div>
+                </div>
+              </div>
+              {/* MEE Products */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+                <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold truncate">MEE Products</h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    MEE
+                  </span>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xl font-bold">{formatCurrency(summary.meeTotal)}</div>
+                  <div className="mt-1 text-sm font-bold text-green-600 dark:text-green-400">
+                    {salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                  </div>
+                </div>
+              </div>
+              {/* OTH Products */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+                <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold truncate">Other Products</h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    OTH
+                  </span>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xl font-bold">{formatCurrency(summary.othTotal)}</div>
+                  <div className="mt-1 text-sm font-bold text-purple-600 dark:text-purple-400">
+                    {salesData.filter(p => p.type === "OTH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
       {isLoading ? (
@@ -1071,8 +1121,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
           </div>
 
           {/* Dashboard content - Three separate doughnut charts without legends */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 ${isJp ? "md:grid-cols-1" : "md:grid-cols-3"} gap-6`}>
             {/* BH Products Doughnut Chart */}
+            {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Bihun Products Distribution
@@ -1131,8 +1182,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                 </div>
               )}
             </div>
+            )}
 
             {/* MEE Products Doughnut Chart */}
+            {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
                 Mee Products Distribution
@@ -1191,11 +1244,12 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                 </div>
               )}
             </div>
+            )}
 
-            {/* OTH Products Doughnut Chart */}
+            {/* OTH / JP Products Doughnut Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                Other Products Distribution
+                {isJp ? "Jelly Polly Products Distribution" : "Other Products Distribution"}
               </h2>
               {summary.othPieData && summary.othPieData.length > 0 ? (
                 <>
@@ -1234,20 +1288,20 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   <div
                     className="text-center mt-2 py-2 rounded-lg"
                     style={{
-                      backgroundColor: `${categoryColors["OTH"]}15`,
-                      color: categoryColors["OTH"] || "#9f7aea",
+                      backgroundColor: `${categoryColors[isJp ? "JP" : "OTH"]}15`,
+                      color: categoryColors[isJp ? "JP" : "OTH"] || (isJp ? "#ed8936" : "#9f7aea"),
                       fontWeight: 600,
                     }}
                   >
                     <div>Total: {formatCurrency(summary.othTotal)}</div>
                     <div className="text-sm opacity-80">
-                      {salesData.filter(p => p.type === "OTH" || p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                      {salesData.filter(p => isJp ? p.type === "JP" : p.type === "OTH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
-                  No Other products data available
+                  {isJp ? "No Jelly Polly products data available" : "No Other products data available"}
                 </div>
               )}
             </div>

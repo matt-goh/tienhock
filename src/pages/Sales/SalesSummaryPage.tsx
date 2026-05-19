@@ -1,8 +1,15 @@
 import React, { useState } from "react";
 import SalesByProductsPage from "./SalesByProductsPage";
 import SalesBySalesmanPage from "./SalesBySalesmanPage";
+import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
 
-const SalesSummaryPage: React.FC = () => {
+interface SalesSummaryPageProps {
+  scope?: SalesSummaryScope;
+}
+
+const SalesSummaryPage: React.FC<SalesSummaryPageProps> = ({
+  scope = "tienhock",
+}) => {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -11,11 +18,13 @@ const SalesSummaryPage: React.FC = () => {
         <SalesByProductsPage
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          scope={scope}
         />
       ) : (
         <SalesBySalesmanPage
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          scope={scope}
         />
       )}
     </div>

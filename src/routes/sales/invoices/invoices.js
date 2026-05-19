@@ -903,7 +903,7 @@ export default function (pool, config) {
 
   // POST /api/invoices/sales/summary - Get comprehensive sales summary data
   router.post("/sales/summary", async (req, res) => {
-    const { startDate, endDate, summaries } = req.body;
+    const { startDate, endDate, summaries, scope = "tienhock" } = req.body;
 
     if (!startDate || !endDate || !summaries || !Array.isArray(summaries)) {
       return res.status(400).json({
@@ -978,14 +978,10 @@ export default function (pool, config) {
       GROUP BY i.id
     `;
 
-      // Execute both queries in parallel
-      const [mainResult, jellypollyResult] = await Promise.all([
-        pool.query(mainQuery, [startDate, endDate]),
-        pool.query(jellypollyQuery, [startDate, endDate]),
-      ]);
-
-      // Combine results from both schemas
-      const allInvoices = [...mainResult.rows, ...jellypollyResult.rows];
+      // Execute only the relevant query based on scope
+      const query = scope === "jp" ? jellypollyQuery : mainQuery;
+      const result = await pool.query(query, [startDate, endDate]);
+      const allInvoices = result.rows;
 
       // Process the data for different summary types
       const summaryData = {};
@@ -1033,6 +1029,7 @@ export default function (pool, config) {
       category_we_300g: { quantity: 0, amount: 0, products: [] }, // ID "WE-300G"
       category_we_600g: { quantity: 0, amount: 0, products: [] }, // ID "WE-600G"
       category_we_others: { quantity: 0, amount: 0, products: [] }, // WE-360(5PK), WE-360, WE-3UDG, WE-420
+      category_aq: { quantity: 0, amount: 0, products: [] }, // ID starts with "AQ-" (JellyPolly)
       category_empty_bag: { quantity: 0, amount: 0, products: [] }, // ID starts with "EMPTY_BAG"
       category_sbh: { quantity: 0, amount: 0, products: [] }, // ID "SBH"
       category_smee: { quantity: 0, amount: 0, products: [] }, // ID "SMEE"
@@ -1055,6 +1052,7 @@ export default function (pool, config) {
       category_we_300g: new Map(),
       category_we_600g: new Map(),
       category_we_others: new Map(),
+      category_aq: new Map(),
       category_empty_bag: new Map(),
       category_sbh: new Map(),
       category_smee: new Map(),
@@ -1148,6 +1146,7 @@ export default function (pool, config) {
         else if (code === "WE-600G") category = "category_we_600g";
         else if (["WE-360(5PK)", "WE-360", "WE-3UDG", "WE-420"].includes(code))
           category = "category_we_others";
+        else if (code.startsWith("AQ-")) category = "category_aq";
         else if (code.startsWith("EMPTY_BAG")) category = "category_empty_bag";
         else if (code === "SBH") category = "category_sbh";
         else if (code === "SMEE") category = "category_smee";
@@ -1619,7 +1618,7 @@ export default function (pool, config) {
   // GET /api/invoices/sales/products - Get product sales data
   router.get("/sales/products", async (req, res) => {
     try {
-      const { startDate, endDate, salesman } = req.query;
+      const { startDate, endDate, salesman, scope = "tienhock" } = req.query;
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Date range is required" });
@@ -1668,14 +1667,10 @@ export default function (pool, config) {
         paramCount++;
       }
 
-      // Execute both queries in parallel
-      const [mainResult, jellypollyResult] = await Promise.all([
-        pool.query(mainQuery, queryParams),
-        pool.query(jellypollyQuery, queryParams),
-      ]);
-
-      // Combine results from both schemas
-      const allProducts = [...mainResult.rows, ...jellypollyResult.rows];
+      // Execute only the relevant query based on scope
+      const query = scope === "jp" ? jellypollyQuery : mainQuery;
+      const result = await pool.query(query, queryParams);
+      const allProducts = result.rows;
 
       // Process data - group by product
       const productMap = new Map();
@@ -1737,7 +1732,7 @@ export default function (pool, config) {
   // GET /api/invoices/sales/salesmen - Get salesmen sales data
   router.get("/sales/salesmen", async (req, res) => {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, scope = "tienhock" } = req.query;
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Date range is required" });
@@ -1795,17 +1790,14 @@ export default function (pool, config) {
       GROUP BY it.salespersonid
     `;
 
-      // Execute both queries in parallel
-      const [mainResult, jellypollyResult] = await Promise.all([
-        pool.query(mainQuery, [startDate, endDate]),
-        pool.query(jellypollyQuery, [startDate, endDate]),
-      ]);
+      // Execute only the relevant query based on scope
+      const query = scope === "jp" ? jellypollyQuery : mainQuery;
+      const result = await pool.query(query, [startDate, endDate]);
 
-      // Combine and aggregate results by salesperson
+      // Aggregate results by salesperson
       const salesmanMap = new Map();
 
-      // Process main results
-      mainResult.rows.forEach((row) => {
+      result.rows.forEach((row) => {
         const salesmanId = row.id;
         salesmanMap.set(salesmanId, {
           id: salesmanId,
@@ -1815,30 +1807,6 @@ export default function (pool, config) {
           invoiceCount: parseInt(row.invoice_count) || 0,
           cashCount: parseInt(row.cash_count) || 0,
         });
-      });
-
-      // Process JellyPolly results and combine with main results
-      jellypollyResult.rows.forEach((row) => {
-        const salesmanId = row.id;
-        if (salesmanMap.has(salesmanId)) {
-          // Add to existing salesman data
-          const existing = salesmanMap.get(salesmanId);
-          existing.totalSales += parseFloat(row.total_sales) || 0;
-          existing.totalQuantity += parseInt(row.total_quantity) || 0;
-          existing.salesCount += parseInt(row.sales_count) || 0;
-          existing.invoiceCount += parseInt(row.invoice_count) || 0;
-          existing.cashCount += parseInt(row.cash_count) || 0;
-        } else {
-          // Create new salesman data
-          salesmanMap.set(salesmanId, {
-            id: salesmanId,
-            totalSales: parseFloat(row.total_sales) || 0,
-            totalQuantity: parseInt(row.total_quantity) || 0,
-            salesCount: parseInt(row.sales_count) || 0,
-            invoiceCount: parseInt(row.invoice_count) || 0,
-            cashCount: parseInt(row.cash_count) || 0,
-          });
-        }
       });
 
       // Convert to array and sort by total sales
@@ -1859,7 +1827,7 @@ export default function (pool, config) {
   // GET /api/invoices/sales/products-by-salesman - Get product sales data grouped by salesman
   router.get("/sales/products-by-salesman", async (req, res) => {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, scope = "tienhock" } = req.query;
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Date range is required" });
@@ -1897,14 +1865,10 @@ export default function (pool, config) {
         AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
     `;
 
-      // Execute both queries in parallel
-      const [mainResult, jellypollyResult] = await Promise.all([
-        pool.query(mainQuery, [startDate, endDate]),
-        pool.query(jellypollyQuery, [startDate, endDate]),
-      ]);
-
-      // Combine results from both schemas
-      const allProducts = [...mainResult.rows, ...jellypollyResult.rows];
+      // Execute only the relevant query based on scope
+      const query = scope === "jp" ? jellypollyQuery : mainQuery;
+      const result = await pool.query(query, [startDate, endDate]);
+      const allProducts = result.rows;
 
       // Process data - group by salesman first, then by product
       const salesmanMap = new Map();
@@ -1955,7 +1919,7 @@ export default function (pool, config) {
       });
 
       // Convert to array format for response
-      const result = Array.from(salesmanMap.values())
+      const responseData = Array.from(salesmanMap.values())
         .map((salesman) => ({
           salesmanId: salesman.salesmanId,
           totalSales: salesman.totalSales,
@@ -1966,7 +1930,7 @@ export default function (pool, config) {
         }))
         .sort((a, b) => b.totalSales - a.totalSales);
 
-      res.json(result);
+      res.json(responseData);
     } catch (error) {
       console.error("Error fetching products by salesman data:", error);
       res.status(500).json({
@@ -1979,7 +1943,7 @@ export default function (pool, config) {
   // GET /api/invoices/sales/trends - Get monthly sales trends for products or salesmen
   router.get("/sales/trends", async (req, res) => {
     try {
-      const { startDate, endDate, type, ids } = req.query;
+      const { startDate, endDate, type, ids, scope = "tienhock" } = req.query;
 
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "Date range is required" });
@@ -2104,14 +2068,10 @@ export default function (pool, config) {
         }
       }
 
-      // Execute both queries in parallel
-      const [mainResult, jellypollyResult] = await Promise.all([
-        pool.query(mainQuery, queryParams),
-        pool.query(jellypollyQuery, queryParams),
-      ]);
-
-      // Combine results from both schemas
-      const allTrendData = [...mainResult.rows, ...jellypollyResult.rows];
+      // Execute only the relevant query based on scope
+      const query = scope === "jp" ? jellypollyQuery : mainQuery;
+      const trendsResult = await pool.query(query, queryParams);
+      const allTrendData = trendsResult.rows;
 
       // Transform data for frontend consumption - need to aggregate data from both schemas
       const monthlyData = new Map();

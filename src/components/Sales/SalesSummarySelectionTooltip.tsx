@@ -5,13 +5,17 @@ import Button from "../Button";
 import { IconFileText, IconPrinter, IconDownload } from "@tabler/icons-react";
 import LoadingSpinner from "../LoadingSpinner";
 import { useMonthSelection } from "../../hooks/useMonthSelection";
-import { generateSalesSummaryPDF } from "../../utils/sales/SalesSummaryPDF";
+import {
+  generateSalesSummaryPDF,
+  SalesSummaryScope,
+} from "../../utils/sales/SalesSummaryPDF";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 interface SalesSummarySelectionTooltipProps {
   activeTab: number;
+  scope?: SalesSummaryScope;
 }
 
 interface SummaryOption {
@@ -20,7 +24,7 @@ interface SummaryOption {
   description: string;
 }
 
-const SUMMARY_OPTIONS: SummaryOption[] = [
+const TIENHOCK_SUMMARY_OPTIONS: SummaryOption[] = [
   {
     id: "all_sales",
     name: "Summary of all sales",
@@ -42,20 +46,30 @@ const SUMMARY_OPTIONS: SummaryOption[] = [
     description: "BH products only",
   },
   {
-    id: "jp_salesmen",
-    name: "Summary of Jellypolly sales by salesmen",
-    description: "JP products only",
-  },
-  {
     id: "sisa_sales",
     name: "Summary of Sisa sales",
     description: "EMPTY_BAG, SBH, SMEE products",
   },
 ];
 
+const JP_SUMMARY_OPTIONS: SummaryOption[] = [
+  {
+    id: "all_sales",
+    name: "Summary of all sales",
+    description: "All Jelly Polly products",
+  },
+  {
+    id: "jp_salesmen",
+    name: "Summary of sales by salesmen",
+    description: "Grouped by salesman",
+  },
+];
+
 const SalesSummarySelectionTooltip: React.FC<
   SalesSummarySelectionTooltipProps
-> = ({ activeTab }) => {
+> = ({ activeTab, scope = "tienhock" }) => {
+  const SUMMARY_OPTIONS =
+    scope === "jp" ? JP_SUMMARY_OPTIONS : TIENHOCK_SUMMARY_OPTIONS;
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [selectedSummaries, setSelectedSummaries] = useState<
@@ -71,7 +85,7 @@ const SalesSummarySelectionTooltip: React.FC<
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { allProducts } = useProductsCache("all");
+  const { allProducts } = useProductsCache(scope === "jp" ? "jp" : "all");
   const { selectedMonth, selectedYear } = useMonthSelection(activeTab);
 
   useEffect(() => {
@@ -159,6 +173,7 @@ const SalesSummarySelectionTooltip: React.FC<
         summaries: Object.keys(selectedSummaries).filter(
           (key) => selectedSummaries[key]
         ),
+        scope,
       });
 
       // Generate PDF - ADD allProducts parameter here
@@ -167,7 +182,8 @@ const SalesSummarySelectionTooltip: React.FC<
         selectedMonth,
         selectedYear,
         action,
-        allProducts // Add this parameter
+        allProducts,
+        scope
       );
 
       toast.success(
