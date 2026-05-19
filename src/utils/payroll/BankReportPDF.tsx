@@ -115,7 +115,8 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: "row",
-    paddingVertical: 4,
+    alignItems: "center",
+    paddingVertical: 7,
     paddingHorizontal: 3,
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -124,6 +125,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     textTransform: "uppercase",
     color: colors.textSecondary,
+    lineHeight: 1.2,
   },
   tableRow: {
     flexDirection: "row",
