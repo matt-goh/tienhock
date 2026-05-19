@@ -109,7 +109,7 @@ This is a comprehensive ERP system supporting three companies:
 
 **Staff & Employees:**
 
-- `staffs` - id, name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
+- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location, date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports)
 - `active_sessions` - session_id, staff_id, last_active, created_at, status
 - `bookmarks` - id, staff_id, name
 
@@ -159,8 +159,8 @@ This is a comprehensive ERP system supporting three companies:
 
 **Leave Management:**
 
-- `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at
-- `leave_records` - id, employee_id, leave_date, leave_type, work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
+- `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total (default 60, fixed for all employees - Hospital Leave), created_at, updated_at. NOTE: leave allowances and usage are aggregated by `staffs.name` across sibling IDs — the canonical row is tied to the senior sibling (earliest date_joined; tie-breaker: lowest id). Multi-ID employees share one entitlement bucket.
+- `leave_records` - id, employee_id, leave_date, leave_type ('cuti_umum' | 'cuti_sakit' | 'cuti_tahunan' | 'cuti_rawatan'), work_log_id, days_taken, amount_paid, status, notes, created_by, created_at, updated_at
 - `holiday_calendar` - id, holiday_date, description, is_active, is_cuti_umum (checked holidays count toward yearly Cuti Umum entitlement)
 
 **Reference Data:**

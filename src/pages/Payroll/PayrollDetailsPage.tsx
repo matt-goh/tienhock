@@ -338,6 +338,53 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     0,
   );
 
+  type BaseBagSummary = {
+    averageRate: number;
+    totalBags: number;
+  };
+
+  const formatUnitQuantity = (quantity: number): string => {
+    return new Intl.NumberFormat("en-MY", {
+      minimumFractionDigits: Number.isInteger(quantity) ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(quantity);
+  };
+
+  const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
+    const quantity: number = Number(item.total_quantity) || 0;
+    const focUnits: number = Number(item.total_foc_units) || 0;
+    return quantity + focUnits;
+  };
+
+  const getBaseBagSummary = (
+    baseItems: ConsolidatedPayrollItem[],
+  ): BaseBagSummary | null => {
+    const bagItems: ConsolidatedPayrollItem[] = baseItems.filter(
+      (item) => item.rate_unit === "Bag",
+    );
+    const hourItems: ConsolidatedPayrollItem[] = baseItems.filter(
+      (item) => item.rate_unit === "Hour",
+    );
+    const isBagBased: boolean = bagItems.length > hourItems.length;
+
+    if (!isBagBased) return null;
+
+    const bagTotals: { amount: number; bags: number } = bagItems.reduce(
+      (totals, item) => ({
+        amount: totals.amount + (Number(item.total_amount) || 0),
+        bags: totals.bags + getTotalUnitQuantity(item),
+      }),
+      { amount: 0, bags: 0 },
+    );
+
+    if (bagTotals.bags <= 0) return null;
+
+    return {
+      averageRate: bagTotals.amount / bagTotals.bags,
+      totalBags: bagTotals.bags,
+    };
+  };
+
   // Helper to format job type for display
   const formatJobType = (jobType: string): string => {
     const jobTypeMap: Record<string, string> = {
@@ -539,6 +586,84 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           )}
         </tr>
       </React.Fragment>
+    );
+  };
+
+  const getHourlyAverageBaseRate = (): number | null => {
+    const baseGroupedByHours: { hours: number; amount: number }[] =
+      groupedItems["Base"]
+        .filter(
+          (item) => item.rate_unit === "Hour" || item.rate_unit === "Bill",
+        )
+        .reduce((acc, item) => {
+          const existing = acc.find((group) => group.hours === item.quantity);
+          if (existing) existing.amount += item.amount;
+          else acc.push({ hours: item.quantity, amount: item.amount });
+          return acc;
+        }, [] as { hours: number; amount: number }[]);
+
+    if (baseGroupedByHours.length === 0) return null;
+
+    const maxHoursGroup: { hours: number; amount: number } =
+      baseGroupedByHours.reduce(
+        (max, curr) => (curr.hours > max.hours ? curr : max),
+        baseGroupedByHours[0],
+      );
+
+    return maxHoursGroup.hours > 0 ? baseTotal / maxHoursGroup.hours : 0;
+  };
+
+  const renderBaseFooter = (
+    baseItems: ConsolidatedPayrollItem[],
+    totalAmount: number,
+    totalLabel: string,
+    showHourlyAverage: boolean,
+  ): React.ReactElement => {
+    const bagSummary: BaseBagSummary | null = getBaseBagSummary(baseItems);
+
+    if (bagSummary) {
+      return (
+        <tr>
+          {viewMode === "detailed" && (
+            <td className="px-3 py-2 bg-default-50 dark:bg-gray-800" />
+          )}
+          <td className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300">
+            {totalLabel}
+          </td>
+          <td className="px-3 py-2 text-center text-sm font-semibold text-default-800 dark:text-gray-100">
+            Rate/Bag: {formatCurrency(bagSummary.averageRate)}
+          </td>
+          <td className="px-3 py-2 text-center text-sm font-medium text-default-600 dark:text-gray-300">
+            Jumlah Bag: {formatUnitQuantity(bagSummary.totalBags)}
+          </td>
+          <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
+            {formatCurrency(totalAmount)}
+          </td>
+        </tr>
+      );
+    }
+
+    const hourlyAverageRate: number | null = showHourlyAverage
+      ? getHourlyAverageBaseRate()
+      : null;
+
+    return (
+      <tr>
+        <td
+          colSpan={viewMode === "detailed" ? 4 : 3}
+          className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
+        >
+          {totalLabel}
+          {hourlyAverageRate !== null && (
+            <div className="text-xs text-default-400 dark:text-gray-400">
+              Avg: {formatCurrency(hourlyAverageRate)}/hr
+            </div>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
+          {formatCurrency(totalAmount)}
+        </td>
+      </tr>
     );
   };
 
@@ -1333,17 +1458,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               )}
                         </tbody>
                         <tfoot className="bg-default-50 dark:bg-gray-800">
-                          <tr>
-                            <td
-                              colSpan={viewMode === "detailed" ? 4 : 3}
-                              className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                            >
-                              Total Base
-                            </td>
-                            <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
-                              {formatCurrency(jobBaseTotal)}
-                            </td>
-                          </tr>
+                          {renderBaseFooter(
+                            jobConsolidatedItems?.["Base"] || [],
+                            jobBaseTotal,
+                            "Total Base",
+                            false,
+                          )}
                         </tfoot>
                       </table>
                     </div>
@@ -1608,57 +1728,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           )}
                     </tbody>
                     <tfoot className="bg-default-50 dark:bg-gray-800">
-                      <tr>
-                        <td
-                          colSpan={viewMode === "detailed" ? 4 : 3}
-                          className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                        >
-                          Total Base Pay
-                          {(() => {
-                            const baseGroupedByHours = groupedItems["Base"]
-                              .filter(
-                                (item) =>
-                                  item.rate_unit === "Hour" ||
-                                  item.rate_unit === "Bill",
-                              )
-                              .reduce(
-                                (acc, item) => {
-                                  const existing = acc.find(
-                                    (group) => group.hours === item.quantity,
-                                  );
-                                  if (existing) existing.amount += item.amount;
-                                  else
-                                    acc.push({
-                                      hours: item.quantity,
-                                      amount: item.amount,
-                                    });
-                                  return acc;
-                                },
-                                [] as { hours: number; amount: number }[],
-                              );
-                            if (baseGroupedByHours.length > 0) {
-                              const maxHoursGroup = baseGroupedByHours.reduce(
-                                (max, curr) =>
-                                  curr.hours > max.hours ? curr : max,
-                                baseGroupedByHours[0],
-                              );
-                              const avgRate =
-                                maxHoursGroup?.hours > 0
-                                  ? baseTotal / maxHoursGroup.hours
-                                  : 0;
-                              return (
-                                <div className="text-xs text-default-400 dark:text-gray-400">
-                                  Avg: {formatCurrency(avgRate)}/hr
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </td>
-                        <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
-                          {formatCurrency(baseTotal)}
-                        </td>
-                      </tr>
+                      {renderBaseFooter(
+                        groupedConsolidatedItems["Base"],
+                        baseTotal,
+                        "Total Base Pay",
+                        true,
+                      )}
                     </tfoot>
                   </table>
                 </div>
@@ -2087,6 +2162,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           return "Cuti Sakit";
                         case "cuti_tahunan":
                           return "Cuti Tahunan";
+                        case "cuti_rawatan":
+                          return "Cuti Rawatan";
                         default:
                           return leaveType;
                       }
@@ -2115,6 +2192,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
                         case "cuti_tahunan":
                           return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+                        case "cuti_rawatan":
+                          return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300";
                         default:
                           return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
                       }

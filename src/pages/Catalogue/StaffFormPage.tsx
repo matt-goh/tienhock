@@ -45,6 +45,8 @@ interface SameNameStaff {
   isHead: boolean;
 }
 
+const STAFF_ID_WHITESPACE_REGEX: RegExp = /\s/;
+
 /**
  * This form handles a special case with select dropdowns:
  * - Database stores display names (e.g., "Buddhist", "Malaysian")
@@ -951,6 +953,11 @@ const StaffFormPage: React.FC = () => {
         ...prevData,
         [name]: formattedValue,
       }));
+    } else if (name === "id") {
+      setFormData((prevData) => ({
+        ...prevData,
+        [name]: value.replace(/\s/g, ""),
+      }));
     } else {
       setFormData((prevData) => ({
         ...prevData,
@@ -986,7 +993,9 @@ const StaffFormPage: React.FC = () => {
   );
 
   const validateForm = (): boolean => {
-    const requiredFields: (keyof Employee)[] = ["name"];
+    const requiredFields: (keyof Employee)[] = isEditMode
+      ? ["name"]
+      : ["id", "name"];
 
     for (const field of requiredFields) {
       if (!formData[field]) {
@@ -995,6 +1004,11 @@ const StaffFormPage: React.FC = () => {
         );
         return false;
       }
+    }
+
+    if (STAFF_ID_WHITESPACE_REGEX.test(formData.id)) {
+      toast.error("Staff ID cannot contain whitespace.");
+      return false;
     }
 
     if (formData.email) {
