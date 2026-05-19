@@ -81,6 +81,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       ...item,
       rate: parseFloat(item.rate),
       quantity: parseFloat(item.quantity),
+      foc_units: parseFloat(item.foc_units || 0),
       amount: parseFloat(item.amount),
     }));
 
@@ -216,10 +217,11 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
         // Defensive: Validate numeric fields
         const rate = parseFloat(item.rate);
         const quantity = parseFloat(item.quantity);
+        const focUnits = parseFloat(item.foc_units || 0);
         const amount = parseFloat(item.amount);
 
         // Defensive: Skip invalid items
-        if (isNaN(rate) || isNaN(quantity) || isNaN(amount)) {
+        if (isNaN(rate) || isNaN(quantity) || isNaN(focUnits) || isNaN(amount)) {
           console.error('Invalid numeric values in payroll item:', item);
           return; // Skip this item
         }
@@ -228,12 +230,14 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
         if (groups.has(key)) {
           const group = groups.get(key);
           group.totalQuantity += quantity;      // Now guaranteed to be number
+          group.totalFocUnits += focUnits;      // Now guaranteed to be number
           group.originalAmountSum += amount;    // Now guaranteed to be number
         } else {
           groups.set(key, {
             rate: rate,
             rate_unit: item.rate_unit,
             totalQuantity: quantity,
+            totalFocUnits: focUnits,
             originalAmountSum: amount,
           });
         }
@@ -244,7 +248,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
           totalCents += Math.round(group.originalAmountSum * 100);
         } else {
           const roundedRate = Math.round(group.rate * 100) / 100;
-          totalCents += Math.round(roundedRate * group.totalQuantity * 100);
+          const totalUnits = group.totalQuantity + group.totalFocUnits;
+          totalCents += Math.round(roundedRate * totalUnits * 100);
         }
       });
       return totalCents;
@@ -521,7 +526,7 @@ export default function (pool) {
       const itemsQuery = `
       SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
             pi.quantity, pi.amount, pi.is_manual, pi.job_type, pi.source_employee_id,
-            pi.source_date, pi.work_log_id, pi.work_log_type,
+            pi.source_date, pi.work_log_id, pi.work_log_type, pi.foc_units,
             pc.pay_type
       FROM payroll_items pi
       LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
@@ -541,6 +546,7 @@ export default function (pool) {
           id: parseInt(item.id),
           rate: parseFloat(item.rate),
           quantity: parseFloat(item.quantity),
+          foc_units: parseFloat(item.foc_units || 0),
           amount: parseFloat(item.amount),
           is_manual: !!item.is_manual,
         });
@@ -856,6 +862,7 @@ export default function (pool) {
         ...item,
         rate: parseFloat(item.rate),
         quantity: parseFloat(item.quantity),
+        foc_units: parseFloat(item.foc_units || 0),
         amount: parseFloat(item.amount),
         is_manual: !!item.is_manual,
       }));
@@ -879,12 +886,14 @@ export default function (pool) {
           if (groups.has(key)) {
             const group = groups.get(key);
             group.totalQuantity += item.quantity;
+            group.totalFocUnits += item.foc_units || 0;
             group.originalAmountSum += item.amount;
           } else {
             groups.set(key, {
               rate: item.rate,
               rate_unit: item.rate_unit,
               totalQuantity: item.quantity,
+              totalFocUnits: item.foc_units || 0,
               originalAmountSum: item.amount,
             });
           }
@@ -892,12 +901,13 @@ export default function (pool) {
         let totalCents = 0;
         groups.forEach(group => {
           if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
-            totalCents += Math.round(group.originalAmountSum * 100);
-          } else {
-            const roundedRate = Math.round(group.rate * 100) / 100;
-            totalCents += Math.round(roundedRate * group.totalQuantity * 100);
-          }
-        });
+          totalCents += Math.round(group.originalAmountSum * 100);
+        } else {
+          const roundedRate = Math.round(group.rate * 100) / 100;
+          const totalUnits = group.totalQuantity + group.totalFocUnits;
+          totalCents += Math.round(roundedRate * totalUnits * 100);
+        }
+      });
         return totalCents;
       };
 
@@ -1056,6 +1066,7 @@ export default function (pool) {
         ...item,
         rate: parseFloat(item.rate),
         quantity: parseFloat(item.quantity),
+        foc_units: parseFloat(item.foc_units || 0),
         amount: parseFloat(item.amount),
         is_manual: !!item.is_manual,
       }));
@@ -1079,12 +1090,14 @@ export default function (pool) {
           if (groups.has(key)) {
             const group = groups.get(key);
             group.totalQuantity += item.quantity;
+            group.totalFocUnits += item.foc_units || 0;
             group.originalAmountSum += item.amount;
           } else {
             groups.set(key, {
               rate: item.rate,
               rate_unit: item.rate_unit,
               totalQuantity: item.quantity,
+              totalFocUnits: item.foc_units || 0,
               originalAmountSum: item.amount,
             });
           }
@@ -1092,12 +1105,13 @@ export default function (pool) {
         let totalCents = 0;
         groups.forEach(group => {
           if (group.rate_unit === 'Percent' || group.rate_unit === 'Fixed') {
-            totalCents += Math.round(group.originalAmountSum * 100);
-          } else {
-            const roundedRate = Math.round(group.rate * 100) / 100;
-            totalCents += Math.round(roundedRate * group.totalQuantity * 100);
-          }
-        });
+          totalCents += Math.round(group.originalAmountSum * 100);
+        } else {
+          const roundedRate = Math.round(group.rate * 100) / 100;
+          const totalUnits = group.totalQuantity + group.totalFocUnits;
+          totalCents += Math.round(roundedRate * totalUnits * 100);
+        }
+      });
         return totalCents;
       };
 
