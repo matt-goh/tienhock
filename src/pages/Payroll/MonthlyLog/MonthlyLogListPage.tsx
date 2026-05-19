@@ -32,6 +32,10 @@ interface MonthlyWorkLog {
   total_workers: number;
   total_hours: number;
   total_overtime_hours: number;
+  total_ahad_hours: number;
+  total_ahad_overtime_hours: number;
+  total_umum_hours: number;
+  total_umum_overtime_hours: number;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +45,7 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const jobConfig = getJobConfig(jobType);
+  const supportsDayTypeHours = jobType !== "OFFICE";
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1; // 1-12
@@ -141,11 +146,36 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
       (sum, log) => sum + log.total_overtime_hours,
       0
     );
+    const totalAhadHours = workLogs.reduce(
+      (sum, log) => sum + (log.total_ahad_hours || 0),
+      0
+    );
+    const totalAhadOvertimeHours = workLogs.reduce(
+      (sum, log) => sum + (log.total_ahad_overtime_hours || 0),
+      0
+    );
+    const totalUmumHours = workLogs.reduce(
+      (sum, log) => sum + (log.total_umum_hours || 0),
+      0
+    );
+    const totalUmumOvertimeHours = workLogs.reduce(
+      (sum, log) => sum + (log.total_umum_overtime_hours || 0),
+      0
+    );
     const totalWorkers = workLogs.reduce(
       (sum, log) => sum + log.total_workers,
       0
     );
-    return { totalRecords, totalHours, totalOvertimeHours, totalWorkers };
+    return {
+      totalRecords,
+      totalHours,
+      totalOvertimeHours,
+      totalAhadHours,
+      totalAhadOvertimeHours,
+      totalUmumHours,
+      totalUmumOvertimeHours,
+      totalWorkers,
+    };
   }, [workLogs]);
 
   const handleAddEntry = () => {
@@ -313,11 +343,18 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
                     Workers
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                    Regular Hrs
+                    Biasa
                   </th>
-                  <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                    OT Hours
-                  </th>
+                  {supportsDayTypeHours && (
+                    <>
+                      <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
+                        Ahad
+                      </th>
+                      <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
+                        Umum
+                      </th>
+                    </>
+                  )}
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
                     Status
                   </th>
@@ -343,11 +380,33 @@ const MonthlyLogListPage: React.FC<MonthlyLogListPageProps> = ({ jobType }) => {
                       {log.total_workers}
                     </td>
                     <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
-                      {log.total_hours.toFixed(1)}
+                      <div className="font-medium">{log.total_hours.toFixed(1)}</div>
+                      {log.total_overtime_hours > 0 && (
+                        <div className="text-xs text-default-500 dark:text-gray-400">
+                          +{log.total_overtime_hours.toFixed(1)} OT
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
-                      {log.total_overtime_hours.toFixed(1)}
-                    </td>
+                    {supportsDayTypeHours && (
+                      <>
+                        <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
+                          <div className="font-medium">{(log.total_ahad_hours || 0).toFixed(1)}</div>
+                          {(log.total_ahad_overtime_hours || 0) > 0 && (
+                            <div className="text-xs text-default-500 dark:text-gray-400">
+                              +{log.total_ahad_overtime_hours.toFixed(1)} OT
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
+                          <div className="font-medium">{(log.total_umum_hours || 0).toFixed(1)}</div>
+                          {(log.total_umum_overtime_hours || 0) > 0 && (
+                            <div className="text-xs text-default-500 dark:text-gray-400">
+                              +{log.total_umum_overtime_hours.toFixed(1)} OT
+                            </div>
+                          )}
+                        </td>
+                      </>
+                    )}
                     <td className="px-4 py-2 text-center">
                       {getStatusBadge(log.status)}
                     </td>

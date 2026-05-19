@@ -4,6 +4,57 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
+  const monthlySectionJobIds = {
+    MAINTENANCE: ["MAINTEN"],
+    OFFICE: ["OFFICE"],
+    SAPU: ["SAPU"],
+  };
+
+  const getMonthlySectionJobIds = (section) => {
+    const sectionKey = Array.isArray(section) ? section[0] : section;
+    if (!sectionKey) return [];
+    return monthlySectionJobIds[sectionKey] || [sectionKey];
+  };
+
+  const getMonthlyEntryHours = (entry) => ({
+    totalHours: Number(entry.totalHours) || 0,
+    overtimeHours: Number(entry.overtimeHours) || 0,
+    ahadHours: Number(entry.ahadHours) || 0,
+    ahadOvertimeHours: Number(entry.ahadOvertimeHours) || 0,
+    umumHours: Number(entry.umumHours) || 0,
+    umumOvertimeHours: Number(entry.umumOvertimeHours) || 0,
+  });
+
+  const getMonthlyEntryHoursError = (entry) => {
+    const {
+      totalHours,
+      overtimeHours,
+      ahadHours,
+      ahadOvertimeHours,
+      umumHours,
+      umumOvertimeHours,
+    } =
+      getMonthlyEntryHours(entry);
+    const hourValues = [
+      totalHours,
+      overtimeHours,
+      ahadHours,
+      ahadOvertimeHours,
+      umumHours,
+      umumOvertimeHours,
+    ];
+
+    if (hourValues.some((hours) => hours < 0)) {
+      return "Monthly log hours cannot be negative";
+    }
+
+    if (hourValues.reduce((sum, hours) => sum + hours, 0) <= 0) {
+      return "At least one monthly log hour value is required";
+    }
+
+    return null;
+  };
+
   // Get monthly work logs with filtering
   router.get("/", async (req, res) => {
     const {
@@ -21,7 +72,11 @@ export default function (pool) {
           mwl.*,
           COUNT(DISTINCT mwle.employee_id) as total_workers,
           CAST(COALESCE(SUM(mwle.total_hours), 0) AS NUMERIC(10, 2)) as total_hours,
-          CAST(COALESCE(SUM(mwle.overtime_hours), 0) AS NUMERIC(10, 2)) as total_overtime_hours
+          CAST(COALESCE(SUM(mwle.overtime_hours), 0) AS NUMERIC(10, 2)) as total_overtime_hours,
+          CAST(COALESCE(SUM(mwle.ahad_hours), 0) AS NUMERIC(10, 2)) as total_ahad_hours,
+          CAST(COALESCE(SUM(mwle.ahad_overtime_hours), 0) AS NUMERIC(10, 2)) as total_ahad_overtime_hours,
+          CAST(COALESCE(SUM(mwle.umum_hours), 0) AS NUMERIC(10, 2)) as total_umum_hours,
+          CAST(COALESCE(SUM(mwle.umum_overtime_hours), 0) AS NUMERIC(10, 2)) as total_umum_overtime_hours
         FROM monthly_work_logs mwl
         LEFT JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
         WHERE 1=1
@@ -79,6 +134,10 @@ export default function (pool) {
           ...log,
           total_hours: parseFloat(log.total_hours),
           total_overtime_hours: parseFloat(log.total_overtime_hours),
+          total_ahad_hours: parseFloat(log.total_ahad_hours),
+          total_ahad_overtime_hours: parseFloat(log.total_ahad_overtime_hours),
+          total_umum_hours: parseFloat(log.total_umum_hours),
+          total_umum_overtime_hours: parseFloat(log.total_umum_overtime_hours),
           total_workers: parseInt(log.total_workers),
         }));
 
@@ -124,7 +183,9 @@ export default function (pool) {
           CAST(mwle.total_hours AS NUMERIC(10, 2)) as total_hours,
           CAST(mwle.overtime_hours AS NUMERIC(10, 2)) as overtime_hours,
           CAST(mwle.ahad_hours AS NUMERIC(10, 2)) as ahad_hours,
+          CAST(mwle.ahad_overtime_hours AS NUMERIC(10, 2)) as ahad_overtime_hours,
           CAST(mwle.umum_hours AS NUMERIC(10, 2)) as umum_hours,
+          CAST(mwle.umum_overtime_hours AS NUMERIC(10, 2)) as umum_overtime_hours,
           s.name as employee_name,
           j.name as job_name
         FROM monthly_work_log_entries mwle
@@ -133,6 +194,13 @@ export default function (pool) {
         WHERE mwle.monthly_log_id = $1
       `;
       const entriesResult = await pool.query(entriesQuery, [id]);
+      const leaveJobIds = [
+        ...new Set(entriesResult.rows.map((entry) => entry.job_id).filter(Boolean)),
+      ];
+      const leaveFilterJobIds =
+        leaveJobIds.length > 0
+          ? leaveJobIds
+          : getMonthlySectionJobIds(workLog.section);
 
       // Get activities for each entry
       const entriesWithActivities = await Promise.all(
@@ -144,7 +212,7 @@ export default function (pool) {
               CAST(mwla.units_produced AS NUMERIC(10, 2)) as units_produced,
               CAST(mwla.rate_used AS NUMERIC(10, 2)) as rate_used,
               CAST(mwla.calculated_amount AS NUMERIC(10, 2)) as calculated_amount,
-              pc.description,
+              COALESCE(mwla.description, pc.description) as description,
               pc.pay_type,
               pc.rate_unit
             FROM monthly_work_log_activities mwla
@@ -158,7 +226,9 @@ export default function (pool) {
             total_hours: parseFloat(entry.total_hours),
             overtime_hours: parseFloat(entry.overtime_hours),
             ahad_hours: parseFloat(entry.ahad_hours || 0),
+            ahad_overtime_hours: parseFloat(entry.ahad_overtime_hours || 0),
             umum_hours: parseFloat(entry.umum_hours || 0),
+            umum_overtime_hours: parseFloat(entry.umum_overtime_hours || 0),
             activities: activitiesResult.rows.map((activity) => ({
               ...activity,
               hours_applied: activity.hours_applied
@@ -174,8 +244,8 @@ export default function (pool) {
         })
       );
 
-      // Get leave records for this month and section's employees
-      // Include employees whose job includes this section (not just those with work entries)
+      // Get leave records for this month and monthly job's employees.
+      // Include employees whose staff job matches this monthly log's job IDs.
       const leaveQuery = `
         SELECT
           lr.*,
@@ -185,13 +255,13 @@ export default function (pool) {
         LEFT JOIN staffs s ON lr.employee_id = s.id
         WHERE EXTRACT(MONTH FROM lr.leave_date) = $1
           AND EXTRACT(YEAR FROM lr.leave_date) = $2
-          AND s.job::jsonb ? $3
+          AND COALESCE(s.job::jsonb, '[]'::jsonb) ?| $3::text[]
         ORDER BY lr.leave_date, s.name
       `;
       const leaveResult = await pool.query(leaveQuery, [
         workLog.log_month,
         workLog.log_year,
-        workLog.section,
+        leaveFilterJobIds,
       ]);
 
       res.json({
@@ -226,6 +296,15 @@ export default function (pool) {
     if (!employeeEntries || employeeEntries.length === 0) {
       return res.status(400).json({
         message: "At least one employee entry is required",
+      });
+    }
+
+    const invalidHoursEntry = employeeEntries.find((entry) =>
+      getMonthlyEntryHoursError(entry)
+    );
+    if (invalidHoursEntry) {
+      return res.status(400).json({
+        message: getMonthlyEntryHoursError(invalidHoursEntry),
       });
     }
 
@@ -271,13 +350,23 @@ export default function (pool) {
 
       // Insert employee entries and activities
       for (const entry of employeeEntries) {
-        const { employeeId, jobType, totalHours, overtimeHours, ahadHours, umumHours, activities } = entry;
+        const { employeeId, jobType, activities } = entry;
+        const {
+          totalHours,
+          overtimeHours,
+          ahadHours,
+          ahadOvertimeHours,
+          umumHours,
+          umumOvertimeHours,
+        } =
+          getMonthlyEntryHours(entry);
 
         // Insert employee entry
         const entryQuery = `
           INSERT INTO monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours, ahad_hours, umum_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id
         `;
 
@@ -288,7 +377,9 @@ export default function (pool) {
           totalHours,
           overtimeHours || 0,
           ahadHours || 0,
+          ahadOvertimeHours || 0,
           umumHours || 0,
+          umumOvertimeHours || 0,
         ]);
 
         const entryId = entryResult.rows[0].id;
@@ -299,14 +390,15 @@ export default function (pool) {
             if (activity.isSelected) {
               const activityQuery = `
                 INSERT INTO monthly_work_log_activities (
-                  monthly_entry_id, pay_code_id, hours_applied,
+                  monthly_entry_id, pay_code_id, description, hours_applied,
                   units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               `;
 
               await pool.query(activityQuery, [
                 entryId,
                 activity.payCodeId,
+                activity.description || null,
                 activity.hoursApplied || null,
                 activity.unitsProduced || null,
                 parseFloat(activity.rate),
@@ -383,6 +475,15 @@ export default function (pool) {
       });
     }
 
+    const invalidHoursEntry = employeeEntries.find((entry) =>
+      getMonthlyEntryHoursError(entry)
+    );
+    if (invalidHoursEntry) {
+      return res.status(400).json({
+        message: getMonthlyEntryHoursError(invalidHoursEntry),
+      });
+    }
+
     try {
       await pool.query("BEGIN");
 
@@ -429,12 +530,22 @@ export default function (pool) {
 
       // Insert updated employee entries and activities
       for (const entry of employeeEntries) {
-        const { employeeId, jobType, totalHours, overtimeHours, ahadHours, umumHours, activities } = entry;
+        const { employeeId, jobType, activities } = entry;
+        const {
+          totalHours,
+          overtimeHours,
+          ahadHours,
+          ahadOvertimeHours,
+          umumHours,
+          umumOvertimeHours,
+        } =
+          getMonthlyEntryHours(entry);
 
         const entryQuery = `
           INSERT INTO monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours, ahad_hours, umum_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id
         `;
 
@@ -445,7 +556,9 @@ export default function (pool) {
           totalHours,
           overtimeHours || 0,
           ahadHours || 0,
+          ahadOvertimeHours || 0,
           umumHours || 0,
+          umumOvertimeHours || 0,
         ]);
 
         const entryId = entryResult.rows[0].id;
@@ -455,14 +568,15 @@ export default function (pool) {
             if (activity.isSelected) {
               const activityQuery = `
                 INSERT INTO monthly_work_log_activities (
-                  monthly_entry_id, pay_code_id, hours_applied,
+                  monthly_entry_id, pay_code_id, description, hours_applied,
                   units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
               `;
 
               await pool.query(activityQuery, [
                 entryId,
                 activity.payCodeId,
+                activity.description || null,
                 activity.hoursApplied || null,
                 activity.unitsProduced || null,
                 parseFloat(activity.rate),
@@ -590,8 +704,8 @@ export default function (pool) {
 
       // If section is provided, filter by employees whose job includes this section
       if (section) {
-        query += ` AND s.job::jsonb ? $3`;
-        values.push(section);
+        query += ` AND COALESCE(s.job::jsonb, '[]'::jsonb) ?| $3::text[]`;
+        values.push(getMonthlySectionJobIds(section));
       }
 
       query += ` ORDER BY lr.leave_date, s.name`;

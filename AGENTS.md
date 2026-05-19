@@ -137,8 +137,8 @@ This is a comprehensive ERP system supporting three companies:
 
 **Work Logs (Monthly):**
 - `monthly_work_logs` - id, log_month, log_year, section, context_data, status, created_at, updated_at
-- `monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours, overtime_hours, created_at
-- `monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, hours_applied, units_produced, rate_used, calculated_amount, is_manually_added, created_at
+- `monthly_work_log_entries` - id, monthly_log_id, employee_id, job_id, total_hours (regular/Biasa hours), overtime_hours (regular/Biasa OT), ahad_hours (Ahad non-OT), ahad_overtime_hours (Ahad OT), umum_hours (Umum non-OT), umum_overtime_hours (Umum OT), created_at
+- `monthly_work_log_activities` - id, monthly_entry_id, pay_code_id, description (stored activity variant label such as OT (Ahad)), hours_applied, units_produced, rate_used, calculated_amount, is_manually_added, created_at
 
 **Leave Management:**
 - `employee_leave_balances` - id, employee_id, year, cuti_umum_total, cuti_tahunan_total, cuti_sakit_total, created_at, updated_at

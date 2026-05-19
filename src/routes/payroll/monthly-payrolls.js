@@ -324,11 +324,15 @@ export default function (pool) {
             'job_id', mwle.job_id,
             'total_hours', mwle.total_hours,
             'overtime_hours', mwle.overtime_hours,
+            'ahad_hours', mwle.ahad_hours,
+            'ahad_overtime_hours', mwle.ahad_overtime_hours,
+            'umum_hours', mwle.umum_hours,
+            'umum_overtime_hours', mwle.umum_overtime_hours,
             'activities', (
               SELECT json_agg(
                 json_build_object(
                   'pay_code_id', mwla.pay_code_id,
-                  'description', pc.description,
+                  'description', COALESCE(mwla.description, pc.description),
                   'pay_type', pc.pay_type,
                   'rate_unit', pc.rate_unit,
                   'rate_used', mwla.rate_used,
@@ -452,15 +456,17 @@ export default function (pool) {
         client.query(`
           SELECT mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
             mwle.total_hours, mwle.overtime_hours,
+            mwle.ahad_hours, mwle.ahad_overtime_hours,
+            mwle.umum_hours, mwle.umum_overtime_hours,
             json_agg(json_build_object(
               'pay_code_id', mwla.pay_code_id,
-              'description', pc.description,
+              'description', COALESCE(mwla.description, pc.description),
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', mwla.rate_used,
-              'rate_biasa', pc.rate_biasa,
-              'rate_ahad', pc.rate_ahad,
-              'rate_umum', pc.rate_umum,
+              'rate_biasa', COALESCE(epc.override_rate_biasa, jpc.override_rate_biasa, pc.rate_biasa),
+              'rate_ahad', COALESCE(epc.override_rate_ahad, jpc.override_rate_ahad, pc.rate_ahad),
+              'rate_umum', COALESCE(epc.override_rate_umum, jpc.override_rate_umum, pc.rate_umum),
               'hours_applied', mwla.hours_applied,
               'calculated_amount', mwla.calculated_amount
             )) as activities
@@ -468,9 +474,13 @@ export default function (pool) {
           JOIN monthly_work_log_entries mwle ON mwl.id = mwle.monthly_log_id
           LEFT JOIN monthly_work_log_activities mwla ON mwla.monthly_entry_id = mwle.id
           LEFT JOIN pay_codes pc ON mwla.pay_code_id = pc.id
+          LEFT JOIN job_pay_codes jpc ON jpc.job_id = mwle.job_id AND jpc.pay_code_id = mwla.pay_code_id
+          LEFT JOIN employee_pay_codes epc ON epc.employee_id = mwle.employee_id AND epc.pay_code_id = mwla.pay_code_id
           WHERE mwl.log_month = $1 AND mwl.log_year = $2 AND mwl.status = 'Submitted'
           GROUP BY mwl.id, mwl.log_month, mwl.log_year, mwle.employee_id, mwle.job_id,
-            mwle.total_hours, mwle.overtime_hours
+            mwle.total_hours, mwle.overtime_hours,
+            mwle.ahad_hours, mwle.ahad_overtime_hours,
+            mwle.umum_hours, mwle.umum_overtime_hours
         `, [month, year]),
 
         // Existing manual items
@@ -605,19 +615,88 @@ export default function (pool) {
         if (!workLogsByEmployeeJob[key]) {
           workLogsByEmployeeJob[key] = { employeeId: log.employee_id, jobType: log.job_id, items: [] };
         }
-        (log.activities || []).filter(a => a.pay_code_id).forEach(activity => {
+        const totalHours = parseFloat(log.total_hours) || 0;
+        const overtimeHours = parseFloat(log.overtime_hours) || 0;
+        const ahadHours = parseFloat(log.ahad_hours) || 0;
+        const ahadOvertimeHours = parseFloat(log.ahad_overtime_hours) || 0;
+        const umumHours = parseFloat(log.umum_hours) || 0;
+        const umumOvertimeHours = parseFloat(log.umum_overtime_hours) || 0;
+        const activities = (log.activities || []).filter(a => a.pay_code_id);
+        const activityCountsByPayCode = new Map();
+        activities.forEach(activity => {
+          activityCountsByPayCode.set(
+            activity.pay_code_id,
+            (activityCountsByPayCode.get(activity.pay_code_id) || 0) + 1
+          );
+        });
+
+        activities.forEach(activity => {
+          const isDayTypeHourActivity =
+            (activity.pay_type === "Base" || activity.pay_type === "Overtime") &&
+            activity.rate_unit === "Hour";
+          const biasaHours = activity.pay_type === "Overtime" ? overtimeHours : totalHours;
+          const dayAhadHours =
+            activity.pay_type === "Overtime" ? ahadOvertimeHours : ahadHours;
+          const dayUmumHours =
+            activity.pay_type === "Overtime" ? umumOvertimeHours : umumHours;
+          const combinedDayTypeHours = biasaHours + dayAhadHours + dayUmumHours;
+          const hoursApplied = parseFloat(activity.hours_applied) || 0;
+          const shouldSplitUnsplitDayTypeHours =
+            isDayTypeHourActivity &&
+            activityCountsByPayCode.get(activity.pay_code_id) === 1 &&
+            (dayAhadHours > 0 || dayUmumHours > 0) &&
+            (Math.abs(hoursApplied - combinedDayTypeHours) < 0.001 ||
+              (activity.pay_type === "Overtime" &&
+                Math.abs(hoursApplied - overtimeHours) < 0.001));
+
+          if (shouldSplitUnsplitDayTypeHours) {
+            const baseDescription = activity.description || "";
+            const biasaRate = parseFloat(activity.rate_biasa) || 0;
+            const ahadRate =
+              activity.rate_ahad === null || activity.rate_ahad === undefined
+                ? biasaRate
+                : parseFloat(activity.rate_ahad) || 0;
+            const umumRate =
+              activity.rate_umum === null || activity.rate_umum === undefined
+                ? biasaRate
+                : parseFloat(activity.rate_umum) || 0;
+            const splitItems = [
+              { hours: biasaHours, rate: biasaRate, description: baseDescription },
+              { hours: dayAhadHours, rate: ahadRate, description: `${baseDescription} (Ahad)` },
+              { hours: dayUmumHours, rate: umumRate, description: `${baseDescription} (Umum)` },
+            ].filter(item => item.hours > 0);
+
+            splitItems.forEach(item => {
+              workLogsByEmployeeJob[key].items.push({
+                pay_code_id: activity.pay_code_id,
+                description: item.description,
+                pay_type: activity.pay_type || "Tambahan",
+                rate: item.rate,
+                rate_unit: activity.rate_unit || "Fixed",
+                quantity: item.hours,
+                amount: Math.round(item.rate * item.hours * 100) / 100,
+                source_date: null,
+                work_log_id: log.id,
+                work_log_type: 'monthly',
+              });
+            });
+            return;
+          }
+
           const qty = activity.rate_unit === "Hour"
             ? parseFloat(activity.hours_applied) || 0
             : 1;
           // Append day-type suffix when activity's rate matches Ahad/Umum rate
-          // (handles Base+Hour pay codes split across Biasa/Ahad/Umum variants)
+          // (handles hourly pay codes split across Biasa/Ahad/Umum variants)
           let description = activity.description || "";
           const rateUsed = parseFloat(activity.rate_used) || 0;
           const rateBiasa = parseFloat(activity.rate_biasa) || 0;
           const rateAhad = parseFloat(activity.rate_ahad) || 0;
           const rateUmum = parseFloat(activity.rate_umum) || 0;
+          const alreadyHasDayTypeSuffix = /\((Ahad|Umum)\)$/.test(description);
           if (
-            activity.pay_type === "Base" &&
+            !alreadyHasDayTypeSuffix &&
+            (activity.pay_type === "Base" || activity.pay_type === "Overtime") &&
             activity.rate_unit === "Hour" &&
             rateAhad > 0 &&
             Math.abs(rateUsed - rateAhad) < 0.001 &&
@@ -625,7 +704,8 @@ export default function (pool) {
           ) {
             description = `${description} (Ahad)`;
           } else if (
-            activity.pay_type === "Base" &&
+            !alreadyHasDayTypeSuffix &&
+            (activity.pay_type === "Base" || activity.pay_type === "Overtime") &&
             activity.rate_unit === "Hour" &&
             rateUmum > 0 &&
             Math.abs(rateUsed - rateUmum) < 0.001 &&
@@ -1065,8 +1145,8 @@ export default function (pool) {
           });
           const workGrossPay = workGrossPayCents / 100;
 
-          // Fetch leave and commission records for this employee
-          const [leaveResult, commissionResult] = await Promise.all([
+          // Fetch leave, commission, and others (kerja luar OT) records for this employee
+          const [leaveResult, commissionResult, othersResult] = await Promise.all([
             client.query(`
               SELECT SUM(amount_paid) as total FROM leave_records
               WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
@@ -1076,11 +1156,16 @@ export default function (pool) {
               SELECT SUM(amount) as total FROM commission_records
               WHERE employee_id = $1 AND DATE(commission_date) >= $2 AND DATE(commission_date) <= $3
             `, [primaryEmployee.employeeId, startDate, endDate]),
+            client.query(`
+              SELECT SUM(amount) as total FROM others_records
+              WHERE employee_id = $1 AND DATE(record_date) >= $2 AND DATE(record_date) <= $3
+            `, [primaryEmployee.employeeId, startDate, endDate]),
           ]);
 
           const leaveGrossPay = parseFloat(leaveResult.rows[0]?.total) || 0;
           const commissionGrossPay = parseFloat(commissionResult.rows[0]?.total) || 0;
-          const grossPay = workGrossPay + leaveGrossPay + commissionGrossPay;
+          const othersGrossPay = parseFloat(othersResult.rows[0]?.total) || 0;
+          const grossPay = workGrossPay + leaveGrossPay + commissionGrossPay + othersGrossPay;
 
           // Check for missing income tax rates
           if (grossPay > INCOME_TAX_THRESHOLD) {
@@ -1110,7 +1195,7 @@ export default function (pool) {
           const epfGrossPay =
             groupedItems.Base.reduce((s, i) => s + i.amount, 0) +
             groupedItems.Tambahan.reduce((s, i) => s + i.amount, 0) +
-            leaveGrossPay + commissionGrossPay;
+            leaveGrossPay + commissionGrossPay + othersGrossPay;
 
           const deductions = [];
 
@@ -1215,6 +1300,7 @@ export default function (pool) {
           }
 
           // Calculate net pay
+          // Commission is deducted as advance; Others (kerja luar OT) is a regular earning — gross only, not an advance.
           const totalEmployeeDeductions = deductions.reduce((sum, d) => sum + d.employee_amount, 0);
           const netPay = grossPay - totalEmployeeDeductions - commissionGrossPay;
 
