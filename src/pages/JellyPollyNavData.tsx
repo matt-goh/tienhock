@@ -11,7 +11,7 @@ import InvoiceFormPage from "./JellyPolly/InvoiceFormPage";
 import InvoiceDetailsPage from "./JellyPolly/InvoiceDetailsPage";
 
 // Sales related imports
-import SalesSummaryPage from "./Sales/SalesSummaryPage";
+import JellyPollySalesSummaryPage from "./Sales/JellyPollySalesSummaryPage";
 import PaymentPage from "./JellyPolly/PaymentPage";
 
 // Accounting related imports (to be created)
@@ -56,7 +56,7 @@ export const JellyPollyNavData: SidebarItem[] = [
       {
         name: "Sales Summary",
         path: "/sales/summary",
-        component: SalesSummaryPage,
+        component: JellyPollySalesSummaryPage,
       },
       {
         name: "Payments",
