@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-05-19",
+    ms: "Pembetulan: Jumlah Gaji Kasar untuk salesman kini termasuk unit FOC, jadi jumlah asas dan payslip sepadan.",
+    en: "Fix: Salesman gross pay now includes FOC units, so base totals and payslips match.",
+  },
+  {
+    date: "2026-05-19",
     ms: "Pembetulan: Gaji Genap sebelum pinjam kini mengikut jumlah akhir gaji yang telah digenapkan.",
     en: "Fix: Gaji Genap before pinjam now matches the final rounded payroll amount.",
   },

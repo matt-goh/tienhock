@@ -1016,6 +1016,7 @@ export default function (pool) {
                   is_manual: false,
                   amount: Math.round(item.amount * 100) / 100,
                   quantity: Math.round(item.quantity * 100) / 100,
+                  foc_units: Math.round((item.foc_units || 0) * 100) / 100,
                 });
               });
             }
@@ -1034,12 +1035,14 @@ export default function (pool) {
             if (consolidatedGroups.has(key)) {
               const group = consolidatedGroups.get(key);
               group.totalQuantity += item.quantity;
+              group.totalFocUnits += item.foc_units || 0;
               group.originalAmountSum += item.amount; // Keep for Percent/Fixed
             } else {
               consolidatedGroups.set(key, {
                 rate: item.rate,
                 rate_unit: item.rate_unit,
                 totalQuantity: item.quantity,
+                totalFocUnits: item.foc_units || 0,
                 originalAmountSum: item.amount,
               });
             }
@@ -1053,9 +1056,10 @@ export default function (pool) {
               // Keep original summed amount for special rate units
               amountCents = Math.round(group.originalAmountSum * 100);
             } else {
-              // Calculate from consolidated: roundedRate × totalQuantity
+              // Calculate from consolidated: roundedRate × (quantity + FOC)
               const roundedRate = Math.round(group.rate * 100) / 100;
-              amountCents = Math.round(roundedRate * group.totalQuantity * 100);
+              const totalUnits = group.totalQuantity + group.totalFocUnits;
+              amountCents = Math.round(roundedRate * totalUnits * 100);
             }
             workGrossPayCents += amountCents;
           });
