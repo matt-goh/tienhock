@@ -25,6 +25,7 @@ const colors = {
   sky: "#0284c7",
   amber: "#d97706",
   emerald: "#059669",
+  violet: "#7c3aed",
   header: {
     companyName: "#1e293b",
     companyDetails: "#334155",
@@ -191,6 +192,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#bbf7d0",
   },
+  balanceItemRawatan: {
+    backgroundColor: "#f5f3ff",
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+  },
   balanceLeaveType: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
@@ -255,35 +261,35 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
   },
 
-  // Column widths for monthly table
+  // Column widths for monthly table (4 categories, landscape A4)
   colMonth: {
-    width: "13%",
+    width: "10%",
     paddingHorizontal: 3,
     textAlign: "center",
     justifyContent: "center",
   },
   colDays: {
-    width: "8%",
+    width: "6.5%",
     paddingHorizontal: 2,
     textAlign: "center",
     justifyContent: "center",
   },
   colAmount: {
-    width: "11%",
+    width: "9%",
     paddingHorizontal: 2,
     textAlign: "center",
     justifyContent: "center",
   },
   colBalance: {
-    width: "10%",
+    width: "7%",
     paddingHorizontal: 2,
     textAlign: "center",
     justifyContent: "center",
   },
 
-  // Header columns
+  // Header columns (each category spans Days + Amount + Balance = 22.5%)
   colCategoryHeader: {
-    width: "29%",
+    width: "22.5%",
     paddingHorizontal: 3,
     textAlign: "center",
     fontFamily: "Helvetica-Bold",
@@ -316,6 +322,7 @@ const styles = StyleSheet.create({
   textSky: { color: colors.sky },
   textAmber: { color: colors.amber },
   textEmerald: { color: colors.emerald },
+  textViolet: { color: colors.violet },
 
   // Summary footer
   summarySection: {
@@ -399,18 +406,21 @@ export interface CutiLeaveBalance {
   cuti_umum_total: number;
   cuti_tahunan_total: number;
   cuti_sakit_total: number;
+  cuti_rawatan_total: number;
 }
 
 export interface CutiLeaveTaken {
   cuti_umum?: number;
   cuti_sakit?: number;
   cuti_tahunan?: number;
+  cuti_rawatan?: number;
 }
 
 export interface CutiMonthlyData {
   cuti_umum: { days: number; amount: number };
   cuti_sakit: { days: number; amount: number };
   cuti_tahunan: { days: number; amount: number };
+  cuti_rawatan: { days: number; amount: number };
 }
 
 export interface CutiReportData {
@@ -431,11 +441,13 @@ export interface CutiBatchReportData {
       cuti_tahunan: number;
       cuti_sakit: number;
       cuti_umum: number;
+      cuti_rawatan: number;
     };
     totalAmountPaid: {
       cuti_tahunan: number;
       cuti_sakit: number;
       cuti_umum: number;
+      cuti_rawatan: number;
     };
   };
 }
@@ -511,6 +523,8 @@ const LeaveBalanceSummary: React.FC<{
     leaveBalance.cuti_sakit_total - (leaveTaken.cuti_sakit || 0);
   const remainingUmum =
     leaveBalance.cuti_umum_total - (leaveTaken.cuti_umum || 0);
+  const remainingRawatan =
+    leaveBalance.cuti_rawatan_total - (leaveTaken.cuti_rawatan || 0);
 
   return (
     <View style={styles.balanceSection}>
@@ -549,6 +563,17 @@ const LeaveBalanceSummary: React.FC<{
             / {leaveBalance.cuti_umum_total} days
           </Text>
         </View>
+        <View style={[styles.balanceItem, styles.balanceItemRawatan]}>
+          <Text style={[styles.balanceLeaveType, styles.textViolet]}>
+            Cuti Rawatan
+          </Text>
+          <Text style={[styles.balanceValue, styles.textViolet]}>
+            {remainingRawatan}
+          </Text>
+          <Text style={styles.balanceTotal}>
+            / {leaveBalance.cuti_rawatan_total} days
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -567,12 +592,14 @@ const MonthlyLeaveTable: React.FC<{
         tahunanBalance: number;
         sakitBalance: number;
         umumBalance: number;
+        rawatanBalance: number;
       }
     > = {};
 
     let cumulativeTahunan = 0;
     let cumulativeSakit = 0;
     let cumulativeUmum = 0;
+    let cumulativeRawatan = 0;
 
     for (let month = 1; month <= 12; month++) {
       const monthData = monthlySummary[month];
@@ -580,11 +607,13 @@ const MonthlyLeaveTable: React.FC<{
       cumulativeTahunan += monthData.cuti_tahunan.days;
       cumulativeSakit += monthData.cuti_sakit.days;
       cumulativeUmum += monthData.cuti_umum.days;
+      cumulativeRawatan += monthData.cuti_rawatan.days;
 
       results[month] = {
         tahunanBalance: leaveBalance.cuti_tahunan_total - cumulativeTahunan,
         sakitBalance: leaveBalance.cuti_sakit_total - cumulativeSakit,
         umumBalance: leaveBalance.cuti_umum_total - cumulativeUmum,
+        rawatanBalance: leaveBalance.cuti_rawatan_total - cumulativeRawatan,
       };
     }
 
@@ -613,9 +642,14 @@ const MonthlyLeaveTable: React.FC<{
             CUTI SAKIT
           </Text>
         </View>
-        <View style={styles.colCategoryHeader}>
+        <View style={[styles.colCategoryHeader, styles.colBorder]}>
           <Text style={[styles.bold, { fontSize: 8, color: "#ffffff" }]}>
             CUTI UMUM
+          </Text>
+        </View>
+        <View style={styles.colCategoryHeader}>
+          <Text style={[styles.bold, { fontSize: 8, color: "#ffffff" }]}>
+            CUTI RAWATAN
           </Text>
         </View>
       </View>
@@ -650,8 +684,18 @@ const MonthlyLeaveTable: React.FC<{
         <View style={styles.colAmount}>
           <Text style={{ fontSize: 7, color: colors.emerald }}>Amount</Text>
         </View>
-        <View style={styles.colBalance}>
+        <View style={[styles.colBalance, styles.colBorderSub]}>
           <Text style={{ fontSize: 7, color: colors.emerald }}>Balance</Text>
+        </View>
+        {/* Cuti Rawatan */}
+        <View style={styles.colDays}>
+          <Text style={{ fontSize: 7, color: colors.violet }}>Days</Text>
+        </View>
+        <View style={styles.colAmount}>
+          <Text style={{ fontSize: 7, color: colors.violet }}>Amount</Text>
+        </View>
+        <View style={styles.colBalance}>
+          <Text style={{ fontSize: 7, color: colors.violet }}>Balance</Text>
         </View>
       </View>
 
@@ -747,6 +791,32 @@ const MonthlyLeaveTable: React.FC<{
                 ]}
               >
                 {balances.umumBalance}
+              </Text>
+            </View>
+
+            {/* Cuti Rawatan */}
+            <View style={styles.colDays}>
+              <Text style={{ fontSize: 8, color: colors.violet }}>
+                {summary.cuti_rawatan.days || "0"}
+              </Text>
+            </View>
+            <View style={styles.colAmount}>
+              <Text style={{ fontSize: 8, color: colors.violet }}>
+                {formatCurrency(summary.cuti_rawatan.amount)}
+              </Text>
+            </View>
+            <View style={styles.colBalance}>
+              <Text
+                style={[
+                  styles.bold,
+                  {
+                    fontSize: 8,
+                    color:
+                      balances.rawatanBalance < 0 ? colors.danger : colors.violet,
+                  },
+                ]}
+              >
+                {balances.rawatanBalance}
               </Text>
             </View>
           </View>
@@ -845,6 +915,35 @@ const MonthlyLeaveTable: React.FC<{
               )}
           </Text>
         </View>
+
+        {/* Cuti Rawatan Totals */}
+        <View style={styles.colDays}>
+          <Text style={[styles.bold, { fontSize: 8, color: colors.violet }]}>
+            {Object.values(monthlySummary).reduce(
+              (sum, month) => sum + month.cuti_rawatan.days,
+              0
+            )}
+          </Text>
+        </View>
+        <View style={styles.colAmount}>
+          <Text style={[styles.bold, { fontSize: 8, color: colors.violet }]}>
+            {formatCurrency(
+              Object.values(monthlySummary).reduce(
+                (sum, month) => sum + month.cuti_rawatan.amount,
+                0
+              )
+            )}
+          </Text>
+        </View>
+        <View style={styles.colBalance}>
+          <Text style={[styles.bold, { fontSize: 8, color: colors.violet }]}>
+            {leaveBalance.cuti_rawatan_total -
+              Object.values(monthlySummary).reduce(
+                (sum, month) => sum + month.cuti_rawatan.days,
+                0
+              )}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -859,7 +958,7 @@ const SingleCutiReportPDF: React.FC<{
 
   return (
     <Document title={`Leave Report ${data.employee.name} ${data.year}`}>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" orientation="landscape" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={TienHockLogo} style={styles.logo} />

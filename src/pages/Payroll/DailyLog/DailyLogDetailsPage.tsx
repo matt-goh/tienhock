@@ -621,6 +621,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                       return "Cuti Sakit";
                     case "cuti_tahunan":
                       return "Cuti Tahunan";
+                    case "cuti_rawatan":
+                      return "Cuti Rawatan";
                     default:
                       return leaveType;
                   }
@@ -634,6 +636,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                       return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300";
                     case "cuti_tahunan":
                       return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
+                    case "cuti_rawatan":
+                      return "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300";
                     default:
                       return "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200";
                   }

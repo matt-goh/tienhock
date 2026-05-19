@@ -27,7 +27,7 @@ const calculateYearsOfService = (dateJoined) => {
  * Calculates leave allocation based on years of service.
  * These values are based on standard Malaysian labor law.
  * @param {number} yearsOfService - The employee's years of service.
- * @returns {{cuti_tahunan_total: number, cuti_sakit_total: number}}
+ * @returns {{cuti_tahunan_total: number, cuti_sakit_total: number, cuti_rawatan_total: number}}
  */
 const calculateLeaveAllocation = (yearsOfService) => {
   let cuti_tahunan_total;
@@ -44,7 +44,25 @@ const calculateLeaveAllocation = (yearsOfService) => {
     cuti_sakit_total = 22;
   }
 
-  return { cuti_tahunan_total, cuti_sakit_total };
+  return { cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total: 60 };
+};
+
+/**
+ * Returns the list of sibling staff IDs sharing the same name as `employeeId`,
+ * sorted by date_joined ASC (senior first) with id ASC as tie-breaker.
+ * Multi-ID employees: leave is aggregated across these siblings so they share
+ * one entitlement bucket per person, matching how payroll groups them.
+ * Single-ID employees: returns just [{id: self, date_joined}].
+ */
+const getSiblingIds = async (client, employeeId) => {
+  const result = await client.query(
+    `SELECT id, date_joined
+       FROM staffs
+      WHERE name = (SELECT name FROM staffs WHERE id = $1)
+      ORDER BY date_joined ASC, id ASC`,
+    [employeeId],
+  );
+  return result.rows; // [{ id, date_joined }, ...]
 };
 
 const getCutiUmumTotal = async (client, year) => {
@@ -93,68 +111,77 @@ export default function (pool) {
         const result = {};
         const cutiUmumTotal = await getCutiUmumTotal(client, parseInt(year));
 
-        // Process each employee
-        for (const employeeId of employeeIdList) {
-          let balanceResult = await client.query(
-            `SELECT * FROM employee_leave_balances WHERE employee_id = $1 AND year = $2`,
-            [employeeId, parseInt(year)]
-          );
+        // Cache results per canonical ID so that two requested IDs sharing a
+        // name don't re-run the same lookups twice.
+        const canonicalCache = new Map(); // canonicalId -> { balance, taken }
 
-          if (balanceResult.rows.length === 0) {
-            // If no balance record exists, create one
-            const staffResult = await client.query(
-              `SELECT date_joined FROM staffs WHERE id = $1`,
-              [employeeId]
+        for (const employeeId of employeeIdList) {
+          const siblings = await getSiblingIds(client, employeeId);
+          if (siblings.length === 0) continue; // unknown employee → skip
+
+          const canonicalId = siblings[0].id;
+          const seniorJoined = siblings[0].date_joined;
+          const siblingIds = siblings.map((s) => s.id);
+
+          let cached = canonicalCache.get(canonicalId);
+          if (!cached) {
+            let balanceResult = await client.query(
+              `SELECT * FROM employee_leave_balances
+                WHERE employee_id = ANY($1::text[]) AND year = $2
+                ORDER BY CASE WHEN employee_id = $3 THEN 0 ELSE 1 END, id ASC
+                LIMIT 1`,
+              [siblingIds, parseInt(year), canonicalId]
             );
 
-            if (staffResult.rows.length === 0) {
-              // Skip employees that don't exist
-              continue;
+            if (balanceResult.rows.length === 0) {
+              const yearsOfService = calculateYearsOfService(seniorJoined);
+              const {
+                cuti_tahunan_total,
+                cuti_sakit_total,
+                cuti_rawatan_total,
+              } = calculateLeaveAllocation(yearsOfService);
+
+              balanceResult = await client.query(
+                `INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+                 VALUES ($1, $2, $3, $4, $5)
+                 RETURNING *;`,
+                [
+                  canonicalId,
+                  parseInt(year),
+                  cuti_tahunan_total,
+                  cuti_sakit_total,
+                  cuti_rawatan_total,
+                ]
+              );
             }
 
-            const yearsOfService = calculateYearsOfService(
-              staffResult.rows[0].date_joined
+            const takenLeaveResult = await client.query(
+              `SELECT leave_type, SUM(days_taken) as total_taken
+                 FROM leave_records
+                WHERE employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM leave_date) = $2
+                  AND status = 'approved'
+                GROUP BY leave_type;`,
+              [siblingIds, parseInt(year)]
             );
-            const { cuti_tahunan_total, cuti_sakit_total } =
-              calculateLeaveAllocation(yearsOfService);
 
-            const insertQuery = `
-              INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total)
-              VALUES ($1, $2, $3, $4)
-              RETURNING *;
-            `;
-            balanceResult = await client.query(insertQuery, [
-              employeeId,
-              parseInt(year),
-              cuti_tahunan_total,
-              cuti_sakit_total,
-            ]);
+            const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
+              acc[row.leave_type] = parseFloat(row.total_taken);
+              return acc;
+            }, {});
+
+            cached = {
+              balance: {
+                ...balanceResult.rows[0],
+                cuti_umum_total: cutiUmumTotal,
+              },
+              taken: takenLeave,
+            };
+            canonicalCache.set(canonicalId, cached);
           }
 
-          // Get the sum of taken leave days for the year
-          const takenLeaveQuery = `
-              SELECT leave_type, SUM(days_taken) as total_taken
-              FROM leave_records
-              WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2 AND status = 'approved'
-              GROUP BY leave_type;
-          `;
-          const takenLeaveResult = await client.query(takenLeaveQuery, [
-            employeeId,
-            parseInt(year),
-          ]);
-
-          const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
-            acc[row.leave_type] = parseFloat(row.total_taken);
-            return acc;
-          }, {});
-
-          result[employeeId] = {
-            balance: {
-              ...balanceResult.rows[0],
-              cuti_umum_total: cutiUmumTotal,
-            },
-            taken: takenLeave,
-          };
+          // Always key the response by the originally-requested ID.
+          result[employeeId] = cached;
         }
 
         await client.query("COMMIT");
@@ -186,54 +213,57 @@ export default function (pool) {
       try {
         await client.query("BEGIN");
 
+        // Find all sibling IDs sharing this employee's name.
+        const siblings = await getSiblingIds(client, employeeId);
+        if (siblings.length === 0) {
+          return res.status(404).json({ message: "Employee not found." });
+        }
+
+        const siblingIds = siblings.map((s) => s.id);
+        const canonicalId = siblings[0].id;
+        const seniorJoined = siblings[0].date_joined;
+
+        // Prefer the canonical sibling's balance row; fall back to any sibling's.
         let balanceResult = await client.query(
-          `SELECT * FROM employee_leave_balances WHERE employee_id = $1 AND year = $2`,
-          [employeeId, parseInt(year)]
+          `SELECT * FROM employee_leave_balances
+            WHERE employee_id = ANY($1::text[]) AND year = $2
+            ORDER BY CASE WHEN employee_id = $3 THEN 0 ELSE 1 END, id ASC
+            LIMIT 1`,
+          [siblingIds, parseInt(year), canonicalId]
         );
 
         if (balanceResult.rows.length === 0) {
-          // If no balance record exists, create one
-          const staffResult = await client.query(
-            `SELECT date_joined FROM staffs WHERE id = $1`,
-            [employeeId]
-          );
-
-          if (staffResult.rows.length === 0) {
-            return res.status(404).json({ message: "Employee not found." });
-          }
-
-          const yearsOfService = calculateYearsOfService(
-            staffResult.rows[0].date_joined
-          );
-          const { cuti_tahunan_total, cuti_sakit_total } =
+          // Lazy-create the canonical balance row using the senior sibling's tenure.
+          const yearsOfService = calculateYearsOfService(seniorJoined);
+          const { cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total } =
             calculateLeaveAllocation(yearsOfService);
 
-          const insertQuery = `
-            INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *;
-          `;
-          balanceResult = await client.query(insertQuery, [
-            employeeId,
-            parseInt(year),
-            cuti_tahunan_total,
-            cuti_sakit_total,
-          ]);
+          balanceResult = await client.query(
+            `INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *;`,
+            [
+              canonicalId,
+              parseInt(year),
+              cuti_tahunan_total,
+              cuti_sakit_total,
+              cuti_rawatan_total,
+            ]
+          );
         }
 
         const cutiUmumTotal = await getCutiUmumTotal(client, parseInt(year));
 
-        // Now, get the sum of taken leave days for the year
-        const takenLeaveQuery = `
-            SELECT leave_type, SUM(days_taken) as total_taken
-            FROM leave_records
-            WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2 AND status = 'approved'
-            GROUP BY leave_type;
-        `;
-        const takenLeaveResult = await client.query(takenLeaveQuery, [
-          employeeId,
-          parseInt(year),
-        ]);
+        // Sum taken-days across ALL sibling IDs so multi-ID employees share one bucket.
+        const takenLeaveResult = await client.query(
+          `SELECT leave_type, SUM(days_taken) as total_taken
+             FROM leave_records
+            WHERE employee_id = ANY($1::text[])
+              AND EXTRACT(YEAR FROM leave_date) = $2
+              AND status = 'approved'
+            GROUP BY leave_type;`,
+          [siblingIds, parseInt(year)]
+        );
 
         const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
           acc[row.leave_type] = parseFloat(row.total_taken);
@@ -270,13 +300,25 @@ export default function (pool) {
   router.get("/records/:employeeId/:year", async (req, res) => {
     const { employeeId, year } = req.params;
     try {
-      const query = `
-        SELECT * FROM leave_records 
-        WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
-        ORDER BY leave_date DESC
-      `;
-      const result = await pool.query(query, [employeeId, parseInt(year)]);
-      res.json(result.rows);
+      const client = await pool.connect();
+      try {
+        const siblings = await getSiblingIds(client, employeeId);
+        if (siblings.length === 0) {
+          return res.json([]);
+        }
+        const siblingIds = siblings.map((s) => s.id);
+
+        const result = await client.query(
+          `SELECT * FROM leave_records
+            WHERE employee_id = ANY($1::text[])
+              AND EXTRACT(YEAR FROM leave_date) = $2
+            ORDER BY leave_date DESC`,
+          [siblingIds, parseInt(year)]
+        );
+        res.json(result.rows);
+      } finally {
+        client.release();
+      }
     } catch (error) {
       console.error("Error fetching leave records:", error);
       res.status(500).json({
@@ -402,25 +444,32 @@ export default function (pool) {
   router.get("/summary/:employeeId/:year/:month", async (req, res) => {
     const { employeeId, year, month } = req.params;
     try {
-      const query = `
-        SELECT 
-          to_char(leave_date, 'YYYY-MM-DD') as date,
-          leave_type,
-          days_taken,
-          amount_paid
-        FROM leave_records
-        WHERE employee_id = $1 
-          AND EXTRACT(YEAR FROM leave_date) = $2
-          AND EXTRACT(MONTH FROM leave_date) = $3
-          AND status = 'approved'
-        ORDER BY leave_date ASC;
-      `;
-      const result = await pool.query(query, [
-        employeeId,
-        parseInt(year),
-        parseInt(month),
-      ]);
-      res.json(result.rows);
+      const client = await pool.connect();
+      try {
+        const siblings = await getSiblingIds(client, employeeId);
+        if (siblings.length === 0) {
+          return res.json([]);
+        }
+        const siblingIds = siblings.map((s) => s.id);
+
+        const result = await client.query(
+          `SELECT
+             to_char(leave_date, 'YYYY-MM-DD') as date,
+             leave_type,
+             days_taken,
+             amount_paid
+           FROM leave_records
+           WHERE employee_id = ANY($1::text[])
+             AND EXTRACT(YEAR FROM leave_date) = $2
+             AND EXTRACT(MONTH FROM leave_date) = $3
+             AND status = 'approved'
+           ORDER BY leave_date ASC;`,
+          [siblingIds, parseInt(year), parseInt(month)]
+        );
+        res.json(result.rows);
+      } finally {
+        client.release();
+      }
     } catch (error) {
       console.error("Error fetching monthly leave summary:", error);
       res.status(500).json({
@@ -458,27 +507,53 @@ export default function (pool) {
       try {
         await client.query("BEGIN");
 
-        // Fetch employee basic info, leave balances, and records in a single optimized query
+        // Fetch employee info + leave balances/records aggregated by name so
+        // multi-ID employees share a single entitlement bucket.
         const query = `
-          WITH employee_info AS (
-            SELECT 
-              s.id,
+          WITH requested AS (
+            SELECT id FROM staffs WHERE id = ANY($1::text[])
+          ),
+          name_groups AS (
+            -- For each requested ID, find all sibling IDs sharing the name.
+            SELECT
+              r.id AS requested_id,
               s.name,
-              s.job,
-              s.date_joined as "dateJoined",
-              s.ic_no as "icNo",
-              s.nationality,
-              EXTRACT(YEAR FROM AGE(CURRENT_DATE, s.date_joined)) as years_of_service
-            FROM staffs s
-            WHERE s.id = ANY($1::text[])
+              ARRAY_AGG(sib.id ORDER BY sib.date_joined ASC, sib.id ASC) AS sibling_ids,
+              MIN(sib.date_joined) AS senior_joined,
+              (ARRAY_AGG(sib.id ORDER BY sib.date_joined ASC, sib.id ASC))[1] AS canonical_id
+            FROM requested r
+            JOIN staffs s ON s.id = r.id
+            JOIN staffs sib ON sib.name = s.name
+            GROUP BY r.id, s.name
+          ),
+          employee_info AS (
+            -- Use the canonical (senior) sibling's identity for display + tenure.
+            SELECT
+              ng.requested_id AS id,
+              canon.name,
+              canon.job,
+              canon.date_joined AS "dateJoined",
+              canon.ic_no AS "icNo",
+              canon.nationality,
+              EXTRACT(YEAR FROM AGE(CURRENT_DATE, ng.senior_joined)) AS years_of_service,
+              ng.sibling_ids,
+              ng.canonical_id
+            FROM name_groups ng
+            JOIN staffs canon ON canon.id = ng.canonical_id
           ),
           leave_balances AS (
-            SELECT 
-              lb.employee_id,
+            -- One balance row per requested ID; prefer the canonical sibling's row.
+            SELECT DISTINCT ON (ei.id)
+              ei.id AS requested_id,
               lb.cuti_tahunan_total,
-              lb.cuti_sakit_total
-            FROM employee_leave_balances lb
-            WHERE lb.employee_id = ANY($1::text[]) AND lb.year = $2
+              lb.cuti_sakit_total,
+              lb.cuti_rawatan_total
+            FROM employee_info ei
+            JOIN employee_leave_balances lb
+              ON lb.employee_id = ANY(ei.sibling_ids) AND lb.year = $2
+            ORDER BY ei.id,
+                     CASE WHEN lb.employee_id = ei.canonical_id THEN 0 ELSE 1 END,
+                     lb.id
           ),
           cuti_umum_entitlement AS (
             SELECT COUNT(*)::integer as total
@@ -487,68 +562,68 @@ export default function (pool) {
               AND is_cuti_umum = true
               AND EXTRACT(YEAR FROM holiday_date) = $2
           ),
-          leave_records AS (
-            SELECT 
-              lr.employee_id,
+          leave_records_filtered AS (
+            -- Expand the per-name sibling list so we pick up every record.
+            SELECT
+              ei.id AS requested_id,
               lr.leave_date,
               lr.leave_type,
               lr.days_taken,
               lr.amount_paid
-            FROM leave_records lr
-            WHERE lr.employee_id = ANY($1::text[]) 
-              AND EXTRACT(YEAR FROM lr.leave_date) = $2
+            FROM employee_info ei
+            JOIN leave_records lr ON lr.employee_id = ANY(ei.sibling_ids)
+            WHERE EXTRACT(YEAR FROM lr.leave_date) = $2
               AND lr.status = 'approved'
           ),
           leave_taken AS (
-            SELECT 
-              employee_id,
-              SUM(CASE WHEN leave_type = 'cuti_umum' THEN days_taken ELSE 0 END) as cuti_umum,
-              SUM(CASE WHEN leave_type = 'cuti_sakit' THEN days_taken ELSE 0 END) as cuti_sakit,
-              SUM(CASE WHEN leave_type = 'cuti_tahunan' THEN days_taken ELSE 0 END) as cuti_tahunan
-            FROM leave_records
-            GROUP BY employee_id
+            SELECT
+              requested_id,
+              SUM(CASE WHEN leave_type = 'cuti_umum' THEN days_taken ELSE 0 END) AS cuti_umum,
+              SUM(CASE WHEN leave_type = 'cuti_sakit' THEN days_taken ELSE 0 END) AS cuti_sakit,
+              SUM(CASE WHEN leave_type = 'cuti_tahunan' THEN days_taken ELSE 0 END) AS cuti_tahunan,
+              SUM(CASE WHEN leave_type = 'cuti_rawatan' THEN days_taken ELSE 0 END) AS cuti_rawatan
+            FROM leave_records_filtered
+            GROUP BY requested_id
           )
-          SELECT 
-            ei.*,
-            (SELECT total FROM cuti_umum_entitlement) as cuti_umum_total,
-            COALESCE(lb.cuti_tahunan_total, 
-              CASE 
+          SELECT
+            ei.id,
+            ei.name,
+            ei.job,
+            ei."dateJoined",
+            ei."icNo",
+            ei.nationality,
+            ei.years_of_service,
+            (SELECT total FROM cuti_umum_entitlement) AS cuti_umum_total,
+            COALESCE(lb.cuti_tahunan_total,
+              CASE
                 WHEN ei.years_of_service < 2 THEN 8
                 WHEN ei.years_of_service < 5 THEN 12
                 ELSE 16
-              END
-            ) as cuti_tahunan_total,
+              END) AS cuti_tahunan_total,
             COALESCE(lb.cuti_sakit_total,
-              CASE 
+              CASE
                 WHEN ei.years_of_service < 2 THEN 14
                 WHEN ei.years_of_service < 5 THEN 18
                 ELSE 22
-              END
-            ) as cuti_sakit_total,
-            COALESCE(lt.cuti_umum, 0) as cuti_umum_taken,
-            COALESCE(lt.cuti_sakit, 0) as cuti_sakit_taken,
-            COALESCE(lt.cuti_tahunan, 0) as cuti_tahunan_taken,
+              END) AS cuti_sakit_total,
+            COALESCE(lb.cuti_rawatan_total, 60) AS cuti_rawatan_total,
+            COALESCE(lt.cuti_umum, 0) AS cuti_umum_taken,
+            COALESCE(lt.cuti_sakit, 0) AS cuti_sakit_taken,
+            COALESCE(lt.cuti_tahunan, 0) AS cuti_tahunan_taken,
+            COALESCE(lt.cuti_rawatan, 0) AS cuti_rawatan_taken,
             COALESCE(
-              JSON_AGG(
-                CASE WHEN lr.employee_id IS NOT NULL THEN
-                  JSON_BUILD_OBJECT(
-                    'leave_date', lr.leave_date,
-                    'leave_type', lr.leave_type,
-                    'days_taken', lr.days_taken,
-                    'amount_paid', lr.amount_paid
-                  )
-                END
-              ) FILTER (WHERE lr.employee_id IS NOT NULL), 
+              (SELECT JSON_AGG(JSON_BUILD_OBJECT(
+                 'leave_date', lrf.leave_date,
+                 'leave_type', lrf.leave_type,
+                 'days_taken', lrf.days_taken,
+                 'amount_paid', lrf.amount_paid))
+               FROM leave_records_filtered lrf
+               WHERE lrf.requested_id = ei.id),
               '[]'::json
-            ) as leave_records
+            ) AS leave_records
           FROM employee_info ei
-          LEFT JOIN leave_balances lb ON ei.id = lb.employee_id
-          LEFT JOIN leave_taken lt ON ei.id = lt.employee_id
-          LEFT JOIN leave_records lr ON ei.id = lr.employee_id
-          GROUP BY 
-            ei.id, ei.name, ei.job, ei."dateJoined", ei."icNo", ei.nationality, ei.years_of_service,
-            lb.cuti_tahunan_total, lb.cuti_sakit_total,
-            lt.cuti_umum, lt.cuti_sakit, lt.cuti_tahunan
+          LEFT JOIN leave_balances lb ON lb.requested_id = ei.id
+          LEFT JOIN leave_taken lt ON lt.requested_id = ei.id
           ORDER BY ei.name
         `;
 
@@ -563,6 +638,7 @@ export default function (pool) {
               cuti_umum: { days: 0, amount: 0 },
               cuti_sakit: { days: 0, amount: 0 },
               cuti_tahunan: { days: 0, amount: 0 },
+              cuti_rawatan: { days: 0, amount: 0 },
             };
           }
 
@@ -602,11 +678,13 @@ export default function (pool) {
               cuti_umum_total: Number(row.cuti_umum_total || 0),
               cuti_tahunan_total: Number(row.cuti_tahunan_total || 8),
               cuti_sakit_total: Number(row.cuti_sakit_total || 14),
+              cuti_rawatan_total: Number(row.cuti_rawatan_total || 60),
             },
             leaveTaken: {
               cuti_umum: Number(row.cuti_umum_taken || 0),
               cuti_sakit: Number(row.cuti_sakit_taken || 0),
               cuti_tahunan: Number(row.cuti_tahunan_taken || 0),
+              cuti_rawatan: Number(row.cuti_rawatan_taken || 0),
             },
             monthlySummary: monthlySummary,
           };
@@ -643,6 +721,15 @@ export default function (pool) {
                 ),
               0
             ),
+            cuti_rawatan: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_rawatan.days,
+                  0
+                ),
+              0
+            ),
           },
           totalAmountPaid: {
             cuti_tahunan: employees.reduce(
@@ -668,6 +755,15 @@ export default function (pool) {
                 sum +
                 Object.values(emp.monthlySummary).reduce(
                   (monthSum, month) => monthSum + month.cuti_umum.amount,
+                  0
+                ),
+              0
+            ),
+            cuti_rawatan: employees.reduce(
+              (sum, emp) =>
+                sum +
+                Object.values(emp.monthlySummary).reduce(
+                  (monthSum, month) => monthSum + month.cuti_rawatan.amount,
                   0
                 ),
               0

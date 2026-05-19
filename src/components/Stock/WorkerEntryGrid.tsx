@@ -1,5 +1,5 @@
 // src/components/Stock/WorkerEntryGrid.tsx
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import {
@@ -57,11 +57,6 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   const setSearchQuery = onSearchChange || setInternalSearchQuery;
   const useExternalSearch = externalSearchQuery !== undefined;
 
-  const [isInputFocused, setIsInputFocused] = useState(false);
-
-  // Ref to store the frozen sort order while editing
-  const frozenSortOrderRef = useRef<string[]>([]);
-
   // Calculate total bags
   const totalBags = useMemo(() => {
     return Object.values(entries).reduce((sum, bags) => sum + (Number(bags) || 0), 0);
@@ -72,7 +67,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
     return Object.values(entries).filter((bags) => bags > 0).length;
   }, [entries]);
 
-  // Filter workers by search (always applied)
+  // Filter workers by search (no sorting — preserve natural order)
   const filteredWorkers = useMemo(() => {
     return workers.filter(
       (worker) =>
@@ -80,38 +75,6 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
         worker.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [workers, searchQuery]);
-
-  // Sort workers by bags packed (always calculated)
-  const sortedWorkers = useMemo(() => {
-    return [...filteredWorkers].sort((a, b) => {
-      const bagsA = entries[a.id] || 0;
-      const bagsB = entries[b.id] || 0;
-      return bagsB - bagsA;
-    });
-  }, [filteredWorkers, entries]);
-
-  // Update frozen order when not focused
-  useEffect(() => {
-    if (!isInputFocused) {
-      frozenSortOrderRef.current = sortedWorkers.map((w) => w.id);
-    }
-  }, [isInputFocused, sortedWorkers]);
-
-  // Use frozen order while editing, live sort otherwise
-  const filteredAndSortedWorkers = useMemo(() => {
-    if (isInputFocused && frozenSortOrderRef.current.length > 0) {
-      // Use frozen order - reorder filtered workers according to frozen order
-      const orderMap = new Map(
-        frozenSortOrderRef.current.map((id, idx) => [id, idx])
-      );
-      return [...filteredWorkers].sort((a, b) => {
-        const orderA = orderMap.get(a.id) ?? Infinity;
-        const orderB = orderMap.get(b.id) ?? Infinity;
-        return orderA - orderB;
-      });
-    }
-    return sortedWorkers;
-  }, [isInputFocused, filteredWorkers, sortedWorkers]);
 
   // Check if we're using decimal mode
   const isDecimalMode = inputStep < 1;
@@ -169,9 +132,9 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
     if (e.key === "ArrowDown" || e.key === "Enter") {
       e.preventDefault();
       const nextIndex = currentIndex + 1;
-      if (nextIndex < filteredAndSortedWorkers.length) {
+      if (nextIndex < filteredWorkers.length) {
         const nextInput = document.getElementById(
-          `worker-input-${filteredAndSortedWorkers[nextIndex].id}`
+          `worker-input-${filteredWorkers[nextIndex].id}`
         );
         nextInput?.focus();
         (nextInput as HTMLInputElement)?.select();
@@ -181,7 +144,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       const prevIndex = currentIndex - 1;
       if (prevIndex >= 0) {
         const prevInput = document.getElementById(
-          `worker-input-${filteredAndSortedWorkers[prevIndex].id}`
+          `worker-input-${filteredWorkers[prevIndex].id}`
         );
         prevInput?.focus();
         (prevInput as HTMLInputElement)?.select();
@@ -218,13 +181,13 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
     <div className="overflow-hidden">
       {/* Worker rows - 3 column grid */}
       <div className="p-4 bg-white dark:bg-gray-800">
-        {filteredAndSortedWorkers.length === 0 ? (
+        {filteredWorkers.length === 0 ? (
           <div className="py-8 text-center text-default-500 dark:text-gray-400">
             No workers found matching "{searchQuery}"
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
-            {filteredAndSortedWorkers.map((worker, index) => (
+            {filteredWorkers.map((worker, index) => (
               <div
                 key={worker.id}
                 className={clsx(
@@ -266,11 +229,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   value={getDisplayValue(worker.id)}
                   onChange={(e) => handleInputChange(worker.id, e)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
-                  onFocus={(e) => {
-                    setIsInputFocused(true);
-                    e.target.select();
-                  }}
-                  onBlur={() => setIsInputFocused(false)}
+                  onFocus={(e) => e.target.select()}
                   disabled={disabled}
                   placeholder="0"
                   className={clsx(
