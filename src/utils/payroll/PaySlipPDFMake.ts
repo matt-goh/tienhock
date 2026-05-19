@@ -354,11 +354,23 @@ const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
   return quantity + focUnits;
 };
 
-const calculateAverageBaseRate = (
+interface BaseRateSummary {
+  averageRate: number;
+  totalUnits: number;
+}
+
+const formatUnitQuantity = (quantity: number): string => {
+  return new Intl.NumberFormat("en-MY", {
+    minimumFractionDigits: Number.isInteger(quantity) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(quantity);
+};
+
+const calculateBaseRateSummary = (
   consolidatedBaseItems: ConsolidatedPayrollItem[],
   baseTotalAmount: number,
   isBagBased: boolean,
-): number => {
+): BaseRateSummary => {
   if (isBagBased) {
     const bagTotals: { amount: number; units: number } = consolidatedBaseItems
       .filter((item) => item.rate_unit === "Bag")
@@ -370,7 +382,10 @@ const calculateAverageBaseRate = (
         { amount: 0, units: 0 },
       );
 
-    return bagTotals.units > 0 ? bagTotals.amount / bagTotals.units : 0;
+    return {
+      averageRate: bagTotals.units > 0 ? bagTotals.amount / bagTotals.units : 0,
+      totalUnits: bagTotals.units,
+    };
   }
 
   // Hourly rows can repeat the same hours across multiple tasks, so keep using
@@ -381,7 +396,11 @@ const calculateAverageBaseRate = (
     hourBasedItemsForRate.length > 0
       ? Number(hourBasedItemsForRate[0].total_quantity) || 0
       : 0;
-  return representativeHours > 0 ? baseTotalAmount / representativeHours : 0;
+  return {
+    averageRate:
+      representativeHours > 0 ? baseTotalAmount / representativeHours : 0,
+    totalUnits: representativeHours,
+  };
 };
 
 // Build main payroll page content
@@ -511,7 +530,7 @@ const buildMainPayrollPage = (
     commissionTotalAmount +
     othersTotalAmount;
 
-  const averageBaseRate: number = calculateAverageBaseRate(
+  const baseRateSummary: BaseRateSummary = calculateBaseRateSummary(
     consolidatedBaseItems,
     baseTotalAmount,
     isBagBased,
@@ -606,9 +625,15 @@ const buildMainPayrollPage = (
   if (consolidatedBaseItems.length > 0 && !isGroupedPayroll) {
     tableBody.push([
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       {
-        text: `Rate/${rateUnitLabel}: ${averageBaseRate.toFixed(2)}`,
+        text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
+        alignment: "right",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+      {
+        text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
         bold: true,
         fillColor: "#f8f9fa",
         fontSize: 8,
@@ -1279,7 +1304,7 @@ const buildIndividualJobPage = (
     commissionTotalAmount +
     othersTotalAmount;
 
-  const averageBaseRate: number = calculateAverageBaseRate(
+  const baseRateSummary: BaseRateSummary = calculateBaseRateSummary(
     consolidatedBaseItems,
     baseTotalAmount,
     isBagBased,
@@ -1330,9 +1355,15 @@ const buildIndividualJobPage = (
   if (consolidatedBaseItems.length > 0) {
     tableBody.push([
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       {
-        text: `Rate/${rateUnitLabel}: ${averageBaseRate.toFixed(2)}`,
+        text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
+        alignment: "right",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+      {
+        text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
         bold: true,
         fillColor: "#f8f9fa",
         fontSize: 8,
