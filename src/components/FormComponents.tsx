@@ -1,5 +1,5 @@
 // src/components/FormComponents.tsx
-import React, { Fragment, ReactNode } from "react"; // Added useState, useEffect
+import React, { Fragment } from "react"; // Added useState, useEffect
 import {
   Listbox,
   Transition,
@@ -21,13 +21,7 @@ export interface SelectOption {
   id: string | number;
   name: string;
   phone_number?: string | null;
-}
-
-export interface SelectOptionWithJob {
-  job: ReactNode;
-  id: string | number;
-  name: string;
-  phone_number?: string | null;
+  job?: string | null;
 }
 
 // --- FormInput ---
@@ -281,7 +275,7 @@ interface ComboboxProps {
   label: string;
   value: string | string[] | undefined; // Accept single string, array, or undefined
   onChange: (value: string | string[] | null) => void; // Return type matches mode
-  options: SelectOptionWithJob[];
+  options: SelectOption[];
   query: string;
   setQuery: React.Dispatch<React.SetStateAction<string>>;
   mode?: "single" | "multiple"; // Added mode prop
@@ -337,7 +331,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
         );
 
   // Handle change from Headless UI, converting option object(s) back to ID(s)
-  const handleChange = (selected: SelectOptionWithJob | SelectOptionWithJob[] | null) => {
+  const handleChange = (selected: SelectOption | SelectOption[] | null) => {
     if (isMultiple) {
       // `selected` will be SelectOption[]
       const selectedIds = Array.isArray(selected)
