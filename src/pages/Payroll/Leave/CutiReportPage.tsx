@@ -1,6 +1,7 @@
 // src/pages/Payroll/CutiReportPage.tsx
 import React, { useState, useMemo, useEffect } from "react";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
+import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
 import { FormCombobox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import {
@@ -100,26 +101,30 @@ const CutiReportPage: React.FC = () => {
   const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
+  // Multi-ID employees share one leave entitlement bucket on the backend,
+  // so present one card / option per full name on this page too.
+  const dedupedStaffs = useMemo(() => groupStaffsByName(staffs), [staffs]);
+
   const staffOptions = useMemo(
     () =>
-      staffs.map((staff) => ({
+      dedupedStaffs.map((staff) => ({
         id: staff.id,
         name: `${staff.name} (${staff.id})`,
       })),
-    [staffs]
+    [dedupedStaffs]
   );
 
   const selectedStaff = useMemo(
-    () => staffs.find((s) => s.id === selectedStaffId) || null,
-    [selectedStaffId, staffs]
+    () => dedupedStaffs.find((s) => s.id === selectedStaffId) || null,
+    [selectedStaffId, dedupedStaffs]
   );
 
   // Filtered employees for card display
   const filteredEmployees = useMemo(() => {
-    if (!searchQuery.trim()) return staffs;
+    if (!searchQuery.trim()) return dedupedStaffs;
 
     const query = searchQuery.toLowerCase();
-    return staffs.filter((staff) => {
+    return dedupedStaffs.filter((staff) => {
       const name = staff.name.toLowerCase();
       const id = staff.id.toLowerCase();
       const job = Array.isArray(staff.job)
@@ -128,7 +133,7 @@ const CutiReportPage: React.FC = () => {
 
       return name.includes(query) || id.includes(query) || job.includes(query);
     });
-  }, [staffs, searchQuery]);
+  }, [dedupedStaffs, searchQuery]);
 
   // Handle employee card click
   const handleEmployeeCardClick = (employee: Employee) => {
