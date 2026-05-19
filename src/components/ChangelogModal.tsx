@@ -20,8 +20,18 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-05-19",
-    ms: "Pembetulan: Jam Ahad dan Umum dalam Log Bulanan kini dikira berasingan daripada jam biasa supaya jumlah gaji menggunakan kadar yang betul.",
-    en: "Fix: Sunday and Public Holiday hours in the Monthly Log are now calculated separately from regular hours so payroll uses the correct rates.",
+    ms: 'Halaman baru "Others (Kerja Luar OT)" dalam Payroll untuk merekod OT kerja luar — entri akan keluar pada slip gaji setiap pekerja sebagai pendahuluan.',
+    en: 'New "Others (Kerja Luar OT)" page in Payroll for recording outside-work overtime — entries appear on each employee\'s payslip as an advance.',
+  },
+  {
+    date: "2026-05-19",
+    ms: 'Rekod "Others (Advance)" dan "Others (Kerja Luar OT)" yang berulang dengan keterangan sama kini bergabung jadi satu baris dalam Payroll Details dan slip gaji.',
+    en: 'Duplicate "Others (Advance)" and "Others (Kerja Luar OT)" entries with the same description now combine into a single line on the Payroll Details page and payslip.',
+  },
+  {
+    date: "2026-05-19",
+    ms: "Log Bulanan SAPU dan MAINTENANCE kini memisahkan jam biasa, OT, Ahad, OT Ahad, Umum, dan OT Umum supaya kiraan gaji ikut kadar yang betul.",
+    en: "SAPU and MAINTENANCE Monthly Logs now separate regular, OT, Sunday, Sunday OT, Public Holiday, and Public Holiday OT hours so payroll uses the correct rates.",
   },
   {
     date: "2026-05-19",
@@ -50,23 +60,18 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-05-18",
-    ms: "Kalendar Cuti kini ada kotak semak \"Cuti Umum\" — kelayakan tahunan Cuti Umum setiap pekerja dikira secara automatik daripada tarikh yang ditandakan.",
-    en: "The Holiday Calendar now has a \"Cuti Umum\" checkbox — each staff member's yearly Cuti Umum allowance is calculated automatically from the dates you tick.",
+    ms: 'Kalendar Cuti kini ada kotak semak "Cuti Umum" — kelayakan tahunan Cuti Umum setiap pekerja dikira secara automatik daripada tarikh yang ditandakan.',
+    en: 'The Holiday Calendar now has a "Cuti Umum" checkbox — each staff member\'s yearly Cuti Umum allowance is calculated automatically from the dates you tick.',
   },
   {
     date: "2026-05-18",
-    ms: "\"Commission\" ditukar nama menjadi \"Others (Advance)\".",
-    en: "\"Commission\" has been renamed to \"Others (Advance)\".",
+    ms: '"Commission" ditukar nama menjadi "Others (Advance)".',
+    en: '"Commission" has been renamed to "Others (Advance)".',
   },
   {
     date: "2026-05-18",
-    ms: "Modal \"Tambah Cuti\" baharu — boleh menambah cuti untuk ramai pekerja sekaligus.",
-    en: "New \"Add Leave\" dialog — you can add leave for multiple staff at once.",
-  },
-  {
-    date: "2026-05-18",
-    ms: "Butang \"Set Semua\" cuti telah ditambah ke semua halaman Log Harian.",
-    en: "A \"Set All\" leave button has been added to every Daily Log page.",
+    ms: 'Modal "Tambah Cuti" baharu — boleh menambah cuti untuk ramai pekerja sekaligus.',
+    en: 'New "Add Leave" dialog — you can add leave for multiple staff at once.',
   },
   {
     date: "2026-05-18",
@@ -80,29 +85,44 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-05-18",
-    ms: "\"Self Billed Invoice\" telah dinaik taraf menjadi \"General Purchase\" — pembelian tempatan turut disokong sekarang.",
-    en: "\"Self Billed Invoice\" has been upgraded to \"General Purchase\" — local purchases are now supported too.",
+    ms: '"Self Billed Invoice" telah dinaik taraf menjadi "General Purchase" — pembelian tempatan turut disokong sekarang.',
+    en: '"Self Billed Invoice" has been upgraded to "General Purchase" — local purchases are now supported too.',
   },
   {
     date: "2026-05-18",
     ms: "Pembelian bahan kini berkait terus dengan stok.",
     en: "Material purchases are now linked directly to stock.",
   },
-  {
-    date: "2026-05-18",
-    ms: "Mod Gelap (Dark Mode) kini tersedia — togolnya berada dalam menu pengguna di sebelah kanan atas.",
-    en: "Dark Mode is now available — the toggle lives in the user menu at the top right.",
-  },
 ];
 
 const MONTH_NAMES: Record<Language, string[]> = {
   ms: [
-    "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-    "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+    "Januari",
+    "Februari",
+    "Mac",
+    "April",
+    "Mei",
+    "Jun",
+    "Julai",
+    "Ogos",
+    "September",
+    "Oktober",
+    "November",
+    "Disember",
   ],
   en: [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ],
 };
 
@@ -209,7 +229,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <DialogPanel className="inline-block w-full max-w-2xl p-6 my-4 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
+            <DialogPanel className="inline-block w-full max-w-6xl p-4 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
               <div className="flex justify-between items-center">
                 <DialogTitle
                   as="h3"
@@ -220,7 +240,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
                 {renderToggle()}
               </div>
 
-              <div className="mt-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="mt-4 max-h-[67vh] overflow-y-auto pr-1">
                 <ul className="list-disc pl-6 space-y-2 text-default-700 dark:text-gray-200">
                   {CHANGELOG_ENTRIES.map((entry, index) => (
                     <li key={index} className="leading-relaxed">
@@ -233,7 +253,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose }) => {
                 </ul>
               </div>
 
-              <div className="mt-6 flex justify-end">
+              <div className="flex justify-end">
                 <Button onClick={onClose} variant="outline">
                   {labels.close}
                 </Button>

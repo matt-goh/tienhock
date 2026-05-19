@@ -668,6 +668,7 @@ export interface EmployeePayroll {
   leave_records?: LeaveRecord[];
   mid_month_payroll?: MidMonthPayroll | null;
   commission_records?: CommissionRecord[];
+  others_records?: OthersRecord[];
   // Mapping of employee_id to job_type for combined payrolls (e.g., {"MASRUN_S": "MEE_ROLL", "MASRUN": "MEE_SANGKUT"})
   employee_job_mapping?: Record<string, string>;
   // Rounding adjustment values
@@ -684,6 +685,23 @@ export interface CommissionRecord {
   created_by: string;
   created_at: string;
   employee_name?: string;
+}
+
+export interface OthersRecord {
+  id: number;
+  employee_id: string;
+  record_date: string;
+  pay_code_id: string | null;
+  description: string;
+  rate: number;
+  rate_unit: string;
+  quantity: number;
+  amount: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  employee_name?: string;
+  pay_code_description?: string | null;
 }
 
 export interface LeaveRecord {

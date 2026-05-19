@@ -14,6 +14,7 @@ import {
   IconCirclePlus,
   IconList,
   IconListDetails,
+  IconClockHour4,
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -36,6 +37,7 @@ import {
   EmployeePayroll,
   CommissionRecord,
   MidMonthPayroll,
+  OthersRecord,
 } from "../../types/types";
 import {
   DownloadPayslipButton,
@@ -89,8 +91,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const [commissionRecords, setCommissionRecords] = useState<
     CommissionRecord[]
   >([]);
+  const [othersRecords, setOthersRecords] = useState<OthersRecord[]>([]);
   const [viewMode, setViewMode] = useState<"consolidated" | "detailed">(
-    "consolidated"
+    "consolidated",
   );
 
   useEffect(() => {
@@ -109,6 +112,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       setMidMonthPayroll(response.mid_month_payroll);
       setMonthlyLeaveRecords(response.leave_records || []);
       setCommissionRecords(response.commission_records || []);
+      setOthersRecords(response.others_records || []);
     } catch (error) {
       console.error("Error fetching comprehensive employee payroll:", error);
       toast.error("Failed to load employee payroll details");
@@ -138,7 +142,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const handleBack = () => {
     // Navigate back with year and month params to preserve the selected month
     if (payroll) {
-      navigate(`/payroll/monthly-payrolls?year=${payroll.year}&month=${payroll.month}`);
+      navigate(
+        `/payroll/monthly-payrolls?year=${payroll.year}&month=${payroll.month}`,
+      );
     } else {
       navigate("/payroll/monthly-payrolls");
     }
@@ -210,7 +216,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   if (!payroll) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500 dark:text-gray-400">Employee payroll not found</p>
+        <p className="text-default-500 dark:text-gray-400">
+          Employee payroll not found
+        </p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
           Back
         </Button>
@@ -219,16 +227,46 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   }
 
   const isEditable = payroll.payroll_status !== "Finalized";
+
+  // Merge duplicates within commission_records / others_records by description
+  // so a description repeated across multiple rows collapses into one display line.
+  type MergedAdvance<T> = T & { merged_amount: number; merged_count: number };
+  const mergeByDescription = <
+    T extends { description: string; amount: number },
+  >(
+    rows: T[],
+  ): MergedAdvance<T>[] => {
+    const map = new Map<string, MergedAdvance<T>>();
+    rows.forEach((row) => {
+      const key = (row.description || "").trim().toLowerCase();
+      const existing = map.get(key);
+      if (existing) {
+        existing.merged_amount += Number(row.amount) || 0;
+        existing.merged_count += 1;
+      } else {
+        map.set(key, {
+          ...row,
+          merged_amount: Number(row.amount) || 0,
+          merged_count: 1,
+        });
+      }
+    });
+    return Array.from(map.values());
+  };
+  const mergedCommissionRecords = mergeByDescription(commissionRecords);
+  const mergedOthersRecords = mergeByDescription(othersRecords);
+
   const groupedItems = groupItemsByType(
     payroll.items.map((item) => ({
       ...item,
       id: item.id || 0, // Ensure id is always a number
-    }))
+    })),
   );
 
   // Consolidated items for the consolidated view
   const consolidatedItems = consolidatePayrollItems(payroll.items);
-  const groupedConsolidatedItems = groupConsolidatedItemsByType(consolidatedItems);
+  const groupedConsolidatedItems =
+    groupConsolidatedItemsByType(consolidatedItems);
 
   // Detect if this is a combined job payroll (multiple job types)
   const uniqueJobTypes = [
@@ -238,57 +276,66 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   // Derive employee-to-job-types mapping from actual payroll items
   // This handles cases where one employee ID works on multiple job types
-  const derivedEmployeeJobMapping = payroll.items.reduce((acc, item) => {
-    const empId = item.source_employee_id || payroll.employee_id;
-    if (empId && item.job_type) {
-      if (!acc[empId]) {
-        acc[empId] = new Set<string>();
+  const derivedEmployeeJobMapping = payroll.items.reduce(
+    (acc, item) => {
+      const empId = item.source_employee_id || payroll.employee_id;
+      if (empId && item.job_type) {
+        if (!acc[empId]) {
+          acc[empId] = new Set<string>();
+        }
+        acc[empId].add(item.job_type);
       }
-      acc[empId].add(item.job_type);
-    }
-    return acc;
-  }, {} as Record<string, Set<string>>);
+      return acc;
+    },
+    {} as Record<string, Set<string>>,
+  );
 
   // Group items by job type first, then by pay type for combined payrolls
   const itemsByJob = isCombinedPayroll
-    ? uniqueJobTypes.reduce((acc, jobType) => {
-        const jobItems = payroll.items.filter(
-          (item) => item.job_type === jobType
-        );
-        acc[jobType as string] = groupItemsByType(
-          jobItems.map((item) => ({
-            ...item,
-            id: item.id || 0,
-          }))
-        );
-        return acc;
-      }, {} as Record<string, ReturnType<typeof groupItemsByType>>)
+    ? uniqueJobTypes.reduce(
+        (acc, jobType) => {
+          const jobItems = payroll.items.filter(
+            (item) => item.job_type === jobType,
+          );
+          acc[jobType as string] = groupItemsByType(
+            jobItems.map((item) => ({
+              ...item,
+              id: item.id || 0,
+            })),
+          );
+          return acc;
+        },
+        {} as Record<string, ReturnType<typeof groupItemsByType>>,
+      )
     : null;
 
   // Consolidated items by job type for combined payrolls
   const consolidatedItemsByJob = isCombinedPayroll
-    ? uniqueJobTypes.reduce((acc, jobType) => {
-        const jobItems = payroll.items.filter(
-          (item) => item.job_type === jobType
-        );
-        const consolidated = consolidatePayrollItems(jobItems);
-        acc[jobType as string] = groupConsolidatedItemsByType(consolidated);
-        return acc;
-      }, {} as Record<string, ReturnType<typeof groupConsolidatedItemsByType>>)
+    ? uniqueJobTypes.reduce(
+        (acc, jobType) => {
+          const jobItems = payroll.items.filter(
+            (item) => item.job_type === jobType,
+          );
+          const consolidated = consolidatePayrollItems(jobItems);
+          acc[jobType as string] = groupConsolidatedItemsByType(consolidated);
+          return acc;
+        },
+        {} as Record<string, ReturnType<typeof groupConsolidatedItemsByType>>,
+      )
     : null;
 
   // Calculate totals for each group - use consolidated items for consistency with recalculated amounts
   const baseTotal = groupedConsolidatedItems["Base"].reduce(
     (sum, item) => sum + item.total_amount,
-    0
+    0,
   );
   const tambahanTotal = groupedConsolidatedItems["Tambahan"].reduce(
     (sum, item) => sum + item.total_amount,
-    0
+    0,
   );
   const overtimeTotal = groupedConsolidatedItems["Overtime"].reduce(
     (sum, item) => sum + item.total_amount,
-    0
+    0,
   );
 
   // Helper to format job type for display
@@ -313,7 +360,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   };
 
   // Helper to render consolidated table row
-  const renderConsolidatedRow = (item: ConsolidatedPayrollItem, index: number) => {
+  const renderConsolidatedRow = (
+    item: ConsolidatedPayrollItem,
+    index: number,
+  ) => {
     // Find the original item for deletion (only for single manual items)
     const canDelete = item.is_manual && item.item_count === 1 && isEditable;
     const originalItem = canDelete
@@ -322,19 +372,24 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             i.pay_code_id === item.pay_code_id &&
             i.rate === item.rate &&
             i.rate_unit === item.rate_unit &&
-            i.is_manual
+            i.is_manual,
         )
       : null;
 
     return (
-      <tr key={`${item.pay_code_id}-${item.rate}-${index}`} className="hover:bg-default-50 dark:hover:bg-gray-700">
+      <tr
+        key={`${item.pay_code_id}-${item.rate}-${index}`}
+        className="hover:bg-default-50 dark:hover:bg-gray-700"
+      >
         <td className="px-3 py-2">
           <span
             className="text-sm text-default-900 dark:text-gray-100"
             title={`${item.description} (${item.pay_code_id})`}
           >
             {item.description}{" "}
-            <span className="text-default-500 dark:text-gray-400">({item.pay_code_id})</span>
+            <span className="text-default-500 dark:text-gray-400">
+              ({item.pay_code_id})
+            </span>
             {item.item_count > 1 && (
               <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400">
                 {item.item_count} entries
@@ -351,8 +406,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           {item.rate_unit === "Percent"
             ? `${item.rate}%`
             : item.rate_unit === "Fixed" && item.total_quantity > 1
-            ? "Fixed"
-            : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+              ? "Fixed"
+              : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {item.rate_unit === "Fixed" && item.total_quantity > 1 ? (
@@ -393,89 +448,95 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     item: PayrollItem,
     index: number,
     items: PayrollItem[],
-    showDeleteButton: boolean = false
+    showDeleteButton: boolean = false,
   ) => {
     const prevItem = index > 0 ? items[index - 1] : null;
-    const isNewDay = prevItem && prevItem.source_date !== item.source_date && item.source_date;
+    const isNewDay =
+      prevItem && prevItem.source_date !== item.source_date && item.source_date;
     const colCount = showDeleteButton && isEditable ? 6 : 5;
 
     return (
       <React.Fragment key={item.id}>
         {isNewDay && (
           <tr className="bg-default-100 dark:bg-gray-700">
-            <td colSpan={colCount} className="px-3 py-1.5 text-xs font-semibold text-default-600 dark:text-gray-300 border-t-2 border-default-300 dark:border-gray-600">
+            <td
+              colSpan={colCount}
+              className="px-3 py-1.5 text-xs font-semibold text-default-600 dark:text-gray-300 border-t-2 border-default-300 dark:border-gray-600"
+            >
               {formatSourceDate(item.source_date)}
             </td>
           </tr>
         )}
         <tr className="hover:bg-default-50 dark:hover:bg-gray-700">
-        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.source_date ? (
-            getWorkLogUrl(item) ? (
-              <Link
-                to={getWorkLogUrl(item)!}
-                className="text-sky-600 dark:text-sky-400 hover:underline"
-              >
-                {formatSourceDate(item.source_date)}
-              </Link>
+          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+            {item.source_date ? (
+              getWorkLogUrl(item) ? (
+                <Link
+                  to={getWorkLogUrl(item)!}
+                  className="text-sky-600 dark:text-sky-400 hover:underline"
+                >
+                  {formatSourceDate(item.source_date)}
+                </Link>
+              ) : (
+                formatSourceDate(item.source_date)
+              )
             ) : (
-              formatSourceDate(item.source_date)
-            )
-          ) : (
-            "-"
-          )}
-        </td>
-        <td className="px-3 py-2">
-          <span
-            className="text-sm text-default-900 dark:text-gray-100"
-            title={`${item.description} (${item.pay_code_id})`}
-          >
-            {item.description}{" "}
-            <span className="text-default-500 dark:text-gray-400">({item.pay_code_id})</span>
-            {item.is_manual && (
-              <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
-                Manual
-              </span>
+              "-"
             )}
-          </span>
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Percent"
-            ? `${item.rate}%`
-            : item.rate_unit === "Fixed" && item.quantity > 1
-            ? "Fixed"
-            : `${formatCurrency(item.rate)}/${item.rate_unit}`}
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Fixed" && item.quantity > 1 ? (
-            formatCurrency(item.quantity)
-          ) : (
-            <>
-              {item.quantity}
-              {item.foc_units && item.foc_units > 0 && (
-                <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
-                  (+{Math.round(item.foc_units)})
+          </td>
+          <td className="px-3 py-2">
+            <span
+              className="text-sm text-default-900 dark:text-gray-100"
+              title={`${item.description} (${item.pay_code_id})`}
+            >
+              {item.description}{" "}
+              <span className="text-default-500 dark:text-gray-400">
+                ({item.pay_code_id})
+              </span>
+              {item.is_manual && (
+                <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
+                  Manual
                 </span>
               )}
-            </>
-          )}
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
-          {formatCurrency(item.amount)}
-        </td>
-        {showDeleteButton && isEditable && (
-          <td className="px-3 py-2 whitespace-nowrap text-center">
-            <button
-              onClick={() => {
-                setItemToDelete({ ...item, id: item.id || 0 });
-                setShowDeleteDialog(true);
-              }}
-              className="text-rose-600 hover:text-rose-800"
-            >
-              <IconTrash size={16} />
-            </button>
+            </span>
           </td>
-        )}
+          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+            {item.rate_unit === "Percent"
+              ? `${item.rate}%`
+              : item.rate_unit === "Fixed" && item.quantity > 1
+                ? "Fixed"
+                : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+          </td>
+          <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
+            {item.rate_unit === "Fixed" && item.quantity > 1 ? (
+              formatCurrency(item.quantity)
+            ) : (
+              <>
+                {item.quantity}
+                {item.foc_units && item.foc_units > 0 && (
+                  <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
+                    (+{Math.round(item.foc_units)})
+                  </span>
+                )}
+              </>
+            )}
+          </td>
+          <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
+            {formatCurrency(item.amount)}
+          </td>
+          {showDeleteButton && isEditable && (
+            <td className="px-3 py-2 whitespace-nowrap text-center">
+              <button
+                onClick={() => {
+                  setItemToDelete({ ...item, id: item.id || 0 });
+                  setShowDeleteDialog(true);
+                }}
+                className="text-rose-600 hover:text-rose-800"
+              >
+                <IconTrash size={16} />
+              </button>
+            </td>
+          )}
         </tr>
       </React.Fragment>
     );
@@ -571,7 +632,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
                   Employee
                 </p>
-                {isCombinedPayroll && Object.keys(derivedEmployeeJobMapping).length > 0 ? (
+                {isCombinedPayroll &&
+                Object.keys(derivedEmployeeJobMapping).length > 0 ? (
                   <>
                     <p className="font-semibold text-default-800 dark:text-gray-100">
                       {payroll.employee_name || "Unknown"}
@@ -589,12 +651,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             >
                               {empId}
                             </Link>
-                            <span className="mx-2 text-default-300 dark:text-gray-600">→</span>
+                            <span className="mx-2 text-default-300 dark:text-gray-600">
+                              →
+                            </span>
                             <span className="text-default-600 dark:text-gray-300">
                               {Array.from(jobTypesSet).join(", ")}
                             </span>
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </>
@@ -638,8 +702,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     payroll.payroll_status === "CONFIRMED"
                       ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
                       : payroll.payroll_status === "PENDING"
-                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                      : "bg-default-100 text-default-800 dark:bg-gray-700 dark:text-gray-300"
+                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                        : "bg-default-100 text-default-800 dark:bg-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {payroll.payroll_status}
@@ -653,62 +717,99 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col transition-shadow hover:shadow-md">
           <div className="px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-800/50">
             <h3 className="text-md font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-              <IconCash size={18} className="text-emerald-600 dark:text-emerald-400" />
+              <IconCash
+                size={18}
+                className="text-emerald-600 dark:text-emerald-400"
+              />
               Earnings
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
             <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
-                <span className="text-default-600 dark:text-gray-300">Base Pay</span>
+                <span className="text-default-600 dark:text-gray-300">
+                  Base Pay
+                </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(baseTotal)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-default-600 dark:text-gray-300">Tambahan</span>
+                <span className="text-default-600 dark:text-gray-300">
+                  Tambahan
+                </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(tambahanTotal)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-default-600 dark:text-gray-300">Overtime</span>
+                <span className="text-default-600 dark:text-gray-300">
+                  Overtime
+                </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(overtimeTotal)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-default-600 dark:text-gray-300">Leave Pay</span>
+                <span className="text-default-600 dark:text-gray-300">
+                  Leave Pay
+                </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(
                     monthlyLeaveRecords.reduce(
                       (sum, record) => sum + Number(record.amount_paid),
-                      0
-                    )
+                      0,
+                    ),
                   )}
                 </span>
               </div>
-              {commissionRecords.length > 0 && (
+              {mergedCommissionRecords.length > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    {commissionRecords
+                    {mergedCommissionRecords
                       .map((record) => record.description)
                       .join(" + ")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(
-                      commissionRecords.reduce(
-                        (sum, record) => sum + Number(record.amount),
-                        0
-                      )
+                      mergedCommissionRecords.reduce(
+                        (sum, record) => sum + record.merged_amount,
+                        0,
+                      ),
                     )}
                   </span>
                 </div>
               )}
+              {mergedOthersRecords.length > 0 &&
+                (() => {
+                  const othersJoined = mergedOthersRecords
+                    .map((record) => record.description)
+                    .join(" + ");
+                  return (
+                    <div className="flex justify-between text-sm gap-2">
+                      <span
+                        className="text-default-600 dark:text-gray-300 truncate min-w-0"
+                        title={othersJoined}
+                      >
+                        {othersJoined}
+                      </span>
+                      <span className="font-medium text-default-800 dark:text-gray-100 flex-shrink-0">
+                        {formatCurrency(
+                          mergedOthersRecords.reduce(
+                            (sum, record) => sum + record.merged_amount,
+                            0,
+                          ),
+                        )}
+                      </span>
+                    </div>
+                  );
+                })()}
             </div>
             <div className="border-t border-default-200 dark:border-gray-600 mt-auto pt-3">
               <div className="flex justify-between font-semibold">
-                <span className="text-default-800 dark:text-gray-100">Gross Pay</span>
+                <span className="text-default-800 dark:text-gray-100">
+                  Gross Pay
+                </span>
                 <span className="text-emerald-700 dark:text-emerald-400 text-lg">
                   {formatCurrency(payroll.gross_pay)}
                 </span>
@@ -721,14 +822,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <div className="border border-sky-200 dark:border-sky-800/50 rounded-lg bg-white dark:bg-gray-800 flex flex-col transition-shadow hover:shadow-md">
           <div className="px-4 py-3 bg-sky-50 dark:bg-sky-900/20 border-b border-sky-100 dark:border-sky-800/50 rounded-t-lg">
             <h3 className="text-md font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-2">
-              <IconReceipt size={18} className="text-sky-600 dark:text-sky-400" />
+              <IconReceipt
+                size={18}
+                className="text-sky-600 dark:text-sky-400"
+              />
               Deductions & Final Pay
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
             <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
-                <span className="text-default-600 dark:text-gray-300">Gross Pay</span>
+                <span className="text-default-600 dark:text-gray-300">
+                  Gross Pay
+                </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(payroll.gross_pay)}
                 </span>
@@ -819,7 +925,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                   <span className="capitalize">
                                     {deduction.rate_info.age_group.replace(
                                       /_/g,
-                                      " "
+                                      " ",
                                     )}
                                   </span>
                                 </div>
@@ -833,10 +939,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 })}
 
               {/* Commission Advance with Tooltip */}
-              {commissionRecords.length > 0 && (
+              {mergedCommissionRecords.length > 0 && (
                 <div className="group relative flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                    {commissionRecords
+                    {mergedCommissionRecords
                       .map((record) => record.description)
                       .join(" + ")}{" "}
                     Advance
@@ -848,10 +954,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   <span className="font-medium text-rose-600 dark:text-rose-400">
                     -{" "}
                     {formatCurrency(
-                      commissionRecords.reduce(
-                        (sum, record) => sum + Number(record.amount),
-                        0
-                      )
+                      mergedCommissionRecords.reduce(
+                        (sum, record) => sum + record.merged_amount,
+                        0,
+                      ),
                     )}
                   </span>
                   {/* Tooltip - appears below */}
@@ -868,10 +974,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </span>
                           <span>
                             {formatCurrency(
-                              commissionRecords.reduce(
-                                (sum, record) => sum + Number(record.amount),
-                                0
-                              )
+                              mergedCommissionRecords.reduce(
+                                (sum, record) => sum + record.merged_amount,
+                                0,
+                              ),
                             )}
                           </span>
                         </div>
@@ -918,7 +1024,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           <span>
                             {format(
                               new Date(midMonthPayroll.created_at),
-                              "dd MMM yyyy"
+                              "dd MMM yyyy",
                             )}
                           </span>
                         </div>
@@ -934,7 +1040,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {/* Cuti Tahunan Advance with Tooltip (MAINTEN only) */}
               {payroll.job_type === "MAINTEN" &&
                 monthlyLeaveRecords.filter(
-                  (record) => record.leave_type === "cuti_tahunan"
+                  (record) => record.leave_type === "cuti_tahunan",
                 ).length > 0 && (
                   <div className="group relative flex justify-between text-sm">
                     <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
@@ -949,9 +1055,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       {formatCurrency(
                         monthlyLeaveRecords
                           .filter(
-                            (record) => record.leave_type === "cuti_tahunan"
+                            (record) => record.leave_type === "cuti_tahunan",
                           )
-                          .reduce((sum, record) => sum + record.amount_paid, 0)
+                          .reduce((sum, record) => sum + record.amount_paid, 0),
                       )}
                     </span>
                     {/* Tooltip - appears below */}
@@ -969,12 +1075,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                 monthlyLeaveRecords
                                   .filter(
                                     (record) =>
-                                      record.leave_type === "cuti_tahunan"
+                                      record.leave_type === "cuti_tahunan",
                                   )
                                   .reduce(
                                     (sum, record) => sum + record.amount_paid,
-                                    0
-                                  )
+                                    0,
+                                  ),
                               )}
                             </span>
                           </div>
@@ -984,21 +1090,21 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               {monthlyLeaveRecords
                                 .filter(
                                   (record) =>
-                                    record.leave_type === "cuti_tahunan"
+                                    record.leave_type === "cuti_tahunan",
                                 )
                                 .reduce(
                                   (sum, record) => sum + record.days_taken,
-                                  0
+                                  0,
                                 )}{" "}
                               day
                               {monthlyLeaveRecords
                                 .filter(
                                   (record) =>
-                                    record.leave_type === "cuti_tahunan"
+                                    record.leave_type === "cuti_tahunan",
                                 )
                                 .reduce(
                                   (sum, record) => sum + record.days_taken,
-                                  0
+                                  0,
                                 ) !== 1
                                 ? "s"
                                 : ""}
@@ -1031,7 +1137,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           0;
                         const commissionAdvance = commissionRecords.reduce(
                           (sum, r) => sum + Number(r.amount),
-                          0
+                          0,
                         );
                         const midMonthAdvance = midMonthPayroll?.amount || 0;
                         const cutiTahunanAdvance =
@@ -1046,7 +1152,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           midMonthAdvance +
                           cutiTahunanAdvance
                         );
-                      })()
+                      })(),
                     )}
                   </span>
                 </div>
@@ -1059,10 +1165,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               const cutiTahunanAmount = monthlyLeaveRecords
                 .filter((record) => record.leave_type === "cuti_tahunan")
                 .reduce((sum, record) => sum + record.amount_paid, 0);
-              const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
+              const additionalMaintenDeduction = isMainten
+                ? cutiTahunanAmount
+                : 0;
               const commissionAdvance = commissionRecords.reduce(
                 (sum, r) => sum + Number(r.amount),
-                0
+                0,
               );
               const finalPayment =
                 payroll.net_pay -
@@ -1070,7 +1178,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 additionalMaintenDeduction -
                 commissionAdvance;
               // Use stored rounding values if available, otherwise calculate
-              const digenapkan = payroll.digenapkan ?? (Math.ceil(finalPayment) - finalPayment);
+              const digenapkan =
+                payroll.digenapkan ?? Math.ceil(finalPayment) - finalPayment;
 
               return digenapkan > 0.001 ? (
                 <div className="flex justify-between text-sm mt-2">
@@ -1096,7 +1205,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       const isMainten = payroll.job_type === "MAINTEN";
                       const cutiTahunanAmount = monthlyLeaveRecords
                         .filter(
-                          (record) => record.leave_type === "cuti_tahunan"
+                          (record) => record.leave_type === "cuti_tahunan",
                         )
                         .reduce((sum, record) => sum + record.amount_paid, 0);
                       const additionalMaintenDeduction = isMainten
@@ -1104,7 +1213,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         : 0;
                       const commissionAdvance = commissionRecords.reduce(
                         (sum, r) => sum + Number(r.amount),
-                        0
+                        0,
                       );
                       const finalPayment =
                         payroll.net_pay -
@@ -1112,8 +1221,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         additionalMaintenDeduction -
                         commissionAdvance;
                       // Use stored rounding values if available, otherwise calculate on-the-fly
-                      return payroll.setelah_digenapkan ?? Math.ceil(finalPayment);
-                    })()
+                      return (
+                        payroll.setelah_digenapkan ?? Math.ceil(finalPayment)
+                      );
+                    })(),
                   )}
                 </span>
               </div>
@@ -1128,20 +1239,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           // Combined Payroll: Group by Job Type first
           uniqueJobTypes.map((jobType) => {
             const jobGroupedItems = itemsByJob[jobType as string];
-            const jobConsolidatedItems = consolidatedItemsByJob?.[jobType as string];
+            const jobConsolidatedItems =
+              consolidatedItemsByJob?.[jobType as string];
             // Use consolidated items for totals - consistent with recalculated amounts
             const jobBaseTotal = (jobConsolidatedItems?.["Base"] || []).reduce(
               (sum, item) => sum + item.total_amount,
-              0
+              0,
             );
-            const jobTambahanTotal = (jobConsolidatedItems?.["Tambahan"] || []).reduce(
-              (sum, item) => sum + item.total_amount,
-              0
-            );
-            const jobOvertimeTotal = (jobConsolidatedItems?.["Overtime"] || []).reduce(
-              (sum, item) => sum + item.total_amount,
-              0
-            );
+            const jobTambahanTotal = (
+              jobConsolidatedItems?.["Tambahan"] || []
+            ).reduce((sum, item) => sum + item.total_amount, 0);
+            const jobOvertimeTotal = (
+              jobConsolidatedItems?.["Overtime"] || []
+            ).reduce((sum, item) => sum + item.total_amount, 0);
             const jobTotal = jobBaseTotal + jobTambahanTotal + jobOvertimeTotal;
 
             return (
@@ -1156,12 +1266,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </div>
 
                 {/* Base Pay for this job */}
-                {((viewMode === "consolidated" && (jobConsolidatedItems?.["Base"]?.length ?? 0) > 0) ||
-                  (viewMode === "detailed" && jobGroupedItems["Base"].length > 0)) && (
+                {((viewMode === "consolidated" &&
+                  (jobConsolidatedItems?.["Base"]?.length ?? 0) > 0) ||
+                  (viewMode === "detailed" &&
+                    jobGroupedItems["Base"].length > 0)) && (
                   <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                     <div className="px-4 py-1.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800/50">
                       <h4 className="text-md font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                        <IconCoins size={18} className="text-amber-600 dark:text-amber-400" />
+                        <IconCoins
+                          size={18}
+                          className="text-amber-600 dark:text-amber-400"
+                        />
                         Base Pay
                       </h4>
                     </div>
@@ -1193,7 +1308,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                             >
-                              {viewMode === "consolidated" ? "Total Qty" : "Qty"}
+                              {viewMode === "consolidated"
+                                ? "Total Qty"
+                                : "Qty"}
                             </th>
                             <th
                               scope="col"
@@ -1205,11 +1322,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                           {viewMode === "consolidated"
-                            ? jobConsolidatedItems?.["Base"]?.map((item, index) =>
-                                renderConsolidatedRow(item, index)
+                            ? jobConsolidatedItems?.["Base"]?.map(
+                                (item, index) =>
+                                  renderConsolidatedRow(item, index),
                               )
-                            : getSortedItemsWithSeparators(jobGroupedItems["Base"]).map(
-                                (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                            : getSortedItemsWithSeparators(
+                                jobGroupedItems["Base"],
+                              ).map((item, index, arr) =>
+                                renderDetailedRow(item, index, arr, false),
                               )}
                         </tbody>
                         <tfoot className="bg-default-50 dark:bg-gray-800">
@@ -1231,12 +1351,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 )}
 
                 {/* Tambahan Pay for this job */}
-                {((viewMode === "consolidated" && (jobConsolidatedItems?.["Tambahan"]?.length ?? 0) > 0) ||
-                  (viewMode === "detailed" && jobGroupedItems["Tambahan"].length > 0)) && (
+                {((viewMode === "consolidated" &&
+                  (jobConsolidatedItems?.["Tambahan"]?.length ?? 0) > 0) ||
+                  (viewMode === "detailed" &&
+                    jobGroupedItems["Tambahan"].length > 0)) && (
                   <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                     <div className="px-4 py-1.5 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800/50">
                       <h4 className="text-md font-semibold text-violet-800 dark:text-violet-300 flex items-center gap-2">
-                        <IconCirclePlus size={18} className="text-violet-600 dark:text-violet-400" />
+                        <IconCirclePlus
+                          size={18}
+                          className="text-violet-600 dark:text-violet-400"
+                        />
                         Tambahan Pay
                       </h4>
                     </div>
@@ -1268,7 +1393,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                             >
-                              {viewMode === "consolidated" ? "Total Qty" : "Qty"}
+                              {viewMode === "consolidated"
+                                ? "Total Qty"
+                                : "Qty"}
                             </th>
                             <th
                               scope="col"
@@ -1276,24 +1403,30 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             >
                               Amount
                             </th>
-                            {isEditable && (
-                              viewMode === "detailed" ||
-                              (viewMode === "consolidated" && jobConsolidatedItems?.["Tambahan"]?.some(item => item.is_manual && item.item_count === 1))
-                            ) && (
-                              <th
-                                scope="col"
-                                className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-12"
-                              ></th>
-                            )}
+                            {isEditable &&
+                              (viewMode === "detailed" ||
+                                (viewMode === "consolidated" &&
+                                  jobConsolidatedItems?.["Tambahan"]?.some(
+                                    (item) =>
+                                      item.is_manual && item.item_count === 1,
+                                  ))) && (
+                                <th
+                                  scope="col"
+                                  className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-12"
+                                ></th>
+                              )}
                           </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                           {viewMode === "consolidated"
-                            ? jobConsolidatedItems?.["Tambahan"]?.map((item, index) =>
-                                renderConsolidatedRow(item, index)
+                            ? jobConsolidatedItems?.["Tambahan"]?.map(
+                                (item, index) =>
+                                  renderConsolidatedRow(item, index),
                               )
-                            : getSortedItemsWithSeparators(jobGroupedItems["Tambahan"]).map(
-                                (item, index, arr) => renderDetailedRow(item, index, arr, true)
+                            : getSortedItemsWithSeparators(
+                                jobGroupedItems["Tambahan"],
+                              ).map((item, index, arr) =>
+                                renderDetailedRow(item, index, arr, true),
                               )}
                         </tbody>
                         <tfoot className="bg-default-50 dark:bg-gray-800">
@@ -1307,10 +1440,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                               {formatCurrency(jobTambahanTotal)}
                             </td>
-                            {isEditable && (
-                              viewMode === "detailed" ||
-                              (viewMode === "consolidated" && jobConsolidatedItems?.["Tambahan"]?.some(item => item.is_manual && item.item_count === 1))
-                            ) && <td></td>}
+                            {isEditable &&
+                              (viewMode === "detailed" ||
+                                (viewMode === "consolidated" &&
+                                  jobConsolidatedItems?.["Tambahan"]?.some(
+                                    (item) =>
+                                      item.is_manual && item.item_count === 1,
+                                  ))) && <td></td>}
                           </tr>
                         </tfoot>
                       </table>
@@ -1319,12 +1455,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 )}
 
                 {/* Overtime Pay for this job */}
-                {((viewMode === "consolidated" && (jobConsolidatedItems?.["Overtime"]?.length ?? 0) > 0) ||
-                  (viewMode === "detailed" && jobGroupedItems["Overtime"].length > 0)) && (
+                {((viewMode === "consolidated" &&
+                  (jobConsolidatedItems?.["Overtime"]?.length ?? 0) > 0) ||
+                  (viewMode === "detailed" &&
+                    jobGroupedItems["Overtime"].length > 0)) && (
                   <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                     <div className="px-4 py-1.5 bg-orange-50 dark:bg-orange-900/20 border-b border-orange-100 dark:border-orange-800/50">
                       <h4 className="text-md font-semibold text-orange-800 dark:text-orange-300 flex items-center gap-2">
-                        <IconClock size={18} className="text-orange-600 dark:text-orange-400" />
+                        <IconClock
+                          size={18}
+                          className="text-orange-600 dark:text-orange-400"
+                        />
                         Overtime Pay
                       </h4>
                     </div>
@@ -1356,7 +1497,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                             >
-                              {viewMode === "consolidated" ? "Total Qty" : "Qty"}
+                              {viewMode === "consolidated"
+                                ? "Total Qty"
+                                : "Qty"}
                             </th>
                             <th
                               scope="col"
@@ -1368,11 +1511,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                           {viewMode === "consolidated"
-                            ? jobConsolidatedItems?.["Overtime"]?.map((item, index) =>
-                                renderConsolidatedRow(item, index)
+                            ? jobConsolidatedItems?.["Overtime"]?.map(
+                                (item, index) =>
+                                  renderConsolidatedRow(item, index),
                               )
-                            : getSortedItemsWithSeparators(jobGroupedItems["Overtime"]).map(
-                                (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                            : getSortedItemsWithSeparators(
+                                jobGroupedItems["Overtime"],
+                              ).map((item, index, arr) =>
+                                renderDetailedRow(item, index, arr, false),
                               )}
                         </tbody>
                         <tfoot className="bg-default-50 dark:bg-gray-800">
@@ -1399,12 +1545,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           // Single Job Payroll: Original layout with compact tables
           <>
             {/* Base Pay Items */}
-            {((viewMode === "consolidated" && groupedConsolidatedItems["Base"].length > 0) ||
+            {((viewMode === "consolidated" &&
+              groupedConsolidatedItems["Base"].length > 0) ||
               (viewMode === "detailed" && groupedItems["Base"].length > 0)) && (
               <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                 <div className="px-4 py-1.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800/50">
                   <h3 className="text-md font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                    <IconCoins size={18} className="text-amber-600 dark:text-amber-400" />
+                    <IconCoins
+                      size={18}
+                      className="text-amber-600 dark:text-amber-400"
+                    />
                     Base Pay
                   </h3>
                 </div>
@@ -1449,10 +1599,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
                         ? groupedConsolidatedItems["Base"].map((item, index) =>
-                            renderConsolidatedRow(item, index)
+                            renderConsolidatedRow(item, index),
                           )
-                        : getSortedItemsWithSeparators(groupedItems["Base"]).map(
-                            (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                        : getSortedItemsWithSeparators(
+                            groupedItems["Base"],
+                          ).map((item, index, arr) =>
+                            renderDetailedRow(item, index, arr, false),
                           )}
                     </tbody>
                     <tfoot className="bg-default-50 dark:bg-gray-800">
@@ -1464,24 +1616,31 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           Total Base Pay
                           {(() => {
                             const baseGroupedByHours = groupedItems["Base"]
-                              .filter((item) => item.rate_unit === "Hour" || item.rate_unit === "Bill")
-                              .reduce((acc, item) => {
-                                const existing = acc.find(
-                                  (group) => group.hours === item.quantity
-                                );
-                                if (existing) existing.amount += item.amount;
-                                else
-                                  acc.push({
-                                    hours: item.quantity,
-                                    amount: item.amount,
-                                  });
-                                return acc;
-                              }, [] as { hours: number; amount: number }[]);
+                              .filter(
+                                (item) =>
+                                  item.rate_unit === "Hour" ||
+                                  item.rate_unit === "Bill",
+                              )
+                              .reduce(
+                                (acc, item) => {
+                                  const existing = acc.find(
+                                    (group) => group.hours === item.quantity,
+                                  );
+                                  if (existing) existing.amount += item.amount;
+                                  else
+                                    acc.push({
+                                      hours: item.quantity,
+                                      amount: item.amount,
+                                    });
+                                  return acc;
+                                },
+                                [] as { hours: number; amount: number }[],
+                              );
                             if (baseGroupedByHours.length > 0) {
                               const maxHoursGroup = baseGroupedByHours.reduce(
                                 (max, curr) =>
                                   curr.hours > max.hours ? curr : max,
-                                baseGroupedByHours[0]
+                                baseGroupedByHours[0],
                               );
                               const avgRate =
                                 maxHoursGroup?.hours > 0
@@ -1507,12 +1666,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             )}
 
             {/* Tambahan Pay Items */}
-            {((viewMode === "consolidated" && groupedConsolidatedItems["Tambahan"].length > 0) ||
-              (viewMode === "detailed" && groupedItems["Tambahan"].length > 0)) && (
+            {((viewMode === "consolidated" &&
+              groupedConsolidatedItems["Tambahan"].length > 0) ||
+              (viewMode === "detailed" &&
+                groupedItems["Tambahan"].length > 0)) && (
               <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                 <div className="px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800/50">
                   <h3 className="text-md font-semibold text-violet-800 dark:text-violet-300 flex items-center gap-2">
-                    <IconCirclePlus size={18} className="text-violet-600 dark:text-violet-400" />
+                    <IconCirclePlus
+                      size={18}
+                      className="text-violet-600 dark:text-violet-400"
+                    />
                     Tambahan Pay
                   </h3>
                 </div>
@@ -1552,24 +1716,29 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         >
                           Amount
                         </th>
-                        {isEditable && (
-                          viewMode === "detailed" ||
-                          (viewMode === "consolidated" && groupedConsolidatedItems["Tambahan"].some(item => item.is_manual && item.item_count === 1))
-                        ) && (
-                          <th
-                            scope="col"
-                            className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-12"
-                          ></th>
-                        )}
+                        {isEditable &&
+                          (viewMode === "detailed" ||
+                            (viewMode === "consolidated" &&
+                              groupedConsolidatedItems["Tambahan"].some(
+                                (item) =>
+                                  item.is_manual && item.item_count === 1,
+                              ))) && (
+                            <th
+                              scope="col"
+                              className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-12"
+                            ></th>
+                          )}
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
-                        ? groupedConsolidatedItems["Tambahan"].map((item, index) =>
-                            renderConsolidatedRow(item, index)
+                        ? groupedConsolidatedItems["Tambahan"].map(
+                            (item, index) => renderConsolidatedRow(item, index),
                           )
-                        : getSortedItemsWithSeparators(groupedItems["Tambahan"]).map(
-                            (item, index, arr) => renderDetailedRow(item, index, arr, true)
+                        : getSortedItemsWithSeparators(
+                            groupedItems["Tambahan"],
+                          ).map((item, index, arr) =>
+                            renderDetailedRow(item, index, arr, true),
                           )}
                     </tbody>
                     <tfoot className="bg-default-50 dark:bg-gray-800">
@@ -1583,10 +1752,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                           {formatCurrency(tambahanTotal)}
                         </td>
-                        {isEditable && (
-                          viewMode === "detailed" ||
-                          (viewMode === "consolidated" && groupedConsolidatedItems["Tambahan"].some(item => item.is_manual && item.item_count === 1))
-                        ) && <td></td>}
+                        {isEditable &&
+                          (viewMode === "detailed" ||
+                            (viewMode === "consolidated" &&
+                              groupedConsolidatedItems["Tambahan"].some(
+                                (item) =>
+                                  item.is_manual && item.item_count === 1,
+                              ))) && <td></td>}
                       </tr>
                     </tfoot>
                   </table>
@@ -1595,12 +1767,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             )}
 
             {/* Overtime Pay Items */}
-            {((viewMode === "consolidated" && groupedConsolidatedItems["Overtime"].length > 0) ||
-              (viewMode === "detailed" && groupedItems["Overtime"].length > 0)) && (
+            {((viewMode === "consolidated" &&
+              groupedConsolidatedItems["Overtime"].length > 0) ||
+              (viewMode === "detailed" &&
+                groupedItems["Overtime"].length > 0)) && (
               <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                 <div className="px-4 py-2 bg-orange-50 dark:bg-orange-900/20 border-b border-orange-100 dark:border-orange-800/50">
                   <h3 className="text-md font-semibold text-orange-800 dark:text-orange-300 flex items-center gap-2">
-                    <IconClock size={18} className="text-orange-600 dark:text-orange-400" />
+                    <IconClock
+                      size={18}
+                      className="text-orange-600 dark:text-orange-400"
+                    />
                     Overtime Pay
                   </h3>
                 </div>
@@ -1644,11 +1821,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
-                        ? groupedConsolidatedItems["Overtime"].map((item, index) =>
-                            renderConsolidatedRow(item, index)
+                        ? groupedConsolidatedItems["Overtime"].map(
+                            (item, index) => renderConsolidatedRow(item, index),
                           )
-                        : getSortedItemsWithSeparators(groupedItems["Overtime"]).map(
-                            (item, index, arr) => renderDetailedRow(item, index, arr, false)
+                        : getSortedItemsWithSeparators(
+                            groupedItems["Overtime"],
+                          ).map((item, index, arr) =>
+                            renderDetailedRow(item, index, arr, false),
                           )}
                     </tbody>
                     <tfoot className="bg-default-50 dark:bg-gray-800">
@@ -1672,12 +1851,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         )}
 
         {/* Commission Records */}
-        {commissionRecords.length > 0 && (
+        {mergedCommissionRecords.length > 0 && (
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-teal-50 dark:bg-teal-900/20 border-b border-teal-100 dark:border-teal-800/50">
               <h3 className="text-md font-semibold text-teal-800 dark:text-teal-300 flex items-center gap-2">
-                <IconBusinessplan size={18} className="text-teal-600 dark:text-teal-400" />
-                {commissionRecords
+                <IconBusinessplan
+                  size={18}
+                  className="text-teal-600 dark:text-teal-400"
+                />
+                {mergedCommissionRecords
                   .map((record) => record.description)
                   .join(" + ")}
               </h3>
@@ -1707,22 +1889,32 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {commissionRecords.map((record) => (
-                    <tr key={record.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                  {mergedCommissionRecords.map((record) => (
+                    <tr
+                      key={record.id}
+                      className="hover:bg-default-50 dark:hover:bg-gray-700"
+                    >
                       <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
-                        {format(
-                          new Date(record.commission_date),
-                          "dd MMM yyyy"
-                        )}
+                        {record.merged_count === 1
+                          ? format(
+                              new Date(record.commission_date),
+                              "dd MMM yyyy",
+                            )
+                          : `${record.merged_count} entries`}
                       </td>
                       <td
                         className="px-3 py-2 text-sm text-default-800 dark:text-gray-100"
                         title={record.description}
                       >
                         {record.description}
+                        {record.merged_count > 1 && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                            ×{record.merged_count}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
-                        {formatCurrency(record.amount)}
+                        {formatCurrency(record.merged_amount)}
                       </td>
                     </tr>
                   ))}
@@ -1734,16 +1926,106 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
                       Total{" "}
-                      {commissionRecords
+                      {mergedCommissionRecords
                         .map((record) => record.description)
                         .join(" + ")}
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(
-                        commissionRecords.reduce(
-                          (sum, record) => sum + Number(record.amount),
-                          0
-                        )
+                        mergedCommissionRecords.reduce(
+                          (sum, record) => sum + record.merged_amount,
+                          0,
+                        ),
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Others (Kerja Luar OT) Records */}
+        {mergedOthersRecords.length > 0 && (
+          <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+            <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800/50">
+              <h3 className="text-md font-semibold text-indigo-800 dark:text-indigo-300 flex items-center gap-2">
+                <IconClockHour4
+                  size={18}
+                  className="text-indigo-600 dark:text-indigo-400"
+                />
+                Others (Kerja Luar OT)
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+                <thead className="bg-default-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Date
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Description
+                    </th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Rate × Qty
+                    </th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                  {mergedOthersRecords.map((record) => (
+                    <tr
+                      key={record.id}
+                      className="hover:bg-default-50 dark:hover:bg-gray-700"
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-default-800 dark:text-gray-100">
+                        {record.merged_count === 1
+                          ? format(new Date(record.record_date), "dd MMM yyyy")
+                          : `${record.merged_count} entries`}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-sm text-default-800 dark:text-gray-100 max-w-xs"
+                        title={record.description}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate min-w-0">
+                            {record.description}
+                          </span>
+                          {record.merged_count > 1 && (
+                            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                              ×{record.merged_count}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-400">
+                        {record.merged_count === 1
+                          ? `${Number(record.rate).toFixed(2)} × ${Number(record.quantity)} ${record.rate_unit}`
+                          : "-"}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
+                        {formatCurrency(record.merged_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-default-50 dark:bg-gray-800">
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
+                    >
+                      Total Others (Kerja Luar OT)
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
+                      {formatCurrency(
+                        mergedOthersRecords.reduce(
+                          (sum, record) => sum + record.merged_amount,
+                          0,
+                        ),
                       )}
                     </td>
                   </tr>
@@ -1758,7 +2040,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
             <div className="px-4 py-2 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-100 dark:border-rose-800/50">
               <h3 className="text-md font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
-                <IconCalendarEvent size={18} className="text-rose-600 dark:text-rose-400" />
+                <IconCalendarEvent
+                  size={18}
+                  className="text-rose-600 dark:text-rose-400"
+                />
                 Leave Records This Month
               </h3>
             </div>
@@ -1807,10 +2092,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       }
                     };
                     const getLeaveRecordDisplay = (
-                      leaveRecord: MonthlyLeaveRecord
+                      leaveRecord: MonthlyLeaveRecord,
                     ) => {
                       const baseLabel = getLeaveTypeDisplay(
-                        leaveRecord.leave_type
+                        leaveRecord.leave_type,
                       );
 
                       if (
@@ -1835,17 +2120,20 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       }
                     };
                     return (
-                      <tr key={index} className="hover:bg-default-50 dark:hover:bg-gray-700">
+                      <tr
+                        key={index}
+                        className="hover:bg-default-50 dark:hover:bg-gray-700"
+                      >
                         <td className="px-3 py-2 text-sm text-default-800 dark:text-gray-100">
                           {format(
                             new Date(record.date.replace(/-/g, "/")),
-                            "dd MMM yyyy"
+                            "dd MMM yyyy",
                           )}
                         </td>
                         <td className="px-3 py-2 text-center">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(
-                              record.leave_type
+                              record.leave_type,
                             )}`}
                           >
                             {getLeaveRecordDisplay(record)}
@@ -1870,12 +2158,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       Total (
                       {monthlyLeaveRecords.reduce(
                         (sum, r) => sum + (Number(r.days_taken) || 0),
-                        0
+                        0,
                       )}{" "}
                       day
                       {monthlyLeaveRecords.reduce(
                         (sum, r) => sum + (Number(r.days_taken) || 0),
-                        0
+                        0,
                       ) !== 1
                         ? "s"
                         : ""}
@@ -1885,8 +2173,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       {formatCurrency(
                         monthlyLeaveRecords.reduce(
                           (sum, r) => sum + (Number(r.amount_paid) || 0),
-                          0
-                        )
+                          0,
+                        ),
                       )}
                     </td>
                   </tr>
@@ -1898,7 +2186,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
         {payroll.items.length === 0 && (
           <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
-            <p className="text-default-500 dark:text-gray-400">No payroll items found.</p>
+            <p className="text-default-500 dark:text-gray-400">
+              No payroll items found.
+            </p>
             {isEditable && (
               <Button
                 onClick={() => setShowAddItemModal(true)}
