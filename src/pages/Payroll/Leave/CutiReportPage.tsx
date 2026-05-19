@@ -1,7 +1,10 @@
 // src/pages/Payroll/CutiReportPage.tsx
 import React, { useState, useMemo, useEffect } from "react";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
-import { groupStaffsByName } from "../../../utils/payroll/groupStaffsByName";
+import {
+  getGroupedStaffIdsByEmployeeId,
+  groupStaffsByName,
+} from "../../../utils/payroll/groupStaffsByName";
 import { FormCombobox } from "../../../components/FormComponents";
 import { Employee } from "../../../types/types";
 import {
@@ -58,18 +61,25 @@ interface LeaveRecord {
 // --- Employee Card Component ---
 interface EmployeeCardProps {
   employee: Employee;
+  groupedIds: string[];
   onClick: (employee: Employee) => void;
 }
 
-const EmployeeCard: React.FC<EmployeeCardProps> = ({ employee, onClick }) => {
+const EmployeeCard: React.FC<EmployeeCardProps> = ({
+  employee,
+  groupedIds,
+  onClick,
+}) => {
   const jobDisplay = Array.isArray(employee.job)
     ? employee.job.join(", ")
     : employee.job || "N/A";
+  const hasCollapsedIds: boolean = groupedIds.length > 1;
+  const groupedIdsText: string = groupedIds.join(", ");
 
   return (
     <button
       onClick={() => onClick(employee)}
-      className="block w-full p-4 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white dark:bg-gray-800 h-full min-h-[104px]"
+      className="block w-full p-4 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50 text-left bg-white dark:bg-gray-800 h-full min-h-[116px]"
     >
       <h3
         className="text-base font-semibold text-default-800 dark:text-gray-100 truncate mb-1"
@@ -80,6 +90,14 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({ employee, onClick }) => {
       <p className="text-xs text-default-500 dark:text-gray-400 uppercase mb-2">
         ID: {employee.id}
       </p>
+      {hasCollapsedIds && (
+        <p
+          className="text-xs text-sky-600 dark:text-sky-400 mb-2 line-clamp-2"
+          title={groupedIdsText}
+        >
+          Collapsed IDs: {groupedIdsText}
+        </p>
+      )}
       <p className="text-sm text-default-600 dark:text-gray-300 line-clamp-2" title={jobDisplay}>
         <span className="font-medium">Job:</span> {jobDisplay}
       </p>
@@ -104,14 +122,27 @@ const CutiReportPage: React.FC = () => {
   // Multi-ID employees share one leave entitlement bucket on the backend,
   // so present one card / option per full name on this page too.
   const dedupedStaffs = useMemo(() => groupStaffsByName(staffs), [staffs]);
+  const groupedStaffIdsByEmployeeId = useMemo(
+    () => getGroupedStaffIdsByEmployeeId(staffs),
+    [staffs]
+  );
 
   const staffOptions = useMemo(
     () =>
-      dedupedStaffs.map((staff) => ({
-        id: staff.id,
-        name: `${staff.name} (${staff.id})`,
-      })),
-    [dedupedStaffs]
+      dedupedStaffs.map((staff) => {
+        const groupedIds: string[] =
+          groupedStaffIdsByEmployeeId.get(staff.id) || [staff.id];
+        const groupedIdsLabel: string =
+          groupedIds.length > 1
+            ? ` | Collapsed IDs: ${groupedIds.join(", ")}`
+            : "";
+
+        return {
+          id: staff.id,
+          name: `${staff.name} (${staff.id})${groupedIdsLabel}`,
+        };
+      }),
+    [dedupedStaffs, groupedStaffIdsByEmployeeId]
   );
 
   const selectedStaff = useMemo(
@@ -126,14 +157,20 @@ const CutiReportPage: React.FC = () => {
     const query = searchQuery.toLowerCase();
     return dedupedStaffs.filter((staff) => {
       const name = staff.name.toLowerCase();
-      const id = staff.id.toLowerCase();
+      const groupedIds: string[] =
+        groupedStaffIdsByEmployeeId.get(staff.id) || [staff.id];
+      const groupedIdsText: string = groupedIds.join(" ").toLowerCase();
       const job = Array.isArray(staff.job)
         ? staff.job.join(", ").toLowerCase()
         : String(staff.job || "").toLowerCase();
 
-      return name.includes(query) || id.includes(query) || job.includes(query);
+      return (
+        name.includes(query) ||
+        groupedIdsText.includes(query) ||
+        job.includes(query)
+      );
     });
-  }, [dedupedStaffs, searchQuery]);
+  }, [dedupedStaffs, groupedStaffIdsByEmployeeId, searchQuery]);
 
   // Handle employee card click
   const handleEmployeeCardClick = (employee: Employee) => {
@@ -325,73 +362,93 @@ const CutiReportPage: React.FC = () => {
     }
   };
 
-  const renderStaffHeader = (staff: Employee) => (
-    <div className="bg-white dark:bg-gray-800 px-6 py-4 rounded-xl border border-default-200 dark:border-gray-700">
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-4">
-          <IconUserCircle size={48} className="text-default-400 dark:text-gray-500" />
-          <div>
-            <h2 className="text-xl font-bold text-default-800 dark:text-gray-100">{staff.name}</h2>
-            <p className="text-default-500 dark:text-gray-400">{staff.id}</p>
-          </div>
-        </div>
+  const renderStaffHeader = (staff: Employee) => {
+    const groupedIds: string[] =
+      groupedStaffIdsByEmployeeId.get(staff.id) || [staff.id];
+    const hasCollapsedIds: boolean = groupedIds.length > 1;
+    const groupedIdsText: string = groupedIds.join(", ");
 
-        {/* Single Employee Print Controls */}
-        <div>
-          <Button
-            onClick={() => generateSinglePDF("print")}
-            icon={IconPrinter}
-            color="green"
-            variant="outline"
-            disabled={!leaveBalances || isGeneratingPDF}
-          >
-            Print Report
-          </Button>
+    return (
+      <div className="bg-white dark:bg-gray-800 px-6 py-4 rounded-xl border border-default-200 dark:border-gray-700">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-4">
+            <IconUserCircle size={48} className="text-default-400 dark:text-gray-500" />
+            <div>
+              <h2 className="text-xl font-bold text-default-800 dark:text-gray-100">
+                {staff.name}
+              </h2>
+              <p className="text-default-500 dark:text-gray-400">{staff.id}</p>
+              {hasCollapsedIds && (
+                <p className="text-sm text-sky-600 dark:text-sky-400">
+                  Collapsed IDs: {groupedIdsText}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Single Employee Print Controls */}
+          <div>
+            <Button
+              onClick={() => generateSinglePDF("print")}
+              icon={IconPrinter}
+              color="green"
+              variant="outline"
+              disabled={!leaveBalances || isGeneratingPDF}
+            >
+              Print Report
+            </Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-4 border-t border-default-200 dark:border-gray-700 pt-4">
+          <div className="flex items-center gap-2">
+            <IconBriefcase size={20} className="text-default-500 dark:text-gray-400" />
+            <div>
+              <p className="text-xs text-default-500 dark:text-gray-400">Job</p>
+              <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+                {staff.job.join(", ") || "N/A"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconCalendar size={20} className="text-default-500 dark:text-gray-400" />
+            <div>
+              <p className="text-xs text-default-500 dark:text-gray-400">Date Joined</p>
+              <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+                {new Date(staff.dateJoined).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconClockHour4 size={20} className="text-default-500 dark:text-gray-400" />
+            <div>
+              <p className="text-xs text-default-500 dark:text-gray-400">Years of Service</p>
+              <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+                {yearsOfService} years
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconId size={20} className="text-default-500 dark:text-gray-400" />
+            <div>
+              <p className="text-xs text-default-500 dark:text-gray-400">IC No.</p>
+              <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+                {staff.icNo || "N/A"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconWorld size={20} className="text-default-500 dark:text-gray-400" />
+            <div>
+              <p className="text-xs text-default-500 dark:text-gray-400">Nationality</p>
+              <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+                {staff.nationality || "N/A"}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-4 border-t border-default-200 dark:border-gray-700 pt-4">
-        <div className="flex items-center gap-2">
-          <IconBriefcase size={20} className="text-default-500 dark:text-gray-400" />
-          <div>
-            <p className="text-xs text-default-500 dark:text-gray-400">Job</p>
-            <p className="text-sm font-medium text-default-800 dark:text-gray-100">
-              {staff.job.join(", ") || "N/A"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <IconCalendar size={20} className="text-default-500 dark:text-gray-400" />
-          <div>
-            <p className="text-xs text-default-500 dark:text-gray-400">Date Joined</p>
-            <p className="text-sm font-medium text-default-800 dark:text-gray-100">
-              {new Date(staff.dateJoined).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <IconClockHour4 size={20} className="text-default-500 dark:text-gray-400" />
-          <div>
-            <p className="text-xs text-default-500 dark:text-gray-400">Years of Service</p>
-            <p className="text-sm font-medium text-default-800 dark:text-gray-100">{yearsOfService} years</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <IconId size={20} className="text-default-500 dark:text-gray-400" />
-          <div>
-            <p className="text-xs text-default-500 dark:text-gray-400">IC No.</p>
-            <p className="text-sm font-medium text-default-800 dark:text-gray-100">{staff.icNo || "N/A"}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <IconWorld size={20} className="text-default-500 dark:text-gray-400" />
-          <div>
-            <p className="text-xs text-default-500 dark:text-gray-400">Nationality</p>
-            <p className="text-sm font-medium text-default-800 dark:text-gray-100">{staff.nationality || "N/A"}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderLeaveBalanceSummary = (balances: LeaveBalance) => {
     const remainingTahunan =
@@ -964,6 +1021,9 @@ const CutiReportPage: React.FC = () => {
                 <EmployeeCard
                   key={employee.id}
                   employee={employee}
+                  groupedIds={
+                    groupedStaffIdsByEmployeeId.get(employee.id) || [employee.id]
+                  }
                   onClick={handleEmployeeCardClick}
                 />
               ))}
