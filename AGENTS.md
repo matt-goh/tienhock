@@ -90,6 +90,8 @@ This is a comprehensive ERP system supporting three companies:
 - `payments` - payment_id, invoice_id, payment_date, amount_paid, payment_method, payment_reference, internal_reference, notes, created_at, status, cancellation_date, cancellation_reason
 - `consolidation_settings` - company_id, auto_consolidation_enabled, last_updated, updated_by
 - `consolidation_tracking` - id, company_id, year, month, status, consolidated_invoice_id, last_attempt, next_attempt, attempt_count, error
+- `adjustment_documents` - id (e.g. CN-2026-0001 / DN-2026-0001 / RN-2026-0001), type (credit_note/debit_note/refund_note), original_invoice_id (FK invoices), customerid, salespersonid, createddate (unix ms), reason, paired_with_id (self-FK; CN<->RN pairing), linked_payment_id (FK payments; standalone RN tied to overpaid payment), references_consolidated_id (CON-* parent id when original was consolidated), total_excluding_tax, tax_amount, rounding, totalamountpayable, refund_method, refund_reference, bank_account (RN-only fields), uuid, submission_uid, long_id, datetime_validated, einvoice_status (valid/pending/invalid/cancelled), is_consolidated, consolidated_adjustments (JSONB array of child adj doc IDs when wrapper), status (active/cancelled), cancellation_reason, cancellation_date, journal_entry_id (FK journal_entries), created_by, created_at, updated_at. Tien Hock Credit Notes / Debit Notes / Refund Notes against sales invoices. Atomic create updates invoices.balance_due and customers.credit_used and posts a journal entry; cancellation reverses all three.
+- `adjustment_document_lines` - id, adjustment_doc_id (FK adjustment_documents CASCADE), line_number, code, description, quantity, price, tax, total, issubtotal
 
 **Products & Inventory:**
 
