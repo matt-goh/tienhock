@@ -21,16 +21,18 @@ import { StockProduct } from "../../types/types";
 import { isHiddenSpecialItem } from "../../config/specialItems";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
+type ProductType = "BH" | "MEE" | "JP" | "OTH" | "BUNDLE";
 
 interface ProductSelectorProps {
   value: string | null;
   onChange: (productId: string | null) => void;
-  productTypes?: ("BH" | "MEE" | "JP" | "OTH" | "BUNDLE")[];
+  productTypes?: ProductType[];
   placeholder?: string;
   showCategories?: boolean;
   disabled?: boolean;
   label?: string;
   required?: boolean;
+  productFilter?: (product: StockProduct) => boolean;
 }
 
 interface GroupedProducts {
@@ -50,6 +52,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   disabled = false,
   label,
   required = false,
+  productFilter,
 }) => {
   const [query, setQuery] = useState("");
   const { products, isLoading } = useProductsCache("all");
@@ -91,9 +94,13 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   // Filter and group products by type (excluding hidden special items)
   const groupedProducts = useMemo(() => {
     const filtered = products.filter(
-      (product) =>
-        productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH" | "BUNDLE") &&
-        !isHiddenSpecialItem(product.id)
+      (product): boolean => {
+        return (
+          productTypes.includes(product.type as ProductType) &&
+          !isHiddenSpecialItem(product.id) &&
+          (!productFilter || productFilter(product as StockProduct))
+        );
+      }
     );
 
     const grouped: GroupedProducts = {
@@ -112,17 +119,21 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     });
 
     return grouped;
-  }, [products, productTypes]);
+  }, [products, productTypes, productFilter]);
 
   // Get favorite products (excluding hidden special items)
   const favoriteProducts = useMemo(() => {
     return products.filter(
-      (product) =>
-        favorites.has(product.id) &&
-        productTypes.includes(product.type as "BH" | "MEE" | "JP" | "OTH" | "BUNDLE") &&
-        !isHiddenSpecialItem(product.id)
+      (product): boolean => {
+        return (
+          favorites.has(product.id) &&
+          productTypes.includes(product.type as ProductType) &&
+          !isHiddenSpecialItem(product.id) &&
+          (!productFilter || productFilter(product as StockProduct))
+        );
+      }
     ) as StockProduct[];
-  }, [products, favorites, productTypes]);
+  }, [products, favorites, productTypes, productFilter]);
 
   // Filter products based on search query
   const filteredProducts = useMemo(() => {

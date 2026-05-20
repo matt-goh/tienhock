@@ -35,6 +35,9 @@ import {
   IconSearch,
   IconX,
   IconAlertTriangle,
+  IconRefresh,
+  IconDeviceFloppy,
+  IconPackage,
 } from "@tabler/icons-react";
 import { Switch } from "@headlessui/react";
 import Button from "../../components/Button";
@@ -42,10 +45,11 @@ import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMap
 import { isSpecialItem } from "../../config/specialItems";
 import {
   OTH_PRODUCTION_IDS,
-  getOthProductionConfig,
+  isOthProductionProduct,
 } from "../../config/othProductionProducts";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
+const STOCK_ONLY_WORKER_ID = "__STOCK_ONLY__";
 
 const formatDateLocal = (date: Date): string => {
   const year = date.getFullYear();
@@ -220,15 +224,15 @@ const ProductionEntryPage: React.FC = () => {
   }, [selectedProductId, products]);
 
   // Filter workers from cached staffs.
-  // OTH products with explicit job config use the union of their jobs.
-  // Otherwise fall back to MEE_PACKING (for MEE) or BH_PACKING (for everything else).
+  // OTH production products are stock-only and use a single quantity input.
   const workers: ProductionWorker[] = useMemo(() => {
     if (!selectedProduct) return [];
 
-    const othConfig = getOthProductionConfig(selectedProduct.id);
-    const jobFilters: string[] = othConfig
-      ? othConfig.jobs
-      : [selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING"];
+    if (isOthProductionProduct(selectedProduct.id)) return [];
+
+    const jobFilters: string[] = [
+      selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING",
+    ];
 
     return staffs
       .filter((staff) => jobFilters.some((j) => staff.job.includes(j)))
@@ -254,9 +258,23 @@ const ProductionEntryPage: React.FC = () => {
         );
 
         const entriesMap: Record<string, number> = {};
-        (response || []).forEach((entry: ProductionEntry) => {
-          entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
-        });
+
+        if (isOthProductionProduct(selectedProductId)) {
+          const totalQuantity: number = (response || []).reduce(
+            (sum: number, entry: ProductionEntry) =>
+              sum + (Number(entry.bags_packed) || 0),
+            0
+          );
+
+          if (totalQuantity > 0) {
+            entriesMap[STOCK_ONLY_WORKER_ID] = totalQuantity;
+          }
+        } else {
+          (response || []).forEach((entry: ProductionEntry) => {
+            if (!entry.worker_id) return;
+            entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
+          });
+        }
 
         setEntries(entriesMap);
         setOriginalEntries(entriesMap);
@@ -335,6 +353,22 @@ const ProductionEntryPage: React.FC = () => {
     });
   }, []);
 
+  const handleStockOnlyEntryChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    const value: string = event.target.value;
+
+    if (value === "") {
+      handleEntryChange(STOCK_ONLY_WORKER_ID, 0);
+      return;
+    }
+
+    const quantity: number = parseInt(value, 10);
+    if (!isNaN(quantity) && quantity >= 0) {
+      handleEntryChange(STOCK_ONLY_WORKER_ID, quantity);
+    }
+  };
+
   // Handle save
   const handleSave = async (): Promise<void> => {
     if (!selectedDate || !selectedProductId) {
@@ -344,22 +378,32 @@ const ProductionEntryPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const entriesArray = Object.entries(entries).map(
-        ([worker_id, bags_packed]) => ({
-          worker_id,
-          bags_packed,
-        })
-      );
+      const isStockOnlyProduct: boolean =
+        isOthProductionProduct(selectedProductId);
+      const entriesArray: { worker_id: string; bags_packed: number }[] =
+        isStockOnlyProduct
+          ? [
+              {
+                worker_id: STOCK_ONLY_WORKER_ID,
+                bags_packed: entries[STOCK_ONLY_WORKER_ID] || 0,
+              },
+            ]
+          : Object.entries(entries).map(([worker_id, bags_packed]) => ({
+              worker_id,
+              bags_packed,
+            }));
 
-      // Include workers with 0 bags to clear their entries
-      workers.forEach((worker) => {
-        if (!entries[worker.id]) {
-          entriesArray.push({
-            worker_id: worker.id,
-            bags_packed: 0,
-          });
-        }
-      });
+      if (!isStockOnlyProduct) {
+        // Include workers with 0 bags to clear their entries
+        workers.forEach((worker) => {
+          if (!entries[worker.id]) {
+            entriesArray.push({
+              worker_id: worker.id,
+              bags_packed: 0,
+            });
+          }
+        });
+      }
 
       const response = await api.post("/api/production-entries/batch", {
         date: selectedDate,
@@ -368,7 +412,9 @@ const ProductionEntryPage: React.FC = () => {
       });
 
       toast.success(
-        `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
+        isStockOnlyProduct
+          ? `Stock record saved: ${response.total_bags} total`
+          : `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
       );
       setOriginalEntries({ ...entries });
     } catch (error) {
@@ -476,9 +522,18 @@ const ProductionEntryPage: React.FC = () => {
     });
   };
 
+  const productionProductFilter = useCallback(
+    (product: StockProduct): boolean =>
+      product.type !== "OTH" || OTH_PRODUCTION_IDS.includes(product.id),
+    []
+  );
+
   // Check if we're viewing a regular product (not special selection)
   const isViewingProduct =
     selectedProductId !== null && specialSelection === null;
+  const isViewingStockOnlyProduct: boolean =
+    selectedProductId !== null && isOthProductionProduct(selectedProductId);
+  const stockOnlyQuantity: number = entries[STOCK_ONLY_WORKER_ID] || 0;
 
   return (
     <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
@@ -584,6 +639,7 @@ const ProductionEntryPage: React.FC = () => {
                 value={selectedProductId}
                 onChange={handleProductSelect}
                 productTypes={["MEE", "BH", "BUNDLE", "OTH"]}
+                productFilter={productionProductFilter}
               />
             </div>
 
@@ -851,30 +907,33 @@ const ProductionEntryPage: React.FC = () => {
 
               {/* Right side: Search + Change product */}
               <div className="flex items-center gap-3 flex-shrink-0">
-                {/* Mini Worker Search Input */}
-                <div className="relative">
-                  <IconSearch
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search worker..."
-                    value={workerSearchQuery}
-                    onChange={(e) => setWorkerSearchQuery(e.target.value)}
-                    className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  />
-                  {workerSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setWorkerSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
-                    >
-                      <IconX size={12} />
-                    </button>
-                  )}
-                </div>
-                <div className="h-4 w-px bg-default-300 dark:bg-gray-600" />
+                {!isViewingStockOnlyProduct && (
+                  <>
+                    <div className="relative">
+                      <IconSearch
+                        size={14}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search worker..."
+                        value={workerSearchQuery}
+                        onChange={(e) => setWorkerSearchQuery(e.target.value)}
+                        className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                      {workerSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setWorkerSearchQuery("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
+                        >
+                          <IconX size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="h-4 w-px bg-default-300 dark:bg-gray-600" />
+                  </>
+                )}
                 <button
                   onClick={() => handleProductSelect(null)}
                   className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 whitespace-nowrap"
@@ -885,19 +944,97 @@ const ProductionEntryPage: React.FC = () => {
             </div>
           </div>
 
-          <WorkerEntryGrid
-            workers={workers}
-            entries={entries}
-            onEntryChange={handleEntryChange}
-            isLoading={isLoadingWorkers}
-            disabled={isSaving}
-            onSave={handleSave}
-            onReset={handleReset}
-            hasUnsavedChanges={hasUnsavedChanges}
-            isSaving={isSaving}
-            searchQuery={workerSearchQuery}
-            onSearchChange={setWorkerSearchQuery}
-          />
+          {isViewingStockOnlyProduct ? (
+            <div className="overflow-hidden">
+              <div className="p-4 bg-white dark:bg-gray-800">
+                <div className="max-w-sm rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                  <label
+                    htmlFor="stock-only-quantity"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-300"
+                  >
+                    Quantity
+                  </label>
+                  <input
+                    id="stock-only-quantity"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={stockOnlyQuantity > 0 ? stockOnlyQuantity : ""}
+                    onChange={handleStockOnlyEntryChange}
+                    onFocus={(e) => e.target.select()}
+                    disabled={isSaving}
+                    placeholder="0"
+                    className="mt-2 w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-right text-lg font-semibold text-default-900 dark:text-gray-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <IconPackage
+                      className="text-purple-600 dark:text-purple-400"
+                      size={20}
+                    />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-default-900 dark:text-gray-100">
+                      Stock Total
+                    </div>
+                    <div className="text-xs text-default-500 dark:text-gray-400">
+                      {parseLocalDate(selectedDate).toLocaleDateString("en-MY", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
+                  <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
+                    <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
+                      {stockOnlyQuantity.toLocaleString()}{" "}
+                      <span className="text-base font-normal text-default-500 dark:text-gray-400">
+                        pcs
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleReset}
+                    disabled={!hasUnsavedChanges || isSaving}
+                    color="default"
+                    icon={IconRefresh}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={!hasUnsavedChanges || isSaving}
+                    color="sky"
+                    icon={IconDeviceFloppy}
+                  >
+                    {isSaving ? "Saving..." : "Save Production"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <WorkerEntryGrid
+              workers={workers}
+              entries={entries}
+              onEntryChange={handleEntryChange}
+              isLoading={isLoadingWorkers}
+              disabled={isSaving}
+              onSave={handleSave}
+              onReset={handleReset}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isSaving={isSaving}
+              searchQuery={workerSearchQuery}
+              onSearchChange={setWorkerSearchQuery}
+            />
+          )}
         </>
       )}
 

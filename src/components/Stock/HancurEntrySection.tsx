@@ -119,6 +119,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
         );
         const hancurMap: Record<string, number> = {};
         (hancurResponse || []).forEach((entry: ProductionEntry) => {
+          if (!entry.worker_id) return;
           hancurMap[entry.worker_id] = Number(entry.bags_packed) || 0;
         });
         setHancurEntries(hancurMap);
@@ -131,9 +132,13 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
         if (karungResponse && karungResponse.length > 0) {
           // Take the first entry (there should only be one per day)
           const karungEntry = karungResponse[0] as ProductionEntry;
-          setKarungWorkerId(karungEntry.worker_id);
+          const karungWorkerId: string =
+            karungEntry.worker_id ||
+            karungConfig.singleWorkerEntry?.defaultWorkerId ||
+            "RAMBU";
+          setKarungWorkerId(karungWorkerId);
           setKarungValue(Number(karungEntry.bags_packed) || 0);
-          setOriginalKarungWorkerId(karungEntry.worker_id);
+          setOriginalKarungWorkerId(karungWorkerId);
           setOriginalKarungValue(Number(karungEntry.bags_packed) || 0);
         } else {
           // Reset to defaults
