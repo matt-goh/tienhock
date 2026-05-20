@@ -35,9 +35,9 @@ This plan introduces a dedicated **Adjustment Documents** ecosystem across all t
 | 1 | Database + Backend Foundation (Tien Hock) | **DONE** |
 | 2 | Frontend Pages (TH, shared component scaffolding) | **DONE** |
 | 3 | Invoice & Payment Integration (TH) | **DONE** |
-| 4 | Individual E-Invoice templates + submission (TH) | Not started |
-| 5 | Consolidated E-Invoice templates + auto-consolidation (TH) | Not started |
-| 6 | Jelly Polly Replication | Not started |
+| 4 | Individual E-Invoice templates + submission (TH) | **DONE** |
+| 5 | Consolidated E-Invoice templates + auto-consolidation (TH) | **DONE** (manual modal tabs deferred) |
+| 6 | Jelly Polly Replication | **DONE** |
 | 7 | Green Target Implementation | Not started |
 
 ### Phase 1 — what shipped
@@ -75,6 +75,106 @@ This plan introduces a dedicated **Adjustment Documents** ecosystem across all t
 - **[src/components/AdjustmentDocs/InvoiceAdjustmentDocsSection.tsx](../src/components/AdjustmentDocs/InvoiceAdjustmentDocsSection.tsx)** — new reusable section component that fetches all adjustment documents for an invoice (`GET /api/adjustment-docs?original_invoice_id=...&include_cancelled=true`) and renders a compact table with type/status badges and click-through navigation. Accepts a `basePath` prop so JP/GT can pass their prefixed paths. Hides itself entirely when there are no related docs (zero-state reduces noise on every invoice).
 - **InvoiceDetailsPage** also renders `<InvoiceAdjustmentDocsSection invoiceId={...} />` below the main invoice card (acceptable substitute for the originally-planned position; placing inline would have required restructuring the existing card layout).
 - **[src/components/ChangelogModal.tsx](../src/components/ChangelogModal.tsx)** — new bilingual entry dated 2026-05-20 announcing Adjustment Documents to end users.
+
+### Phase 3.1 (post-Phase-3 fix) — Invoice picker on the form page
+
+- **[src/pages/AdjustmentDocs/AdjustmentDocsFormPage.tsx](../src/pages/AdjustmentDocs/AdjustmentDocsFormPage.tsx)** — when the URL has `?type=...` but no `invoiceId`, the form now shows an in-place invoice picker (search by invoice number / customer name / amount) instead of bouncing back to the list with an error. Selection writes `invoiceId` into the URL and proceeds with the normal form load. List-page "New Debit Note" / "New Credit Note" buttons now work end-to-end.
+
+### Phase 4 — what shipped
+
+- **[src/utils/invoice/einvoice/EInvoiceAdjustmentNoteTemplate.js](../src/utils/invoice/einvoice/EInvoiceAdjustmentNoteTemplate.js)** — single shared template that emits the right `InvoiceTypeCode` (02 / 03 / 04) based on the doc's `type`. Populates `cac:BillingReference > cac:InvoiceDocumentReference > cbc:UUID` with the referenced source document's UUID. Forks the helper functions from `EInvoiceTemplate.js` (date validation, tax/totals computation, line generation) and reuses `TIENHOCK_INFO` for the supplier party.
+- **[src/routes/sales/adjustment-docs/index.js](../src/routes/sales/adjustment-docs/index.js)** — three new endpoints:
+  - `POST /api/adjustment-docs/:id/submit-einvoice` — builds XML, calls `EInvoiceSubmissionHandler.submitAndPollDocuments`, persists `uuid`/`submission_uid`/`long_id`/`datetime_validated`/`einvoice_status`. Resolves the referenced UUID by first checking the original invoice's own UUID (valid e-invoice) then falling back to `references_consolidated_id` then to a live JSONB lookup. Refuses to submit when customer has no TIN/ID, when source has no valid UUID, or when doc is already valid/pending. Persists `'invalid'` on submission failure so the user can clear-and-retry.
+  - `POST /api/adjustment-docs/:id/update-status` — polls `GET /api/v1.0/documents/:uuid/details` and updates `einvoice_status`/`long_id`/`datetime_validated` based on the remote response.
+  - `POST /api/adjustment-docs/:id/cancel-einvoice` — calls `PUT /api/v1.0/documents/state/:uuid/state` with `{ status: 'cancelled', reason }`, then sets local `einvoice_status='cancelled'`. Does NOT cancel the document itself — that's a separate call. Tolerates MyInvois API quirks (proceeds with local cleanup even when the remote returns an error).
+- **Router signature updated** ([src/routes/index.js](../src/routes/index.js)) — adjustment-docs router now receives `myInvoisConfig` and instantiates the API client via `EInvoiceApiClientFactory.getInstance()`.
+- **[src/pages/AdjustmentDocs/AdjustmentDocsDetailsPage.tsx](../src/pages/AdjustmentDocs/AdjustmentDocsDetailsPage.tsx)** — action bar now renders the right e-invoice action depending on state:
+  - `einvoice_status === null` → **Submit e-Invoice**
+  - `einvoice_status === 'invalid'` → **Clear & Retry** + **Re-submit**
+  - `einvoice_status === 'pending'` → **Update Status**
+  - `einvoice_status === 'valid' | 'invalid'` → **Cancel e-Invoice**
+  - **Cancel Document** stays available when status is active and e-invoice is not valid/pending. New confirmation dialog for e-invoice cancellation.
+- **TypeScript clean** — `tsc --noEmit` passes.
+
+### Phase 5 — what shipped
+
+- **[src/utils/invoice/einvoice/EInvoiceConsolidatedAdjustmentTemplate.js](../src/utils/invoice/einvoice/EInvoiceConsolidatedAdjustmentTemplate.js)** — generates a consolidated UBL for a single (type, parent_consolidated_uuid) group. Each child adjustment doc becomes one `cac:InvoiceLine` whose description is `"Adjustment {childId} for Invoice {original_invoice_id} — {reason}"`. Uses the "Consolidated Customers" placeholder customer party (TIN `EI00000000010`) and populates BillingReference with the parent consolidated invoice's UUID.
+- **[src/routes/sales/adjustment-docs/index.js](../src/routes/sales/adjustment-docs/index.js)** — three new consolidated endpoints:
+  - `GET /api/adjustment-docs/eligible-for-consolidation?type=&month=&year=` — returns active adjustment docs whose original invoice has a parent consolidated invoice with a valid UUID, scoped to the given month.
+  - `POST /api/adjustment-docs/submit-consolidated` — body `{ type, adjustmentDocIds[] }`. Verifies same type + same parent, generates `CON-{CN|DN|RN}-{YYYYMM}-{N}`, submits to MyInvois, inserts a wrapper row in `adjustment_documents` with `is_consolidated=true` + `consolidated_adjustments` JSONB array, propagates the e-invoice uuid/submission_uid/status to each child.
+  - `GET /api/adjustment-docs/consolidated-history?year=` — list of wrapper rows.
+- **[src/utils/invoice/autoAdjustmentConsolidation.js](../src/utils/invoice/autoAdjustmentConsolidation.js)** — new module. `checkAndProcessDueAdjustmentConsolidations(pool)` runs in the days 3-7 window, finds eligible adjustment docs grouped by `(type, parent_consolidated_id)`, generates IDs of the form `CON-{TYPE}-{YYYYMM}-{N}-AUTO`, and submits each group as its own consolidated wrapper. Uses the Tien Hock MyInvois client (JP/GT modules will mirror this in their phases).
+- **[server.js](../server.js)** — the existing daily auto-consolidation cron now also calls `checkAndProcessDueAdjustmentConsolidations(pool)` after the regular invoice consolidation pass.
+- **Deferred to a follow-up**: tabs on `ConsolidatedInvoiceModal.tsx` for manually triggering consolidation of adjustment docs by type. The auto-consolidation cron handles the common case; the manual modal extension can land as a small follow-up when needed.
+
+### Phase 6 — Jelly Polly — DONE
+
+**Backend:**
+- `migrations/002_create_jp_adjustment_documents.sql` applied — `jellypolly.adjustment_documents` and `jellypolly.adjustment_document_lines` mirror the TH schema, FKs point at `jellypolly.invoices` and `jellypolly.payments`. Shares `customers`, `account_codes`, `journal_entries` with TH.
+- **TH route refactored into a parameterised factory** at [src/routes/sales/adjustment-docs/index.js](../src/routes/sales/adjustment-docs/index.js) — `export default function (pool, myInvoisConfig, options = {})` accepts `options.tables` (per-table override) and `options.supplierInfo`. Helpers and inline SQL use `${T.docs}` / `${T.lines}` / `${T.invoices}` / `${T.payments}` via closure. All helpers moved inside the factory function.
+- **EInvoiceAdjustmentNoteTemplate** and **EInvoiceConsolidatedAdjustmentTemplate** accept `supplierInfo` and default to `TIENHOCK_INFO` for back-compat.
+- **JP route wrapper** at [src/routes/jellypolly/adjustment-docs.js](../src/routes/jellypolly/adjustment-docs.js) — 12-line file that calls the factory with `jellypolly.*` tables and `JELLYPOLLY_INFO`. Registered in `routes/index.js` under `/jellypolly/api/adjustment-docs` with `myInvoisJPConfig`.
+- **Auto-consolidation extended for JP** — [src/utils/invoice/autoAdjustmentConsolidation.js](../src/utils/invoice/autoAdjustmentConsolidation.js) rewritten with a `processCompany(pool, cfg)` helper. The cron entry point calls it twice: once with the TH client (`EInvoiceApiClientFactory` + `EInvoiceSubmissionHandler` + TH credentials + TH tables) and once with the JP client (`JPEInvoiceApiClientFactory` + `JPEInvoiceSubmissionHandler` + JP credentials + JP tables).
+
+**Frontend:**
+- **Path helper** at [src/components/AdjustmentDocs/useAdjustmentDocsPaths.ts](../src/components/AdjustmentDocs/useAdjustmentDocsPaths.ts) — `getAdjustmentDocsPaths(company)` returns `{ apiBase, invoiceApiBase, paymentsApiBase, invoicesSearchApi, uiBase, invoiceUiBase }`.
+- **Shared pages accept `company` prop**: `AdjustmentDocsListPage`, `AdjustmentDocsFormPage`, `AdjustmentDocsDetailsPage`, `InvoiceAdjustmentDocsSection`. All API calls and navigate() targets derive from the paths helper.
+- **JP page wrappers** at `src/pages/JellyPolly/AdjustmentDocs/JPAdjustmentDocsListPage.tsx`, `…/JPAdjustmentDocsFormPage.tsx`, `…/JPAdjustmentDocsDetailsPage.tsx` — thin one-liners that render the shared page with `company="jellypolly"`.
+- **JP sidebar** entry added in [src/pages/JellyPollyNavData.tsx](../src/pages/JellyPollyNavData.tsx) under Sales > Adjustment Documents (registers `/jellypolly/sales/adjustment-docs`, `/new`, `/:id`).
+- **JP invoice integration**:
+  - [src/pages/JellyPolly/InvoiceListPage.tsx](../src/pages/JellyPolly/InvoiceListPage.tsx) — `Documents` mini button between Consolidated and Refresh.
+  - [src/pages/JellyPolly/InvoiceDetailsPage.tsx](../src/pages/JellyPolly/InvoiceDetailsPage.tsx) — Debit / Credit / Refund Note buttons (visibility-gated like TH) plus `<InvoiceAdjustmentDocsSection company="jellypolly" />` below the main card.
+
+**Bugs found and fixed during refactor:**
+- The TH `findConsolidatedParentId` and `resolveReferencedDocument` helpers ordered `invoices` by `created_at` (column doesn't exist). Changed to `CAST(createddate AS bigint) DESC NULLS LAST`.
+- The initial `DEFAULT_TABLES` constant got accidentally caught by the `replace_all` of `adjustment_documents` → `${T.docs}`, which made `T.docs` resolve to the literal string `"${T.docs}"`. Restored to literal table names.
+
+### Phase 6 — earlier scratch notes (kept for reference)
+
+**What shipped:**
+- **[migrations/002_create_jp_adjustment_documents.sql](../migrations/002_create_jp_adjustment_documents.sql)** — `jellypolly.adjustment_documents` and `jellypolly.adjustment_document_lines` with FKs to `jellypolly.invoices` and `jellypolly.payments`. Reuses the shared `adjustment_documents_touch_updated_at()` trigger function. **Applied to dev DB.**
+- **Templates parameterised**:
+  - [`EInvoiceAdjustmentNoteTemplate.js`](../src/utils/invoice/einvoice/EInvoiceAdjustmentNoteTemplate.js) now accepts an optional `supplierInfo` 4th argument (defaults to `TIENHOCK_INFO`).
+  - [`EInvoiceConsolidatedAdjustmentTemplate.js`](../src/utils/invoice/einvoice/EInvoiceConsolidatedAdjustmentTemplate.js) `args.supplierInfo` works the same way.
+  - JP can pass `JELLYPOLLY_INFO` from `companyInfo.js` without forking the template files.
+- **CLAUDE.md** and **AGENTS.md** schema sections updated.
+
+**What still remains for Phase 6:**
+
+1. **JP route file** — `src/routes/jellypolly/adjustment-docs.js`. Easiest path is to refactor `src/routes/sales/adjustment-docs/index.js` to accept a 3rd `options` param `{ tables: { docs, lines, invoices, payments }, supplierInfo }` and template-literal-ize the SQL table names, then create a tiny JP wrapper:
+   ```js
+   import createAdjustmentDocsRouter from "../sales/adjustment-docs/index.js";
+   import { JELLYPOLLY_INFO } from "../../utils/invoice/einvoice/companyInfo.js";
+   export default (pool, myInvoisConfig) => createAdjustmentDocsRouter(pool, myInvoisConfig, {
+     tables: {
+       docs: "jellypolly.adjustment_documents",
+       lines: "jellypolly.adjustment_document_lines",
+       invoices: "jellypolly.invoices",
+       payments: "jellypolly.payments",
+     },
+     supplierInfo: JELLYPOLLY_INFO,
+   });
+   ```
+   Inside the TH file, replace all hardcoded `adjustment_documents` / `adjustment_document_lines` / `invoices` / `payments` SQL references with `${T.docs}` / `${T.lines}` / `${T.invoices}` / `${T.payments}` (the helpers `generateNextDocId`, `findConsolidatedParentId`, `applyBalanceDelta`, `insertDoc`, `fetchDocWithRelations`, `resolveReferencedDocument` need to either be moved inside the factory closure or accept a `T` parameter). The helper modules `accounting.js` is shared (uses `journal_entries`, `account_codes`, `customers` which are all shared tables).
+2. **Wire JP route** in `src/routes/index.js`:
+   ```js
+   import jellypollyAdjustmentDocsRouter from "./jellypolly/adjustment-docs.js";
+   ...
+   app.use("/jellypolly/api/adjustment-docs", jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig));
+   ```
+3. **Extend auto-consolidation** — `src/utils/invoice/autoAdjustmentConsolidation.js` currently only processes Tien Hock. Add a parallel `processJellypollyAdjustmentConsolidations(pool)` that queries `jellypolly.adjustment_documents` against `jellypolly.invoices` using `MYINVOIS_JP_CLIENT_ID/SECRET` and JPEInvoiceApiClientFactory + JPEInvoiceSubmissionHandler. Server cron call it after TH.
+4. **JP page wrappers** — easiest path is to make the existing pages accept a `company` prop with TH default that controls API base path (`/api/adjustment-docs` vs `/jellypolly/api/adjustment-docs`) and UI base path (`/sales/...` vs `/jellypolly/sales/...`). Then create thin JP page files that pass `company="jellypolly"`. Affected pages: `AdjustmentDocsListPage`, `AdjustmentDocsFormPage`, `AdjustmentDocsDetailsPage`. Update `InvoiceAdjustmentDocsSection.tsx` so it derives the API path from the company prop (currently only takes `basePath` for navigation).
+5. **JP sidebar entry** — add to `src/pages/JellyPollyNavData.tsx` under Sales (same position as TH).
+6. **JP invoice integration** — mirror Phase 3's `Documents` mini button + DN/CN/RN buttons + InvoiceAdjustmentDocsSection on JP InvoiceListPage and InvoiceDetailsPage.
+
+**Critical files to read first when resuming Phase 6**:
+- `src/routes/jellypolly/invoices.js` (mirror this pattern)
+- `src/routes/jellypolly/payments.js` (confirm payment-status semantics match TH — especially the `'overpaid'` status used by Refund Notes)
+- `src/utils/JellyPolly/einvoice/JPEInvoiceApiClientFactory.js` and `JPEInvoiceSubmissionHandler.js` (for the auto-consolidation extension)
+- `src/pages/JellyPolly/Invoice/*` and `src/pages/JellyPolly/Payments/*` for page integration points
+- `src/pages/JellyPollyNavData.tsx` for sidebar position
+
+Phase 7 (Green Target) has not been started — its database schema and field names diverge significantly from TH/JP, so it needs its own design pass and templates (see Phase 7 section above for the diverging fields).
 
 ---
 

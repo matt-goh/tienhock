@@ -97,6 +97,7 @@ import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
 import jellypollyPaymentRouter from "./jellypolly/payments.js";
 import jellypollyEInvoiceRouter from "./jellypolly/e-invoices.js";
 import jellypollyDebtorsRouter from "./jellypolly/debtors.js";
+import jellypollyAdjustmentDocsRouter from "./jellypolly/adjustment-docs.js";
 
 // Excel routes
 import paymentExportRouter from "./excel/payment-export.js";
@@ -187,7 +188,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/payments", paymentsRouter(pool));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
-  app.use("/api/adjustment-docs", adjustmentDocsRouter(pool));
+  app.use("/api/adjustment-docs", adjustmentDocsRouter(pool, myInvoisConfig));
 
   // Payroll routes
   app.use("/api/daily-work-logs", dailyWorkLogsRouter(pool));
@@ -264,6 +265,10 @@ export default function setupRoutes(app, pool) {
     jellypollyEInvoiceRouter(pool, myInvoisJPConfig)
   );
   app.use("/jellypolly/api/debtors", jellypollyDebtorsRouter(pool));
+  app.use(
+    "/jellypolly/api/adjustment-docs",
+    jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig)
+  );
 
   // Catalogue - Main routes
   app.use("/api/staffs", staffRouter(pool));

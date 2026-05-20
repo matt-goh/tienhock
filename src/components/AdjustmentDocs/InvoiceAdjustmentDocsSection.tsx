@@ -5,25 +5,31 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconFileText, IconExternalLink } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
-import { AdjustmentDocument } from "../../types/types";
+import type { AdjustmentDocument } from "../../types/types";
 import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
 } from "./AdjustmentDocBadge";
 import LoadingSpinner from "../LoadingSpinner";
+import { getAdjustmentDocsPaths } from "./useAdjustmentDocsPaths";
+import type {
+  AdjustmentDocsCompany,
+  AdjustmentDocsPaths,
+} from "./useAdjustmentDocsPaths";
 
 interface Props {
   invoiceId: string;
   /**
-   * Optional base path. Defaults to Tien Hock's `/sales/adjustment-docs`.
-   * Jelly Polly / Green Target wrappers pass their own prefixed path.
+   * Company scope. Determines both the API endpoint to fetch from and the
+   * UI prefix for click-through navigation. Defaults to Tien Hock.
    */
-  basePath?: string;
+  company?: AdjustmentDocsCompany;
   /**
    * A counter that the parent can bump to force a refetch
    * (e.g. after creating/cancelling a doc elsewhere).
    */
   refreshKey?: number;
+  onDocsLoaded?: (docs: AdjustmentDocument[]) => void;
 }
 
 const formatCurrency = (amount: number): string =>
@@ -34,29 +40,42 @@ const formatCurrency = (amount: number): string =>
 
 const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
   invoiceId,
-  basePath = "/sales/adjustment-docs",
+  company = "tienhock",
   refreshKey,
+  onDocsLoaded,
 }) => {
   const navigate = useNavigate();
+  const paths: AdjustmentDocsPaths = getAdjustmentDocsPaths(company);
   const [docs, setDocs] = useState<AdjustmentDocument[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDocs = useCallback(async () => {
-    if (!invoiceId) return;
+    if (!invoiceId) {
+      setDocs([]);
+      onDocsLoaded?.([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    onDocsLoaded?.([]);
     try {
-      const result = await api.get(
-        `/api/adjustment-docs?original_invoice_id=${encodeURIComponent(
+      const result: unknown = await api.get(
+        `${paths.apiBase}?original_invoice_id=${encodeURIComponent(
           invoiceId
         )}&include_cancelled=true`
       );
-      setDocs(Array.isArray(result) ? result : []);
+      const fetchedDocs: AdjustmentDocument[] = Array.isArray(result)
+        ? result
+        : [];
+      setDocs(fetchedDocs);
+      onDocsLoaded?.(fetchedDocs);
     } catch {
       setDocs([]);
+      onDocsLoaded?.([]);
     } finally {
       setLoading(false);
     }
-  }, [invoiceId]);
+  }, [invoiceId, onDocsLoaded, paths.apiBase]);
 
   useEffect(() => {
     fetchDocs();
@@ -110,7 +129,7 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
               <tr
                 key={d.id}
                 className="hover:bg-default-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors duration-150"
-                onClick={() => navigate(`${basePath}/${d.id}`)}
+                onClick={() => navigate(`${paths.uiBase}/${d.id}`)}
               >
                 <td className="px-4 py-2 text-sm font-medium text-default-900 dark:text-gray-100">
                   {d.id}
