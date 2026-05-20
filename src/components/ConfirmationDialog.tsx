@@ -74,7 +74,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             leaveTo="opacity-0 scale-95"
           >
             <DialogPanel
-              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
+              className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 border border-transparent dark:border-gray-700 shadow-xl rounded-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <DialogTitle
@@ -83,8 +83,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
               >
                 {title}
               </DialogTitle>
-              <div className="mt-2">
-                <p className="text-sm text-default-500 dark:text-gray-400">{message}</p>
+              <div className="mt-2 text-sm text-default-500 dark:text-gray-400">
+                {message}
               </div>
 
               <div className="mt-4 flex justify-end space-x-2">

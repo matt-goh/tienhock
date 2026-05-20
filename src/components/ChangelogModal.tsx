@@ -19,6 +19,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-20",
+    ms: 'Dokumen Pelarasan kini tersedia untuk Jelly Polly juga: Nota Kredit, Nota Debit dan Nota Refund boleh dikeluarkan untuk invois Jelly Polly dengan aliran kerja yang sama seperti Tien Hock, termasuk e-invois MyInvois (individu dan konsolidasi) menggunakan kredensial Jelly Polly.',
+    en: "Adjustment Documents now also available for Jelly Polly: Credit, Debit, and Refund Notes can be issued for Jelly Polly invoices with the same workflow as Tien Hock, including MyInvois e-invoice (individual and consolidated) using Jelly Polly's credentials.",
+  },
+  {
+    date: "2026-05-20",
+    ms: 'Dokumen Pelarasan diperkenalkan dalam Sales: Nota Kredit, Nota Debit dan Nota Refund kini boleh dikeluarkan dari halaman butiran invois dan diuruskan di halaman baru "Adjustment Documents" di bawah Sales. Nota Kredit boleh mengeluarkan Nota Refund berpasangan secara automatik apabila invois sudah dibayar. Pembatalan dokumen akan membalikkan kesan kepada baki invois, kredit pelanggan, dan rekod perakaunan.',
+    en: 'Adjustment Documents introduced in Sales: Credit, Debit, and Refund Notes can now be issued from the invoice details page and managed at a new "Adjustment Documents" page under Sales. Credit Notes can automatically issue a paired Refund Note when the invoice is already paid. Cancelling a document reverses its effect on the invoice balance, customer credit, and accounting entries.',
+  },
+  {
+    date: "2026-05-20",
+    ms: 'Halaman baru "Production Records" ditambah dalam Stock untuk melihat rekod pengeluaran mengikut hari, kategori, produk dan pekerja, dengan pautan terus untuk mengedit di Production Entry.',
+    en: 'New "Production Records" page in Stock for viewing production records by day, category, product, and worker, with direct links back to Production Entry for editing.',
+  },
+  {
     date: "2026-05-19",
     ms: "Jelly Polly kini mempunyai halaman Ringkasan Jualan sendiri yang memaparkan hanya produk Jelly Polly. Ringkasan Jualan Tien Hock tidak lagi memasukkan data Jelly Polly, dan PDF Jelly Polly menggunakan \"JELLY POLLY FOOD INDUSTRIES\" sebagai tajuk syarikat.",
     en: "Jelly Polly now has its own Sales Summary page showing only Jelly Polly products. The Tien Hock Sales Summary no longer includes Jelly Polly data.",

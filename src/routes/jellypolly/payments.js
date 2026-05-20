@@ -22,6 +22,20 @@ const updateCustomerCredit = async (client, customerId, amount) => {
   }
 };
 
+const fetchActiveAdjustmentForInvoice = async (client, invoiceId) => {
+  const result = await client.query(
+    `SELECT id, type
+       FROM jellypolly.adjustment_documents
+      WHERE original_invoice_id = $1
+        AND status = 'active'
+        AND COALESCE(is_consolidated, false) = false
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [invoiceId]
+  );
+  return result.rows[0] || null;
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -484,6 +498,16 @@ export default function (pool) {
       if (invoice_status === "cancelled") {
         throw new Error(
           `Cannot cancel payment for a cancelled invoice (${invoice_id}).`
+        );
+      }
+
+      const existingAdjustment = await fetchActiveAdjustmentForInvoice(
+        client,
+        invoice_id
+      );
+      if (existingAdjustment) {
+        throw new Error(
+          `Cannot cancel payment for invoice ${invoice_id} because active adjustment document ${existingAdjustment.id} exists. Cancel the adjustment document first.`
         );
       }
 

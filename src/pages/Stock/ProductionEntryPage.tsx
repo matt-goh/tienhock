@@ -17,6 +17,7 @@ import BundleEntrySection, {
   BundleEntrySectionHandle,
 } from "../../components/Stock/BundleEntrySection";
 import ProductionHelpDialog from "../../components/Stock/ProductionHelpDialog";
+import DateNavigator from "../../components/DateNavigator";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
@@ -34,6 +35,9 @@ import {
   IconSearch,
   IconX,
   IconAlertTriangle,
+  IconRefresh,
+  IconDeviceFloppy,
+  IconPackage,
 } from "@tabler/icons-react";
 import { Switch } from "@headlessui/react";
 import Button from "../../components/Button";
@@ -41,10 +45,23 @@ import ProductPayCodeMappingModal from "../../components/Stock/ProductPayCodeMap
 import { isSpecialItem } from "../../config/specialItems";
 import {
   OTH_PRODUCTION_IDS,
-  getOthProductionConfig,
+  isOthProductionProduct,
 } from "../../config/othProductionProducts";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
+const STOCK_ONLY_WORKER_ID = "__STOCK_ONLY__";
+
+const formatDateLocal = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
 
 // Special selection types for Hancur and Bundle entries
 type SpecialSelection =
@@ -56,21 +73,47 @@ type SpecialSelection =
 
 const ProductionEntryPage: React.FC = () => {
   // Get initial values from URL params or defaults
-  const getInitialDate = () => {
+  const getInitialDate = (): string => {
     const params = new URLSearchParams(window.location.search);
     const dateParam = params.get("date");
     if (dateParam) {
-      const parsed = new Date(dateParam);
+      const parsed = parseLocalDate(dateParam);
       if (!isNaN(parsed.getTime())) {
         return dateParam;
       }
     }
-    return new Date().toISOString().split("T")[0];
+    return formatDateLocal(new Date());
   };
 
-  const getInitialProduct = () => {
+  const getInitialProduct = (): string | null => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("product") || null;
+    const productParam = params.get("product");
+    if (
+      productParam === "HANCUR_BH" ||
+      productParam === "KARUNG_HANCUR" ||
+      productParam === "BUNDLE_BP" ||
+      productParam === "BUNDLE_BH" ||
+      productParam === "BUNDLE_MEE"
+    ) {
+      return null;
+    }
+    return productParam || null;
+  };
+
+  const getInitialSpecialSelection = (): SpecialSelection => {
+    const params = new URLSearchParams(window.location.search);
+    const productParam = params.get("product");
+    if (productParam === "HANCUR_BH" || productParam === "KARUNG_HANCUR") {
+      return "HANCUR_BH";
+    }
+    if (
+      productParam === "BUNDLE_BP" ||
+      productParam === "BUNDLE_BH" ||
+      productParam === "BUNDLE_MEE"
+    ) {
+      return productParam;
+    }
+    return null;
   };
 
   // State
@@ -86,7 +129,7 @@ const ProductionEntryPage: React.FC = () => {
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [specialSelection, setSpecialSelection] =
-    useState<SpecialSelection>(null);
+    useState<SpecialSelection>(getInitialSpecialSelection);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const [hancurSearchQuery, setHancurSearchQuery] = useState("");
   const [bundleSearchQuery, setBundleSearchQuery] = useState("");
@@ -207,15 +250,15 @@ const ProductionEntryPage: React.FC = () => {
   }, [selectedProductId, products]);
 
   // Filter workers from cached staffs.
-  // OTH products with explicit job config use the union of their jobs.
-  // Otherwise fall back to MEE_PACKING (for MEE) or BH_PACKING (for everything else).
+  // OTH production products are stock-only and use a single quantity input.
   const workers: ProductionWorker[] = useMemo(() => {
     if (!selectedProduct) return [];
 
-    const othConfig = getOthProductionConfig(selectedProduct.id);
-    const jobFilters: string[] = othConfig
-      ? othConfig.jobs
-      : [selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING"];
+    if (isOthProductionProduct(selectedProduct.id)) return [];
+
+    const jobFilters: string[] = [
+      selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING",
+    ];
 
     return staffs
       .filter((staff) => jobFilters.some((j) => staff.job.includes(j)))
@@ -241,9 +284,23 @@ const ProductionEntryPage: React.FC = () => {
         );
 
         const entriesMap: Record<string, number> = {};
-        (response || []).forEach((entry: ProductionEntry) => {
-          entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
-        });
+
+        if (isOthProductionProduct(selectedProductId)) {
+          const totalQuantity: number = (response || []).reduce(
+            (sum: number, entry: ProductionEntry) =>
+              sum + (Number(entry.bags_packed) || 0),
+            0
+          );
+
+          if (totalQuantity > 0) {
+            entriesMap[STOCK_ONLY_WORKER_ID] = totalQuantity;
+          }
+        } else {
+          (response || []).forEach((entry: ProductionEntry) => {
+            if (!entry.worker_id) return;
+            entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
+          });
+        }
 
         setEntries(entriesMap);
         setOriginalEntries(entriesMap);
@@ -290,7 +347,9 @@ const ProductionEntryPage: React.FC = () => {
   }, [selectedDate, selectedProductId, specialSelection, selectedProduct]);
 
   // Handle machine broken toggle
-  const handleMachineBrokenToggle = async (newValue: boolean) => {
+  const handleMachineBrokenToggle = async (
+    newValue: boolean
+  ): Promise<void> => {
     if (!selectedDate || !selectedProductId) return;
 
     try {
@@ -320,8 +379,24 @@ const ProductionEntryPage: React.FC = () => {
     });
   }, []);
 
+  const handleStockOnlyEntryChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    const value: string = event.target.value;
+
+    if (value === "") {
+      handleEntryChange(STOCK_ONLY_WORKER_ID, 0);
+      return;
+    }
+
+    const quantity: number = parseInt(value, 10);
+    if (!isNaN(quantity) && quantity >= 0) {
+      handleEntryChange(STOCK_ONLY_WORKER_ID, quantity);
+    }
+  };
+
   // Handle save
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!selectedDate || !selectedProductId) {
       toast.error("Please select a date and product first");
       return;
@@ -329,22 +404,32 @@ const ProductionEntryPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const entriesArray = Object.entries(entries).map(
-        ([worker_id, bags_packed]) => ({
-          worker_id,
-          bags_packed,
-        })
-      );
+      const isStockOnlyProduct: boolean =
+        isOthProductionProduct(selectedProductId);
+      const entriesArray: { worker_id: string; bags_packed: number }[] =
+        isStockOnlyProduct
+          ? [
+              {
+                worker_id: STOCK_ONLY_WORKER_ID,
+                bags_packed: entries[STOCK_ONLY_WORKER_ID] || 0,
+              },
+            ]
+          : Object.entries(entries).map(([worker_id, bags_packed]) => ({
+              worker_id,
+              bags_packed,
+            }));
 
-      // Include workers with 0 bags to clear their entries
-      workers.forEach((worker) => {
-        if (!entries[worker.id]) {
-          entriesArray.push({
-            worker_id: worker.id,
-            bags_packed: 0,
-          });
-        }
-      });
+      if (!isStockOnlyProduct) {
+        // Include workers with 0 bags to clear their entries
+        workers.forEach((worker) => {
+          if (!entries[worker.id]) {
+            entriesArray.push({
+              worker_id: worker.id,
+              bags_packed: 0,
+            });
+          }
+        });
+      }
 
       const response = await api.post("/api/production-entries/batch", {
         date: selectedDate,
@@ -353,7 +438,9 @@ const ProductionEntryPage: React.FC = () => {
       });
 
       toast.success(
-        `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
+        isStockOnlyProduct
+          ? `Stock record saved: ${response.total_bags} total`
+          : `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
       );
       setOriginalEntries({ ...entries });
     } catch (error) {
@@ -365,12 +452,12 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   // Handle reset
-  const handleReset = () => {
+  const handleReset = (): void => {
     setEntries({ ...originalEntries });
   };
 
   // Handle special selection change with unsaved changes warning
-  const handleSpecialSelect = (selection: SpecialSelection) => {
+  const handleSpecialSelect = (selection: SpecialSelection): void => {
     // Check for unsaved changes based on current selection
     let hasCurrentUnsavedChanges = false;
 
@@ -399,7 +486,7 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   // Handle product selection with unsaved changes warning
-  const handleProductSelect = (productId: string | null) => {
+  const handleProductSelect = (productId: string | null): void => {
     // Check for unsaved changes in current view
     let hasCurrentUnsavedChanges = false;
     if (specialSelection === null && selectedProductId) {
@@ -443,24 +530,36 @@ const ProductionEntryPage: React.FC = () => {
     setWorkerSearchQuery(""); // Clear search when changing product
   };
 
-  // Format date for display
-  const formatDateDisplay = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const english = date.toLocaleDateString("en-MY", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const malayWeekday = date.toLocaleDateString("ms-MY", {
-      weekday: "long",
-    });
-    return { english, malay: malayWeekday };
+  const handleDateNavigatorChange = (date: Date): void => {
+    setSelectedDate(formatDateLocal(date));
   };
+
+  const handleDateInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    const nextDate: string = event.target.value;
+    if (!nextDate) return;
+    setSelectedDate(nextDate);
+  };
+
+  const formatNavigatorDisplay = (date: Date): string => {
+    return date.toLocaleDateString("ms-MY", {
+      weekday: "long",
+    });
+  };
+
+  const productionProductFilter = useCallback(
+    (product: StockProduct): boolean =>
+      product.type !== "OTH" || OTH_PRODUCTION_IDS.includes(product.id),
+    []
+  );
 
   // Check if we're viewing a regular product (not special selection)
   const isViewingProduct =
     selectedProductId !== null && specialSelection === null;
+  const isViewingStockOnlyProduct: boolean =
+    selectedProductId !== null && isOthProductionProduct(selectedProductId);
+  const stockOnlyQuantity: number = entries[STOCK_ONLY_WORKER_ID] || 0;
 
   return (
     <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
@@ -481,13 +580,17 @@ const ProductionEntryPage: React.FC = () => {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                max={new Date().toISOString().split("T")[0]}
+                onChange={handleDateInputChange}
+                max={formatDateLocal(new Date())}
                 className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
-              <span className="text-xs text-default-500 dark:text-gray-400 hidden sm:inline">
-                {formatDateDisplay(selectedDate).malay}
-              </span>
+              <DateNavigator
+                selectedDate={parseLocalDate(selectedDate)}
+                onChange={handleDateNavigatorChange}
+                showGoToTodayButton={false}
+                formatDisplay={formatNavigatorDisplay}
+                size="sm"
+              />
             </div>
             {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
             {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
@@ -562,6 +665,7 @@ const ProductionEntryPage: React.FC = () => {
                 value={selectedProductId}
                 onChange={handleProductSelect}
                 productTypes={["MEE", "BH", "BUNDLE", "OTH"]}
+                productFilter={productionProductFilter}
               />
             </div>
 
@@ -829,30 +933,33 @@ const ProductionEntryPage: React.FC = () => {
 
               {/* Right side: Search + Change product */}
               <div className="flex items-center gap-3 flex-shrink-0">
-                {/* Mini Worker Search Input */}
-                <div className="relative">
-                  <IconSearch
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search worker..."
-                    value={workerSearchQuery}
-                    onChange={(e) => setWorkerSearchQuery(e.target.value)}
-                    className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  />
-                  {workerSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setWorkerSearchQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
-                    >
-                      <IconX size={12} />
-                    </button>
-                  )}
-                </div>
-                <div className="h-4 w-px bg-default-300 dark:bg-gray-600" />
+                {!isViewingStockOnlyProduct && (
+                  <>
+                    <div className="relative">
+                      <IconSearch
+                        size={14}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search worker..."
+                        value={workerSearchQuery}
+                        onChange={(e) => setWorkerSearchQuery(e.target.value)}
+                        className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                      {workerSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setWorkerSearchQuery("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
+                        >
+                          <IconX size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="h-4 w-px bg-default-300 dark:bg-gray-600" />
+                  </>
+                )}
                 <button
                   onClick={() => handleProductSelect(null)}
                   className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 whitespace-nowrap"
@@ -863,19 +970,97 @@ const ProductionEntryPage: React.FC = () => {
             </div>
           </div>
 
-          <WorkerEntryGrid
-            workers={workers}
-            entries={entries}
-            onEntryChange={handleEntryChange}
-            isLoading={isLoadingWorkers}
-            disabled={isSaving}
-            onSave={handleSave}
-            onReset={handleReset}
-            hasUnsavedChanges={hasUnsavedChanges}
-            isSaving={isSaving}
-            searchQuery={workerSearchQuery}
-            onSearchChange={setWorkerSearchQuery}
-          />
+          {isViewingStockOnlyProduct ? (
+            <div className="overflow-hidden">
+              <div className="p-4 bg-white dark:bg-gray-800">
+                <div className="max-w-sm rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                  <label
+                    htmlFor="stock-only-quantity"
+                    className="block text-sm font-medium text-default-700 dark:text-gray-300"
+                  >
+                    Quantity
+                  </label>
+                  <input
+                    id="stock-only-quantity"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={stockOnlyQuantity > 0 ? stockOnlyQuantity : ""}
+                    onChange={handleStockOnlyEntryChange}
+                    onFocus={(e) => e.target.select()}
+                    disabled={isSaving}
+                    placeholder="0"
+                    className="mt-2 w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-right text-lg font-semibold text-default-900 dark:text-gray-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <IconPackage
+                      className="text-purple-600 dark:text-purple-400"
+                      size={20}
+                    />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-default-900 dark:text-gray-100">
+                      Stock Total
+                    </div>
+                    <div className="text-xs text-default-500 dark:text-gray-400">
+                      {parseLocalDate(selectedDate).toLocaleDateString("en-MY", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
+                  <div className="ml-4 pl-6 border-l border-default-300 dark:border-gray-600">
+                    <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
+                      {stockOnlyQuantity.toLocaleString()}{" "}
+                      <span className="text-base font-normal text-default-500 dark:text-gray-400">
+                        pcs
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleReset}
+                    disabled={!hasUnsavedChanges || isSaving}
+                    color="default"
+                    icon={IconRefresh}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={!hasUnsavedChanges || isSaving}
+                    color="sky"
+                    icon={IconDeviceFloppy}
+                  >
+                    {isSaving ? "Saving..." : "Save Production"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <WorkerEntryGrid
+              workers={workers}
+              entries={entries}
+              onEntryChange={handleEntryChange}
+              isLoading={isLoadingWorkers}
+              disabled={isSaving}
+              onSave={handleSave}
+              onReset={handleReset}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isSaving={isSaving}
+              searchQuery={workerSearchQuery}
+              onSearchChange={setWorkerSearchQuery}
+            />
+          )}
         </>
       )}
 
