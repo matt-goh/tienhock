@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 import { createDatabasePool } from "./src/routes/utils/db-pool.js";
 import { updateInvoiceStatuses } from "./src/utils/invoice/invoiceStatusUpdater.js";
 import { checkAndProcessDueConsolidations } from "./src/utils/invoice/autoConsolidation.js";
+import { checkAndProcessDueAdjustmentConsolidations } from "./src/utils/invoice/autoAdjustmentConsolidation.js";
 import { createAutoBackup, syncLocalToS3, deleteOldS3Backups } from "./src/utils/s3-backup.js";
 import { clearInvalidEInvoicesForNonEligibleCustomers } from "./src/routes/sales/invoices/invoices.js";
 
@@ -103,6 +104,9 @@ cron.schedule(
     try {
       // Check if any consolidations are due today
       await checkAndProcessDueConsolidations(pool);
+      // Then process Tien Hock adjustment-doc consolidations
+      // (JP/GT to be added in their respective phases)
+      await checkAndProcessDueAdjustmentConsolidations(pool);
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] Error in auto-consolidation job:`,

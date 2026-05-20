@@ -42,6 +42,7 @@ import {
   IconFileInvoice,
   IconUser,
   IconFileExport,
+  IconFileText,
 } from "@tabler/icons-react";
 import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 // Import the specific utilities needed
@@ -1748,7 +1749,7 @@ const InvoiceListPage: React.FC = () => {
 
           {/* Action Buttons (Show only when items are selected) */}
           <div
-            className="flex gap-2 flex-wrap w-full sm:w-auto sm:ml-auto"
+            className="flex gap-2 flex-wrap w-full sm:w-auto sm:ml-auto [&>button]:rounded-md [&>button]:px-3 [&>button]:py-1.5 [&>button]:text-sm"
             onClick={(e) => e.stopPropagation()} // Prevent row selection click
           >
             {selectedInvoiceIds.size > 0 && (
@@ -1857,6 +1858,17 @@ const InvoiceListPage: React.FC = () => {
               aria-label="Consolidated Invoice"
             >
               Consolidated
+            </Button>
+            <Button
+              onClick={() => navigate("/sales/adjustment-docs")}
+              icon={IconFileText}
+              variant="outline"
+              disabled={isLoading || isExporting}
+              size="sm"
+              title="Adjustment Documents (Credit / Debit / Refund Notes)"
+              aria-label="Adjustment Documents"
+            >
+              Documents
             </Button>
             <Button
               onClick={handleRefresh}

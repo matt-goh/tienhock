@@ -448,7 +448,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 text-sm">
-                              <span className="font-medium">{invoice.invoice_number}</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{invoice.invoice_number}</span>
                               <span className="text-gray-600 dark:text-gray-400 truncate">
                                 {invoice.customer_name} ({invoice.customer_id})
                               </span>
@@ -581,7 +581,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                     {selectedInvoices.length} invoice
                     {selectedInvoices.length !== 1 ? "s" : ""} selected
                     {formData.payment_method === "cheque" && (
-                      <span className="ml-2 text-amber-600">
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">
                         (Will be marked as pending until confirmed)
                       </span>
                     )}
@@ -622,7 +622,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
         } Detected`}
         message={
           overpaymentDetails ? (
-            <div className="space-y-2">
+            <div className="space-y-2 text-default-600 dark:text-gray-300">
               <p>
                 {overpaymentDetails.length === 1
                   ? "The following payment exceeds the balance due:"
@@ -633,9 +633,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                 {overpaymentDetails.map((detail, index) => (
                   <div
                     key={detail.invoiceId}
-                    className="bg-gray-50 p-3 border rounded-lg"
+                    className="bg-gray-50 dark:bg-gray-900/50 p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
                   >
-                    <div className="font-medium text-sm text-gray-800 mb-2">
+                    <div className="font-medium text-sm text-gray-800 dark:text-gray-100 mb-2">
                       Invoice {detail.invoiceId} - {detail.customerName}
                     </div>
                     <div className="space-y-1 text-sm">
@@ -651,9 +651,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                           {formatCurrency(detail.regularAmount)}
                         </span>
                       </div>
-                      <div className="flex justify-between border-t pt-1 mt-1">
+                      <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
                         <span>Overpaid Amount:</span>
-                        <span className="font-medium text-purple-600">
+                        <span className="font-medium text-purple-600 dark:text-purple-300">
                           {formatCurrency(detail.overpaidAmount)}
                         </span>
                       </div>
@@ -663,8 +663,8 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
               </div>
 
               {/* Summary */}
-              <div className="bg-purple-50 p-3 border border-purple-200 rounded-lg">
-                <div className="font-medium text-sm text-purple-800 mb-2">
+              <div className="bg-purple-50 dark:bg-purple-900/30 p-3 border border-purple-200 dark:border-purple-700 rounded-lg">
+                <div className="font-medium text-sm text-purple-800 dark:text-purple-200 mb-2">
                   Summary
                 </div>
                 <div className="space-y-1 text-sm">
@@ -681,7 +681,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                   </div>
                   <div className="flex justify-between">
                     <span>Total Overpaid Amount:</span>
-                    <span className="font-medium text-purple-600">
+                    <span className="font-medium text-purple-600 dark:text-purple-300">
                       {formatCurrency(
                         overpaymentDetails.reduce(
                           (sum, detail) => sum + detail.overpaidAmount,
@@ -690,9 +690,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                       )}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t pt-1 mt-1">
+                  <div className="flex justify-between border-t border-purple-200 dark:border-purple-700 pt-1 mt-1">
                     <span>Grand Total:</span>
-                    <span className="font-bold">
+                    <span className="font-bold text-default-900 dark:text-gray-100">
                       {formatCurrency(
                         overpaymentDetails.reduce(
                           (sum, detail) => sum + detail.totalAmount,
@@ -704,7 +704,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                 </div>
               </div>
 
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Each overpaid amount will be recorded as a separate "Overpaid"
                 payment record for its respective invoice.
               </p>

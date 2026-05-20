@@ -48,11 +48,17 @@ import InvoiceFormPage from "./Invoice/InvoiceFormPage";
 import InvoiceDetailsPage from "./Invoice/InvoiceDetailsPage";
 import PaymentPage from "./Payments/PaymentPage";
 
+// Adjustment Documents (Credit / Debit / Refund Notes)
+import AdjustmentDocsListPage from "./AdjustmentDocs/AdjustmentDocsListPage";
+import AdjustmentDocsFormPage from "./AdjustmentDocs/AdjustmentDocsFormPage";
+import AdjustmentDocsDetailsPage from "./AdjustmentDocs/AdjustmentDocsDetailsPage";
+
 // Sales related imports
 import SalesSummaryPage from "./Sales/SalesSummaryPage";
 
 // Stock related imports
 import ProductionEntryPage from "./Stock/ProductionEntryPage";
+import ProductionListPage from "./Stock/ProductionListPage";
 import ProductStockMovementPage from "./Stock/ProductStockMovementPage";
 import ProductStockAdjustmentEntryPage from "./Stock/ProductStockAdjustmentEntryPage";
 
@@ -404,6 +410,24 @@ export const TienHockNavData: SidebarItem[] = [
         path: "/sales/payments",
         component: PaymentPage,
       },
+      {
+        name: "Adjustment Documents",
+        path: "/sales/adjustment-docs",
+        component: AdjustmentDocsListPage,
+        subItems: [
+          {
+            name: "New Adjustment Document",
+            path: "/sales/adjustment-docs/new",
+            component: AdjustmentDocsFormPage,
+            showInPopover: true,
+          },
+          {
+            name: "Adjustment Document Details",
+            path: "/sales/adjustment-docs/:id",
+            component: AdjustmentDocsDetailsPage,
+          },
+        ],
+      },
     ],
   },
   {
@@ -424,6 +448,11 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Production Entry",
         path: "/stock/production",
         component: ProductionEntryPage,
+      },
+      {
+        name: "Production Records",
+        path: "/stock/production-records",
+        component: ProductionListPage,
       },
       {
         name: "Product Adjustments",
