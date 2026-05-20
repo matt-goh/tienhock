@@ -88,12 +88,20 @@ export default function (pool) {
   // GET /api/production-entries - List entries with filters
   router.get("/", async (req, res) => {
     try {
-      const { date, product_id, worker_id, start_date, end_date } = req.query;
+      const {
+        date,
+        product_id,
+        worker_id,
+        start_date,
+        end_date,
+        include_machine_status,
+      } = req.query;
+      const includeMachineStatus = include_machine_status === "true";
 
       let query = `
         SELECT
           pe.id,
-          pe.entry_date,
+          TO_CHAR(pe.entry_date, 'YYYY-MM-DD') as entry_date,
           pe.product_id,
           pe.worker_id,
           pe.bags_packed,
@@ -103,9 +111,11 @@ export default function (pool) {
           s.name as worker_name,
           p.description as product_description,
           p.type as product_type
+          ${includeMachineStatus ? ", COALESCE(pms.machine_broken, false) as machine_broken" : ""}
         FROM production_entries pe
         LEFT JOIN staffs s ON pe.worker_id = s.id
         LEFT JOIN products p ON pe.product_id = p.id
+        ${includeMachineStatus ? "LEFT JOIN production_machine_status pms ON pms.entry_date = pe.entry_date AND pms.product_id = pe.product_id" : ""}
         WHERE 1=1
       `;
 

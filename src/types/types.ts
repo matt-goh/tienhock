@@ -1006,6 +1006,7 @@ export interface ProductionEntry {
   created_by?: string;
   product_description?: string;
   product_type?: string;
+  machine_broken?: boolean;
 }
 
 // Production Entry Batch (for daily form submission)

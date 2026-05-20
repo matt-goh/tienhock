@@ -426,6 +426,11 @@ export const TienHockNavData: SidebarItem[] = [
         component: ProductionEntryPage,
       },
       {
+        name: "Production Records",
+        path: "/stock/production-records",
+        component: ProductionListPage,
+      },
+      {
         name: "Product Adjustments",
         path: "/stock/adjustments",
         component: ProductStockAdjustmentEntryPage,
