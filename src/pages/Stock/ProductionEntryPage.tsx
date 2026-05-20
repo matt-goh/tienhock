@@ -17,6 +17,7 @@ import BundleEntrySection, {
   BundleEntrySectionHandle,
 } from "../../components/Stock/BundleEntrySection";
 import ProductionHelpDialog from "../../components/Stock/ProductionHelpDialog";
+import DateNavigator from "../../components/DateNavigator";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import {
@@ -46,6 +47,18 @@ import {
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
 
+const formatDateLocal = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
 // Special selection types for Hancur and Bundle entries
 type SpecialSelection =
   | "HANCUR_BH"
@@ -56,19 +69,19 @@ type SpecialSelection =
 
 const ProductionEntryPage: React.FC = () => {
   // Get initial values from URL params or defaults
-  const getInitialDate = () => {
+  const getInitialDate = (): string => {
     const params = new URLSearchParams(window.location.search);
     const dateParam = params.get("date");
     if (dateParam) {
-      const parsed = new Date(dateParam);
+      const parsed = parseLocalDate(dateParam);
       if (!isNaN(parsed.getTime())) {
         return dateParam;
       }
     }
-    return new Date().toISOString().split("T")[0];
+    return formatDateLocal(new Date());
   };
 
-  const getInitialProduct = () => {
+  const getInitialProduct = (): string | null => {
     const params = new URLSearchParams(window.location.search);
     return params.get("product") || null;
   };
@@ -290,7 +303,9 @@ const ProductionEntryPage: React.FC = () => {
   }, [selectedDate, selectedProductId, specialSelection, selectedProduct]);
 
   // Handle machine broken toggle
-  const handleMachineBrokenToggle = async (newValue: boolean) => {
+  const handleMachineBrokenToggle = async (
+    newValue: boolean
+  ): Promise<void> => {
     if (!selectedDate || !selectedProductId) return;
 
     try {
@@ -321,7 +336,7 @@ const ProductionEntryPage: React.FC = () => {
   }, []);
 
   // Handle save
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!selectedDate || !selectedProductId) {
       toast.error("Please select a date and product first");
       return;
@@ -365,12 +380,12 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   // Handle reset
-  const handleReset = () => {
+  const handleReset = (): void => {
     setEntries({ ...originalEntries });
   };
 
   // Handle special selection change with unsaved changes warning
-  const handleSpecialSelect = (selection: SpecialSelection) => {
+  const handleSpecialSelect = (selection: SpecialSelection): void => {
     // Check for unsaved changes based on current selection
     let hasCurrentUnsavedChanges = false;
 
@@ -399,7 +414,7 @@ const ProductionEntryPage: React.FC = () => {
   };
 
   // Handle product selection with unsaved changes warning
-  const handleProductSelect = (productId: string | null) => {
+  const handleProductSelect = (productId: string | null): void => {
     // Check for unsaved changes in current view
     let hasCurrentUnsavedChanges = false;
     if (specialSelection === null && selectedProductId) {
@@ -443,19 +458,22 @@ const ProductionEntryPage: React.FC = () => {
     setWorkerSearchQuery(""); // Clear search when changing product
   };
 
-  // Format date for display
-  const formatDateDisplay = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const english = date.toLocaleDateString("en-MY", {
+  const handleDateNavigatorChange = (date: Date): void => {
+    setSelectedDate(formatDateLocal(date));
+  };
+
+  const handleDateInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    const nextDate: string = event.target.value;
+    if (!nextDate) return;
+    setSelectedDate(nextDate);
+  };
+
+  const formatNavigatorDisplay = (date: Date): string => {
+    return date.toLocaleDateString("ms-MY", {
       weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
     });
-    const malayWeekday = date.toLocaleDateString("ms-MY", {
-      weekday: "long",
-    });
-    return { english, malay: malayWeekday };
   };
 
   // Check if we're viewing a regular product (not special selection)
@@ -481,13 +499,17 @@ const ProductionEntryPage: React.FC = () => {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                max={new Date().toISOString().split("T")[0]}
+                onChange={handleDateInputChange}
+                max={formatDateLocal(new Date())}
                 className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
-              <span className="text-xs text-default-500 dark:text-gray-400 hidden sm:inline">
-                {formatDateDisplay(selectedDate).malay}
-              </span>
+              <DateNavigator
+                selectedDate={parseLocalDate(selectedDate)}
+                onChange={handleDateNavigatorChange}
+                showGoToTodayButton={false}
+                formatDisplay={formatNavigatorDisplay}
+                size="sm"
+              />
             </div>
             {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
             {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
