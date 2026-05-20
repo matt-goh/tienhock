@@ -1,7 +1,12 @@
 // src/pages/JellyPolly/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ExtendedInvoiceData, Payment, ProductItem } from "../../types/types";
+import type {
+  AdjustmentDocument,
+  ExtendedInvoiceData,
+  Payment,
+  ProductItem,
+} from "../../types/types";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -36,8 +41,12 @@ import {
   IconPrinter,
   IconPencil,
   IconX,
+  IconFileMinus,
+  IconFilePlus,
+  IconRotate2,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
+import InvoiceAdjustmentDocsSection from "../../components/AdjustmentDocs/InvoiceAdjustmentDocsSection";
 import { api } from "../../routes/utils/api";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
@@ -46,6 +55,11 @@ import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
 import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
+import {
+  getInvoiceDisplayStatus,
+  getInvoiceDisplayStatusLabel,
+} from "../../utils/invoice/invoiceDisplayStatus";
+import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
 
 // --- Helper: Read-only Line Items Table ---
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
@@ -177,6 +191,9 @@ const InvoiceDetailsPage: React.FC = () => {
     null
   );
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [adjustmentDocs, setAdjustmentDocs] = useState<AdjustmentDocument[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -1237,6 +1254,13 @@ const InvoiceDetailsPage: React.FC = () => {
       return;
     }
 
+    if (hasActiveAdjustmentDocs) {
+      toast.error(
+        "Cancel the active adjustment document before cancelling payments."
+      );
+      return;
+    }
+
     setPaymentToCancel(payment);
     setShowCancelPaymentConfirm(true);
   };
@@ -1284,13 +1308,19 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const getStatusBadgeClass = (
-    status: ExtendedInvoiceData["invoice_status"]
+    status: InvoiceDisplayStatus
   ) => {
     switch (
       status?.toLowerCase() // Use toLowerCase for safety
     ) {
       case "paid":
+      case "refunded":
         return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
+      case "partially_refunded":
+        return "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300";
+      case "credit_balance":
+      case "credited":
+        return "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300";
       case "cancelled":
         return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300";
       case "overdue":
@@ -1392,7 +1422,11 @@ const InvoiceDetailsPage: React.FC = () => {
 
   // Derived states after data load
   const { date: createdDate } = parseDatabaseTimestamp(invoiceData.createddate);
-  const invoiceStatusStyle = getStatusBadgeClass(invoiceData.invoice_status);
+  const invoiceDisplayStatus: InvoiceDisplayStatus = getInvoiceDisplayStatus(
+    invoiceData,
+    adjustmentDocs
+  );
+  const invoiceStatusStyle = getStatusBadgeClass(invoiceDisplayStatus);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoiceData.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const consolidatedStatusInfo = getConsolidatedStatusInfo(
@@ -1401,6 +1435,10 @@ const InvoiceDetailsPage: React.FC = () => {
   const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const isCancelled = invoiceData.invoice_status === "cancelled";
   const isPaid = !isCancelled && invoiceData.balance_due <= 0; // Check balance only if not cancelled
+  const hasActiveAdjustmentDocs: boolean = adjustmentDocs.some(
+    (doc: AdjustmentDocument) =>
+      doc.status === "active" && !doc.is_consolidated
+  );
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
     invoiceData.createddate
   );
@@ -1448,10 +1486,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${invoiceStatusStyle}`}
             >
-              {invoiceData.invoice_status
-                ? invoiceData.invoice_status.charAt(0).toUpperCase() +
-                  invoiceData.invoice_status.slice(1)
-                : "Unknown"}
+              {getInvoiceDisplayStatusLabel(invoiceDisplayStatus)}
             </span>
             {eInvoiceStatusInfo && EInvoiceIcon && (
               <a
@@ -1483,7 +1518,7 @@ const InvoiceDetailsPage: React.FC = () => {
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-center mt-2 md:mt-0 [&>button]:rounded-md [&>button]:px-3 [&>button]:py-1.5 [&>button]:text-sm">
             {invoiceData.invoice_status === "cancelled" &&
               invoiceData.uuid &&
               invoiceData.einvoice_status !== "cancelled" && (
@@ -1557,6 +1592,73 @@ const InvoiceDetailsPage: React.FC = () => {
                 {showPaymentForm ? "Cancel Payment" : "Record Payment"}
               </Button>
             )}
+            {/* Adjustment Document Buttons */}
+            {!isCancelled && (
+              <>
+                <Button
+                  onClick={() =>
+                    navigate(
+                      `/jellypolly/sales/adjustment-docs/new?type=debit&invoiceId=${invoiceData.id}`
+                    )
+                  }
+                  icon={IconFilePlus}
+                  variant="outline"
+                  color="amber"
+                  size="md"
+                  disabled={isLoading || hasActiveAdjustmentDocs}
+                  title={
+                    hasActiveAdjustmentDocs
+                      ? "Cancel the existing adjustment document before creating another"
+                      : "Issue a Debit Note (additional charge)"
+                  }
+                >
+                  Debit Note
+                </Button>
+                <Button
+                  onClick={() =>
+                    navigate(
+                      `/jellypolly/sales/adjustment-docs/new?type=credit&invoiceId=${invoiceData.id}`
+                    )
+                  }
+                  icon={IconFileMinus}
+                  variant="outline"
+                  color="rose"
+                  size="md"
+                  disabled={isLoading || hasActiveAdjustmentDocs}
+                  title={
+                    hasActiveAdjustmentDocs
+                      ? "Cancel the existing adjustment document before creating another"
+                      : "Issue a Credit Note (sales return / reduction)"
+                  }
+                >
+                  Credit Note
+                </Button>
+                {payments.some((p) => p.status === "overpaid") && (
+                  <Button
+                    onClick={() => {
+                      const op = payments.find((p) => p.status === "overpaid");
+                      if (!op) return;
+                      navigate(
+                        `/jellypolly/sales/adjustment-docs/new?type=refund&invoiceId=${invoiceData.id}&paymentId=${op.payment_id}`
+                      );
+                    }}
+                    icon={IconRotate2}
+                    variant="outline"
+                    color="sky"
+                    size="md"
+                    disabled={isLoading || hasActiveAdjustmentDocs}
+                    title={
+                      hasActiveAdjustmentDocs
+                        ? "Cancel the existing adjustment document before creating another"
+                        : "Refund overpaid amount"
+                    }
+                  >
+                    Refund Note
+                  </Button>
+                )}
+              </>
+            )}
+
             {/* Print Button */}
             <Button
               onClick={handlePrintInvoice}
@@ -1809,7 +1911,12 @@ const InvoiceDetailsPage: React.FC = () => {
                   </span>
                   {isPaid && !isCancelled && (
                     <span className="ml-2 text-green-600 dark:text-green-400 text-sm font-medium px-2 py-0.5 bg-green-50 dark:bg-green-900/20 rounded-full">
-                      Paid in Full
+                      {invoiceDisplayStatus === "refunded" ||
+                      invoiceDisplayStatus === "partially_refunded" ||
+                      invoiceDisplayStatus === "credit_balance" ||
+                      invoiceDisplayStatus === "credited"
+                        ? getInvoiceDisplayStatusLabel(invoiceDisplayStatus)
+                        : "Paid in Full"}
                     </span>
                   )}
                   {isCancelled && (
@@ -2155,8 +2262,16 @@ const InvoiceDetailsPage: React.FC = () => {
                                   variant="outline"
                                   color="rose"
                                   onClick={() => handleCancelPaymentClick(p)}
-                                  disabled={isCancellingPayment || isCancelled}
-                                  title="Cancel Payment"
+                                  disabled={
+                                    isCancellingPayment ||
+                                    isCancelled ||
+                                    hasActiveAdjustmentDocs
+                                  }
+                                  title={
+                                    hasActiveAdjustmentDocs
+                                      ? "Cancel the active adjustment document before cancelling payments"
+                                      : "Cancel Payment"
+                                  }
                                 >
                                   <span className="flex items-center gap-1">
                                     <IconTrash size={16} />
@@ -2169,8 +2284,16 @@ const InvoiceDetailsPage: React.FC = () => {
                                 variant="outline"
                                 color="rose"
                                 onClick={() => handleCancelPaymentClick(p)}
-                                disabled={isCancellingPayment || isCancelled}
-                                title="Cancel Payment"
+                                disabled={
+                                  isCancellingPayment ||
+                                  isCancelled ||
+                                  hasActiveAdjustmentDocs
+                                }
+                                title={
+                                  hasActiveAdjustmentDocs
+                                    ? "Cancel the active adjustment document before cancelling payments"
+                                    : "Cancel Payment"
+                                }
                               >
                                 <span className="flex items-center gap-1">
                                   <IconTrash size={16} /> Delete
@@ -2187,6 +2310,18 @@ const InvoiceDetailsPage: React.FC = () => {
             )}
           </section>
         </div>
+
+        {/* --- Adjustment Documents (Credit / Debit / Refund Notes) --- */}
+        {invoiceData && (
+          <div className="mt-4">
+            <InvoiceAdjustmentDocsSection
+              invoiceId={invoiceData.id}
+              company="jellypolly"
+              onDocsLoaded={setAdjustmentDocs}
+            />
+          </div>
+        )}
+
         {/* --- Submission Results Modal --- */}
         <SubmissionResultsModal
           isOpen={showSubmissionResults}

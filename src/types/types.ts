@@ -391,6 +391,70 @@ export interface Payment {
   cancellation_reason?: string;
 }
 
+export type AdjustmentDocType = "credit_note" | "debit_note" | "refund_note";
+
+export interface AdjustmentDocLine {
+  id?: number;
+  line_number?: number;
+  code: string | null;
+  description: string | null;
+  quantity: number | null;
+  price: number | null;
+  tax: number | null;
+  total: number | null;
+  issubtotal: boolean;
+}
+
+export interface AdjustmentDocument {
+  id: string; // CN-2026-0001 / DN-2026-0001 / RN-2026-0001
+  type: AdjustmentDocType;
+  original_invoice_id: string;
+  customerid: string;
+  customer_name?: string;
+  salespersonid: string | null;
+  createddate: string; // unix ms as string (matches invoices)
+  reason: string | null;
+  paired_with_id: string | null;
+  linked_payment_id: number | null;
+  references_consolidated_id: string | null;
+
+  total_excluding_tax: number;
+  tax_amount: number;
+  rounding: number;
+  totalamountpayable: number;
+
+  refund_method: Payment["payment_method"] | null;
+  refund_reference: string | null;
+  bank_account: Payment["bank_account"] | null;
+
+  uuid: string | null;
+  submission_uid: string | null;
+  long_id: string | null;
+  datetime_validated: string | null;
+  einvoice_status: EInvoiceStatus;
+
+  is_consolidated: boolean;
+  consolidated_adjustments: string[] | null;
+
+  status: "active" | "cancelled";
+  cancellation_reason: string | null;
+  cancellation_date: string | null;
+  journal_entry_id: number | null;
+
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+
+  // Joined fields when fetching list
+  paired_doc_id?: string | null;
+  paired_type?: AdjustmentDocType | null;
+  paired_status?: "active" | "cancelled" | null;
+  paired_einvoice_status?: EInvoiceStatus;
+
+  // Populated by /:id endpoint
+  lines?: AdjustmentDocLine[];
+}
+
 export interface Employee {
   id: string;
   name: string;
