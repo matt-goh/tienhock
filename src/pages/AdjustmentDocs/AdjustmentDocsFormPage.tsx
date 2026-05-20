@@ -17,6 +17,7 @@ import { FormInput, FormListbox } from "../../components/FormComponents";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import {
+  AdjustmentDocument,
   AdjustmentDocType,
   AdjustmentDocLine,
   ExtendedInvoiceData,
@@ -30,9 +31,17 @@ import {
   roundMoney,
 } from "../../utils/moneyUtils";
 import { AdjustmentDocTypeBadge } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
+import {
+  AdjustmentDocsCompany,
+  getAdjustmentDocsPaths,
+} from "../../components/AdjustmentDocs/useAdjustmentDocsPaths";
 
 interface LineState extends AdjustmentDocLine {
   uid: string;
+}
+
+interface Props {
+  company?: AdjustmentDocsCompany;
 }
 
 const TYPE_LABEL: Record<AdjustmentDocType, string> = {
@@ -60,13 +69,15 @@ const parseType = (s: string | null): AdjustmentDocType | null => {
   return null;
 };
 
-const AdjustmentDocsFormPage: React.FC = () => {
+const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const navigate = useNavigate();
+  const paths = getAdjustmentDocsPaths(company);
   const [params, setParams] = useSearchParams();
   const type = parseType(params.get("type"));
   const urlInvoiceId = params.get("invoiceId") || "";
   const paymentIdParam = params.get("paymentId");
   const linkedPaymentId = paymentIdParam ? parseInt(paymentIdParam, 10) : null;
+  const pairedCreditNoteId: string = params.get("creditNoteId") || "";
 
   // Effective invoice id — starts from URL but can be set by the in-form picker
   // when the user opened the page without a preselected invoice.
@@ -79,6 +90,8 @@ const AdjustmentDocsFormPage: React.FC = () => {
   const [invoice, setInvoice] = useState<ExtendedInvoiceData | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [linkedPayment, setLinkedPayment] = useState<Payment | null>(null);
+  const [pairedCreditNote, setPairedCreditNote] =
+    useState<AdjustmentDocument | null>(null);
 
   // Invoice picker state (only used when no invoiceId in URL)
   const [pickerQuery, setPickerQuery] = useState("");
@@ -104,12 +117,13 @@ const AdjustmentDocsFormPage: React.FC = () => {
   const isCN = type === "credit_note";
   const isDN = type === "debit_note";
   const isRN = type === "refund_note";
+  const isReplacementPairedRefund: boolean = isRN && Boolean(pairedCreditNoteId);
 
   // ----- Validate type only (invoiceId can be picked in-form) -----
   useEffect(() => {
     if (!type) {
       toast.error("Missing required parameter: type");
-      navigate("/sales/adjustment-docs", { replace: true });
+      navigate(paths.uiBase, { replace: true });
     }
   }, [type, navigate]);
 
@@ -124,7 +138,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
         params.set("page", "1");
         params.set("limit", "50");
         if (pickerQuery.trim()) params.set("search", pickerQuery.trim());
-        const response: any = await api.get(`/api/invoices?${params.toString()}`);
+        const response: any = await api.get(`${paths.invoicesSearchApi}?${params.toString()}`);
         if (cancelled) return;
         const rows = Array.isArray(response?.data)
           ? response.data
@@ -153,26 +167,57 @@ const AdjustmentDocsFormPage: React.FC = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const inv = (await api.get(`/api/invoices/${invoiceId}`)) as ExtendedInvoiceData;
+        const inv = (await api.get(
+          `${paths.invoiceApiBase}/${invoiceId}`
+        )) as ExtendedInvoiceData;
         if (!inv) {
           toast.error(`Invoice ${invoiceId} not found`);
-          navigate("/sales/adjustment-docs", { replace: true });
+          navigate(paths.uiBase, { replace: true });
           return;
         }
         if (inv.invoice_status === "cancelled") {
           toast.error("Cannot create adjustment for a cancelled invoice");
-          navigate(`/sales/invoice/${invoiceId}`, { replace: true });
+          navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
           return;
         }
         setInvoice(inv);
+        setPairedCreditNote(null);
 
         const pays = (await api.get(
-          `/api/payments?invoice_id=${invoiceId}&include_cancelled=false`
+          `${paths.paymentsApiBase}?invoice_id=${invoiceId}&include_cancelled=false`
         )) as Payment[];
         setPayments(pays || []);
 
+        let loadedPairedCreditNote: AdjustmentDocument | null = null;
+        if (isReplacementPairedRefund) {
+          const creditNote = (await api.get(
+            `${paths.apiBase}/${pairedCreditNoteId}`
+          )) as AdjustmentDocument;
+          if (
+            creditNote.type !== "credit_note" ||
+            creditNote.original_invoice_id !== invoiceId ||
+            creditNote.status !== "active"
+          ) {
+            toast.error("Active Credit Note not found for this invoice");
+            navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
+            return;
+          }
+          if (creditNote.paired_with_id) {
+            const pairedDoc = (await api.get(
+              `${paths.apiBase}/${creditNote.paired_with_id}`
+            )) as AdjustmentDocument;
+            if (pairedDoc.status === "active") {
+              toast.error("This Credit Note already has an active Refund Note");
+              navigate(`${paths.uiBase}/${creditNote.id}`, { replace: true });
+              return;
+            }
+          }
+          loadedPairedCreditNote = creditNote;
+          setPairedCreditNote(creditNote);
+        }
+
         // Standalone RN: validate linked payment is overpaid
-        if (isRN && linkedPaymentId) {
+        if (isRN && linkedPaymentId && !isReplacementPairedRefund) {
           const lp = (pays || []).find(
             (p) => p.payment_id === linkedPaymentId && p.status === "overpaid"
           );
@@ -180,7 +225,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
             toast.error(
               "Linked payment not found or not in overpaid status"
             );
-            navigate(`/sales/invoice/${invoiceId}`, { replace: true });
+            navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
             return;
           }
           setLinkedPayment(lp);
@@ -197,7 +242,24 @@ const AdjustmentDocsFormPage: React.FC = () => {
         // Pre-fill lines:
         //  - CN/DN: copy original line items as starting point
         //  - RN standalone: single line for the overpaid amount
-        if (isRN && linkedPaymentId) {
+        if (isReplacementPairedRefund && loadedPairedCreditNote?.lines?.length) {
+          setLines(
+            loadedPairedCreditNote.lines
+              .filter((line) => !line.issubtotal)
+              .map((line) => ({
+                uid: crypto.randomUUID(),
+                code: line.code || "REFUND",
+                description:
+                  line.description ||
+                  `Refund for Credit Note ${loadedPairedCreditNote?.id}`,
+                quantity: Number(line.quantity || 1),
+                price: Number(line.price || 0),
+                tax: Number(line.tax || 0),
+                total: Number(line.total || 0),
+                issubtotal: false,
+              }))
+          );
+        } else if (isRN && linkedPaymentId) {
           const overpaidAmt = (pays || []).find(
             (p) => p.payment_id === linkedPaymentId
           )?.amount_paid;
@@ -245,7 +307,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
       } catch (error: any) {
         console.error(error);
         toast.error(error?.message || "Failed to load invoice");
-        navigate("/sales/adjustment-docs", { replace: true });
+        navigate(paths.uiBase, { replace: true });
       } finally {
         setIsLoading(false);
       }
@@ -253,7 +315,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
 
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, invoiceId, linkedPaymentId]);
+  }, [type, invoiceId, linkedPaymentId, pairedCreditNoteId]);
 
   // ----- Totals (sen-safe) -----
   const totals = useMemo(() => {
@@ -360,6 +422,18 @@ const AdjustmentDocsFormPage: React.FC = () => {
       if (!refundMethod) errors.push("Refund method required");
       if (refundMethod !== "cash" && !bankAccount)
         errors.push("Bank account required for non-cash refund");
+      if (isReplacementPairedRefund && !pairedCreditNote) {
+        errors.push("Credit Note link required for replacement Refund Note");
+      }
+      if (isReplacementPairedRefund && pairedCreditNote) {
+        if (totals.totalamountpayable > pairedCreditNote.totalamountpayable) {
+          errors.push(
+            `Refund amount cannot exceed Credit Note amount RM ${pairedCreditNote.totalamountpayable.toFixed(
+              2
+            )}`
+          );
+        }
+      }
       if (linkedPayment) {
         if (totals.totalamountpayable > linkedPayment.amount_paid) {
           errors.push(
@@ -414,6 +488,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
         payload.refund_reference = refundReference || null;
         payload.bank_account = refundMethod === "cash" ? "CASH" : bankAccount;
         if (linkedPaymentId) payload.linked_payment_id = linkedPaymentId;
+        if (pairedCreditNoteId) payload.paired_credit_note_id = pairedCreditNoteId;
       }
 
       if (isCN && issuePairedRefund) {
@@ -430,9 +505,9 @@ const AdjustmentDocsFormPage: React.FC = () => {
         };
       }
 
-      const response = await api.post("/api/adjustment-docs", payload);
+      const response = await api.post(paths.apiBase, payload);
       toast.success(response.message || "Document created", { id: toastId });
-      navigate(`/sales/adjustment-docs/${response.document.id}`, {
+      navigate(`${paths.uiBase}/${response.document.id}`, {
         replace: true,
       });
     } catch (error: any) {
@@ -449,7 +524,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
     if (isFormDirty && !isSaving) {
       setShowBackConfirm(true);
     } else {
-      navigate(invoice ? `/sales/invoice/${invoice.id}` : "/sales/adjustment-docs");
+      navigate(invoice ? `${paths.invoiceUiBase}/${invoice.id}` : paths.uiBase);
     }
   };
 
@@ -476,7 +551,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
           <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             <div className="flex items-center gap-3">
-              <BackButton onClick={() => navigate("/sales/adjustment-docs")} />
+              <BackButton onClick={() => navigate(paths.uiBase)} />
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 New {TYPE_LABEL[type]} — Select Invoice
@@ -666,6 +741,16 @@ const AdjustmentDocsFormPage: React.FC = () => {
               </span>
             </div>
           )}
+          {pairedCreditNote && (
+            <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
+              <span className="font-medium text-indigo-800 dark:text-indigo-300">
+                Reissuing Refund Note for Credit Note {pairedCreditNote.id}
+              </span>
+              <span className="ml-2 text-indigo-700 dark:text-indigo-400">
+                (Available: RM {Number(pairedCreditNote.totalamountpayable).toFixed(2)})
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Reason */}
@@ -681,6 +766,8 @@ const AdjustmentDocsFormPage: React.FC = () => {
                 ? "e.g. Goods returned damaged"
                 : isDN
                 ? "e.g. Late payment fee"
+                : isReplacementPairedRefund
+                ? `Replacement refund for Credit Note ${pairedCreditNoteId}`
                 : "e.g. Refund of overpayment"
             }
             rows={2}
@@ -782,7 +869,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
                     <td className="px-2 py-1">
                       <input
                         type="number"
-                        step="0.01"
+                        step="0.1"
                         value={line.price ?? 0}
                         onChange={(e) =>
                           updateLine(line.uid, { price: Number(e.target.value) })
@@ -794,7 +881,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
                     <td className="px-2 py-1">
                       <input
                         type="number"
-                        step="0.01"
+                        step="0.1"
                         value={line.tax ?? 0}
                         onChange={(e) =>
                           updateLine(line.uid, { tax: Number(e.target.value) })
@@ -957,7 +1044,7 @@ const AdjustmentDocsFormPage: React.FC = () => {
         isOpen={showBackConfirm}
         onClose={() => setShowBackConfirm(false)}
         onConfirm={() =>
-          navigate(invoice ? `/sales/invoice/${invoice.id}` : "/sales/adjustment-docs")
+          navigate(invoice ? `${paths.invoiceUiBase}/${invoice.id}` : paths.uiBase)
         }
         title="Discard Draft"
         message="Are you sure you want to leave? Your changes will be lost."

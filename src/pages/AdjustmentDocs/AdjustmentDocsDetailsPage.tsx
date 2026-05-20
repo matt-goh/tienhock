@@ -5,6 +5,10 @@ import {
   IconExternalLink,
   IconBan,
   IconReceipt,
+  IconRotate2,
+  IconSend,
+  IconRotateClockwise,
+  IconRefresh,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
@@ -18,7 +22,15 @@ import {
   AdjustmentDocStatusBadge,
   ADJUSTMENT_DOC_TYPE_META,
 } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
+import {
+  AdjustmentDocsCompany,
+  getAdjustmentDocsPaths,
+} from "../../components/AdjustmentDocs/useAdjustmentDocsPaths";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
+
+interface Props {
+  company?: AdjustmentDocsCompany;
+}
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-MY", {
@@ -26,28 +38,36 @@ const formatCurrency = (amount: number): string =>
     currency: "MYR",
   }).format(amount);
 
-const AdjustmentDocsDetailsPage: React.FC = () => {
+const AdjustmentDocsDetailsPage: React.FC<Props> = ({
+  company = "tienhock",
+}) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const paths = getAdjustmentDocsPaths(company);
   const [doc, setDoc] = useState<AdjustmentDocument | null>(null);
   const [pairedDoc, setPairedDoc] = useState<AdjustmentDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isSubmittingEinvoice, setIsSubmittingEinvoice] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isCancellingEinvoice, setIsCancellingEinvoice] = useState(false);
+  const [showCancelEinvoiceDialog, setShowCancelEinvoiceDialog] = useState(false);
+  const [einvoiceCancelReason, setEinvoiceCancelReason] = useState("");
 
   const fetchDoc = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
       const data = (await api.get(
-        `/api/adjustment-docs/${id}`
+        `${paths.apiBase}/${id}`
       )) as AdjustmentDocument;
       setDoc(data);
       if (data.paired_with_id) {
         try {
           const paired = (await api.get(
-            `/api/adjustment-docs/${data.paired_with_id}`
+            `${paths.apiBase}/${data.paired_with_id}`
           )) as AdjustmentDocument;
           setPairedDoc(paired);
         } catch {
@@ -58,7 +78,7 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
       }
     } catch (error: any) {
       toast.error(error?.message || "Failed to load document");
-      navigate("/sales/adjustment-docs", { replace: true });
+      navigate(paths.uiBase, { replace: true });
     } finally {
       setLoading(false);
     }
@@ -73,7 +93,7 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
     setIsCancelling(true);
     const toastId = toast.loading(`Cancelling ${doc.id}...`);
     try {
-      const response = await api.post(`/api/adjustment-docs/${doc.id}/cancel`, {
+      const response = await api.post(`${paths.apiBase}/${doc.id}/cancel`, {
         reason: cancelReason || null,
       });
       toast.success(response.message || "Cancelled", { id: toastId });
@@ -84,6 +104,86 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
       toast.error(error?.message || "Failed to cancel", { id: toastId });
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  const handleSubmitEinvoice = async () => {
+    if (!doc) return;
+    setIsSubmittingEinvoice(true);
+    const toastId = toast.loading(`Submitting ${doc.id} to MyInvois...`);
+    try {
+      const response = await api.post(
+        `${paths.apiBase}/${doc.id}/submit-einvoice`
+      );
+      toast.success(response.message || "Submitted", { id: toastId, duration: 5000 });
+      fetchDoc();
+    } catch (error: any) {
+      toast.error(error?.message || "Submission failed", {
+        id: toastId,
+        duration: 6000,
+      });
+      fetchDoc();
+    } finally {
+      setIsSubmittingEinvoice(false);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!doc) return;
+    setIsUpdatingStatus(true);
+    const toastId = toast.loading(`Checking MyInvois status for ${doc.id}...`);
+    try {
+      const response = await api.post(
+        `${paths.apiBase}/${doc.id}/update-status`
+      );
+      toast.success(
+        response.updated
+          ? `Status updated to ${response.status}`
+          : "No change since last check",
+        { id: toastId }
+      );
+      fetchDoc();
+    } catch (error: any) {
+      toast.error(error?.message || "Status check failed", { id: toastId });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleCancelEinvoice = async () => {
+    if (!doc) return;
+    setIsCancellingEinvoice(true);
+    const toastId = toast.loading(`Cancelling e-invoice for ${doc.id}...`);
+    try {
+      const response = await api.post(
+        `${paths.apiBase}/${doc.id}/cancel-einvoice`,
+        { reason: einvoiceCancelReason || null }
+      );
+      toast.success(response.message || "E-invoice cancelled", {
+        id: toastId,
+        duration: 6000,
+      });
+      setShowCancelEinvoiceDialog(false);
+      setEinvoiceCancelReason("");
+      fetchDoc();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to cancel e-invoice", {
+        id: toastId,
+      });
+    } finally {
+      setIsCancellingEinvoice(false);
+    }
+  };
+
+  const handleClearStatus = async () => {
+    if (!doc) return;
+    const toastId = toast.loading("Clearing e-invoice status...");
+    try {
+      await api.post(`${paths.apiBase}/${doc.id}/clear-einvoice-status`);
+      toast.success("Cleared — you can retry submission", { id: toastId });
+      fetchDoc();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to clear status", { id: toastId });
     }
   };
 
@@ -106,6 +206,10 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
   const cnBlockedByPaired =
     doc.type === "credit_note" &&
     pairedDoc?.status === "active";
+  const canIssuePairedRefund: boolean =
+    doc.type === "credit_note" &&
+    doc.status === "active" &&
+    pairedDoc?.status !== "active";
 
   return (
     <div className="space-y-4">
@@ -114,7 +218,7 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
           <div className="flex items-center gap-3">
             <BackButton
-              onClick={() => navigate("/sales/adjustment-docs")}
+              onClick={() => navigate(paths.uiBase)}
             />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
@@ -126,8 +230,71 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
               />
             </h1>
           </div>
-          <div className="flex items-center gap-2">
-            {/* E-invoice action buttons appear here in Phase 4 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Submit / Update / Cancel e-Invoice */}
+            {doc.status === "active" && !doc.einvoice_status && (
+              <Button
+                onClick={handleSubmitEinvoice}
+                icon={IconSend}
+                variant="outline"
+                color="sky"
+                size="md"
+                disabled={isSubmittingEinvoice}
+                title="Submit this document to MyInvois"
+              >
+                {isSubmittingEinvoice ? "Submitting..." : "Submit e-Invoice"}
+              </Button>
+            )}
+            {doc.status === "active" && doc.einvoice_status === "invalid" && (
+              <>
+                <Button
+                  onClick={handleClearStatus}
+                  icon={IconRefresh}
+                  variant="outline"
+                  size="md"
+                  title="Clear invalid status to retry"
+                >
+                  Clear & Retry
+                </Button>
+                <Button
+                  onClick={handleSubmitEinvoice}
+                  icon={IconSend}
+                  variant="outline"
+                  color="sky"
+                  size="md"
+                  disabled={isSubmittingEinvoice}
+                >
+                  {isSubmittingEinvoice ? "Submitting..." : "Re-submit"}
+                </Button>
+              </>
+            )}
+            {doc.status === "active" && doc.einvoice_status === "pending" && (
+              <Button
+                onClick={handleUpdateStatus}
+                icon={IconRotateClockwise}
+                variant="outline"
+                size="md"
+                disabled={isUpdatingStatus}
+              >
+                {isUpdatingStatus ? "Checking..." : "Update Status"}
+              </Button>
+            )}
+            {doc.status === "active" &&
+              (doc.einvoice_status === "valid" ||
+                doc.einvoice_status === "invalid") && (
+                <Button
+                  onClick={() => setShowCancelEinvoiceDialog(true)}
+                  icon={IconBan}
+                  variant="outline"
+                  color="rose"
+                  size="md"
+                  disabled={isCancellingEinvoice}
+                  title="Cancel the e-invoice at MyInvois"
+                >
+                  Cancel e-Invoice
+                </Button>
+              )}
+
             {canCancel && (
               <Button
                 onClick={() => setShowCancelDialog(true)}
@@ -145,6 +312,22 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
                 Cancel Document
               </Button>
             )}
+            {canIssuePairedRefund && (
+              <Button
+                onClick={() =>
+                  navigate(
+                    `${paths.uiBase}/new?type=refund&invoiceId=${doc.original_invoice_id}&creditNoteId=${doc.id}`
+                  )
+                }
+                icon={IconRotate2}
+                variant="outline"
+                color="sky"
+                size="md"
+                title={`Create a new Refund Note for Credit Note ${doc.id}`}
+              >
+                {pairedDoc ? "Reissue Refund Note" : "Issue Refund Note"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -158,7 +341,7 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
               <div className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1">
                 {doc.original_invoice_id}
                 <button
-                  onClick={() => navigate(`/sales/invoice/${doc.original_invoice_id}`)}
+                  onClick={() => navigate(`${paths.invoiceUiBase}/${doc.original_invoice_id}`)}
                   className="text-sky-600 dark:text-sky-400 hover:underline"
                   title="Open invoice"
                 >
@@ -236,7 +419,7 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
               </div>
               <Button
                 onClick={() =>
-                  navigate(`/sales/adjustment-docs/${pairedDoc.id}`)
+                  navigate(`${paths.uiBase}/${pairedDoc.id}`)
                 }
                 icon={IconExternalLink}
                 variant="outline"
@@ -396,7 +579,7 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
               )}
               {!doc.einvoice_status && (
                 <div className="text-xs text-default-500 dark:text-gray-400 pt-2">
-                  E-invoice submission becomes available in Phase 4.
+                  Not yet submitted to MyInvois. Use the action bar to submit.
                 </div>
               )}
             </dl>
@@ -470,6 +653,23 @@ const AdjustmentDocsDetailsPage: React.FC = () => {
             : ""
         }. This action cannot be undone.`}
         confirmButtonText={isCancelling ? "Cancelling..." : "Confirm Cancellation"}
+        variant="danger"
+      />
+
+      <ConfirmationDialog
+        isOpen={showCancelEinvoiceDialog}
+        onClose={() => {
+          if (!isCancellingEinvoice) {
+            setShowCancelEinvoiceDialog(false);
+            setEinvoiceCancelReason("");
+          }
+        }}
+        onConfirm={handleCancelEinvoice}
+        title={`Cancel e-invoice for ${doc.id}?`}
+        message="This sets the MyInvois document state to cancelled. The local document accounting stays intact — cancel the document separately if you want to reverse it."
+        confirmButtonText={
+          isCancellingEinvoice ? "Cancelling..." : "Cancel e-Invoice"
+        }
         variant="danger"
       />
     </div>

@@ -26,6 +26,10 @@ import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
 } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
+import {
+  AdjustmentDocsCompany,
+  getAdjustmentDocsPaths,
+} from "../../components/AdjustmentDocs/useAdjustmentDocsPaths";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
 
 interface FilterState {
@@ -43,8 +47,13 @@ const TYPE_TABS: Array<{ id: FilterState["type"]; label: string; icon: any }> = 
   { id: "refund_note", label: "Refund Notes", icon: IconRotate2 },
 ];
 
-const AdjustmentDocsListPage: React.FC = () => {
+interface Props {
+  company?: AdjustmentDocsCompany;
+}
+
+const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const navigate = useNavigate();
+  const paths = getAdjustmentDocsPaths(company);
   const [docs, setDocs] = useState<AdjustmentDocument[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -90,7 +99,7 @@ const AdjustmentDocsListPage: React.FC = () => {
       if (filters.searchTerm) params.append("search", filters.searchTerm);
       params.append("include_cancelled", "true");
 
-      const response = await api.get(`/api/adjustment-docs?${params.toString()}`);
+      const response = await api.get(`${paths.apiBase}?${params.toString()}`);
       setDocs(Array.isArray(response) ? response : []);
     } catch (error: any) {
       console.error("Error fetching adjustment documents:", error);
@@ -148,7 +157,7 @@ const AdjustmentDocsListPage: React.FC = () => {
         </h1>
         <div className="flex items-center gap-2">
           <Button
-            onClick={() => navigate("/sales/adjustment-docs/new?type=debit")}
+            onClick={() => navigate(`${paths.uiBase}/new?type=debit`)}
             icon={IconFilePlus}
             variant="outline"
             size="md"
@@ -156,7 +165,7 @@ const AdjustmentDocsListPage: React.FC = () => {
             New Debit Note
           </Button>
           <Button
-            onClick={() => navigate("/sales/adjustment-docs/new?type=credit")}
+            onClick={() => navigate(`${paths.uiBase}/new?type=credit`)}
             icon={IconFileMinus}
             variant="outline"
             size="md"
@@ -347,9 +356,7 @@ const AdjustmentDocsListPage: React.FC = () => {
                     <tr
                       key={doc.id}
                       className="hover:bg-default-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors duration-150"
-                      onClick={() =>
-                        navigate(`/sales/adjustment-docs/${doc.id}`)
-                      }
+                      onClick={() => navigate(`${paths.uiBase}/${doc.id}`)}
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                         {doc.id}
