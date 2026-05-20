@@ -887,7 +887,7 @@ const InvoiceFormPage: React.FC = () => {
                     invoiceNumberValidation.isDuplicate
                       ? "border-red-500 bg-red-50 dark:bg-red-900/30"
                       : invoiceNumberValidation.isValid
-                      ? "border-default-300 dark:border-gray-600"
+                      ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                       : "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30"
                   )}
                   placeholder="Enter custom invoice number or leave blank"
@@ -936,6 +936,7 @@ const InvoiceFormPage: React.FC = () => {
                 required
                 className={clsx(
                   "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                  "bg-white dark:bg-gray-700",
                   "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                 )}
               />
@@ -1002,19 +1003,11 @@ const InvoiceFormPage: React.FC = () => {
                             "p-4 cursor-pointer transition-colors relative",
                             isEditMode
                               ? "cursor-not-allowed"
-                              : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                          )}
-                          style={
+                              : "hover:bg-gray-50 dark:hover:bg-gray-700",
                             isSelected
-                              ? {
-                                  backgroundColor: "#f0f9ff",
-                                  borderLeft: "4px solid #0ea5e9",
-                                  borderRight: "none",
-                                  borderTop: "none",
-                                  borderBottom: "none",
-                                }
-                              : {}
-                          }
+                              ? "bg-sky-50 dark:bg-sky-900/30 border-l-[4px] border-l-sky-400 dark:border-l-sky-500 !border-t-0 !border-r-0 !border-b-0"
+                              : ""
+                          )}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
@@ -1133,8 +1126,8 @@ const InvoiceFormPage: React.FC = () => {
           )}
 
           {/* Amount and Tax Section */}
-          <div className="mt-6 border-t pt-6">
-            <h2 className="text-lg font-medium mb-4">Invoice Amount</h2>
+          <div className="mt-6 border-t dark:border-gray-700 pt-6">
+            <h2 className="text-lg font-medium mb-4 dark:text-gray-100">Invoice Amount</h2>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
               <div className="space-y-2">
                 <label
@@ -1160,9 +1153,10 @@ const InvoiceFormPage: React.FC = () => {
                       "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                       "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                       !isEditMode &&
-                        formData.type === "regular" &&
-                        selectedRentals.length > 0 &&
-                        "bg-sky-50 dark:bg-sky-900/30"
+                      formData.type === "regular" &&
+                      selectedRentals.length > 0
+                        ? "bg-sky-50 dark:bg-sky-900/30"
+                        : "bg-white dark:bg-gray-700"
                     )}
                   />
                 </div>
@@ -1204,7 +1198,7 @@ const InvoiceFormPage: React.FC = () => {
                   <input
                     type="text"
                     value={totalAmount.toFixed(2)}
-                    className="w-full pl-10 pr-3 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-100 font-medium text-default-700 dark:text-gray-200 cursor-default"
+                    className="w-full pl-10 pr-3 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 font-medium text-default-700 dark:text-gray-200 cursor-default"
                     readOnly
                     tabIndex={-1}
                   />
@@ -1229,7 +1223,7 @@ const InvoiceFormPage: React.FC = () => {
                           size={20}
                         />
                       )}
-                      <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900 dark:text-gray-100">
+                      <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-100">
                         Mark as Paid
                       </span>
                     </button>
@@ -1241,8 +1235,8 @@ const InvoiceFormPage: React.FC = () => {
 
           {/* Payment Method Section */}
           {!isEditMode && isPaid && (
-            <div className="mt-6 border-t pt-6">
-              <h2 className="text-lg font-medium mb-4">
+            <div className="mt-6 border-t dark:border-gray-700 pt-6">
+              <h2 className="text-lg font-medium mb-4 dark:text-gray-100">
                 Payment Info (Optional)
               </h2>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -1343,6 +1337,7 @@ const InvoiceFormPage: React.FC = () => {
                       onChange={(e) => setPaymentReference(e.target.value)}
                       className={clsx(
                         "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
+                        "bg-white dark:bg-gray-700",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                       )}
                     />
@@ -1354,8 +1349,8 @@ const InvoiceFormPage: React.FC = () => {
 
           {/* e-Invoice Section */}
           {!isEditMode && formData.customer_id > 0 && (
-            <div className="mt-6 border-t pt-6">
-              <h2 className="text-lg font-medium mb-2">e-Invoice Option</h2>
+            <div className="mt-6 border-t dark:border-gray-700 pt-6">
+              <h2 className="text-lg font-medium mb-2 dark:text-gray-100">e-Invoice Option</h2>
               {canSubmitEinvoice ? (
                 isInvoiceDateEligibleForEinvoice(formData.date_issued) ? (
                   <div className="flex items-center space-x-2">
