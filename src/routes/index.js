@@ -53,6 +53,7 @@ import selfBilledInvoicesRouter from "./accounting/self-billed-invoices.js";
 import invoiceRouter from "./sales/invoices/invoices.js";
 import paymentsRouter from "./sales/invoices/payments.js";
 import eInvoiceRouter from "./sales/invoices/e-invoices.js";
+import adjustmentDocsRouter from "./sales/adjustment-docs/index.js";
 
 // Payroll routes
 import dailyWorkLogsRouter from "./payroll/daily-work-logs.js";
@@ -186,6 +187,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/invoices", invoiceRouter(pool, myInvoisConfig));
   app.use("/api/payments", paymentsRouter(pool));
   app.use("/api/einvoice", eInvoiceRouter(pool, myInvoisConfig));
+  app.use("/api/adjustment-docs", adjustmentDocsRouter(pool));
 
   // Payroll routes
   app.use("/api/daily-work-logs", dailyWorkLogsRouter(pool));
