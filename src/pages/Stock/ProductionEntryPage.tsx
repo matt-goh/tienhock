@@ -87,7 +87,33 @@ const ProductionEntryPage: React.FC = () => {
 
   const getInitialProduct = (): string | null => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("product") || null;
+    const productParam = params.get("product");
+    if (
+      productParam === "HANCUR_BH" ||
+      productParam === "KARUNG_HANCUR" ||
+      productParam === "BUNDLE_BP" ||
+      productParam === "BUNDLE_BH" ||
+      productParam === "BUNDLE_MEE"
+    ) {
+      return null;
+    }
+    return productParam || null;
+  };
+
+  const getInitialSpecialSelection = (): SpecialSelection => {
+    const params = new URLSearchParams(window.location.search);
+    const productParam = params.get("product");
+    if (productParam === "HANCUR_BH" || productParam === "KARUNG_HANCUR") {
+      return "HANCUR_BH";
+    }
+    if (
+      productParam === "BUNDLE_BP" ||
+      productParam === "BUNDLE_BH" ||
+      productParam === "BUNDLE_MEE"
+    ) {
+      return productParam;
+    }
+    return null;
   };
 
   // State
@@ -103,7 +129,7 @@ const ProductionEntryPage: React.FC = () => {
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [specialSelection, setSpecialSelection] =
-    useState<SpecialSelection>(null);
+    useState<SpecialSelection>(getInitialSpecialSelection);
   const [workerSearchQuery, setWorkerSearchQuery] = useState("");
   const [hancurSearchQuery, setHancurSearchQuery] = useState("");
   const [bundleSearchQuery, setBundleSearchQuery] = useState("");
