@@ -998,7 +998,7 @@ export interface ProductionEntry {
   id?: number;
   entry_date: string; // YYYY-MM-DD
   product_id: string;
-  worker_id: string;
+  worker_id: string | null;
   worker_name?: string;
   bags_packed: number;
   created_at?: string;

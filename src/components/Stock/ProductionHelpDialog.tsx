@@ -36,7 +36,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
       sections: [
         {
           icon: IconPackage,
-          title: "Regular Product Entry",
+          title: "Mee and Bihun Product Entry",
           color: "text-sky-600 dark:text-sky-400",
           bgColor: "bg-sky-50 dark:bg-sky-900/20",
           items: [
@@ -45,6 +45,17 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
             "Use arrow keys to navigate between worker inputs",
             "Click Save to record the production data",
             "Star your frequently used products for quick access",
+          ],
+        },
+        {
+          icon: IconPackage,
+          title: "Other Products",
+          color: "text-purple-600 dark:text-purple-400",
+          bgColor: "bg-purple-50 dark:bg-purple-900/20",
+          items: [
+            "EMPTY_BAG, EMPTY_BAG(S), SBH, and SMEE use one quantity input",
+            "These records update stock only",
+            "No worker or pay code mapping is needed",
           ],
         },
         {
@@ -92,6 +103,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
           product: "Regular Products",
           payCode: "Configure in Manage Mappings",
         },
+        { product: "Other Products", payCode: "Stock only" },
         { product: "Bihun Hancur", payCode: "BH_HANCUR" },
         { product: "Karung Hancur", payCode: "TIMBANG_HANCUR" },
         { product: "Bundle BP", payCode: "PB_KG" },
@@ -106,7 +118,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
       sections: [
         {
           icon: IconPackage,
-          title: "Entry Produk Biasa",
+          title: "Entry Produk Mee dan Bihun",
           color: "text-sky-600 dark:text-sky-400",
           bgColor: "bg-sky-50 dark:bg-sky-900/20",
           items: [
@@ -115,6 +127,17 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
             "Gunakan kekunci anak panah untuk navigasi antara input pekerja",
             "Klik Simpan untuk merekod data pengeluaran",
             "Star produk yang sering digunakan untuk akses pantas",
+          ],
+        },
+        {
+          icon: IconPackage,
+          title: "Produk Lain",
+          color: "text-purple-600 dark:text-purple-400",
+          bgColor: "bg-purple-50 dark:bg-purple-900/20",
+          items: [
+            "EMPTY_BAG, EMPTY_BAG(S), SBH dan SMEE guna satu input kuantiti",
+            "Rekod ini hanya mengemas kini stok",
+            "Pekerja dan pemetaan kod gaji tidak diperlukan",
           ],
         },
         {
@@ -159,6 +182,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
         "Setiap jenis produk dipetakan ke kod gaji tertentu untuk pengiraan gaji:",
       payCodeTable: [
         { product: "Produk Biasa", payCode: "Tetapkan di Manage Mappings" },
+        { product: "Produk Lain", payCode: "Stok sahaja" },
         { product: "Bihun Hancur", payCode: "BH_HANCUR" },
         { product: "Karung Hancur", payCode: "TIMBANG_HANCUR" },
         { product: "Bundle BP", payCode: "PB_KG" },

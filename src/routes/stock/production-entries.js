@@ -1,6 +1,14 @@
 // src/routes/stock/production-entries.js
 import { Router } from "express";
 
+const STOCK_ONLY_WORKER_ID = "__STOCK_ONLY__";
+const STOCK_ONLY_PRODUCT_IDS = new Set([
+  "EMPTY_BAG",
+  "EMPTY_BAG(S)",
+  "SBH",
+  "SMEE",
+]);
+
 export default function (pool) {
   const router = Router();
 
@@ -322,6 +330,16 @@ export default function (pool) {
         });
       }
 
+      const hasStockOnlyEntry = entries.some(
+        (entry) => entry.worker_id === STOCK_ONLY_WORKER_ID
+      );
+
+      if (hasStockOnlyEntry && !STOCK_ONLY_PRODUCT_IDS.has(product_id)) {
+        return res.status(400).json({
+          message: "Stock-only production entries are only allowed for OTH stock products",
+        });
+      }
+
       const client = await pool.connect();
 
       try {
@@ -329,6 +347,42 @@ export default function (pool) {
 
         const savedEntries = [];
         let totalBags = 0;
+
+        if (hasStockOnlyEntry) {
+          const stockOnlyEntry = entries.find(
+            (entry) => entry.worker_id === STOCK_ONLY_WORKER_ID
+          );
+          const stockOnlyQuantity = Number(stockOnlyEntry?.bags_packed) || 0;
+
+          await client.query(
+            `DELETE FROM production_entries
+             WHERE entry_date = $1 AND product_id = $2`,
+            [date, product_id]
+          );
+
+          if (stockOnlyQuantity > 0) {
+            const result = await client.query(
+              `
+              INSERT INTO production_entries (entry_date, product_id, worker_id, bags_packed, created_by)
+              VALUES ($1, $2, NULL, $3, $4)
+              RETURNING *
+            `,
+              [date, product_id, stockOnlyQuantity, created_by || null]
+            );
+
+            savedEntries.push(result.rows[0]);
+            totalBags = stockOnlyQuantity;
+          }
+
+          await client.query("COMMIT");
+
+          return res.json({
+            message: "Production entries saved successfully",
+            entries: savedEntries,
+            total_bags: totalBags,
+            entry_count: savedEntries.length,
+          });
+        }
 
         for (const entry of entries) {
           const { worker_id, bags_packed } = entry;

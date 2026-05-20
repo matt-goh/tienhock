@@ -170,6 +170,7 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
 
           const entriesMap: Record<string, number> = {};
           (response || []).forEach((entry: ProductionEntry) => {
+            if (!entry.worker_id) return;
             entriesMap[entry.worker_id] = Number(entry.bags_packed) || 0;
           });
           newEntries[bundleId] = entriesMap;

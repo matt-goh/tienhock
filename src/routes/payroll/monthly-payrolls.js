@@ -130,6 +130,7 @@ export default function (pool) {
       JOIN products p ON pe.product_id = p.id
       WHERE pe.entry_date BETWEEN $1 AND $2
       AND pe.bags_packed > 0
+      AND p.type != 'OTH'
     `;
 
       const [dailyResult, monthlyResult, productionResult] = await Promise.all([
@@ -558,6 +559,7 @@ export default function (pool) {
           JOIN products p ON pe.product_id = p.id
           WHERE pe.entry_date BETWEEN $1 AND $2
             AND pe.bags_packed > 0
+            AND p.type != 'OTH'
           ORDER BY pe.worker_id, pe.entry_date
         `,
             [startDate, endDate],
