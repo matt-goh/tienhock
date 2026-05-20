@@ -33,8 +33,8 @@ This plan introduces a dedicated **Adjustment Documents** ecosystem across all t
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Database + Backend Foundation (Tien Hock) | **DONE** |
-| 2 | Frontend Pages (TH, shared component scaffolding) | Not started |
-| 3 | Invoice & Payment Integration (TH) | Not started |
+| 2 | Frontend Pages (TH, shared component scaffolding) | **DONE** |
+| 3 | Invoice & Payment Integration (TH) | **DONE** |
 | 4 | Individual E-Invoice templates + submission (TH) | Not started |
 | 5 | Consolidated E-Invoice templates + auto-consolidation (TH) | Not started |
 | 6 | Jelly Polly Replication | Not started |
@@ -53,6 +53,28 @@ This plan introduces a dedicated **Adjustment Documents** ecosystem across all t
   - `POST   /api/adjustment-docs/:id/clear-einvoice-status` (allow re-submission after rejection)
 - `src/routes/index.js` — registered at `/api/adjustment-docs`.
 - `CLAUDE.md` and `AGENTS.md` schema sections updated.
+
+### Phase 2 — what shipped
+
+- **Types** added to `src/types/types.ts`: `AdjustmentDocType`, `AdjustmentDocLine`, `AdjustmentDocument` (mirrors backend shape, includes joined fields from list endpoint).
+- **Shared component** `src/components/AdjustmentDocs/AdjustmentDocBadge.tsx` exports `AdjustmentDocTypeBadge`, `AdjustmentDocStatusBadge`, and `ADJUSTMENT_DOC_TYPE_META`.
+- **Pages** under `src/pages/AdjustmentDocs/`:
+  - `AdjustmentDocsListPage.tsx` — 4 filter tabs (All / Debit Notes / Credit Notes / Refund Notes) with counts, search box, DateRangePicker + MonthNavigator, e-invoice status filter, status filter, and a table with click-through to details. Empty state when no results.
+  - `AdjustmentDocsFormPage.tsx` — query params `?type=credit|debit|refund&invoiceId=...&paymentId=...`. Loads original invoice + payments, pre-fills lines (copy from original for CN/DN, overpaid-amount-only single line for standalone RN). Live totals (sen-safe via `moneyUtils`). For CN: "Issue paired Refund Note" toggle (defaults ON when active/overpaid payments exist) plus refund-method/bank/reference fields. For RN: required refund method, bank account (when non-cash), reference. Validation blocks empty docs, non-positive totals, RN amount exceeding linked overpaid payment, and missing bank account for non-cash refunds.
+  - `AdjustmentDocsDetailsPage.tsx` — read-only view of doc + lines + refund details (RN only), paired-doc panel with link, e-invoice metadata panel, totals panel, cancellation banner when cancelled. "Cancel Document" button visible when status=active and e-invoice not valid/pending; disabled with tooltip when CN is awaiting paired-RN cancellation. (E-invoice action buttons land in Phase 4.)
+- **Routing/sidebar** updated in `src/pages/TienHockNavData.tsx` — new entry under Sales, **below Payments**, named "Adjustment Documents". Routes `/sales/adjustment-docs`, `/sales/adjustment-docs/new`, `/sales/adjustment-docs/:id` registered.
+- **TypeScript clean** — `tsc --noEmit` runs without errors.
+
+### Phase 3 — what shipped
+
+- **[src/pages/Invoice/InvoiceListPage.tsx](../src/pages/Invoice/InvoiceListPage.tsx)** — `Documents` mini button added between the **Consolidated** and **Refresh** buttons in the action bar. Uses `IconFileText`, pure navigation to `/sales/adjustment-docs`.
+- **[src/pages/Invoice/InvoiceDetailsPage.tsx](../src/pages/Invoice/InvoiceDetailsPage.tsx)** action bar — three new buttons inserted **immediately to the left of "Print"**, all gated on `!isCancelled`:
+  - **Debit Note** (`IconFilePlus`, amber outline) → `/sales/adjustment-docs/new?type=debit&invoiceId={id}`
+  - **Credit Note** (`IconFileMinus`, rose outline) → `/sales/adjustment-docs/new?type=credit&invoiceId={id}`
+  - **Refund Note** (`IconRotate2`, sky outline) — visible only when at least one payment in state has `status === "overpaid"`. Navigates with `&paymentId=` set to the overpaid payment id.
+- **[src/components/AdjustmentDocs/InvoiceAdjustmentDocsSection.tsx](../src/components/AdjustmentDocs/InvoiceAdjustmentDocsSection.tsx)** — new reusable section component that fetches all adjustment documents for an invoice (`GET /api/adjustment-docs?original_invoice_id=...&include_cancelled=true`) and renders a compact table with type/status badges and click-through navigation. Accepts a `basePath` prop so JP/GT can pass their prefixed paths. Hides itself entirely when there are no related docs (zero-state reduces noise on every invoice).
+- **InvoiceDetailsPage** also renders `<InvoiceAdjustmentDocsSection invoiceId={...} />` below the main invoice card (acceptable substitute for the originally-planned position; placing inline would have required restructuring the existing card layout).
+- **[src/components/ChangelogModal.tsx](../src/components/ChangelogModal.tsx)** — new bilingual entry dated 2026-05-20 announcing Adjustment Documents to end users.
 
 ---
 

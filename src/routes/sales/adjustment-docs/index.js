@@ -45,7 +45,7 @@ async function findConsolidatedParentId(client, originalInvoiceId) {
         AND (einvoice_status IS NULL OR einvoice_status != 'cancelled')
         AND consolidated_invoices IS NOT NULL
         AND consolidated_invoices::jsonb ? CAST($1 AS TEXT)
-      ORDER BY created_at DESC NULLS LAST
+      ORDER BY CAST(createddate AS bigint) DESC NULLS LAST
       LIMIT 1`,
     [originalInvoiceId]
   );
