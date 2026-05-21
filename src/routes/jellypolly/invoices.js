@@ -75,7 +75,55 @@ export default function (pool, config) {
               AND con.consolidated_invoices::jsonb ? CAST(i.id AS TEXT)
               AND con.invoice_status != 'cancelled'
             LIMIT 1
-          ) as consolidated_part_of
+          ) as consolidated_part_of,
+          (
+            SELECT COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', a.id,
+                  'type', a.type,
+                  'original_invoice_id', a.original_invoice_id,
+                  'customerid', a.customerid,
+                  'salespersonid', a.salespersonid,
+                  'createddate', a.createddate,
+                  'reason', a.reason,
+                  'paired_with_id', a.paired_with_id,
+                  'linked_payment_id', a.linked_payment_id,
+                  'references_consolidated_id', a.references_consolidated_id,
+                  'total_excluding_tax', a.total_excluding_tax,
+                  'tax_amount', a.tax_amount,
+                  'rounding', a.rounding,
+                  'totalamountpayable', a.totalamountpayable,
+                  'refund_method', a.refund_method,
+                  'refund_reference', a.refund_reference,
+                  'bank_account', a.bank_account,
+                  'uuid', a.uuid,
+                  'submission_uid', a.submission_uid,
+                  'long_id', a.long_id,
+                  'datetime_validated', a.datetime_validated,
+                  'einvoice_status', a.einvoice_status,
+                  'is_consolidated', a.is_consolidated,
+                  'consolidated_adjustments', a.consolidated_adjustments,
+                  'status', a.status,
+                  'cancellation_reason', a.cancellation_reason,
+                  'cancellation_date', a.cancellation_date,
+                  'journal_entry_id', a.journal_entry_id,
+                  'created_by', a.created_by,
+                  'created_at', a.created_at,
+                  'updated_at', a.updated_at,
+                  'paired_doc_id', p.id,
+                  'paired_type', p.type,
+                  'paired_status', p.status,
+                  'paired_einvoice_status', p.einvoice_status
+                )
+                ORDER BY a.created_at DESC
+              ),
+              '[]'::jsonb
+            )
+            FROM jellypolly.adjustment_documents a
+            LEFT JOIN jellypolly.adjustment_documents p ON a.paired_with_id = p.id
+            WHERE a.original_invoice_id = i.id
+          ) as adjustment_docs
       `;
       let fromClause = `
         FROM jellypolly.invoices i
@@ -235,6 +283,16 @@ export default function (pool, config) {
         is_consolidated: row.is_consolidated || false,
         consolidated_invoices: row.consolidated_invoices,
         consolidated_part_of: row.consolidated_part_of,
+        adjustmentDocs: (Array.isArray(row.adjustment_docs)
+          ? row.adjustment_docs
+          : []
+        ).map((doc) => ({
+          ...doc,
+          total_excluding_tax: parseFloat(doc.total_excluding_tax || 0),
+          tax_amount: parseFloat(doc.tax_amount || 0),
+          rounding: parseFloat(doc.rounding || 0),
+          totalamountpayable: parseFloat(doc.totalamountpayable || 0),
+        })),
         customerName: row.customername || row.customerid,
         customerTin: row.customertin,
         customerIdNumber: row.customeridnumber,
