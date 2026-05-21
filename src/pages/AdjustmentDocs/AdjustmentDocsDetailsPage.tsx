@@ -16,7 +16,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
-import { AdjustmentDocument } from "../../types/types";
+import { AdjustmentDocument, EInvoiceStatus } from "../../types/types";
 import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
@@ -46,6 +46,13 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const paths = getAdjustmentDocsPaths(company);
   const [doc, setDoc] = useState<AdjustmentDocument | null>(null);
   const [pairedDoc, setPairedDoc] = useState<AdjustmentDocument | null>(null);
+  const [originalInvoice, setOriginalInvoice] = useState<{
+    id: string;
+    invoice_status: string;
+    einvoice_status: EInvoiceStatus;
+    uuid: string | null;
+    long_id: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -75,6 +82,24 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
         }
       } else {
         setPairedDoc(null);
+      }
+      if (data.original_invoice_id) {
+        try {
+          const inv = (await api.get(
+            `${paths.invoiceApiBase}/${data.original_invoice_id}`
+          )) as any;
+          setOriginalInvoice({
+            id: inv.id,
+            invoice_status: inv.invoice_status,
+            einvoice_status: inv.einvoice_status ?? null,
+            uuid: inv.uuid ?? null,
+            long_id: inv.long_id ?? null,
+          });
+        } catch {
+          setOriginalInvoice(null);
+        }
+      } else {
+        setOriginalInvoice(null);
       }
     } catch (error: any) {
       toast.error(error?.message || "Failed to load document");
@@ -232,7 +257,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
               onClick={() => navigate(paths.uiBase)}
             />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
-            <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
               {meta.label} {doc.id}
               <AdjustmentDocTypeBadge type={doc.type} />
               <AdjustmentDocStatusBadge
@@ -351,7 +376,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
           className="p-4 border-b border-default-200 dark:border-gray-700 cursor-pointer transition hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500 dark:hover:bg-gray-700/50"
           title="Open invoice"
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Original Invoice
@@ -389,8 +414,27 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 {formatCurrency(doc.totalamountpayable)}
               </div>
             </div>
+            <div>
+              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-0.5">
+                Invoice e-Status
+              </div>
+              <div className="font-medium text-default-900 dark:text-gray-100">
+                {originalInvoice ? (
+                  <AdjustmentDocStatusBadge
+                    status={
+                      originalInvoice.invoice_status === "cancelled"
+                        ? "cancelled"
+                        : "active"
+                    }
+                    einvoiceStatus={originalInvoice.einvoice_status}
+                  />
+                ) : (
+                  "—"
+                )}
+              </div>
+            </div>
             {doc.references_consolidated_id && (
-              <div className="col-span-2 md:col-span-4">
+              <div className="col-span-2 md:col-span-5">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                   Referenced Consolidated Invoice
                 </div>
@@ -400,7 +444,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
               </div>
             )}
             {doc.reason && (
-              <div className="col-span-2 md:col-span-4">
+              <div className="col-span-2 md:col-span-5">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                   Reason
                 </div>
@@ -569,51 +613,83 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
 
         {/* Totals + e-invoice */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-default-50 dark:bg-gray-900/30 rounded-lg p-4 border border-default-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
-              e-Invoice
-            </h3>
-            <dl className="text-sm space-y-1">
-              <div className="flex justify-between">
-                <dt className="text-default-500 dark:text-gray-400">Status</dt>
-                <dd>
-                  <AdjustmentDocStatusBadge
-                    status={doc.status}
-                    einvoiceStatus={doc.einvoice_status}
-                  />
-                </dd>
-              </div>
-              {doc.uuid && (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-default-500 dark:text-gray-400">UUID</dt>
-                  <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
-                    {doc.uuid}
-                  </dd>
-                </div>
-              )}
-              {doc.long_id && (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-default-500 dark:text-gray-400">Long ID</dt>
-                  <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
-                    {doc.long_id}
-                  </dd>
-                </div>
-              )}
-              {doc.datetime_validated && (
-                <div className="flex justify-between">
-                  <dt className="text-default-500 dark:text-gray-400">Validated</dt>
-                  <dd className="text-default-900 dark:text-gray-100">
-                    {new Date(doc.datetime_validated).toLocaleString()}
-                  </dd>
-                </div>
-              )}
-              {!doc.einvoice_status && (
-                <div className="text-xs text-default-500 dark:text-gray-400 pt-2">
-                  Not yet submitted to MyInvois. Use the action bar to submit.
-                </div>
-              )}
-            </dl>
-          </div>
+          {(() => {
+            const myInvoisUrl =
+              doc.einvoice_status === "valid" && doc.uuid && doc.long_id
+                ? `https://myinvois.hasil.gov.my/${doc.uuid}/share/${doc.long_id}`
+                : null;
+            const cardClass = `bg-default-50 dark:bg-gray-900/30 rounded-lg border border-default-200 dark:border-gray-700 block ${
+              myInvoisUrl
+                ? "px-4 pt-6 cursor-pointer transition hover:bg-default-100 hover:border-sky-300 dark:hover:bg-gray-800/60 dark:hover:border-sky-700"
+                : "px-4 pt-10"
+            }`;
+            const cardContent = (
+              <>
+                <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2 flex items-center justify-between gap-2">
+                  <span>e-Invoice</span>
+                  {myInvoisUrl && (
+                    <span className="inline-flex items-center gap-1 text-xs font-normal text-sky-600 dark:text-sky-400">
+                      <IconExternalLink size={12} />
+                      Open in MyInvois
+                    </span>
+                  )}
+                </h3>
+                <dl className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <dt className="text-default-500 dark:text-gray-400">Status</dt>
+                    <dd>
+                      <AdjustmentDocStatusBadge
+                        status={doc.status}
+                        einvoiceStatus={doc.einvoice_status}
+                      />
+                    </dd>
+                  </div>
+                  {doc.uuid && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-default-500 dark:text-gray-400">UUID</dt>
+                      <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
+                        {doc.uuid}
+                      </dd>
+                    </div>
+                  )}
+                  {doc.long_id && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-default-500 dark:text-gray-400">Long ID</dt>
+                      <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
+                        {doc.long_id}
+                      </dd>
+                    </div>
+                  )}
+                  {doc.datetime_validated && (
+                    <div className="flex justify-between">
+                      <dt className="text-default-500 dark:text-gray-400">Validated</dt>
+                      <dd className="text-default-900 dark:text-gray-100">
+                        {new Date(doc.datetime_validated).toLocaleString()}
+                      </dd>
+                    </div>
+                  )}
+                  {!doc.einvoice_status && (
+                    <div className="text-xs text-default-500 dark:text-gray-400 pt-2">
+                      Not yet submitted to MyInvois. Use the action bar to submit.
+                    </div>
+                  )}
+                </dl>
+              </>
+            );
+            return myInvoisUrl ? (
+              <a
+                href={myInvoisUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cardClass}
+                title="View this e-Invoice on MyInvois portal"
+              >
+                {cardContent}
+              </a>
+            ) : (
+              <div className={cardClass}>{cardContent}</div>
+            );
+          })()}
 
           <div className="bg-default-50 dark:bg-gray-900/30 rounded-lg p-4 border border-default-200 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">

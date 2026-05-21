@@ -3,19 +3,22 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconFileText,
-  IconPlus,
   IconSearch,
   IconRefresh,
   IconFileMinus,
   IconFilePlus,
   IconRotate2,
   IconLayoutGrid,
+  IconSend,
+  IconSquareMinusFilled,
+  IconSquare,
+  IconSquareCheckFilled,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import DateRangePicker from "../../components/DateRangePicker";
 import MonthNavigator from "../../components/MonthNavigator";
 import StyledListbox from "../../components/StyledListbox";
+import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -42,9 +45,9 @@ interface FilterState {
 
 const TYPE_TABS: Array<{ id: FilterState["type"]; label: string; icon: any }> = [
   { id: "all", label: "All", icon: IconLayoutGrid },
-  { id: "debit_note", label: "Debit Notes", icon: IconFilePlus },
-  { id: "credit_note", label: "Credit Notes", icon: IconFileMinus },
-  { id: "refund_note", label: "Refund Notes", icon: IconRotate2 },
+  { id: "debit_note", label: "DN", icon: IconFilePlus },
+  { id: "credit_note", label: "CN", icon: IconFileMinus },
+  { id: "refund_note", label: "RN", icon: IconRotate2 },
 ];
 
 interface Props {
@@ -56,6 +59,9 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const paths = getAdjustmentDocsPaths(company);
   const [docs, setDocs] = useState<AdjustmentDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const now = new Date();
@@ -79,24 +85,30 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     };
   });
 
+  const {
+    dateRange: filterDateRange,
+    einvoiceStatus: filterEinvoiceStatus,
+    status: filterStatus,
+    searchTerm: filterSearchTerm,
+  } = filters;
+
   const fetchDocs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.type !== "all") params.append("type", filters.type);
-      if (filters.dateRange.start) {
-        params.append("startDate", filters.dateRange.start.getTime().toString());
+      if (filterDateRange.start) {
+        params.append("startDate", filterDateRange.start.getTime().toString());
       }
-      if (filters.dateRange.end) {
-        const end = new Date(filters.dateRange.end);
+      if (filterDateRange.end) {
+        const end = new Date(filterDateRange.end);
         end.setHours(23, 59, 59, 999);
         params.append("endDate", end.getTime().toString());
       }
-      if (filters.einvoiceStatus) {
-        params.append("einvoice_status", filters.einvoiceStatus);
+      if (filterEinvoiceStatus) {
+        params.append("einvoice_status", filterEinvoiceStatus);
       }
-      if (filters.status) params.append("status", filters.status);
-      if (filters.searchTerm) params.append("search", filters.searchTerm);
+      if (filterStatus) params.append("status", filterStatus);
+      if (filterSearchTerm) params.append("search", filterSearchTerm);
       params.append("include_cancelled", "true");
 
       const response = await api.get(`${paths.apiBase}?${params.toString()}`);
@@ -108,18 +120,116 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [
+    filterDateRange,
+    filterEinvoiceStatus,
+    filterStatus,
+    filterSearchTerm,
+    paths.apiBase,
+  ]);
 
   useEffect(() => {
     fetchDocs();
   }, [fetchDocs]);
 
-  const handleDateChange = useCallback(
-    (newDateRange: { start: Date; end: Date }) => {
-      setFilters((prev) => ({ ...prev, dateRange: newDateRange }));
-    },
+  const displayedDocs = useMemo(() => {
+    if (filters.type === "all") return docs;
+    return docs.filter((d) => d.type === filters.type);
+  }, [docs, filters.type]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [
+    filterDateRange,
+    filterEinvoiceStatus,
+    filterStatus,
+    filterSearchTerm,
+    filters.type,
+  ]);
+
+  const isEligibleForSubmit = useCallback(
+    (doc: AdjustmentDocument): boolean =>
+      doc.status === "active" &&
+      doc.einvoice_status !== "valid" &&
+      doc.einvoice_status !== "pending" &&
+      doc.einvoice_status !== "cancelled",
     []
   );
+
+  const eligibleSelectedDocs = useMemo(
+    () => docs.filter((d) => selectedIds.has(d.id) && isEligibleForSubmit(d)),
+    [docs, selectedIds, isEligibleForSubmit]
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size > 0) return new Set();
+      return new Set(displayedDocs.map((d) => d.id));
+    });
+  }, [displayedDocs]);
+
+  const selectAllState = useMemo(() => {
+    if (displayedDocs.length === 0) return "none" as const;
+    const selectedInView = displayedDocs.filter((d) =>
+      selectedIds.has(d.id)
+    ).length;
+    if (selectedInView === 0) return "none" as const;
+    if (selectedInView >= displayedDocs.length) return "all" as const;
+    return "some" as const;
+  }, [displayedDocs, selectedIds]);
+
+  const handleBatchSubmit = useCallback(async () => {
+    setShowSubmitDialog(false);
+    const targets = eligibleSelectedDocs;
+    if (targets.length === 0) return;
+    setIsSubmitting(true);
+    const toastId = toast.loading(
+      `Submitting ${targets.length} document(s) to MyInvois...`
+    );
+    let success = 0;
+    let failed = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const d = targets[i];
+      toast.loading(
+        `Submitting ${i + 1}/${targets.length}: ${d.id}...`,
+        { id: toastId }
+      );
+      try {
+        await api.post(`${paths.apiBase}/${d.id}/submit-einvoice`);
+        success++;
+      } catch (err: any) {
+        failed++;
+        console.error(`Failed to submit ${d.id}:`, err);
+      }
+    }
+    if (failed === 0) {
+      toast.success(`Submitted ${success} document(s) successfully`, {
+        id: toastId,
+      });
+    } else if (success === 0) {
+      toast.error(`All ${failed} submission(s) failed`, {
+        id: toastId,
+        duration: 6000,
+      });
+    } else {
+      toast.success(
+        `${success} submitted, ${failed} failed — check each document for details`,
+        { id: toastId, duration: 6000 }
+      );
+    }
+    setIsSubmitting(false);
+    setSelectedIds(new Set());
+    fetchDocs();
+  }, [eligibleSelectedDocs, paths.apiBase, fetchDocs]);
 
   const handleMonthChange = useCallback((newDate: Date) => {
     setSelectedMonth(newDate);
@@ -150,11 +260,50 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <IconFileText size={28} className="text-gray-700 dark:text-gray-200" />
-          Adjustment Documents
-        </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <IconFileText size={28} className="text-gray-700 dark:text-gray-200" />
+            Adjustment Docs
+          </h1>
+          <span className="hidden sm:inline text-default-300 dark:text-gray-600 text-2xl font-light">
+            |
+          </span>
+          <div className="flex gap-1 bg-default-100 dark:bg-gray-900/50 rounded-lg p-1">
+            {TYPE_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = filters.type === tab.id;
+              const count = counts[tab.id] || 0;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() =>
+                    setFilters((prev) => ({ ...prev, type: tab.id }))
+                  }
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5 ${
+                    active
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-sky-700 dark:text-sky-400 font-semibold"
+                      : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <Icon size={16} />
+                  {tab.label}
+                  {count > 0 && (
+                    <span
+                      className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
+                        active
+                          ? "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
+                          : "bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             onClick={() => navigate(`${paths.uiBase}/new?type=debit`)}
@@ -184,129 +333,114 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         </div>
       </div>
 
-      {/* Type tabs */}
-      <div className="flex gap-1 w-fit bg-default-100 dark:bg-gray-900/50 rounded-lg p-1">
-        {TYPE_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const active = filters.type === tab.id;
-          const count = counts[tab.id] || 0;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setFilters((prev) => ({ ...prev, type: tab.id }))}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5 ${
-                active
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-sky-700 dark:text-sky-400 font-semibold"
-                  : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-200"
-              }`}
-            >
-              <Icon size={16} />
-              {tab.label}
-              {count > 0 && (
-                <span
-                  className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
-                    active
-                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
-                      : "bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-300"
-                  }`}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 min-w-[200px]">
-              <IconSearch
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Search by ID, invoice, or customer"
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
-                value={filters.searchTerm}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
-                }
-              />
-            </div>
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 flex-shrink-0">
+        {/* Left: Date controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          <MonthNavigator
+            selectedMonth={selectedMonth}
+            onChange={handleMonthChange}
+            showGoToCurrentButton={false}
+            dateRange={{
+              start: filters.dateRange.start || new Date(),
+              end: filters.dateRange.end || new Date(),
+            }}
+          />
+        </div>
 
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange}
+        {/* Right: Search and filters */}
+        <div className="flex flex-wrap items-center gap-2 h-10">
+          <div className="relative w-full sm:w-48 h-10">
+            <IconSearch
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-500 pointer-events-none"
+              size={16}
             />
-
-            <MonthNavigator
-              selectedMonth={selectedMonth}
-              onChange={handleMonthChange}
-              showGoToCurrentButton={false}
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
+            <input
+              type="text"
+              placeholder="Search"
+              className="w-full h-10 pl-9 pr-3 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
+              value={filters.searchTerm}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))
+              }
             />
-
-            <div className="w-40">
-              <StyledListbox
-                value={filters.einvoiceStatus || ""}
-                onChange={(value) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    einvoiceStatus: value === "" ? null : String(value),
-                  }))
-                }
-                options={[
-                  { id: "", name: "All e-Status" },
-                  { id: "null", name: "Not Submitted" },
-                  { id: "pending", name: "Pending" },
-                  { id: "valid", name: "Valid" },
-                  { id: "invalid", name: "Invalid" },
-                  { id: "cancelled", name: "Cancelled" },
-                ]}
-                placeholder="All e-Status"
-                rounded="lg"
-              />
-            </div>
-
-            <div className="w-32">
-              <StyledListbox
-                value={filters.status || ""}
-                onChange={(value) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    status: value === "" ? null : String(value),
-                  }))
-                }
-                options={[
-                  { id: "", name: "All" },
-                  { id: "active", name: "Active" },
-                  { id: "cancelled", name: "Cancelled" },
-                ]}
-                placeholder="All"
-                rounded="lg"
-              />
-            </div>
-
-            <Button
-              onClick={fetchDocs}
-              icon={IconRefresh}
-              variant="outline"
-              size="md"
-              disabled={loading}
-            >
-              Refresh
-            </Button>
           </div>
+
+          <div className="w-full sm:w-40 h-10">
+            <StyledListbox
+              value={filters.einvoiceStatus || ""}
+              onChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  einvoiceStatus: value === "" ? null : String(value),
+                }))
+              }
+              options={[
+                { id: "", name: "All e-Status" },
+                { id: "null", name: "Not Submitted" },
+                { id: "pending", name: "Pending" },
+                { id: "valid", name: "Valid" },
+                { id: "invalid", name: "Invalid" },
+                { id: "cancelled", name: "Cancelled" },
+              ]}
+              placeholder="All e-Status"
+              rounded="lg"
+              className="h-10"
+            />
+          </div>
+
+          <div className="w-full sm:w-32 h-10">
+            <StyledListbox
+              value={filters.status || ""}
+              onChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: value === "" ? null : String(value),
+                }))
+              }
+              options={[
+                { id: "", name: "All" },
+                { id: "active", name: "Active" },
+                { id: "cancelled", name: "Cancelled" },
+              ]}
+              placeholder="All"
+              rounded="lg"
+              className="h-10"
+            />
+          </div>
+
+          <Button
+            onClick={fetchDocs}
+            icon={IconRefresh}
+            variant="outline"
+            size="md"
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          {selectedIds.size > 0 && (
+            <Button
+              onClick={() => {
+                if (eligibleSelectedDocs.length === 0) {
+                  toast.error(
+                    "None of the selected documents are eligible for e-invoice submission (need active + not valid/pending/cancelled)."
+                  );
+                  return;
+                }
+                setShowSubmitDialog(true);
+              }}
+              icon={IconSend}
+              variant="outline"
+              color="sky"
+              size="md"
+              disabled={isSubmitting || loading}
+              title="Submit selected documents to MyInvois"
+            >
+              {isSubmitting
+                ? "Submitting..."
+                : `Submit e-Invoice (${eligibleSelectedDocs.length})`}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -315,7 +449,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         <div className="flex justify-center items-center h-64">
           <LoadingSpinner />
         </div>
-      ) : docs.length === 0 ? (
+      ) : displayedDocs.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-12 text-center">
           <IconFileText
             size={40}
@@ -335,6 +469,37 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
+                  <th className="px-3 py-2.5 align-middle w-10">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="inline-flex items-center justify-center p-0.5 rounded hover:bg-default-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 align-middle"
+                      title={
+                        selectAllState === "all"
+                          ? "Deselect all"
+                          : selectAllState === "some"
+                          ? "Clear selection"
+                          : "Select all"
+                      }
+                    >
+                      {selectAllState === "all" ? (
+                        <IconSquareCheckFilled
+                          size={20}
+                          className="text-sky-600 dark:text-sky-400"
+                        />
+                      ) : selectAllState === "some" ? (
+                        <IconSquareMinusFilled
+                          size={20}
+                          className="text-sky-600 dark:text-sky-400"
+                        />
+                      ) : (
+                        <IconSquare
+                          size={20}
+                          className="text-default-400 dark:text-gray-500"
+                        />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Document ID
                   </th>
@@ -359,14 +524,46 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-100 dark:divide-gray-700">
-                {docs.map((doc) => {
+                {displayedDocs.map((doc) => {
                   const { date } = parseDatabaseTimestamp(doc.createddate);
+                  const isSelected = selectedIds.has(doc.id);
                   return (
                     <tr
                       key={doc.id}
-                      className="hover:bg-default-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors duration-150"
+                      className={`hover:bg-default-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors duration-150 ${
+                        isSelected ? "bg-sky-50/60 dark:bg-sky-900/20" : ""
+                      }`}
                       onClick={() => navigate(`${paths.uiBase}/${doc.id}`)}
                     >
+                      <td
+                        className="px-3 py-3 align-middle w-10 text-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelect(doc.id);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center p-0.5 rounded hover:bg-default-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 align-middle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelect(doc.id);
+                          }}
+                          aria-label={isSelected ? "Deselect" : "Select"}
+                        >
+                          {isSelected ? (
+                            <IconSquareCheckFilled
+                              size={20}
+                              className="text-sky-600 dark:text-sky-400"
+                            />
+                          ) : (
+                            <IconSquare
+                              size={20}
+                              className="text-default-400 dark:text-gray-500"
+                            />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                         {doc.id}
                         {doc.paired_doc_id && (
@@ -407,6 +604,22 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={showSubmitDialog}
+        onClose={() => {
+          if (!isSubmitting) setShowSubmitDialog(false);
+        }}
+        onConfirm={handleBatchSubmit}
+        title={`Submit ${eligibleSelectedDocs.length} document(s) to MyInvois`}
+        message={
+          eligibleSelectedDocs.length === selectedIds.size
+            ? `You are about to submit ${eligibleSelectedDocs.length} document(s) to MyInvois. Continue?`
+            : `${eligibleSelectedDocs.length} of ${selectedIds.size} selected document(s) are eligible. The rest will be skipped. Continue?`
+        }
+        confirmButtonText={isSubmitting ? "Submitting..." : "Submit"}
+        variant="default"
+      />
     </div>
   );
 };
