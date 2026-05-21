@@ -64,7 +64,9 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       .filter(
         (pc) =>
           pc.is_active &&
-          (pc.pay_type === "Tambahan" || pc.pay_type === "Overtime")
+          (pc.pay_type === "Base" ||
+            pc.pay_type === "Tambahan" ||
+            pc.pay_type === "Overtime")
       )
       .sort((a, b) => a.description.localeCompare(b.description));
   }, [payCodes]);
