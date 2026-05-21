@@ -334,6 +334,7 @@ export interface ExtendedInvoiceData extends InvoiceData {
   payment_reference?: string;
   payment_notes?: string;
   consolidated_part_of?: ConsolidatedInfo | null;
+  adjustmentDocs?: AdjustmentDocument[];
 }
 
 export interface ProductItem {
