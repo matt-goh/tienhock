@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-21",
+    ms: "Senarai invois kini memaparkan status pelarasan yang sama seperti halaman butiran: Refunded, Partially Refunded, Credited dan Credit Balance untuk Tien Hock dan Jelly Polly.",
+    en: "Invoice lists now show the same adjustment statuses as invoice details: Refunded, Partially Refunded, Credited, and Credit Balance for both Tien Hock and Jelly Polly.",
+  },
+  {
     date: "2026-05-20",
     ms: 'Dokumen Pelarasan kini tersedia untuk Jelly Polly juga: Nota Kredit, Nota Debit dan Nota Refund boleh dikeluarkan untuk invois Jelly Polly dengan aliran kerja yang sama seperti Tien Hock, termasuk e-invois MyInvois (individu dan konsolidasi) menggunakan kredensial Jelly Polly.',
     en: "Adjustment Documents now also available for Jelly Polly: Credit, Debit, and Refund Notes can be issued for Jelly Polly invoices with the same workflow as Tien Hock, including MyInvois e-invoice (individual and consolidated) using Jelly Polly's credentials.",

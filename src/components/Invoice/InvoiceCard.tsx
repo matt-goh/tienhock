@@ -2,7 +2,6 @@
 import React from "react";
 import {
   ExtendedInvoiceData,
-  InvoiceStatus,
   EInvoiceStatus,
 } from "../../types/types";
 import {
@@ -20,6 +19,11 @@ import {
 } from "../../utils/invoice/dateUtils";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../contexts/CompanyContext";
+import {
+  getInvoiceDisplayStatus,
+  getInvoiceDisplayStatusLabel,
+} from "../../utils/invoice/invoiceDisplayStatus";
+import type { InvoiceDisplayStatus } from "../../utils/invoice/invoiceDisplayStatus";
 
 interface InvoiceCardProps {
   invoice: ExtendedInvoiceData;
@@ -29,38 +33,63 @@ interface InvoiceCardProps {
   salesmanName?: string | null;
 }
 
+interface InvoiceStatusStyle {
+  bg: string;
+  text: string;
+  border: string;
+  label: string;
+}
+
 // Helper to get status styles
-const getInvoiceStatusStyles = (status: InvoiceStatus | undefined) => {
+const getInvoiceStatusStyles = (
+  status: InvoiceDisplayStatus | undefined
+): InvoiceStatusStyle => {
   // Added undefined check
   // Use toLowerCase() for case-insensitive matching
   switch (status?.toLowerCase()) {
     case "paid":
+    case "refunded":
       return {
         bg: "bg-green-100 dark:bg-green-900/30",
         text: "text-green-800 dark:text-green-300",
         border: "border-green-200 dark:border-green-700",
-        label: "Paid",
+        label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
+      };
+    case "partially_refunded":
+      return {
+        bg: "bg-teal-100 dark:bg-teal-900/30",
+        text: "text-teal-800 dark:text-teal-300",
+        border: "border-teal-200 dark:border-teal-700",
+        label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
+      };
+    case "credit_balance":
+    case "credited":
+      return {
+        bg: "bg-indigo-100 dark:bg-indigo-900/30",
+        text: "text-indigo-800 dark:text-indigo-300",
+        border: "border-indigo-200 dark:border-indigo-700",
+        label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
       };
     case "cancelled":
       return {
         bg: "bg-rose-100 dark:bg-rose-900/30",
         text: "text-rose-800 dark:text-rose-300",
         border: "border-rose-200 dark:border-rose-700",
-        label: "Cancelled",
+        label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
       };
     case "overdue":
       return {
         bg: "bg-red-100 dark:bg-red-900/30",
         text: "text-red-800 dark:text-red-300",
         border: "border-red-200 dark:border-red-700",
-        label: "Overdue",
+        label: getInvoiceDisplayStatusLabel(status as InvoiceDisplayStatus),
       };
     default: // Default to Unpaid style
       return {
         bg: "bg-amber-100 dark:bg-amber-900/30",
         text: "text-amber-800 dark:text-amber-300",
         border: "border-amber-200 dark:border-amber-700",
-        label: "Unpaid", // Keep original label if needed
+        label: status ? getInvoiceDisplayStatusLabel(status) : "Unpaid",
       };
   }
 };
@@ -111,7 +140,12 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   onViewDetails,
 }) => {
   const { date } = parseDatabaseTimestamp(invoice.createddate);
-  const invoiceStatusStyle = getInvoiceStatusStyles(invoice.invoice_status);
+  const invoiceDisplayStatus: InvoiceDisplayStatus = getInvoiceDisplayStatus(
+    invoice,
+    invoice.adjustmentDocs || []
+  );
+  const invoiceStatusStyle: InvoiceStatusStyle =
+    getInvoiceStatusStyles(invoiceDisplayStatus);
   const eInvoiceStatusInfo = getEInvoiceStatusInfo(invoice.einvoice_status);
   const EInvoiceIcon = eInvoiceStatusInfo?.icon;
   const consolidatedStatusInfo = getConsolidatedStatusInfo(
