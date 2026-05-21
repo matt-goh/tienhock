@@ -94,7 +94,11 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
               0
             );
             const groupNetPay = employees.reduce(
-              (sum, emp) => sum + parseFloat(emp.net_pay.toString()),
+              (sum, emp) =>
+                sum +
+                (emp.setelah_digenapkan != null
+                  ? parseFloat(emp.setelah_digenapkan.toString())
+                  : parseFloat(emp.net_pay.toString())),
               0
             );
 

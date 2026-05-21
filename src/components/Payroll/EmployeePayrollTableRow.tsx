@@ -142,9 +142,13 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
           {formatCurrency(parseFloat(employeePayroll.gross_pay.toString()))}
         </td>
 
-        {/* Net Pay */}
+        {/* Net Pay (Take Home — includes rounding) */}
         <td className="px-3 py-2 text-right font-medium text-emerald-600 dark:text-emerald-400">
-          {formatCurrency(parseFloat(employeePayroll.net_pay.toString()))}
+          {formatCurrency(
+            employeePayroll.setelah_digenapkan != null
+              ? parseFloat(employeePayroll.setelah_digenapkan.toString())
+              : parseFloat(employeePayroll.net_pay.toString())
+          )}
         </td>
 
         {/* Status Badge */}
