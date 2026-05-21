@@ -26,7 +26,7 @@ import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappin
 import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { PayrollCalculationService } from "../../utils/payroll/payrollCalculationService";
-import { RateUnit } from "../../types/types";
+import { PayCode, RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
@@ -49,6 +49,8 @@ interface AddOthersModalProps {
   currentMonth: number;
   displayLabel: string;
 }
+
+const PAY_CODE_PAGE_SIZE = 50;
 
 const computeAmount = (
   rate: string,
@@ -94,6 +96,9 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
   const [payCodeQueries, setPayCodeQueries] = useState<Record<number, string>>(
     {}
   );
+  const [loadedPayCodeCounts, setLoadedPayCodeCounts] = useState<
+    Record<number, number>
+  >({});
 
   // Pay codes available: Base + Tambahan + Overtime, active only
   const availablePayCodes = useMemo(() => {
@@ -127,10 +132,11 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
     const defaultDate = sameMonth
       ? today.toISOString().split("T")[0]
       : `${currentYear}-${currentMonth.toString().padStart(2, "0")}-15`;
+    const initialEntryId: number = Date.now();
     setRecordDate(defaultDate);
     setEntries([
       {
-        id: Date.now(),
+        id: initialEntryId,
         employeeId: null,
         payCodeId: "",
         description: "",
@@ -141,6 +147,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
     ]);
     setStaffQueries({});
     setPayCodeQueries({});
+    setLoadedPayCodeCounts({ [initialEntryId]: PAY_CODE_PAGE_SIZE });
   }, [isOpen, currentYear, currentMonth]);
 
   const handleEntryChange = <K extends keyof OthersEntry>(
@@ -170,11 +177,35 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
     );
   };
 
+  const handlePayCodeQueryChange = (entryId: number, value: string): void => {
+    setPayCodeQueries((prev) => ({
+      ...prev,
+      [entryId]: value,
+    }));
+    setLoadedPayCodeCounts((prev) => ({
+      ...prev,
+      [entryId]: PAY_CODE_PAGE_SIZE,
+    }));
+  };
+
+  const handleLoadMorePayCodes = (
+    entryId: number,
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    setLoadedPayCodeCounts((prev) => ({
+      ...prev,
+      [entryId]: (prev[entryId] ?? PAY_CODE_PAGE_SIZE) + PAY_CODE_PAGE_SIZE,
+    }));
+  };
+
   const addEntryRow = (): void => {
+    const newEntryId: number = Date.now() + Math.floor(Math.random() * 1000);
     setEntries([
       ...entries,
       {
-        id: Date.now() + Math.floor(Math.random() * 1000),
+        id: newEntryId,
         employeeId: null,
         payCodeId: "",
         description: "",
@@ -183,6 +214,10 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
         quantity: "1",
       },
     ]);
+    setLoadedPayCodeCounts((prev) => ({
+      ...prev,
+      [newEntryId]: PAY_CODE_PAGE_SIZE,
+    }));
   };
 
   const removeEntryRow = (id: number): void => {
@@ -194,6 +229,11 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
       return next;
     });
     setPayCodeQueries((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setLoadedPayCodeCounts((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
@@ -344,7 +384,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                               ? "0.5"
                               : "1";
                           const pcQuery = payCodeQueries[entry.id] || "";
-                          const filteredPayCodes =
+                          const filteredPayCodes: PayCode[] =
                             pcQuery === ""
                               ? availablePayCodes
                               : availablePayCodes.filter((pc) =>
@@ -352,6 +392,15 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                     pcQuery.toLowerCase()
                                   )
                                 );
+                          const loadedPayCodeCount: number =
+                            loadedPayCodeCounts[entry.id] ??
+                            PAY_CODE_PAGE_SIZE;
+                          const visiblePayCodes: PayCode[] =
+                            filteredPayCodes.slice(0, loadedPayCodeCount);
+                          const remainingPayCodeCount: number = Math.max(
+                            filteredPayCodes.length - visiblePayCodes.length,
+                            0
+                          );
                           return (
                             <tr
                               key={entry.id}
@@ -490,10 +539,10 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                           : "";
                                       }}
                                       onChange={(event) =>
-                                        setPayCodeQueries((prev) => ({
-                                          ...prev,
-                                          [entry.id]: event.target.value,
-                                        }))
+                                        handlePayCodeQueryChange(
+                                          entry.id,
+                                          event.target.value
+                                        )
                                       }
                                       placeholder="Search pay code..."
                                     />
@@ -510,57 +559,88 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                     leave="transition ease-in duration-100"
                                     leaveFrom="opacity-100"
                                     leaveTo="opacity-0"
-                                    afterLeave={() =>
+                                    afterLeave={() => {
                                       setPayCodeQueries((prev) => ({
                                         ...prev,
                                         [entry.id]: "",
-                                      }))
-                                    }
+                                      }));
+                                      setLoadedPayCodeCounts((prev) => ({
+                                        ...prev,
+                                        [entry.id]: PAY_CODE_PAGE_SIZE,
+                                      }));
+                                    }}
                                   >
-                                    <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-[300px] overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none sm:text-sm">
+                                    <ComboboxOptions className="absolute z-20 mt-1 max-h-72 w-auto overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none sm:text-sm">
                                       {filteredPayCodes.length === 0 ? (
                                         <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                                           No pay codes found.
                                         </div>
                                       ) : (
-                                        filteredPayCodes.slice(0, 50).map((pc) => (
-                                          <ComboboxOption
-                                            key={pc.id}
-                                            value={pc.id}
-                                            className={({ active }) =>
-                                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                                active
-                                                  ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
-                                                  : "text-gray-900 dark:text-gray-100"
-                                              }`
-                                            }
-                                          >
-                                            {({ selected }) => (
-                                              <>
-                                                <span
-                                                  className={`block truncate ${
-                                                    selected
-                                                      ? "font-medium"
-                                                      : "font-normal"
-                                                  }`}
-                                                >
-                                                  <span className="text-xs text-default-500 dark:text-gray-400 mr-1">
-                                                    [{pc.pay_type}]
+                                        <>
+                                          {visiblePayCodes.map((pc) => (
+                                            <ComboboxOption
+                                              key={pc.id}
+                                              value={pc.id}
+                                              className={({ active }) =>
+                                                `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                                  active
+                                                    ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                                                    : "text-gray-900 dark:text-gray-100"
+                                                }`
+                                              }
+                                            >
+                                              {({ selected }) => (
+                                                <>
+                                                  <span
+                                                    className={`block truncate ${
+                                                      selected
+                                                        ? "font-medium"
+                                                        : "font-normal"
+                                                    }`}
+                                                  >
+                                                    <span className="text-xs text-default-500 dark:text-gray-400 mr-1">
+                                                      [{pc.pay_type}]
+                                                    </span>
+                                                    {pc.id} - {pc.description}
                                                   </span>
-                                                  {pc.id} - {pc.description}
+                                                  {selected ? (
+                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
+                                                      <IconCheck
+                                                        size={20}
+                                                        aria-hidden="true"
+                                                      />
+                                                    </span>
+                                                  ) : null}
+                                                </>
+                                              )}
+                                            </ComboboxOption>
+                                          ))}
+                                          {remainingPayCodeCount > 0 && (
+                                            <div className="border-t border-gray-200 dark:border-gray-700 p-2">
+                                              <button
+                                                type="button"
+                                                onClick={(event) =>
+                                                  handleLoadMorePayCodes(
+                                                    entry.id,
+                                                    event
+                                                  )
+                                                }
+                                                className="w-full rounded-md bg-sky-50 px-4 py-1.5 text-sm font-medium text-sky-600 transition-colors duration-200 hover:bg-sky-100 disabled:opacity-50 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50"
+                                                disabled={isSaving}
+                                              >
+                                                <span className="inline-flex items-center justify-center">
+                                                  <IconChevronDown
+                                                    size={16}
+                                                    className="mr-1.5"
+                                                  />
+                                                  Load More Paycodes (
+                                                  {remainingPayCodeCount}{" "}
+                                                  remaining)
                                                 </span>
-                                                {selected ? (
-                                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
-                                                    <IconCheck
-                                                      size={20}
-                                                      aria-hidden="true"
-                                                    />
-                                                  </span>
-                                                ) : null}
-                                              </>
-                                            )}
-                                          </ComboboxOption>
-                                        ))
+                                              </button>
+                                            </div>
+                                          )}
+                                        </>
                                       )}
                                     </ComboboxOptions>
                                   </Transition>
@@ -608,7 +688,9 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                 />
                               </td>
                               <td className="py-2 px-3 align-top text-right text-sm font-medium text-default-800 dark:text-gray-100">
-                                {formatCurrency(amount)}
+                                <div className="flex h-10 items-center justify-end">
+                                  {formatCurrency(amount)}
+                                </div>
                               </td>
                               <td className="py-2 px-3 align-top">
                                 <FormInput

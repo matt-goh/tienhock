@@ -21,7 +21,7 @@ import Button from "../Button";
 import { FormInput } from "../FormComponents";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { PayrollCalculationService } from "../../utils/payroll/payrollCalculationService";
-import { OthersRecord, RateUnit } from "../../types/types";
+import { OthersRecord, PayCode, RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 
@@ -41,6 +41,8 @@ const formatCurrency = (amount: number): string =>
     maximumFractionDigits: 2,
   }).format(amount);
 
+const PAY_CODE_PAGE_SIZE = 50;
+
 const EditOthersModal: React.FC<EditOthersModalProps> = ({
   isOpen,
   onClose,
@@ -57,9 +59,11 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
   const [rateUnit, setRateUnit] = useState<RateUnit | "">("");
   const [quantity, setQuantity] = useState("1");
   const [pcQuery, setPcQuery] = useState("");
+  const [loadedPayCodeCount, setLoadedPayCodeCount] =
+    useState<number>(PAY_CODE_PAGE_SIZE);
   const [isSaving, setIsSaving] = useState(false);
 
-  const availablePayCodes = useMemo(() => {
+  const availablePayCodes = useMemo((): PayCode[] => {
     return payCodes
       .filter(
         (pc) =>
@@ -71,7 +75,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       .sort((a, b) => a.description.localeCompare(b.description));
   }, [payCodes]);
 
-  const filteredPayCodes = useMemo(() => {
+  const filteredPayCodes = useMemo((): PayCode[] => {
     if (pcQuery === "") return availablePayCodes;
     return availablePayCodes.filter((pc) =>
       `${pc.id.toLowerCase()} ${pc.description.toLowerCase()}`.includes(
@@ -79,6 +83,14 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       )
     );
   }, [availablePayCodes, pcQuery]);
+
+  const visiblePayCodes = useMemo((): PayCode[] => {
+    return filteredPayCodes.slice(0, loadedPayCodeCount);
+  }, [filteredPayCodes, loadedPayCodeCount]);
+
+  const remainingPayCodeCount = useMemo((): number => {
+    return Math.max(filteredPayCodes.length - visiblePayCodes.length, 0);
+  }, [filteredPayCodes.length, visiblePayCodes.length]);
 
   useEffect(() => {
     if (isOpen && record) {
@@ -92,16 +104,30 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       setRateUnit((record.rate_unit as RateUnit) || "");
       setQuantity(String(record.quantity ?? 1));
       setPcQuery("");
+      setLoadedPayCodeCount(PAY_CODE_PAGE_SIZE);
     }
   }, [isOpen, record]);
 
-  const handlePayCodeChange = (newId: string) => {
+  const handlePayCodeChange = (newId: string): void => {
     setPayCodeId(newId);
     const pc = availablePayCodes.find((p) => p.id === newId);
     if (pc) {
       setRateUnit(pc.rate_unit as RateUnit);
       // Don't overwrite rate/description if user already edited them; only update unit
     }
+  };
+
+  const handlePayCodeQueryChange = (value: string): void => {
+    setPcQuery(value);
+    setLoadedPayCodeCount(PAY_CODE_PAGE_SIZE);
+  };
+
+  const handleLoadMorePayCodes = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    setLoadedPayCodeCount((prev) => prev + PAY_CODE_PAGE_SIZE);
   };
 
   const calculatedAmount = useMemo(() => {
@@ -115,7 +141,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
     }
   }, [rate, quantity, rateUnit]);
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (!record) return;
     if (!payCodeId || !rateUnit || !description.trim()) {
       toast.error("Pay code, description, and rate unit are required.");
@@ -230,7 +256,9 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                               ? `${selected.id} - ${selected.description}`
                               : "";
                           }}
-                          onChange={(event) => setPcQuery(event.target.value)}
+                          onChange={(event) =>
+                            handlePayCodeQueryChange(event.target.value)
+                          }
                           placeholder="Search pay code..."
                         />
                         <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -245,47 +273,73 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                         leave="transition ease-in duration-100"
                         leaveFrom="opacity-100"
                         leaveTo="opacity-0"
-                        afterLeave={() => setPcQuery("")}
+                        afterLeave={() => {
+                          setPcQuery("");
+                          setLoadedPayCodeCount(PAY_CODE_PAGE_SIZE);
+                        }}
                       >
-                        <ComboboxOptions className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none sm:text-sm">
+                        <ComboboxOptions className="absolute z-20 mt-1 max-h-96 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none sm:text-sm">
                           {filteredPayCodes.length === 0 ? (
                             <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
                               No pay codes found.
                             </div>
                           ) : (
-                            filteredPayCodes.slice(0, 50).map((pc) => (
-                              <ComboboxOption
-                                key={pc.id}
-                                value={pc.id}
-                                className={({ active }) =>
-                                  `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                    active
-                                      ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
-                                      : "text-gray-900 dark:text-gray-100"
-                                  }`
-                                }
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span
-                                      className={`block truncate ${
-                                        selected ? "font-medium" : "font-normal"
-                                      }`}
-                                    >
-                                      <span className="text-xs text-default-500 dark:text-gray-400 mr-1">
-                                        [{pc.pay_type}]
+                            <>
+                              {visiblePayCodes.map((pc) => (
+                                <ComboboxOption
+                                  key={pc.id}
+                                  value={pc.id}
+                                  className={({ active }) =>
+                                    `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                      active
+                                        ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                                        : "text-gray-900 dark:text-gray-100"
+                                    }`
+                                  }
+                                >
+                                  {({ selected }) => (
+                                    <>
+                                      <span
+                                        className={`block truncate ${
+                                          selected
+                                            ? "font-medium"
+                                            : "font-normal"
+                                        }`}
+                                      >
+                                        <span className="text-xs text-default-500 dark:text-gray-400 mr-1">
+                                          [{pc.pay_type}]
+                                        </span>
+                                        {pc.id} - {pc.description}
                                       </span>
-                                      {pc.id} - {pc.description}
+                                      {selected ? (
+                                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
+                                          <IconCheck size={20} />
+                                        </span>
+                                      ) : null}
+                                    </>
+                                  )}
+                                </ComboboxOption>
+                              ))}
+                              {remainingPayCodeCount > 0 && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 p-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleLoadMorePayCodes}
+                                    className="w-full rounded-md bg-sky-50 px-4 py-1.5 text-sm font-medium text-sky-600 transition-colors duration-200 hover:bg-sky-100 disabled:opacity-50 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50"
+                                    disabled={isSaving}
+                                  >
+                                    <span className="inline-flex items-center justify-center">
+                                      <IconChevronDown
+                                        size={16}
+                                        className="mr-1.5"
+                                      />
+                                      Load More Paycodes (
+                                      {remainingPayCodeCount} remaining)
                                     </span>
-                                    {selected ? (
-                                      <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
-                                        <IconCheck size={20} />
-                                      </span>
-                                    ) : null}
-                                  </>
-                                )}
-                              </ComboboxOption>
-                            ))
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
                         </ComboboxOptions>
                       </Transition>
