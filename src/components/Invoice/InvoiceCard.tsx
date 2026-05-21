@@ -1,6 +1,7 @@
 // src/components/Invoice/InvoiceCard.tsx
 import React from "react";
 import {
+  AdjustmentDocument,
   ExtendedInvoiceData,
   EInvoiceStatus,
 } from "../../types/types";
@@ -39,6 +40,92 @@ interface InvoiceStatusStyle {
   border: string;
   label: string;
 }
+
+interface InvoiceAmountAdjustmentSummary {
+  adjustedTotal: number;
+  balanceDue: number;
+  debitTotal: number;
+  creditTotal: number;
+  pairedRefundTotal: number;
+  standaloneRefundTotal: number;
+  hasInvoiceAdjustment: boolean;
+  hasAdjustmentActivity: boolean;
+}
+
+const formatCurrency = (amount: number): string => `RM ${amount.toFixed(2)}`;
+
+const getAmountAdjustmentSummary = (
+  invoice: ExtendedInvoiceData
+): InvoiceAmountAdjustmentSummary => {
+  const activeAdjustments: AdjustmentDocument[] = (
+    invoice.adjustmentDocs || []
+  ).filter(
+    (doc: AdjustmentDocument) =>
+      doc.status === "active" && !doc.is_consolidated
+  );
+  const activeInvoiceAdjustments: AdjustmentDocument[] = activeAdjustments.filter(
+    (doc: AdjustmentDocument) =>
+      (doc.type === "credit_note" || doc.type === "debit_note")
+  );
+  const debitTotal: number = activeInvoiceAdjustments
+    .filter((doc: AdjustmentDocument) => doc.type === "debit_note")
+    .reduce(
+      (sum: number, doc: AdjustmentDocument) =>
+        sum + Number(doc.totalamountpayable || 0),
+      0
+    );
+  const creditTotal: number = activeInvoiceAdjustments
+    .filter((doc: AdjustmentDocument) => doc.type === "credit_note")
+    .reduce(
+      (sum: number, doc: AdjustmentDocument) =>
+        sum + Number(doc.totalamountpayable || 0),
+      0
+    );
+  const adjustedTotal: number = Number(
+    (Number(invoice.totalamountpayable || 0) + debitTotal - creditTotal).toFixed(
+      2
+    )
+  );
+  const pairedRefundTotal: number = activeAdjustments
+    .filter(
+      (doc: AdjustmentDocument) =>
+        doc.type === "refund_note" &&
+        Boolean(doc.paired_with_id) &&
+        doc.paired_status === "active"
+    )
+    .reduce(
+      (sum: number, doc: AdjustmentDocument) =>
+        sum + Number(doc.totalamountpayable || 0),
+      0
+    );
+  const standaloneRefundTotal: number = activeAdjustments
+    .filter(
+      (doc: AdjustmentDocument) =>
+        doc.type === "refund_note" && !doc.paired_with_id
+    )
+    .reduce(
+      (sum: number, doc: AdjustmentDocument) =>
+        sum + Number(doc.totalamountpayable || 0),
+      0
+    );
+  const hasInvoiceAdjustment: boolean =
+    debitTotal > 0 ||
+    creditTotal > 0 ||
+    adjustedTotal !== Number(invoice.totalamountpayable || 0);
+  const hasRefundActivity: boolean =
+    pairedRefundTotal > 0 || standaloneRefundTotal > 0;
+
+  return {
+    adjustedTotal,
+    balanceDue: Number(invoice.balance_due || 0),
+    debitTotal,
+    creditTotal,
+    pairedRefundTotal,
+    standaloneRefundTotal,
+    hasInvoiceAdjustment,
+    hasAdjustmentActivity: hasInvoiceAdjustment || hasRefundActivity,
+  };
+};
 
 // Helper to get status styles
 const getInvoiceStatusStyles = (
@@ -154,6 +241,8 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const { activeCompany } = useCompany();
   const navigate = useNavigate();
+  const amountAdjustmentSummary: InvoiceAmountAdjustmentSummary =
+    getAmountAdjustmentSummary(invoice);
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent navigation if clicking specifically on the checkbox icon/wrapper
@@ -261,9 +350,22 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             {invoice.salespersonid}
           </span>
         </p>
-        <p className="w-fit text-lg font-semibold text-default-900 dark:text-gray-100">
-          {`RM ${invoice.totalamountpayable.toFixed(2)}`}
-        </p>
+        {amountAdjustmentSummary.hasInvoiceAdjustment ? (
+          <div className="space-y-1">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-sm text-default-400 dark:text-gray-500 line-through">
+                {formatCurrency(invoice.totalamountpayable)}
+              </span>
+              <span className="text-lg font-semibold text-default-900 dark:text-gray-100">
+                {formatCurrency(amountAdjustmentSummary.adjustedTotal)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <p className="w-fit text-lg font-semibold text-default-900 dark:text-gray-100">
+            {formatCurrency(invoice.totalamountpayable)}
+          </p>
+        )}
       </div>
 
       {/* Footer - Uses parent's horizontal padding */}

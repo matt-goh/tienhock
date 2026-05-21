@@ -150,6 +150,20 @@ async function processCompany(pool, cfg) {
             await client.query("ROLLBACK");
             continue;
           }
+
+          // Idempotency guard: if any child already carries a submission_uid
+          // we treat the group as needing manual review and skip — re-submission
+          // could create a MyInvois duplicate.
+          const stuckIds = lockResult.rows
+            .filter((r) => r.submission_uid)
+            .map((r) => r.id);
+          if (stuckIds.length > 0) {
+            console.warn(
+              `[${now.toISOString()}] ${cfg.label}: skipping group ${parentId}/${type} — children with prior submission attempts need manual review: ${stuckIds.join(", ")}`
+            );
+            await client.query("ROLLBACK");
+            continue;
+          }
           const lockedDocs = lockResult.rows;
           const parent = { id: parentId, uuid: docs[0].parent_uuid };
 

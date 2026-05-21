@@ -172,6 +172,15 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
           >
             New Credit Note
           </Button>
+          <Button
+            onClick={() => navigate(`${paths.uiBase}/new?type=refund`)}
+            icon={IconRotate2}
+            variant="outline"
+            size="md"
+            title="Issue a standalone Refund Note (rare — normally use Credit Note with paired refund)"
+          >
+            New Refund Note
+          </Button>
         </div>
       </div>
 

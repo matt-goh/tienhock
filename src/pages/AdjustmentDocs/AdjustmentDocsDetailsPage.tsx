@@ -210,6 +210,17 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
     doc.type === "credit_note" &&
     doc.status === "active" &&
     pairedDoc?.status !== "active";
+  const originalInvoicePath: string = `${paths.invoiceUiBase}/${doc.original_invoice_id}`;
+  const handleOpenOriginalInvoice = (): void => {
+    navigate(originalInvoicePath);
+  };
+  const handleOriginalInvoiceKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>
+  ): void => {
+    if (event.key === "Enter") {
+      handleOpenOriginalInvoice();
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -332,7 +343,14 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
         </div>
 
         {/* Summary grid */}
-        <div className="p-4 border-b border-default-200 dark:border-gray-700">
+        <div
+          role="link"
+          tabIndex={0}
+          onClick={handleOpenOriginalInvoice}
+          onKeyDown={handleOriginalInvoiceKeyDown}
+          className="p-4 border-b border-default-200 dark:border-gray-700 cursor-pointer transition hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500 dark:hover:bg-gray-700/50"
+          title="Open invoice"
+        >
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
@@ -340,13 +358,11 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1">
                 {doc.original_invoice_id}
-                <button
-                  onClick={() => navigate(`${paths.invoiceUiBase}/${doc.original_invoice_id}`)}
-                  className="text-sky-600 dark:text-sky-400 hover:underline"
-                  title="Open invoice"
-                >
-                  <IconExternalLink size={14} />
-                </button>
+                <IconExternalLink
+                  size={14}
+                  className="text-sky-600 dark:text-sky-400"
+                  aria-hidden="true"
+                />
               </div>
             </div>
             <div>
@@ -437,6 +453,20 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
             <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
               Refund Details
             </h3>
+            {doc.linked_payment_id &&
+              doc.linked_payment &&
+              doc.linked_payment.status === "cancelled" && (
+                <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">
+                  Linked payment #{doc.linked_payment_id} has been cancelled
+                  {doc.linked_payment.cancellation_date
+                    ? ` on ${new Date(
+                        doc.linked_payment.cancellation_date
+                      ).toLocaleDateString()}`
+                    : ""}
+                  . The link is stale — this refund's accounting impact still
+                  stands until you cancel the document.
+                </div>
+              )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase">
