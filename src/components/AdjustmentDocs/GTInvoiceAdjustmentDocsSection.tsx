@@ -11,7 +11,11 @@ import {
   AdjustmentDocStatusBadge,
 } from "./AdjustmentDocBadge";
 import LoadingSpinner from "../LoadingSpinner";
-import { AdjustmentDocType } from "../../types/types";
+import type {
+  AdjustmentDocType,
+  AdjustmentDocument,
+  EInvoiceStatus,
+} from "../../types/types";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -20,8 +24,8 @@ interface GTAdjDocRow {
   id: string;
   type: AdjustmentDocType;
   total_amount: number;
-  status: string;
-  einvoice_status: string | null;
+  status: AdjustmentDocument["status"];
+  einvoice_status: EInvoiceStatus;
   paired_doc_id?: string | null;
 }
 

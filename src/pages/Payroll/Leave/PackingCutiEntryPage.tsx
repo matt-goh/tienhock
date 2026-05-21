@@ -69,6 +69,11 @@ const LEAVE_OPTIONS: Array<{ id: LeaveType; name: string }> = [
 
 const DEFAULT_LEAVE_TYPE: LeaveType = "cuti_sakit";
 const DEFAULT_AMOUNT_PAID: string = "50";
+const DEFAULT_ROW_STATE: RowState = {
+  selected: false,
+  leaveType: DEFAULT_LEAVE_TYPE,
+  amountPaid: DEFAULT_AMOUNT_PAID,
+};
 
 const formatDateLocal = (date: Date): string => {
   const year = date.getFullYear();
@@ -271,9 +276,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
     setRowState((prev) => ({
       ...prev,
       [employeeId]: {
-        selected: false,
-        leaveType: DEFAULT_LEAVE_TYPE,
-        amountPaid: DEFAULT_AMOUNT_PAID,
+        ...DEFAULT_ROW_STATE,
         ...prev[employeeId],
         ...next,
       },

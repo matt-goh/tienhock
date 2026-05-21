@@ -23,7 +23,11 @@ import MonthNavigator from "../../../components/MonthNavigator";
 import StyledListbox from "../../../components/StyledListbox";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
-import { AdjustmentDocType } from "../../../types/types";
+import type {
+  AdjustmentDocType,
+  AdjustmentDocument,
+  EInvoiceStatus,
+} from "../../../types/types";
 import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
@@ -45,15 +49,15 @@ interface GTAdjDoc {
   paired_with_id: string | null;
   paired_doc_id?: string | null;
   paired_type?: AdjustmentDocType | null;
-  paired_status?: string | null;
+  paired_status?: AdjustmentDocument["status"] | null;
   amount_before_tax: number;
   tax_amount: number;
   total_amount: number;
   refund_method: string | null;
   uuid: string | null;
-  einvoice_status: string | null;
+  einvoice_status: EInvoiceStatus;
   is_consolidated: boolean;
-  status: string;
+  status: AdjustmentDocument["status"];
   created_at: string;
 }
 
