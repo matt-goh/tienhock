@@ -710,6 +710,9 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
                   Type
                 </th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
+                  Amount
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-default-100 dark:divide-gray-700">
@@ -740,6 +743,9 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                     >
                       {getLeaveTypeLabel(record.leave_type)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-sm font-medium text-default-700 dark:text-gray-200">
+                    {formatCurrency(Number(record.amount_paid || 0))}
                   </td>
                 </tr>
               ))}

@@ -88,9 +88,10 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     // Get employee payroll details to fetch year and month for leave records
     const payrollInfoRes = await pool.query(
       `
-      SELECT ep.employee_id, mp.year, mp.month
+      SELECT ep.employee_id, s.name as employee_name, mp.year, mp.month
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+      JOIN staffs s ON s.id = ep.employee_id
       WHERE ep.id = $1
     `,
       [employeePayrollId],
@@ -100,7 +101,7 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       throw new Error("Employee payroll not found");
     }
 
-    const { year, month } = payrollInfoRes.rows[0];
+    const { year, month, employee_name } = payrollInfoRes.rows[0];
 
     // Get leave records for this employee for the specific month/year
     const leaveRecordsRes = await pool.query(
@@ -111,13 +112,15 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
         days_taken,
         amount_paid
       FROM leave_records
-      WHERE employee_id = $1 
+      WHERE employee_id IN (
+        SELECT id FROM staffs WHERE name = $1
+      )
         AND EXTRACT(YEAR FROM leave_date) = $2
         AND EXTRACT(MONTH FROM leave_date) = $3
         AND status = 'approved'
       ORDER BY leave_date ASC
     `,
-      [employee_id, year, month],
+      [employee_name, year, month],
     );
 
     const leaveRecords = leaveRecordsRes.rows.map((record) => ({
@@ -490,14 +493,6 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     const netPay =
       grossPay - totalEmployeeDeductions - totalCommissionDeductions;
 
-    // Fetch job_type to check for MAINTEN
-    const payrollJobTypeRes = await pool.query(
-      "SELECT job_type FROM employee_payrolls WHERE id = $1",
-      [employeePayrollId],
-    );
-    const jobTypes = payrollJobTypeRes.rows[0]?.job_type || "";
-    const isMainten = jobTypes === "MAINTEN" || jobTypes.includes("MAINTEN");
-
     // Get mid-month payroll for rounding calculation
     const midMonthRes = await pool.query(
       `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
@@ -506,23 +501,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     );
     const midMonthAmount = parseFloat(midMonthRes.rows[0]?.amount || 0);
 
-    // For MAINTEN, get cuti_tahunan advance (approved annual leave amount)
-    let cutiTahunanAdvance = 0;
-    if (isMainten) {
-      const cutiRes = await pool.query(
-        `
-        SELECT COALESCE(SUM(amount_paid), 0) as total FROM leave_records
-        WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
-          AND EXTRACT(MONTH FROM leave_date) = $3 AND status = 'approved'
-          AND leave_type = 'cuti_tahunan'
-      `,
-        [employee_id, year, month],
-      );
-      cutiTahunanAdvance = parseFloat(cutiRes.rows[0]?.total || 0);
-    }
-
     // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
-    const jumlah = netPay - midMonthAmount - cutiTahunanAdvance;
+    const jumlah = netPay - midMonthAmount;
     const setelahDigenapkan = Math.ceil(jumlah);
     const digenapkan = setelahDigenapkan - jumlah;
 
@@ -648,7 +628,10 @@ export default function (pool) {
         h.description as holiday_description
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-      JOIN leave_records lr ON ep.employee_id = lr.employee_id
+      JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
+      JOIN leave_records lr ON lr.employee_id IN (
+        SELECT s2.id FROM staffs s2 WHERE s2.name = emp_staff.name
+      )
       LEFT JOIN holiday_calendar h
         ON lr.leave_type = 'cuti_umum'
         AND h.holiday_date = lr.leave_date
@@ -916,16 +899,18 @@ export default function (pool) {
           `
           SELECT
             to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+            lr.employee_id,
             lr.leave_type,
             lr.days_taken,
             lr.amount_paid,
             h.description as holiday_description
           FROM leave_records lr
+          JOIN staffs s ON s.id = lr.employee_id
           LEFT JOIN holiday_calendar h
             ON lr.leave_type = 'cuti_umum'
             AND h.holiday_date = lr.leave_date
             AND h.is_active = true
-          WHERE lr.employee_id = $1
+          WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
             AND EXTRACT(MONTH FROM lr.leave_date) = $3
             AND lr.status = 'approved'
@@ -1218,16 +1203,18 @@ export default function (pool) {
           `
           SELECT
             to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+            lr.employee_id,
             lr.leave_type,
             lr.days_taken,
             lr.amount_paid,
             h.description as holiday_description
           FROM leave_records lr
+          JOIN staffs s ON s.id = lr.employee_id
           LEFT JOIN holiday_calendar h
             ON lr.leave_type = 'cuti_umum'
             AND h.holiday_date = lr.leave_date
             AND h.is_active = true
-          WHERE lr.employee_id = $1
+          WHERE s.name = (SELECT name FROM staffs WHERE id = $1)
             AND EXTRACT(YEAR FROM lr.leave_date) = $2
             AND EXTRACT(MONTH FROM lr.leave_date) = $3
             AND lr.status = 'approved'
