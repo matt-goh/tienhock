@@ -78,6 +78,10 @@ type EmployeeHourField =
   | "umumHours"
   | "umumOvertimeHours";
 
+type LeaveType = "cuti_sakit" | "cuti_tahunan" | "cuti_umum" | "cuti_rawatan";
+const DEFAULT_LEAVE_AMOUNT: number = 65;
+const DEFAULT_LEAVE_AMOUNT_INPUT: string = String(DEFAULT_LEAVE_AMOUNT);
+
 const getActivityIdentity = (
   activity: Pick<
     ActivityItem,
@@ -103,7 +107,8 @@ interface LeaveEntry {
   employeeId: string;
   employeeName: string;
   leaveDate: string;
-  leaveType: "cuti_sakit" | "cuti_tahunan" | "cuti_umum" | "cuti_rawatan";
+  leaveType: LeaveType;
+  amountPaid: number;
   isNew: boolean; // true = to be created, false = existing from DB
 }
 
@@ -185,11 +190,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const [showAddLeaveModal, setShowAddLeaveModal] = useState(false);
   const [leaveFormData, setLeaveFormData] = useState({
     leaveDate: format(new Date(), "yyyy-MM-dd"),
-    leaveType: "cuti_sakit" as
-      | "cuti_sakit"
-      | "cuti_tahunan"
-      | "cuti_umum"
-      | "cuti_rawatan",
+    leaveType: "cuti_sakit" as LeaveType,
+    amountPaid: DEFAULT_LEAVE_AMOUNT_INPUT,
   });
   // Multi-employee selection state for the Add Leave modal
   const [leaveEmployeeSelections, setLeaveEmployeeSelections] = useState<
@@ -721,6 +723,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           employeeName: record.employee_name,
           leaveDate: record.leave_date.split("T")[0],
           leaveType: record.leave_type,
+          amountPaid: Number(record.amount_paid || 0),
           isNew: false,
         }));
         setExistingLeaveRecords(leaveRecords);
@@ -823,6 +826,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     setLeaveFormData({
       leaveDate: format(new Date(), "yyyy-MM-dd"),
       leaveType: "cuti_sakit",
+      amountPaid: DEFAULT_LEAVE_AMOUNT_INPUT,
     });
   };
 
@@ -854,6 +858,16 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
     const leaveType = leaveFormData.leaveType;
     const leaveDate = leaveFormData.leaveDate;
+    const trimmedAmount: string = leaveFormData.amountPaid.trim();
+    const parsedAmount: number =
+      trimmedAmount === "" ? DEFAULT_LEAVE_AMOUNT : Number(trimmedAmount);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      toast.error("Please enter a valid non-negative leave amount.");
+      return;
+    }
+
+    const amountPaid: number = Math.round(parsedAmount * 100) / 100;
 
     const additions: LeaveEntry[] = targetEmployeeIds.map((employeeId) => {
       const employee = eligibleEmployees.find(
@@ -864,6 +878,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         employeeName: employee?.name || "",
         leaveDate,
         leaveType,
+        amountPaid,
         isNew: true,
       };
     });
@@ -898,6 +913,39 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
   const handleRemoveNewLeave = (index: number) => {
     setNewLeaveEntries((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleNewLeaveAmountChange = (index: number, value: string): void => {
+    const trimmedAmount: string = value.trim();
+    const parsedAmount: number = trimmedAmount === "" ? 0 : Number(value);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return;
+
+    setNewLeaveEntries((prev) =>
+      prev.map((leave, i) =>
+        i === index
+          ? { ...leave, amountPaid: Math.round(parsedAmount * 100) / 100 }
+          : leave,
+      ),
+    );
+  };
+
+  const handleExistingLeaveAmountChange = (
+    leaveId: number,
+    value: string,
+  ): void => {
+    const trimmedAmount: string = value.trim();
+    const parsedAmount: number = trimmedAmount === "" ? 0 : Number(value);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return;
+
+    setExistingLeaveRecords((prev) =>
+      prev.map((leave) =>
+        leave.id === leaveId
+          ? { ...leave, amountPaid: Math.round(parsedAmount * 100) / 100 }
+          : leave,
+      ),
+    );
   };
 
   const handleRemoveExistingLeave = (leaveId: number) => {
@@ -1007,8 +1055,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           leaveDate: leave.leaveDate,
           leaveType: leave.leaveType,
           isNew: true,
-          amount_paid: 0,
+          amount_paid: leave.amountPaid,
         })),
+        updatedLeaveEntries: existingLeaveRecords
+          .filter((leave) => leave.id !== undefined)
+          .map((leave) => ({
+            id: leave.id,
+            amount_paid: leave.amountPaid,
+          })),
         deletedLeaveIds: deletedLeaveIds,
       };
 
@@ -1100,6 +1154,29 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       default:
         return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
     }
+  };
+
+  const formatLeaveAmount = (amount: number): string => {
+    return (Math.round(amount * 100) / 100).toFixed(2);
+  };
+
+  const handleLeaveAmountBlur = (): void => {
+    const trimmedAmount: string = leaveFormData.amountPaid.trim();
+    if (trimmedAmount === "") {
+      setLeaveFormData((prev) => ({
+        ...prev,
+        amountPaid: DEFAULT_LEAVE_AMOUNT_INPUT,
+      }));
+      return;
+    }
+
+    const parsedAmount: number = Number(trimmedAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return;
+
+    setLeaveFormData((prev) => ({
+      ...prev,
+      amountPaid: formatLeaveAmount(parsedAmount),
+    }));
   };
 
   const allSelected =
@@ -1452,6 +1529,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                     Type
                   </th>
+                  <th className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+                    Amount
+                  </th>
                   <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                     Status
                   </th>
@@ -1461,60 +1541,94 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-default-200 dark:divide-gray-700">
-                {allLeaveRecords.map((leave, index) => (
-                  <tr
-                    key={`${leave.employeeId}-${leave.leaveDate}-${index}`}
-                    className="bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700"
-                  >
-                    <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
-                      <span className="font-medium">{leave.employeeName}</span>
-                      <span className="text-default-400 dark:text-gray-500 ml-2">
-                        ({leave.employeeId})
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
-                      {format(new Date(leave.leaveDate), "dd MMM yyyy")}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(
-                          leave.leaveType,
-                        )}`}
-                      >
-                        {getLeaveTypeLabel(leave.leaveType)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      {leave.isNew ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
-                          New
+                {allLeaveRecords.map((leave, index) => {
+                  const newLeaveIndex: number = newLeaveEntries.indexOf(
+                    leave,
+                  );
+                  const canEditAmount: boolean =
+                    (leave.isNew && newLeaveIndex >= 0) ||
+                    (!leave.isNew && leave.id !== undefined);
+
+                  return (
+                    <tr
+                      key={`${leave.employeeId}-${leave.leaveDate}-${index}`}
+                      className="bg-white dark:bg-gray-800 hover:bg-default-50 dark:hover:bg-gray-700"
+                    >
+                      <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
+                        <span className="font-medium">
+                          {leave.employeeName}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
-                          Existing
+                        <span className="text-default-400 dark:text-gray-500 ml-2">
+                          ({leave.employeeId})
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <button
-                        onClick={() => {
-                          if (leave.isNew) {
-                            handleRemoveNewLeave(
-                              newLeaveEntries.indexOf(leave as any),
-                            );
-                          } else if (leave.id) {
-                            handleRemoveExistingLeave(leave.id);
-                          }
-                        }}
-                        className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300"
-                        title="Remove"
-                        disabled={isSaving}
-                      >
-                        <IconTrash size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
+                        {format(new Date(leave.leaveDate), "dd MMM yyyy")}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(
+                            leave.leaveType,
+                          )}`}
+                        >
+                          {getLeaveTypeLabel(leave.leaveType)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-sm text-default-700 dark:text-gray-200">
+                        {canEditAmount ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={leave.amountPaid}
+                            onChange={(e) =>
+                              leave.isNew
+                                ? handleNewLeaveAmountChange(
+                                    newLeaveIndex,
+                                    e.target.value,
+                                  )
+                                : handleExistingLeaveAmountChange(
+                                    leave.id!,
+                                    e.target.value,
+                                  )
+                            }
+                            disabled={isSaving}
+                            className="w-24 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 py-1 text-right text-sm text-default-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-default-100 dark:disabled:bg-gray-700 disabled:text-default-400 dark:disabled:text-gray-500"
+                          />
+                        ) : (
+                          <>RM {formatLeaveAmount(leave.amountPaid)}</>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        {leave.isNew ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                            New
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
+                            Existing
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <button
+                          onClick={() => {
+                            if (leave.isNew) {
+                              handleRemoveNewLeave(newLeaveIndex);
+                            } else if (leave.id) {
+                              handleRemoveExistingLeave(leave.id);
+                            }
+                          }}
+                          className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300"
+                          title="Remove"
+                          disabled={isSaving}
+                        >
+                          <IconTrash size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1586,8 +1700,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   Pick a date and leave type, then select one or more employees.
                 </p>
 
-                {/* Date + Type row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                {/* Date + Type + Amount row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
                       Date
@@ -1616,11 +1730,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       onChange={(value) =>
                         setLeaveFormData({
                           ...leaveFormData,
-                          leaveType: value as
-                            | "cuti_sakit"
-                            | "cuti_tahunan"
-                            | "cuti_umum"
-                            | "cuti_rawatan",
+                          leaveType: value as LeaveType,
                         })
                       }
                       options={[
@@ -1631,6 +1741,30 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       ]}
                       rounded="lg"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
+                      Amount
+                    </label>
+                    <div className="relative h-10">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-default-400 dark:text-gray-400 pointer-events-none">
+                        RM
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={leaveFormData.amountPaid}
+                        onChange={(e) =>
+                          setLeaveFormData({
+                            ...leaveFormData,
+                            amountPaid: e.target.value,
+                          })
+                        }
+                        onBlur={handleLeaveAmountBlur}
+                        className="w-full h-full pl-10 pr-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 text-right focus:outline-none focus:border-default-500 dark:focus:border-gray-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
