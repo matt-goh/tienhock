@@ -55,6 +55,14 @@ export default function (pool) {
     return null;
   };
 
+  const parseLeaveAmount = (amount) => {
+    const parsedAmount = Number(amount || 0);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      return null;
+    }
+    return Math.round(parsedAmount * 100) / 100;
+  };
+
   // Get monthly work logs with filtering
   router.get("/", async (req, res) => {
     const {
@@ -291,6 +299,7 @@ export default function (pool) {
       status,
       employeeEntries,
       leaveEntries,
+      updatedLeaveEntries,
     } = req.body;
 
     if (!employeeEntries || employeeEntries.length === 0) {
@@ -414,6 +423,14 @@ export default function (pool) {
       if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
         for (const leave of leaveEntries) {
           const { employeeId, leaveDate, leaveType, amount_paid, activities } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (leaveAmount === null) {
+            await pool.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
 
           // Check if leave record already exists for this date/employee
           const existingLeave = await pool.query(
@@ -433,9 +450,33 @@ export default function (pool) {
               leaveDate,
               leaveType,
               1.0,
-              amount_paid || 0,
+              leaveAmount,
             ]);
           }
+        }
+      }
+
+      // Update existing saved leave amounts if any
+      if (
+        updatedLeaveEntries &&
+        Array.isArray(updatedLeaveEntries) &&
+        updatedLeaveEntries.length > 0
+      ) {
+        for (const leave of updatedLeaveEntries) {
+          const { id: leaveId, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (!leaveId || leaveAmount === null) {
+            await pool.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          await pool.query(
+            "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
+            [leaveAmount, leaveId]
+          );
         }
       }
 
@@ -466,6 +507,7 @@ export default function (pool) {
       status,
       employeeEntries,
       leaveEntries,
+      updatedLeaveEntries,
       deletedLeaveIds,
     } = req.body;
 
@@ -600,6 +642,14 @@ export default function (pool) {
         for (const leave of leaveEntries) {
           if (leave.isNew) {
             const { employeeId, leaveDate, leaveType, amount_paid } = leave;
+            const leaveAmount = parseLeaveAmount(amount_paid);
+
+            if (leaveAmount === null) {
+              await pool.query("ROLLBACK");
+              return res.status(400).json({
+                message: "Leave amount must be a non-negative number",
+              });
+            }
 
             // Check if leave record already exists
             const existingLeave = await pool.query(
@@ -618,10 +668,34 @@ export default function (pool) {
                 leaveDate,
                 leaveType,
                 1.0,
-                amount_paid || 0,
+                leaveAmount,
               ]);
             }
           }
+        }
+      }
+
+      // Update existing saved leave amounts if any
+      if (
+        updatedLeaveEntries &&
+        Array.isArray(updatedLeaveEntries) &&
+        updatedLeaveEntries.length > 0
+      ) {
+        for (const leave of updatedLeaveEntries) {
+          const { id: leaveId, amount_paid } = leave;
+          const leaveAmount = parseLeaveAmount(amount_paid);
+
+          if (!leaveId || leaveAmount === null) {
+            await pool.query("ROLLBACK");
+            return res.status(400).json({
+              message: "Leave amount must be a non-negative number",
+            });
+          }
+
+          await pool.query(
+            "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
+            [leaveAmount, leaveId]
+          );
         }
       }
 

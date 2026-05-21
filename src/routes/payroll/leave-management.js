@@ -1,6 +1,20 @@
 // src/routes/payroll/leave-management.js
 import { Router } from "express";
 
+const CUTI_TAHUNAN_ADVANCE_LOCATION_CODE = "23";
+const PACKING_CUTI_NOTE_PREFIX = "PACKING_CUTI";
+const PACKING_CUTI_JOB_TYPES = new Set(["MEE_PACKING", "BH_PACKING"]);
+const PACKING_PRODUCT_TYPES = {
+  MEE_PACKING: "MEE",
+  BH_PACKING: "BH",
+};
+const VALID_LEAVE_TYPES = new Set([
+  "cuti_umum",
+  "cuti_sakit",
+  "cuti_tahunan",
+  "cuti_rawatan",
+]);
+
 // --- Helper Functions for Leave Calculation ---
 
 /**
@@ -80,8 +94,259 @@ const getCutiUmumTotal = async (client, year) => {
   return Number(result.rows[0]?.total || 0);
 };
 
+const getCutiTahunanAdvanceDaysExpression = () => "1::numeric";
+
+const getPackingCutiNote = (jobType) => `${PACKING_CUTI_NOTE_PREFIX}:${jobType}`;
+
+const isValidDateString = (date) => /^\d{4}-\d{2}-\d{2}$/.test(date || "");
+
+const createRequestError = (message) => {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+};
+
 export default function (pool) {
   const router = Router();
+
+  router.get("/packing-cuti", async (req, res) => {
+    const { job_type, date } = req.query;
+
+    if (!PACKING_CUTI_JOB_TYPES.has(job_type)) {
+      return res.status(400).json({ message: "Invalid packing job type" });
+    }
+
+    if (!isValidDateString(date)) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    try {
+      const note = getPackingCutiNote(job_type);
+      const [workersResult, entriesResult] = await Promise.all([
+        pool.query(
+          `
+            SELECT id, name, job
+            FROM staffs
+            WHERE job::jsonb ? $1
+              AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+            ORDER BY name ASC
+          `,
+          [job_type],
+        ),
+        pool.query(
+          `
+            SELECT
+              lr.id,
+              lr.employee_id,
+              s.name as employee_name,
+              to_char(lr.leave_date, 'YYYY-MM-DD') as leave_date,
+              lr.leave_type,
+              lr.days_taken,
+              lr.amount_paid,
+              lr.status,
+              lr.notes
+            FROM leave_records lr
+            JOIN staffs s ON s.id = lr.employee_id
+            WHERE lr.leave_date = $1
+              AND lr.status = 'approved'
+              AND lr.notes = $2
+            ORDER BY s.name ASC
+          `,
+          [date, note],
+        ),
+      ]);
+
+      res.json({
+        job_type,
+        date,
+        workers: workersResult.rows,
+        entries: entriesResult.rows.map((entry) => ({
+          ...entry,
+          days_taken: parseFloat(entry.days_taken || 0),
+          amount_paid: parseFloat(entry.amount_paid || 0),
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching packing cuti entries:", error);
+      res.status(500).json({
+        message: "Error fetching packing cuti entries",
+        error: error.message,
+      });
+    }
+  });
+
+  router.post("/packing-cuti/batch", async (req, res) => {
+    const { job_type, date, entries, created_by } = req.body;
+
+    if (!PACKING_CUTI_JOB_TYPES.has(job_type)) {
+      return res.status(400).json({ message: "Invalid packing job type" });
+    }
+
+    if (!isValidDateString(date)) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    if (!Array.isArray(entries)) {
+      return res.status(400).json({ message: "entries must be an array" });
+    }
+
+    const normalizedEntries = [];
+    const seenEmployeeIds = new Set();
+    for (const entry of entries) {
+      const employeeId = String(entry.employee_id || "").trim();
+      const leaveType = entry.leave_type;
+      const amountPaid = Number(entry.amount_paid);
+
+      if (!employeeId) {
+        return res.status(400).json({ message: "employee_id is required" });
+      }
+
+      if (seenEmployeeIds.has(employeeId)) {
+        return res.status(400).json({
+          message: `Duplicate cuti entry for ${employeeId}`,
+        });
+      }
+
+      if (!VALID_LEAVE_TYPES.has(leaveType)) {
+        return res.status(400).json({
+          message: `Invalid leave type for ${employeeId}`,
+        });
+      }
+
+      if (!Number.isFinite(amountPaid) || amountPaid < 0) {
+        return res.status(400).json({
+          message: `Invalid leave amount for ${employeeId}`,
+        });
+      }
+
+      seenEmployeeIds.add(employeeId);
+      normalizedEntries.push({
+        employee_id: employeeId,
+        leave_type: leaveType,
+        amount_paid: Math.round(amountPaid * 100) / 100,
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const note = getPackingCutiNote(job_type);
+      const employeeIds = normalizedEntries.map((entry) => entry.employee_id);
+
+      if (employeeIds.length > 0) {
+        const workerResult = await client.query(
+          `
+            SELECT id
+            FROM staffs
+            WHERE id = ANY($1::text[])
+              AND job::jsonb ? $2
+              AND (date_resigned IS NULL OR date_resigned > CURRENT_DATE)
+          `,
+          [employeeIds, job_type],
+        );
+        const validWorkerIds = new Set(workerResult.rows.map((row) => row.id));
+        const invalidEmployeeIds = employeeIds.filter(
+          (employeeId) => !validWorkerIds.has(employeeId),
+        );
+
+        if (invalidEmployeeIds.length > 0) {
+          throw createRequestError(
+            `Invalid ${job_type} worker(s): ${invalidEmployeeIds.join(", ")}`,
+          );
+        }
+
+        const existingLeaveResult = await client.query(
+          `
+            SELECT employee_id
+            FROM leave_records
+            WHERE employee_id = ANY($1::text[])
+              AND leave_date = $2
+              AND status = 'approved'
+              AND COALESCE(notes, '') <> $3
+          `,
+          [employeeIds, date, note],
+        );
+
+        if (existingLeaveResult.rows.length > 0) {
+          throw createRequestError(
+            `Existing leave already recorded for: ${existingLeaveResult.rows
+              .map((row) => row.employee_id)
+              .join(", ")}`,
+          );
+        }
+
+        const productType = PACKING_PRODUCT_TYPES[job_type];
+        const productionConflictResult = await client.query(
+          `
+            SELECT DISTINCT pe.worker_id, p.description as product_description
+            FROM production_entries pe
+            JOIN products p ON p.id = pe.product_id
+            WHERE pe.worker_id = ANY($1::text[])
+              AND pe.entry_date = $2
+              AND pe.bags_packed > 0
+              AND p.type = $3
+          `,
+          [employeeIds, date, productType],
+        );
+
+        if (productionConflictResult.rows.length > 0) {
+          throw createRequestError(
+            `Production already recorded for: ${productionConflictResult.rows
+              .map((row) => row.worker_id)
+              .join(", ")}`,
+          );
+        }
+      }
+
+      await client.query(
+        `
+          DELETE FROM leave_records
+          WHERE leave_date = $1
+            AND notes = $2
+        `,
+        [date, note],
+      );
+
+      const savedEntries = [];
+      for (const entry of normalizedEntries) {
+        const result = await client.query(
+          `
+            INSERT INTO leave_records (
+              employee_id, leave_date, leave_type, work_log_id, days_taken,
+              amount_paid, status, notes, created_by
+            )
+            VALUES ($1, $2, $3, NULL, 1.0, $4, 'approved', $5, $6)
+            RETURNING *
+          `,
+          [
+            entry.employee_id,
+            date,
+            entry.leave_type,
+            entry.amount_paid,
+            note,
+            created_by || null,
+          ],
+        );
+        savedEntries.push(result.rows[0]);
+      }
+
+      await client.query("COMMIT");
+      res.json({
+        message: "Packing cuti entries saved successfully",
+        entries: savedEntries,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error saving packing cuti entries:", error);
+      res.status(error.status || 500).json({
+        message: error.message || "Error saving packing cuti entries",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
 
   /**
    * GET /api/leave-management/balances/batch?employeeIds=EMP1,EMP2&year=2024
@@ -142,9 +407,17 @@ export default function (pool) {
               } = calculateLeaveAllocation(yearsOfService);
 
               balanceResult = await client.query(
-                `INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
-                 VALUES ($1, $2, $3, $4, $5)
-                 RETURNING *;`,
+                `WITH inserted AS (
+                   INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT (employee_id, year) DO NOTHING
+                   RETURNING *
+                 )
+                 SELECT * FROM inserted
+                 UNION ALL
+                 SELECT * FROM employee_leave_balances
+                  WHERE employee_id = $1 AND year = $2
+                 LIMIT 1;`,
                 [
                   canonicalId,
                   parseInt(year),
@@ -156,13 +429,27 @@ export default function (pool) {
             }
 
             const takenLeaveResult = await client.query(
-              `SELECT leave_type, SUM(days_taken) as total_taken
-                 FROM leave_records
-                WHERE employee_id = ANY($1::text[])
-                  AND EXTRACT(YEAR FROM leave_date) = $2
-                  AND status = 'approved'
+              `SELECT leave_type, SUM(total_taken) as total_taken
+                 FROM (
+                   SELECT leave_type, SUM(days_taken)::numeric as total_taken
+                     FROM leave_records
+                    WHERE employee_id = ANY($1::text[])
+                      AND EXTRACT(YEAR FROM leave_date) = $2
+                      AND status = 'approved'
+                    GROUP BY leave_type
+
+                   UNION ALL
+
+                   SELECT 'cuti_tahunan' as leave_type,
+                          SUM(${getCutiTahunanAdvanceDaysExpression()}) as total_taken
+                     FROM commission_records cr
+                    WHERE cr.employee_id = ANY($1::text[])
+                      AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                      AND cr.location_code = $3
+                 ) leave_sources
+                WHERE total_taken IS NOT NULL
                 GROUP BY leave_type;`,
-              [siblingIds, parseInt(year)]
+              [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
             );
 
             const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
@@ -239,9 +526,17 @@ export default function (pool) {
             calculateLeaveAllocation(yearsOfService);
 
           balanceResult = await client.query(
-            `INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING *;`,
+            `WITH inserted AS (
+               INSERT INTO employee_leave_balances (employee_id, year, cuti_tahunan_total, cuti_sakit_total, cuti_rawatan_total)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (employee_id, year) DO NOTHING
+               RETURNING *
+             )
+             SELECT * FROM inserted
+             UNION ALL
+             SELECT * FROM employee_leave_balances
+              WHERE employee_id = $1 AND year = $2
+             LIMIT 1;`,
             [
               canonicalId,
               parseInt(year),
@@ -256,13 +551,27 @@ export default function (pool) {
 
         // Sum taken-days across ALL sibling IDs so multi-ID employees share one bucket.
         const takenLeaveResult = await client.query(
-          `SELECT leave_type, SUM(days_taken) as total_taken
-             FROM leave_records
-            WHERE employee_id = ANY($1::text[])
-              AND EXTRACT(YEAR FROM leave_date) = $2
-              AND status = 'approved'
+          `SELECT leave_type, SUM(total_taken) as total_taken
+             FROM (
+               SELECT leave_type, SUM(days_taken)::numeric as total_taken
+                 FROM leave_records
+                WHERE employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM leave_date) = $2
+                  AND status = 'approved'
+                GROUP BY leave_type
+
+               UNION ALL
+
+               SELECT 'cuti_tahunan' as leave_type,
+                      SUM(${getCutiTahunanAdvanceDaysExpression()}) as total_taken
+                 FROM commission_records cr
+                WHERE cr.employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                  AND cr.location_code = $3
+             ) leave_sources
+            WHERE total_taken IS NOT NULL
             GROUP BY leave_type;`,
-          [siblingIds, parseInt(year)]
+          [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
         );
 
         const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
@@ -309,11 +618,34 @@ export default function (pool) {
         const siblingIds = siblings.map((s) => s.id);
 
         const result = await client.query(
-          `SELECT * FROM leave_records
-            WHERE employee_id = ANY($1::text[])
-              AND EXTRACT(YEAR FROM leave_date) = $2
+          `SELECT *
+             FROM (
+               SELECT id, employee_id, leave_date, leave_type, days_taken,
+                      amount_paid, status, notes, created_by, created_at, updated_at
+                 FROM leave_records
+                WHERE employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM leave_date) = $2
+
+               UNION ALL
+
+               SELECT -cr.id as id,
+                      cr.employee_id,
+                      cr.commission_date as leave_date,
+                      'cuti_tahunan' as leave_type,
+                      ${getCutiTahunanAdvanceDaysExpression()} as days_taken,
+                      cr.amount as amount_paid,
+                      'approved' as status,
+                      CONCAT('Others (Advance) - ', cr.description) as notes,
+                      cr.created_by,
+                      cr.created_at,
+                      NULL::timestamp as updated_at
+                 FROM commission_records cr
+                WHERE cr.employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                  AND cr.location_code = $3
+             ) leave_sources
             ORDER BY leave_date DESC`,
-          [siblingIds, parseInt(year)]
+          [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
         );
         res.json(result.rows);
       } finally {
@@ -458,13 +790,33 @@ export default function (pool) {
              leave_type,
              days_taken,
              amount_paid
-           FROM leave_records
-           WHERE employee_id = ANY($1::text[])
-             AND EXTRACT(YEAR FROM leave_date) = $2
-             AND EXTRACT(MONTH FROM leave_date) = $3
-             AND status = 'approved'
+           FROM (
+             SELECT leave_date, leave_type, days_taken, amount_paid
+               FROM leave_records
+              WHERE employee_id = ANY($1::text[])
+                AND EXTRACT(YEAR FROM leave_date) = $2
+                AND EXTRACT(MONTH FROM leave_date) = $3
+                AND status = 'approved'
+
+             UNION ALL
+
+             SELECT cr.commission_date as leave_date,
+                    'cuti_tahunan' as leave_type,
+                    ${getCutiTahunanAdvanceDaysExpression()} as days_taken,
+                    cr.amount as amount_paid
+               FROM commission_records cr
+              WHERE cr.employee_id = ANY($1::text[])
+                AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                AND EXTRACT(MONTH FROM cr.commission_date) = $3
+                AND cr.location_code = $4
+           ) leave_sources
            ORDER BY leave_date ASC;`,
-          [siblingIds, parseInt(year), parseInt(month)]
+          [
+            siblingIds,
+            parseInt(year),
+            parseInt(month),
+            CUTI_TAHUNAN_ADVANCE_LOCATION_CODE,
+          ]
         );
         res.json(result.rows);
       } finally {
@@ -574,6 +926,19 @@ export default function (pool) {
             JOIN leave_records lr ON lr.employee_id = ANY(ei.sibling_ids)
             WHERE EXTRACT(YEAR FROM lr.leave_date) = $2
               AND lr.status = 'approved'
+
+            UNION ALL
+
+            SELECT
+              ei.id AS requested_id,
+              cr.commission_date AS leave_date,
+              'cuti_tahunan' AS leave_type,
+              ${getCutiTahunanAdvanceDaysExpression()} AS days_taken,
+              cr.amount AS amount_paid
+            FROM employee_info ei
+            JOIN commission_records cr ON cr.employee_id = ANY(ei.sibling_ids)
+            WHERE EXTRACT(YEAR FROM cr.commission_date) = $2
+              AND cr.location_code = $3
           ),
           leave_taken AS (
             SELECT
@@ -627,7 +992,11 @@ export default function (pool) {
           ORDER BY ei.name
         `;
 
-        const result = await client.query(query, [employeeIds, year]);
+        const result = await client.query(query, [
+          employeeIds,
+          year,
+          CUTI_TAHUNAN_ADVANCE_LOCATION_CODE,
+        ]);
 
         // Process the results to match the expected frontend format
         const employees = result.rows.map((row) => {

@@ -79,6 +79,7 @@ import MonthlyLogEditPage from "./Payroll/MonthlyLog/MonthlyLogEditPage";
 
 // Payroll - Leave
 import CutiManagementPage from "./Payroll/Leave/CutiManagementPage";
+import PackingCutiEntryPage from "./Payroll/Leave/PackingCutiEntryPage";
 
 // Payroll - Statutory
 import ContributionRatesPage from "./Payroll/Statutory/ContributionRatesPage";
@@ -246,6 +247,24 @@ const generatePayrollSubItems = (): SidebarItem[] => {
           },
         ],
       });
+
+      if (jobConfig.id === "MEE" || jobConfig.id === "BIHUN") {
+        const packingJobType: "MEE_PACKING" | "BH_PACKING" =
+          jobConfig.id === "MEE" ? "MEE_PACKING" : "BH_PACKING";
+        payrollSubItems.push({
+          name:
+            jobConfig.id === "MEE"
+              ? "Mee Packing Cuti"
+              : "Bihun Packing Cuti",
+          path:
+            jobConfig.id === "MEE"
+              ? "/payroll/mee-packing-cuti"
+              : "/payroll/bihun-packing-cuti",
+          component: (props: any) => (
+            <PackingCutiEntryPage jobType={packingJobType} {...props} />
+          ),
+        });
+      }
     }
   });
 

@@ -91,6 +91,7 @@ import greenTargetEmployeePayrollsRouter from "./greentarget/employee-payrolls.j
 import greenTargetPickupDestinationsRouter from "./greentarget/pickup-destinations.js";
 import greenTargetPayrollRulesRouter from "./greentarget/payroll-rules.js";
 import greenTargetRentalAddonsRouter from "./greentarget/rental-addons.js";
+import greenTargetAdjustmentDocsRouter from "./greentarget/adjustment-docs.js";
 
 // Jellypolly routes
 import jellypollyInvoiceRouter from "./jellypolly/invoices.js";
@@ -252,6 +253,10 @@ export default function setupRoutes(app, pool) {
   app.use(
     "/greentarget/api/rental-addons",
     greenTargetRentalAddonsRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/adjustment-docs",
+    greenTargetAdjustmentDocsRouter(pool, myInvoisGTConfig)
   );
 
   // Jellypolly routes
