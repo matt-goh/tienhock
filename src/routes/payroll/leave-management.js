@@ -1,6 +1,20 @@
 // src/routes/payroll/leave-management.js
 import { Router } from "express";
 
+const CUTI_TAHUNAN_ADVANCE_LOCATION_CODE = "23";
+const PACKING_CUTI_NOTE_PREFIX = "PACKING_CUTI";
+const PACKING_CUTI_JOB_TYPES = new Set(["MEE_PACKING", "BH_PACKING"]);
+const PACKING_PRODUCT_TYPES = {
+  MEE_PACKING: "MEE",
+  BH_PACKING: "BH",
+};
+const VALID_LEAVE_TYPES = new Set([
+  "cuti_umum",
+  "cuti_sakit",
+  "cuti_tahunan",
+  "cuti_rawatan",
+]);
+
 // --- Helper Functions for Leave Calculation ---
 
 /**
@@ -156,13 +170,27 @@ export default function (pool) {
             }
 
             const takenLeaveResult = await client.query(
-              `SELECT leave_type, SUM(days_taken) as total_taken
-                 FROM leave_records
-                WHERE employee_id = ANY($1::text[])
-                  AND EXTRACT(YEAR FROM leave_date) = $2
-                  AND status = 'approved'
+              `SELECT leave_type, SUM(total_taken) as total_taken
+                 FROM (
+                   SELECT leave_type, SUM(days_taken)::numeric as total_taken
+                     FROM leave_records
+                    WHERE employee_id = ANY($1::text[])
+                      AND EXTRACT(YEAR FROM leave_date) = $2
+                      AND status = 'approved'
+                    GROUP BY leave_type
+
+                   UNION ALL
+
+                   SELECT 'cuti_tahunan' as leave_type,
+                          SUM(${getCutiTahunanAdvanceDaysExpression()}) as total_taken
+                     FROM commission_records cr
+                    WHERE cr.employee_id = ANY($1::text[])
+                      AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                      AND cr.location_code = $3
+                 ) leave_sources
+                WHERE total_taken IS NOT NULL
                 GROUP BY leave_type;`,
-              [siblingIds, parseInt(year)]
+              [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
             );
 
             const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
@@ -256,13 +284,27 @@ export default function (pool) {
 
         // Sum taken-days across ALL sibling IDs so multi-ID employees share one bucket.
         const takenLeaveResult = await client.query(
-          `SELECT leave_type, SUM(days_taken) as total_taken
-             FROM leave_records
-            WHERE employee_id = ANY($1::text[])
-              AND EXTRACT(YEAR FROM leave_date) = $2
-              AND status = 'approved'
+          `SELECT leave_type, SUM(total_taken) as total_taken
+             FROM (
+               SELECT leave_type, SUM(days_taken)::numeric as total_taken
+                 FROM leave_records
+                WHERE employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM leave_date) = $2
+                  AND status = 'approved'
+                GROUP BY leave_type
+
+               UNION ALL
+
+               SELECT 'cuti_tahunan' as leave_type,
+                      SUM(${getCutiTahunanAdvanceDaysExpression()}) as total_taken
+                 FROM commission_records cr
+                WHERE cr.employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                  AND cr.location_code = $3
+             ) leave_sources
+            WHERE total_taken IS NOT NULL
             GROUP BY leave_type;`,
-          [siblingIds, parseInt(year)]
+          [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
         );
 
         const takenLeave = takenLeaveResult.rows.reduce((acc, row) => {
@@ -309,11 +351,34 @@ export default function (pool) {
         const siblingIds = siblings.map((s) => s.id);
 
         const result = await client.query(
-          `SELECT * FROM leave_records
-            WHERE employee_id = ANY($1::text[])
-              AND EXTRACT(YEAR FROM leave_date) = $2
+          `SELECT *
+             FROM (
+               SELECT id, employee_id, leave_date, leave_type, days_taken,
+                      amount_paid, status, notes, created_by, created_at, updated_at
+                 FROM leave_records
+                WHERE employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM leave_date) = $2
+
+               UNION ALL
+
+               SELECT -cr.id as id,
+                      cr.employee_id,
+                      cr.commission_date as leave_date,
+                      'cuti_tahunan' as leave_type,
+                      ${getCutiTahunanAdvanceDaysExpression()} as days_taken,
+                      cr.amount as amount_paid,
+                      'approved' as status,
+                      CONCAT('Others (Advance) - ', cr.description) as notes,
+                      cr.created_by,
+                      cr.created_at,
+                      NULL::timestamp as updated_at
+                 FROM commission_records cr
+                WHERE cr.employee_id = ANY($1::text[])
+                  AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                  AND cr.location_code = $3
+             ) leave_sources
             ORDER BY leave_date DESC`,
-          [siblingIds, parseInt(year)]
+          [siblingIds, parseInt(year), CUTI_TAHUNAN_ADVANCE_LOCATION_CODE]
         );
         res.json(result.rows);
       } finally {
@@ -458,13 +523,33 @@ export default function (pool) {
              leave_type,
              days_taken,
              amount_paid
-           FROM leave_records
-           WHERE employee_id = ANY($1::text[])
-             AND EXTRACT(YEAR FROM leave_date) = $2
-             AND EXTRACT(MONTH FROM leave_date) = $3
-             AND status = 'approved'
+           FROM (
+             SELECT leave_date, leave_type, days_taken, amount_paid
+               FROM leave_records
+              WHERE employee_id = ANY($1::text[])
+                AND EXTRACT(YEAR FROM leave_date) = $2
+                AND EXTRACT(MONTH FROM leave_date) = $3
+                AND status = 'approved'
+
+             UNION ALL
+
+             SELECT cr.commission_date as leave_date,
+                    'cuti_tahunan' as leave_type,
+                    ${getCutiTahunanAdvanceDaysExpression()} as days_taken,
+                    cr.amount as amount_paid
+               FROM commission_records cr
+              WHERE cr.employee_id = ANY($1::text[])
+                AND EXTRACT(YEAR FROM cr.commission_date) = $2
+                AND EXTRACT(MONTH FROM cr.commission_date) = $3
+                AND cr.location_code = $4
+           ) leave_sources
            ORDER BY leave_date ASC;`,
-          [siblingIds, parseInt(year), parseInt(month)]
+          [
+            siblingIds,
+            parseInt(year),
+            parseInt(month),
+            CUTI_TAHUNAN_ADVANCE_LOCATION_CODE,
+          ]
         );
         res.json(result.rows);
       } finally {
@@ -574,6 +659,19 @@ export default function (pool) {
             JOIN leave_records lr ON lr.employee_id = ANY(ei.sibling_ids)
             WHERE EXTRACT(YEAR FROM lr.leave_date) = $2
               AND lr.status = 'approved'
+
+            UNION ALL
+
+            SELECT
+              ei.id AS requested_id,
+              cr.commission_date AS leave_date,
+              'cuti_tahunan' AS leave_type,
+              ${getCutiTahunanAdvanceDaysExpression()} AS days_taken,
+              cr.amount AS amount_paid
+            FROM employee_info ei
+            JOIN commission_records cr ON cr.employee_id = ANY(ei.sibling_ids)
+            WHERE EXTRACT(YEAR FROM cr.commission_date) = $2
+              AND cr.location_code = $3
           ),
           leave_taken AS (
             SELECT
@@ -627,7 +725,11 @@ export default function (pool) {
           ORDER BY ei.name
         `;
 
-        const result = await client.query(query, [employeeIds, year]);
+        const result = await client.query(query, [
+          employeeIds,
+          year,
+          CUTI_TAHUNAN_ADVANCE_LOCATION_CODE,
+        ]);
 
         // Process the results to match the expected frontend format
         const employees = result.rows.map((row) => {
