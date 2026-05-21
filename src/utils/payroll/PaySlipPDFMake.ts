@@ -137,6 +137,20 @@ const splitGroupedPayroll = (
   const allLeaveRecords = payroll.leave_records || [];
   const allCommissionRecords = payroll.commission_records || [];
   const allOthersRecords = (payroll as any).others_records || [];
+  const employeeJobMapping = payroll.employee_job_mapping || {};
+
+  // Leave/commission/others records each carry the sibling staff's employee_id
+  // (e.g. JAINOL_PM). employee_job_mapping maps that id to the job it owns in
+  // this combined payroll. Attribute each record to that one job's slip so the
+  // individual breakdowns sum back to the combined total. Records whose
+  // employee_id is missing from the mapping fall to the first job so the sum
+  // still matches.
+  const anchorJob = jobTypes[0];
+  const ownerJobForRecord = (employeeId: string | undefined): string => {
+    const mapped = employeeId ? employeeJobMapping[employeeId] : undefined;
+    if (mapped && jobTypes.includes(mapped)) return mapped;
+    return anchorJob;
+  };
 
   jobTypes.forEach((jobType) => {
     const jobItems = allItems.filter((item) => {
@@ -156,25 +170,15 @@ const splitGroupedPayroll = (
       );
     });
 
-    const jobLeaveRecords = [...allLeaveRecords];
-    const jobCommissionRecords = allCommissionRecords.filter((record) => {
-      const hasJobMatch = jobTypes.some((jt) =>
-        itemBelongsToJobByName(record.description, "", jt),
-      );
-      if (!hasJobMatch) {
-        return true;
-      }
-      return itemBelongsToJobByName(record.description, "", jobType);
-    });
-    const jobOthersRecords = allOthersRecords.filter((record: any) => {
-      const hasJobMatch = jobTypes.some((jt) =>
-        itemBelongsToJobByName(record.description, "", jt),
-      );
-      if (!hasJobMatch) {
-        return true;
-      }
-      return itemBelongsToJobByName(record.description, "", jobType);
-    });
+    const jobLeaveRecords = allLeaveRecords.filter(
+      (record) => ownerJobForRecord(record.employee_id) === jobType,
+    );
+    const jobCommissionRecords = allCommissionRecords.filter(
+      (record) => ownerJobForRecord(record.employee_id) === jobType,
+    );
+    const jobOthersRecords = allOthersRecords.filter(
+      (record: any) => ownerJobForRecord(record.employee_id) === jobType,
+    );
 
     const jobGrossPay =
       jobItems.reduce((sum, item) => sum + (item.amount || 0), 0) +

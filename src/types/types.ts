@@ -778,6 +778,7 @@ export interface OthersRecord {
 
 export interface LeaveRecord {
   date: string;
+  employee_id?: string;
   leave_type: string;
   days_taken: number;
   amount_paid: number;
