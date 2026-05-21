@@ -62,12 +62,82 @@ const BANK_ACCOUNT_OPTIONS = [
   { id: "BANK_ABB", name: "Alliance Bank Berhad" },
 ];
 
+const MONEY_TOLERANCE = 0.005;
+
 const parseType = (s: string | null): AdjustmentDocType | null => {
   if (s === "credit" || s === "credit_note") return "credit_note";
   if (s === "debit" || s === "debit_note") return "debit_note";
   if (s === "refund" || s === "refund_note") return "refund_note";
   return null;
 };
+
+const isFreeformAdjustmentCode = (code: string | null): boolean =>
+  code === "OTH" || code === "LESS" || code === "REFUND";
+
+const createBlankAdjustmentLine = (): LineState => ({
+  uid: crypto.randomUUID(),
+  code: "",
+  description: "",
+  quantity: 1,
+  price: 0,
+  tax: 0,
+  total: 0,
+  issubtotal: false,
+});
+
+const createOriginalInvoiceLine = (product: ProductItem): LineState => ({
+  uid: crypto.randomUUID(),
+  code: product.code,
+  description: product.description || "",
+  quantity: Number(product.quantity || 0),
+  price: Number(product.price || 0),
+  tax: Number(product.tax || 0),
+  total: Number(product.total || 0),
+  issubtotal: false,
+});
+
+const createVarianceTemplateLine = (product: ProductItem): LineState => ({
+  uid: crypto.randomUUID(),
+  code: product.code,
+  description: product.description || "",
+  quantity: 1,
+  price: Number(product.price || 0),
+  tax:
+    Number(product.quantity || 0) > 0
+      ? roundMoney(Number(product.tax || 0) / Number(product.quantity || 0))
+      : Number(product.tax || 0),
+  total: addMoney(
+    Number(product.price || 0),
+    Number(product.quantity || 0) > 0
+      ? roundMoney(Number(product.tax || 0) / Number(product.quantity || 0))
+      : Number(product.tax || 0)
+  ),
+  issubtotal: false,
+});
+
+const getActiveDebitNoteTotal = (
+  adjustmentDocs: AdjustmentDocument[] | undefined
+): number =>
+  roundMoney(
+    (adjustmentDocs || [])
+      .filter(
+        (doc: AdjustmentDocument) =>
+          doc.status === "active" &&
+          !doc.is_consolidated &&
+          doc.type === "debit_note"
+      )
+      .reduce(
+        (sum: number, doc: AdjustmentDocument) =>
+          sum + Number(doc.totalamountpayable || 0),
+        0
+      )
+  );
+
+const getMaxCreditNoteAmount = (sourceInvoice: ExtendedInvoiceData): number =>
+  roundMoney(
+    Number(sourceInvoice.totalamountpayable || 0) +
+      getActiveDebitNoteTotal(sourceInvoice.adjustmentDocs)
+  );
 
 const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const navigate = useNavigate();
@@ -100,6 +170,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
 
   const [reason, setReason] = useState("");
   const [lines, setLines] = useState<LineState[]>([]);
+  const [hasLineUserEdits, setHasLineUserEdits] = useState<boolean>(false);
   const [rounding, setRounding] = useState<number>(0);
 
   // Refund-specific
@@ -118,6 +189,37 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const isDN = type === "debit_note";
   const isRN = type === "refund_note";
   const isReplacementPairedRefund: boolean = isRN && Boolean(pairedCreditNoteId);
+
+  const invoiceBalanceDue: number = invoice
+    ? roundMoney(Number(invoice.balance_due || 0))
+    : 0;
+  const maxCreditNoteAmount: number = invoice
+    ? getMaxCreditNoteAmount(invoice)
+    : 0;
+
+  // A paired Refund Note only makes sense when the customer has actually paid
+  // and the Credit Note exceeds the current outstanding balance.
+  const hasReceivedPayment: boolean =
+    invoice?.paymenttype === "CASH" ||
+    payments.some((p: Payment) =>
+      ["active", "overpaid"].includes(p.status || "")
+    );
+  const balanceBeforeReplacementCreditNote: number =
+    isReplacementPairedRefund && pairedCreditNote
+      ? roundMoney(invoiceBalanceDue + Number(pairedCreditNote.totalamountpayable || 0))
+      : invoiceBalanceDue;
+
+  const buildInvoiceProductLines = useCallback(
+    (sourceInvoice: ExtendedInvoiceData, useOriginalLines: boolean): LineState[] =>
+      sourceInvoice.products
+        .filter((p: ProductItem) => !p.issubtotal && !p.istotal)
+        .map((p: ProductItem) =>
+          useOriginalLines
+            ? createOriginalInvoiceLine(p)
+            : createVarianceTemplateLine(p)
+        ),
+    []
+  );
 
   // ----- Validate type only (invoiceId can be picked in-form) -----
   useEffect(() => {
@@ -180,13 +282,25 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
           return;
         }
-        setInvoice(inv);
-        setPairedCreditNote(null);
-
         const pays = (await api.get(
           `${paths.paymentsApiBase}?invoice_id=${invoiceId}&include_cancelled=false`
         )) as Payment[];
         setPayments(pays || []);
+
+        const docsResponse = (await api.get(
+          `${paths.apiBase}?original_invoice_id=${invoiceId}&include_cancelled=false`
+        )) as AdjustmentDocument[];
+        const invoiceAdjustmentDocs: AdjustmentDocument[] = Array.isArray(
+          docsResponse
+        )
+          ? docsResponse
+          : [];
+        const invoiceWithAdjustments: ExtendedInvoiceData = {
+          ...inv,
+          adjustmentDocs: invoiceAdjustmentDocs,
+        };
+        setInvoice(invoiceWithAdjustments);
+        setPairedCreditNote(null);
 
         let loadedPairedCreditNote: AdjustmentDocument | null = null;
         if (isReplacementPairedRefund) {
@@ -231,34 +345,57 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           setLinkedPayment(lp);
         }
 
-        // Default CN pair toggle: ON if there are any active/overpaid payments
+        // Default CN pair toggle: ON when there is paid money and a full
+        // original-credit would create a refundable excess.
         if (isCN) {
-          const hasPaidAny = (pays || []).some((p) =>
-            ["active", "overpaid"].includes(p.status || "")
+          const currentBalanceDue: number = roundMoney(
+            Number(inv.balance_due || 0)
           );
-          setIssuePairedRefund(hasPaidAny);
+          const hasPaidAny: boolean =
+            inv.paymenttype === "CASH" ||
+            (pays || []).some((p: Payment) =>
+              ["active", "overpaid"].includes(p.status || "")
+            );
+          const originalCreditTotal: number = roundMoney(
+            getMaxCreditNoteAmount(invoiceWithAdjustments)
+          );
+          setIssuePairedRefund(
+            hasPaidAny &&
+              originalCreditTotal - Math.max(currentBalanceDue, 0) >
+                MONEY_TOLERANCE
+          );
         }
+        setHasLineUserEdits(false);
 
         // Pre-fill lines:
-        //  - CN/DN: copy original line items as starting point
+        //  - CN paired with RN: full original lines for full reversal/refund.
+        //  - CN without RN / DN: variance-style lines.
         //  - RN standalone: single line for the overpaid amount
         if (isReplacementPairedRefund && loadedPairedCreditNote?.lines?.length) {
-          setLines(
-            loadedPairedCreditNote.lines
-              .filter((line) => !line.issubtotal)
-              .map((line) => ({
-                uid: crypto.randomUUID(),
-                code: line.code || "REFUND",
-                description:
-                  line.description ||
-                  `Refund for Credit Note ${loadedPairedCreditNote?.id}`,
-                quantity: Number(line.quantity || 1),
-                price: Number(line.price || 0),
-                tax: Number(line.tax || 0),
-                total: Number(line.total || 0),
-                issubtotal: false,
-              }))
+          const creditNoteTotal: number = roundMoney(
+            Number(loadedPairedCreditNote.totalamountpayable || 0)
           );
+          const balanceBeforeCreditNote: number = roundMoney(
+            Number(inv.balance_due || 0) + creditNoteTotal
+          );
+          const refundableExcess: number = roundMoney(
+            Math.min(
+              creditNoteTotal,
+              Math.max(0, creditNoteTotal - Math.max(balanceBeforeCreditNote, 0))
+            )
+          );
+          setLines([
+            {
+              uid: crypto.randomUUID(),
+              code: "REFUND",
+              description: `Bayaran balik lebihan daripada Nota Kredit ${loadedPairedCreditNote.id}`,
+              quantity: 1,
+              price: refundableExcess,
+              tax: 0,
+              total: refundableExcess,
+              issubtotal: false,
+            },
+          ]);
         } else if (isRN && linkedPaymentId) {
           const overpaidAmt = (pays || []).find(
             (p) => p.payment_id === linkedPaymentId
@@ -267,7 +404,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             {
               uid: crypto.randomUUID(),
               code: "REFUND",
-              description: `Refund of overpaid Payment #${linkedPaymentId}`,
+              description: `Bayaran balik untuk bayaran lebih #${linkedPaymentId}`,
               quantity: 1,
               price: Number(overpaidAmt || 0),
               tax: 0,
@@ -275,26 +412,13 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               issubtotal: false,
             },
           ]);
-        } else if (inv.products && inv.products.length > 0) {
-          setLines(
-            inv.products
-              .filter((p) => !p.issubtotal && !p.istotal)
-              .map((p) => ({
-                uid: crypto.randomUUID(),
-                code: p.code,
-                description: p.description || "",
-                quantity: Number(p.quantity || 0),
-                price: Number(p.price || 0),
-                tax: Number(p.tax || 0),
-                total: Number(p.total || 0),
-                issubtotal: false,
-              }))
-          );
-        } else {
+        } else if (isRN) {
+          // Standalone unlinked RN — no overpayment, no paired CN. Start with
+          // one empty REFUND line; user fills in the amount and reason.
           setLines([
             {
               uid: crypto.randomUUID(),
-              code: "",
+              code: "REFUND",
               description: "",
               quantity: 1,
               price: 0,
@@ -303,6 +427,17 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               issubtotal: false,
             },
           ]);
+        } else if ((isCN || isDN) && inv.products && inv.products.length > 0) {
+          const canUsePairedOriginalLines: boolean =
+            inv.paymenttype === "CASH" ||
+            (pays || []).some((p: Payment) =>
+              ["active", "overpaid"].includes(p.status || "")
+            );
+          const useOriginalLines: boolean =
+            isCN && canUsePairedOriginalLines;
+          setLines(buildInvoiceProductLines(invoiceWithAdjustments, useOriginalLines));
+        } else {
+          setLines([createBlankAdjustmentLine()]);
         }
       } catch (error: any) {
         console.error(error);
@@ -315,7 +450,13 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
 
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, invoiceId, linkedPaymentId, pairedCreditNoteId]);
+  }, [
+    type,
+    invoiceId,
+    linkedPaymentId,
+    pairedCreditNoteId,
+    buildInvoiceProductLines,
+  ]);
 
   // ----- Totals (sen-safe) -----
   const totals = useMemo(() => {
@@ -326,7 +467,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       const qty = Number(l.quantity || 0);
       const price = Number(l.price || 0);
       const subtotal =
-        l.code === "OTH" || l.code === "LESS" || l.code === "REFUND"
+        isFreeformAdjustmentCode(l.code)
           ? price
           : multiplyMoney(price, qty);
       subtotals.push(subtotal);
@@ -342,10 +483,36 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       totalamountpayable: roundMoney(grand),
     };
   }, [lines, rounding]);
+  // Paired RN is bounded by two things:
+  //   (a) the excess of the CN over the outstanding balance — only that part
+  //       is "refundable" rather than a balance reduction; and
+  //   (b) the value the customer has actually given us (adjusted invoice
+  //       total minus current balance). We can never refund more cash than
+  //       was received, even if the CN line items add up to more.
+  const pairedRefundAmount: number = isCN
+    ? roundMoney(
+        Math.max(
+          0,
+          Math.min(
+            totals.totalamountpayable - Math.max(invoiceBalanceDue, 0),
+            maxCreditNoteAmount - Math.max(invoiceBalanceDue, 0)
+          )
+        )
+      )
+    : 0;
+  const canPairRefund: boolean =
+    isCN && hasReceivedPayment && pairedRefundAmount > MONEY_TOLERANCE;
+
+  useEffect(() => {
+    if (issuePairedRefund && !canPairRefund) {
+      setIssuePairedRefund(false);
+    }
+  }, [canPairRefund, issuePairedRefund]);
 
   // ----- Line item handlers -----
   const updateLine = useCallback(
     (uid: string, patch: Partial<LineState>) => {
+      setHasLineUserEdits(true);
       setLines((prev) =>
         prev.map((l) => {
           if (l.uid !== uid) return l;
@@ -354,7 +521,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           const price = Number(next.price || 0);
           const tax = Number(next.tax || 0);
           const lineTotal =
-            next.code === "OTH" || next.code === "LESS" || next.code === "REFUND"
+            isFreeformAdjustmentCode(next.code)
               ? addMoney(price, tax)
               : addMoney(multiplyMoney(price, qty), tax);
           next.total = roundMoney(lineTotal);
@@ -365,42 +532,30 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     []
   );
 
-  const addLine = () => {
-    setLines((prev) => [
-      ...prev,
-      {
-        uid: crypto.randomUUID(),
-        code: "",
-        description: "",
-        quantity: 1,
-        price: 0,
-        tax: 0,
-        total: 0,
-        issubtotal: false,
-      },
-    ]);
+  const addLine = (): void => {
+    setHasLineUserEdits(true);
+    setLines((prev: LineState[]) => [...prev, createBlankAdjustmentLine()]);
   };
 
-  const removeLine = (uid: string) => {
+  const removeLine = (uid: string): void => {
+    setHasLineUserEdits(true);
     setLines((prev) => prev.filter((l) => l.uid !== uid));
   };
 
-  const copyFromOriginal = () => {
+  const copyFromOriginal = (): void => {
     if (!invoice?.products) return;
-    setLines(
-      invoice.products
-        .filter((p: ProductItem) => !p.issubtotal && !p.istotal)
-        .map((p: ProductItem) => ({
-          uid: crypto.randomUUID(),
-          code: p.code,
-          description: p.description || "",
-          quantity: Number(p.quantity || 0),
-          price: Number(p.price || 0),
-          tax: Number(p.tax || 0),
-          total: Number(p.total || 0),
-          issubtotal: false,
-        }))
-    );
+    setHasLineUserEdits(true);
+    setLines(buildInvoiceProductLines(invoice, isCN && issuePairedRefund));
+  };
+
+  const handlePairedRefundToggle = (): void => {
+    if (!canPairRefund) return;
+    const nextIssuePairedRefund: boolean = !issuePairedRefund;
+    setIssuePairedRefund(nextIssuePairedRefund);
+
+    if (!hasLineUserEdits && invoice?.products?.length) {
+      setLines(buildInvoiceProductLines(invoice, nextIssuePairedRefund));
+    }
   };
 
   // ----- Validation -----
@@ -414,9 +569,39 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         errors.push(`Line ${i + 1}: code or description required`);
       const total = Number(l.total || 0);
       if (!isFinite(total)) errors.push(`Line ${i + 1}: invalid total`);
+      const qty = Number(l.quantity || 0);
+      const price = Number(l.price || 0);
+      const isFreeformAmount = isFreeformAdjustmentCode(l.code);
+      if (!isFreeformAmount && qty <= 0)
+        errors.push(`Line ${i + 1}: quantity must be greater than 0`);
+      if (l.code !== "LESS" && price < 0)
+        errors.push(`Line ${i + 1}: price cannot be negative`);
     });
     if (totals.totalamountpayable <= 0)
       errors.push("Document total must be greater than 0");
+
+    if (isCN && invoice) {
+      const currentBalanceDue: number = roundMoney(
+        Number(invoice.balance_due || 0)
+      );
+      if (totals.totalamountpayable > maxCreditNoteAmount) {
+        errors.push(
+          `Credit Note amount cannot exceed adjusted invoice total RM ${maxCreditNoteAmount.toFixed(
+            2
+          )}`
+        );
+      }
+      if (
+        !hasReceivedPayment &&
+        totals.totalamountpayable > currentBalanceDue
+      ) {
+        errors.push(
+          `Credit Note amount cannot exceed unpaid balance RM ${currentBalanceDue.toFixed(
+            2
+          )} when the invoice has no received payment`
+        );
+      }
+    }
 
     if (isRN) {
       if (!refundMethod) errors.push("Refund method required");
@@ -445,9 +630,39 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       }
     }
 
-    if (isCN && issuePairedRefund) {
+    if (isCN && issuePairedRefund && canPairRefund) {
       if (refundMethod !== "cash" && !bankAccount)
         errors.push("Paired refund requires bank account for non-cash method");
+    }
+    if (isCN && issuePairedRefund && !canPairRefund) {
+      errors.push(
+        `Paired refund is only available when the Credit Note exceeds the current outstanding balance. Current outstanding balance: RM ${invoiceBalanceDue.toFixed(
+          2
+        )}`
+      );
+    }
+    if (isReplacementPairedRefund && pairedCreditNote) {
+      const maxReplacementRefundAmount: number = roundMoney(
+        Math.min(
+          Number(pairedCreditNote.totalamountpayable || 0),
+          Math.max(
+            0,
+            Number(pairedCreditNote.totalamountpayable || 0) -
+              Math.max(balanceBeforeReplacementCreditNote, 0)
+          )
+        )
+      );
+      if (maxReplacementRefundAmount <= MONEY_TOLERANCE) {
+        errors.push(
+          `Refund Note cannot be paired because Credit Note ${pairedCreditNote.id} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.`
+        );
+      } else if (totals.totalamountpayable > maxReplacementRefundAmount) {
+        errors.push(
+          `Refund amount cannot exceed the refundable excess RM ${maxReplacementRefundAmount.toFixed(
+            2
+          )} from Credit Note ${pairedCreditNote.id}.`
+        );
+      }
     }
 
     return errors;
@@ -491,17 +706,28 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         if (pairedCreditNoteId) payload.paired_credit_note_id = pairedCreditNoteId;
       }
 
-      if (isCN && issuePairedRefund) {
+      if (isCN && issuePairedRefund && canPairRefund) {
+        const pairedRefundLines = [
+          {
+            code: "REFUND",
+            description: `Bayaran balik lebihan daripada ${TYPE_LABEL[type]}`,
+            quantity: 1,
+            price: pairedRefundAmount,
+            tax: 0,
+            total: pairedRefundAmount,
+            issubtotal: false,
+          },
+        ];
         payload.paired_refund = {
-          totalamountpayable: totals.totalamountpayable,
-          total_excluding_tax: totals.total_excluding_tax,
-          tax_amount: totals.tax_amount,
-          rounding: totals.rounding,
+          totalamountpayable: pairedRefundAmount,
+          total_excluding_tax: pairedRefundAmount,
+          tax_amount: 0,
+          rounding: 0,
           refund_method: refundMethod,
           refund_reference: refundReference || null,
           bank_account: refundMethod === "cash" ? "CASH" : bankAccount,
           reason: reason || null,
-          lines: payload.lines,
+          lines: pairedRefundLines,
         };
       }
 
@@ -554,7 +780,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               <BackButton onClick={() => navigate(paths.uiBase)} />
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                New {TYPE_LABEL[type]} — Select Invoice
+                {TYPE_LABEL[type]} Baru - Pilih Invois
               </h1>
             </div>
           </div>
@@ -562,7 +788,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           <div className="p-4 border-b border-default-200 dark:border-gray-700">
             <p className="text-sm text-default-600 dark:text-gray-300 mb-3">
               Pilih invois yang anda mahu laraskan. Senarai di bawah hanya
-              memaparkan <strong>50 invois terkini</strong> — gunakan kotak
+              memaparkan <strong>50 invois terkini</strong> - gunakan kotak
               carian untuk mencari invois yang lebih lama (mengikut nombor
               invois, nama pelanggan, atau jumlah).
             </p>
@@ -667,7 +893,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     );
   }
 
-  const showRefundFields = isRN || (isCN && issuePairedRefund);
+  const showRefundFields = isRN || (isCN && issuePairedRefund && canPairRefund);
 
   return (
     <div className="space-y-4">
@@ -734,10 +960,10 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           {linkedPayment && (
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
               <span className="font-medium text-indigo-800 dark:text-indigo-300">
-                Refunding overpaid Payment #{linkedPayment.payment_id}
+                Membayar balik bayaran lebih #{linkedPayment.payment_id}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
-                (Available: RM {Number(linkedPayment.amount_paid).toFixed(2)})
+                (Tersedia: RM {Number(linkedPayment.amount_paid).toFixed(2)})
               </span>
             </div>
           )}
@@ -747,8 +973,25 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 Reissuing Refund Note for Credit Note {pairedCreditNote.id}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
-                (Available: RM {Number(pairedCreditNote.totalamountpayable).toFixed(2)})
+                (Tersedia: RM {Number(pairedCreditNote.totalamountpayable).toFixed(2)})
               </span>
+            </div>
+          )}
+          {isRN && !linkedPayment && !pairedCreditNote && !isReplacementPairedRefund && (
+            <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">
+              <div className="font-medium mb-1">
+                Nota Bayaran Balik sendiri (tiada bayaran lebih, tiada Nota
+                Kredit berpasangan)
+              </div>
+              <div className="text-xs">
+                Catatan perakaunan ialah{" "}
+                <span className="font-mono">Dr Deposit Pelanggan / Cr Bank</span>.
+                Ini sesuai untuk membayar balik baki kredit pelanggan yang masih
+                belum digunakan. Jika anda juga perlu membalikkan jualan asal,
+                keluarkan Nota Kredit sebaliknya (ia boleh menggandingkan Nota
+                Bayaran Balik secara automatik). Untuk kes lain, catat jurnal
+                pelarasan selepas mencipta RN.
+              </div>
             </div>
           )}
         </div>
@@ -763,12 +1006,12 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             onChange={(e) => setReason(e.target.value)}
             placeholder={
               isCN
-                ? "e.g. Goods returned damaged"
+                ? "cth. Barang rosak dipulangkan"
                 : isDN
-                ? "e.g. Late payment fee"
+                ? "cth. Caj bayaran lewat"
                 : isReplacementPairedRefund
-                ? `Replacement refund for Credit Note ${pairedCreditNoteId}`
-                : "e.g. Refund of overpayment"
+                ? `Bayaran balik gantian untuk Nota Kredit ${pairedCreditNoteId}`
+                : "cth. Bayaran balik untuk bayaran lebih"
             }
             rows={2}
             className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
@@ -791,7 +1034,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   size="sm"
                   disabled={isSaving}
                 >
-                  Copy from Original
+                  {isCN && issuePairedRefund
+                    ? "Use Original Items"
+                    : "Set Quantities to 1"}
                 </Button>
               )}
               <Button
@@ -805,6 +1050,15 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               </Button>
             </div>
           </div>
+          {!isRN && (
+            <div className="mb-3 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-900/20 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
+              Masukkan beza yang terlibat sahaja. Untuk pembetulan harga,
+              gunakan kuantiti terlibat dan beza harga setiap item. Untuk
+              pulangan, kekurangan, atau barang rosak, gunakan kuantiti
+              terlibat dan harga unit asal. Nota Debit akan menambah jumlah ini
+              kepada baki invois; Nota Kredit akan mengurangkannya.
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg">
               <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -915,14 +1169,25 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           {/* Left: refund + pairing */}
           <div className="space-y-4">
             {isCN && (
-              <div className="bg-default-50 dark:bg-gray-900/30 rounded-lg p-3 border border-default-200 dark:border-gray-700">
+              <div
+                className={`bg-default-50 dark:bg-gray-900/30 rounded-lg p-3 border border-default-200 dark:border-gray-700 ${
+                  !canPairRefund ? "opacity-60" : ""
+                }`}
+              >
                 <button
                   type="button"
-                  onClick={() => setIssuePairedRefund(!issuePairedRefund)}
-                  className="flex items-center gap-2 text-left w-full"
-                  disabled={isSaving}
+                  onClick={handlePairedRefundToggle}
+                  className={`flex items-center gap-2 text-left w-full ${
+                    !canPairRefund ? "cursor-not-allowed" : ""
+                  }`}
+                  disabled={isSaving || !canPairRefund}
+                  title={
+                    !canPairRefund
+                      ? "Nota Bayaran Balik berpasangan hanya tersedia apabila jumlah Nota Kredit melebihi baki tertunggak. Lebihan sahaja akan dibayar balik."
+                      : ""
+                  }
                 >
-                  {issuePairedRefund ? (
+                  {issuePairedRefund && canPairRefund ? (
                     <IconSquareCheckFilled
                       className="text-blue-600 dark:text-blue-400 flex-shrink-0"
                       size={20}
@@ -935,11 +1200,12 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   )}
                   <div>
                     <div className="font-medium text-sm text-default-900 dark:text-gray-100">
-                      Issue paired Refund Note
+                      Keluarkan Nota Bayaran Balik berpasangan
                     </div>
                     <div className="text-xs text-default-500 dark:text-gray-400">
-                      Recommended when invoice has been paid — pays the credited
-                      amount back to the customer.
+                      {canPairRefund
+                        ? `Lebihan RM ${pairedRefundAmount.toFixed(2)} akan dibayar balik; selebihnya mengurangkan baki pelanggan.`
+                        : "Tidak tersedia: jumlah Nota Kredit belum melebihi baki tertunggak. Nota Kredit sahaja akan mengurangkan baki pelanggan."}
                     </div>
                   </div>
                 </button>
@@ -949,7 +1215,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             {showRefundFields && (
               <div className="space-y-3 bg-indigo-50/40 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-200 dark:border-indigo-800">
                 <div className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
-                  {isRN ? "Refund details" : "Paired refund details"}
+                  {isRN
+                    ? "Butiran bayaran balik"
+                    : "Butiran bayaran balik berpasangan"}
                 </div>
                 <FormListbox
                   name="refundMethod"

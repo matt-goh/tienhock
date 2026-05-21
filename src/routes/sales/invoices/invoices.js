@@ -3166,6 +3166,26 @@ export default function (pool, config) {
           .json({ message: "Invoice is already cancelled" });
       }
 
+      // Block cancellation if active adjustment documents reference this
+      // invoice. They posted their own accounting and must be cancelled first
+      // so their reversal cascade can run cleanly.
+      const adjCheck = await client.query(
+        `SELECT id, type FROM adjustment_documents
+          WHERE original_invoice_id = $1
+            AND status = 'active'
+            AND COALESCE(is_consolidated, false) = false
+          ORDER BY created_at DESC
+          LIMIT 5`,
+        [id]
+      );
+      if (adjCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        const refs = adjCheck.rows.map((r) => r.id).join(", ");
+        return res.status(400).json({
+          message: `Cannot cancel invoice ${id}: active adjustment document(s) reference it (${refs}). Cancel those documents first.`,
+        });
+      }
+
       // 2. Find and cancel ACTIVE payments associated with this invoice
       const activePaymentsQuery = `
         SELECT payment_id, amount_paid, journal_entry_id

@@ -454,6 +454,13 @@ export interface AdjustmentDocument {
 
   // Populated by /:id endpoint
   lines?: AdjustmentDocLine[];
+  linked_payment?: {
+    payment_id: number;
+    status: Payment["status"];
+    amount_paid: number;
+    cancellation_date?: string | null;
+    cancellation_reason?: string | null;
+  } | null;
 }
 
 export interface Employee {

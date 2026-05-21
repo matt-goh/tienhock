@@ -18,6 +18,7 @@ import {
 } from "../../../utils/invoice/einvoice/companyInfo.js";
 
 const VALID_TYPES = ["credit_note", "debit_note", "refund_note"];
+const MONEY_TOLERANCE = 0.005;
 const TYPE_PREFIX = {
   credit_note: "CN",
   debit_note: "DN",
@@ -133,6 +134,94 @@ async function applyBalanceDelta(client, invoiceId, delta) {
   return inv;
 }
 
+async function hasReceivedPaymentForInvoice(client, invoice) {
+  if (invoice.paymenttype === "CASH") return true;
+
+  const result = await client.query(
+    `SELECT 1 FROM ${T.payments}
+      WHERE invoice_id = $1
+        AND status IN ('active', 'overpaid')
+      LIMIT 1`,
+    [invoice.id]
+  );
+  return result.rows.length > 0;
+}
+
+async function getActiveDebitNoteTotalForInvoice(client, invoiceId) {
+  const result = await client.query(
+    `SELECT COALESCE(SUM(totalamountpayable), 0) AS total
+       FROM ${T.docs}
+      WHERE original_invoice_id = $1
+        AND type = 'debit_note'
+        AND status = 'active'
+        AND COALESCE(is_consolidated, false) = false`,
+    [invoiceId]
+  );
+  return parseFloat(parseFloat(result.rows[0]?.total || 0).toFixed(2));
+}
+
+async function validateAdjustmentAmountForCreate(client, type, amount, invoice, pairedRefund) {
+  if (type !== "credit_note") return;
+
+  const originalInvoiceTotal = parseFloat(
+    parseFloat(invoice.totalamountpayable || 0).toFixed(2)
+  );
+  const debitNoteTotal = await getActiveDebitNoteTotalForInvoice(
+    client,
+    invoice.id
+  );
+  const adjustedInvoiceTotal = parseFloat(
+    (originalInvoiceTotal + debitNoteTotal).toFixed(2)
+  );
+  const currentBalance = parseFloat(parseFloat(invoice.balance_due || 0).toFixed(2));
+  const hasReceivedPayment = await hasReceivedPaymentForInvoice(client, invoice);
+
+  if (amount > adjustedInvoiceTotal + MONEY_TOLERANCE) {
+    throw new Error(
+      `Credit Note amount RM ${amount.toFixed(2)} cannot exceed adjusted invoice total RM ${adjustedInvoiceTotal.toFixed(2)}.`
+    );
+  }
+
+  if (!hasReceivedPayment && amount > currentBalance + MONEY_TOLERANCE) {
+    throw new Error(
+      `Credit Note amount RM ${amount.toFixed(2)} cannot exceed unpaid balance RM ${currentBalance.toFixed(2)} when the invoice has no received payment.`
+    );
+  }
+
+  if (pairedRefund) {
+    if (!hasReceivedPayment) {
+      throw new Error(
+        "Cannot create paired Refund Note: invoice has no active, overpaid, or cash payment. Issue the Credit Note alone if it only reduces the outstanding balance."
+      );
+    }
+
+    const refundAmount = parseFloat(pairedRefund.totalamountpayable || amount);
+    if (!isFinite(refundAmount) || refundAmount <= 0) {
+      throw new Error("Paired refund amount must be positive");
+    }
+    // Cap paired refund at the actually-received amount (adjusted total
+    // minus current balance). This prevents refunding more cash than the
+    // customer ever paid us, even if Check 1 above ever changes.
+    const maxRefundAmount = Math.max(
+      0,
+      Math.min(
+        amount - Math.max(currentBalance, 0),
+        adjustedInvoiceTotal - Math.max(currentBalance, 0)
+      )
+    );
+    if (maxRefundAmount <= MONEY_TOLERANCE) {
+      throw new Error(
+        `Cannot create paired Refund Note because Credit Note amount RM ${amount.toFixed(2)} does not exceed outstanding balance RM ${currentBalance.toFixed(2)}. Issue the Credit Note alone to reduce the balance.`
+      );
+    }
+    if (refundAmount > maxRefundAmount + MONEY_TOLERANCE) {
+      throw new Error(
+        `Paired Refund Note amount RM ${refundAmount.toFixed(2)} cannot exceed refundable excess RM ${maxRefundAmount.toFixed(2)}.`
+      );
+    }
+  }
+}
+
 // ---------- core create helpers ----------
 function validateLineItems(items, type) {
   if (!Array.isArray(items) || items.length === 0) {
@@ -147,6 +236,17 @@ function validateLineItems(items, type) {
     const price = Number(item.price);
     if (!isFinite(qty) || !isFinite(price)) {
       throw new Error(`Line ${idx + 1}: quantity/price must be numeric`);
+    }
+    // Reject nonsensical sign combinations. LESS keeps the same convention as
+    // invoices (price stored negative). OTH/REFUND treat price as the line
+    // total directly; quantity is informational and may be 0.
+    const isFreeformAmount =
+      item.code === "OTH" || item.code === "LESS" || item.code === "REFUND";
+    if (!isFreeformAmount && qty <= 0) {
+      throw new Error(`Line ${idx + 1}: quantity must be greater than 0`);
+    }
+    if (item.code !== "LESS" && price < 0) {
+      throw new Error(`Line ${idx + 1}: price cannot be negative`);
     }
   });
   if (type === "credit_note" || type === "refund_note") {
@@ -269,19 +369,32 @@ async function fetchDocWithRelations(client, id) {
   );
   doc.lines = linesResult.rows;
 
+  // Surface linked payment status so the UI can warn when the overpaid
+  // Payment a standalone RN references has since been cancelled.
+  if (doc.linked_payment_id) {
+    const payResult = await client.query(
+      `SELECT payment_id, status, amount_paid, cancellation_date, cancellation_reason
+         FROM ${T.payments}
+        WHERE payment_id = $1`,
+      [doc.linked_payment_id]
+    );
+    doc.linked_payment = payResult.rows[0] || null;
+  }
+
   return doc;
 }
 
-async function fetchActiveAdjustmentForInvoice(client, invoiceId) {
+async function fetchActiveAdjustmentOfTypeForInvoice(client, invoiceId, type) {
   const result = await client.query(
     `SELECT id, type
        FROM ${T.docs}
       WHERE original_invoice_id = $1
+        AND type = $2
         AND status = 'active'
         AND COALESCE(is_consolidated, false) = false
       ORDER BY created_at DESC
       LIMIT 1`,
-    [invoiceId]
+    [invoiceId, type]
   );
   return result.rows[0] || null;
 }
@@ -305,8 +418,28 @@ async function resolveReferencedDocument(client, doc) {
     }
   }
 
-  // 2. Try references_consolidated_id snapshot
+  // 2. Try references_consolidated_id snapshot. If the snapshot points to a
+  //    cancelled / invalid parent, fall through to the live lookup so we don't
+  //    submit against a dead UUID.
   let parentId = doc.references_consolidated_id;
+  let snapshotStale = false;
+  if (parentId) {
+    const snapshotCheck = await client.query(
+      `SELECT id, uuid, einvoice_status, invoice_status
+         FROM ${T.invoices} WHERE id = $1`,
+      [parentId]
+    );
+    const snap = snapshotCheck.rows[0];
+    if (
+      !snap ||
+      snap.invoice_status === "cancelled" ||
+      snap.einvoice_status !== "valid" ||
+      !snap.uuid
+    ) {
+      snapshotStale = true;
+      parentId = null;
+    }
+  }
 
   // 3. Fallback: live lookup for an active consolidated invoice that contains
   //    the original invoice id
@@ -334,6 +467,25 @@ async function resolveReferencedDocument(client, doc) {
   if (parentResult.rows.length === 0) return null;
   const parent = parentResult.rows[0];
   if (!parent.uuid || parent.einvoice_status !== "valid") return null;
+
+  // Persist a refreshed snapshot when the original snapshot was missing or
+  // stale, so subsequent operations and reports see the live parent id.
+  if (
+    (!doc.references_consolidated_id || snapshotStale) &&
+    parent.id !== doc.references_consolidated_id
+  ) {
+    try {
+      await client.query(
+        `UPDATE ${T.docs} SET references_consolidated_id = $1 WHERE id = $2`,
+        [parent.id, doc.id]
+      );
+      doc.references_consolidated_id = parent.id;
+    } catch (e) {
+      // Non-fatal — submission can still proceed without snapshot update.
+      console.warn(`Failed to refresh references_consolidated_id for ${doc.id}: ${e.message}`);
+    }
+  }
+
   return { id: parent.id, uuid: parent.uuid };
 }
 
@@ -556,10 +708,41 @@ async function resolveReferencedDocument(client, doc) {
         throw new Error(`Invoice ${original_invoice_id} is cancelled; cannot adjust`);
       }
 
-      const existingAdjustment = await fetchActiveAdjustmentForInvoice(
+      await validateAdjustmentAmountForCreate(
         client,
-        original_invoice_id
+        type,
+        amt,
+        invoice,
+        paired_refund
       );
+
+      // Defensive backend guard: paired Refund Note requires the invoice to
+      // be cash-paid or have at least one active/overpaid payment. Refusing this at the
+      // route level catches stale / malicious payloads that bypass the UI
+      // gating in the form.
+      if (paired_refund && invoice.paymenttype !== "CASH") {
+        const payCheck = await client.query(
+          `SELECT 1 FROM ${T.payments}
+            WHERE invoice_id = $1
+              AND status IN ('active', 'overpaid')
+            LIMIT 1`,
+          [original_invoice_id]
+        );
+        if (payCheck.rows.length === 0) {
+          throw new Error(
+            "Cannot create paired Refund Note: invoice has no active or overpaid payment. Issue the Credit Note alone — it will reduce the customer's outstanding balance."
+          );
+        }
+      }
+
+      const existingAdjustment =
+        type === "credit_note" || type === "debit_note"
+          ? await fetchActiveAdjustmentOfTypeForInvoice(
+              client,
+              original_invoice_id,
+              type
+            )
+          : null;
       let replacementCreditNote = null;
       if (paired_credit_note_id) {
         const creditNoteResult = await client.query(
@@ -597,6 +780,37 @@ async function resolveReferencedDocument(client, doc) {
             `Refund amount exceeds Credit Note amount (RM ${replacementCreditNote.totalamountpayable}).`
           );
         }
+
+        const hasReceivedPayment = await hasReceivedPaymentForInvoice(
+          client,
+          invoice
+        );
+        if (!hasReceivedPayment) {
+          throw new Error(
+            "Cannot create paired Refund Note: invoice has no active, overpaid, or cash payment. Issue the Credit Note alone if it only reduces the outstanding balance."
+          );
+        }
+        const balanceBeforeCreditNote =
+          parseFloat(invoice.balance_due || 0) +
+          parseFloat(replacementCreditNote.totalamountpayable || 0);
+        const maxRefundAmount = Math.min(
+          parseFloat(replacementCreditNote.totalamountpayable || 0),
+          Math.max(
+            0,
+            parseFloat(replacementCreditNote.totalamountpayable || 0) -
+              Math.max(balanceBeforeCreditNote, 0)
+          )
+        );
+        if (maxRefundAmount <= MONEY_TOLERANCE) {
+          throw new Error(
+            `Cannot create paired Refund Note because Credit Note ${replacementCreditNote.id} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.`
+          );
+        }
+        if (amt > maxRefundAmount + MONEY_TOLERANCE) {
+          throw new Error(
+            `Refund amount RM ${amt.toFixed(2)} cannot exceed refundable excess RM ${maxRefundAmount.toFixed(2)} from Credit Note ${replacementCreditNote.id}.`
+          );
+        }
       }
 
       if (
@@ -604,7 +818,7 @@ async function resolveReferencedDocument(client, doc) {
         (!replacementCreditNote || existingAdjustment.id !== replacementCreditNote.id)
       ) {
         throw new Error(
-          `Invoice ${original_invoice_id} already has active adjustment document ${existingAdjustment.id}. Cancel it before creating another adjustment document.`
+          `Invoice ${original_invoice_id} already has active ${type.replace("_", " ")} ${existingAdjustment.id}. Cancel it before creating another ${type.replace("_", " ")}.`
         );
       }
 
@@ -622,9 +836,22 @@ async function resolveReferencedDocument(client, doc) {
         if (pay.status !== "overpaid") {
           throw new Error(`Linked payment is not in 'overpaid' status (current: ${pay.status})`);
         }
-        if (amt > parseFloat(pay.amount_paid)) {
+        // Cumulative cap: total of all active RNs against this payment plus the
+        // new amount must not exceed the overpaid amount. Allows multiple partial
+        // refunds against the same overpayment while preventing over-refund.
+        const priorRefunds = await client.query(
+          `SELECT COALESCE(SUM(totalamountpayable), 0) AS used
+             FROM ${T.docs}
+            WHERE linked_payment_id = $1
+              AND status = 'active'
+              AND type = 'refund_note'`,
+          [linked_payment_id]
+        );
+        const alreadyRefunded = parseFloat(priorRefunds.rows[0]?.used || 0);
+        const available = parseFloat(pay.amount_paid) - alreadyRefunded;
+        if (amt > available + 0.005) {
           throw new Error(
-            `Refund amount exceeds available overpaid amount (RM ${pay.amount_paid})`
+            `Refund amount RM ${amt.toFixed(2)} exceeds remaining overpaid amount RM ${available.toFixed(2)} (RM ${alreadyRefunded.toFixed(2)} already refunded of RM ${parseFloat(pay.amount_paid).toFixed(2)})`
           );
         }
       }
@@ -806,6 +1033,49 @@ async function resolveReferencedDocument(client, doc) {
         );
       }
 
+      // --- Wrapper (consolidated) row cancellation ---
+      // Wrappers do NOT own balance/credit/journal impact — that lives on the
+      // child docs, which posted their own accounting at creation time.
+      // Cancelling the wrapper only unwinds its MyInvois identity and frees
+      // the children to be re-consolidated.
+      if (doc.is_consolidated) {
+        const childIds = Array.isArray(doc.consolidated_adjustments)
+          ? doc.consolidated_adjustments
+          : doc.consolidated_adjustments
+          ? JSON.parse(doc.consolidated_adjustments)
+          : [];
+        if (childIds.length > 0) {
+          await client.query(
+            `UPDATE ${T.docs}
+                SET uuid = NULL,
+                    submission_uid = NULL,
+                    long_id = NULL,
+                    datetime_validated = NULL,
+                    einvoice_status = NULL
+              WHERE id = ANY($1::text[])`,
+            [childIds]
+          );
+        }
+
+        await client.query(
+          `UPDATE ${T.docs}
+              SET status = 'cancelled',
+                  cancellation_reason = $1,
+                  cancellation_date = NOW()
+            WHERE id = $2`,
+          [reason || null, id]
+        );
+
+        await client.query("COMMIT");
+
+        const freshWrapper = await fetchDocWithRelations(client, id);
+        return res.json({
+          message: `Consolidated wrapper ${id} cancelled. ${childIds.length} child document(s) freed for re-consolidation.`,
+          document: freshWrapper,
+        });
+      }
+
+      // --- Child / standalone doc cancellation ---
       // Lock the invoice for accounting reversal.
       const invResult = await client.query(
         `SELECT id, customerid, paymenttype, balance_due, totalamountpayable, invoice_status
@@ -882,22 +1152,34 @@ async function resolveReferencedDocument(client, doc) {
     }
     const { id } = req.params;
     const client = await pool.connect();
+    let txActive = false;
     try {
-      // Fetch doc + lines + customer
+      // Wrap the whole submit flow in a transaction with FOR UPDATE so two
+      // concurrent submit clicks on the same doc serialise and the second
+      // sees the first's UPDATE before deciding whether to submit.
+      await client.query("BEGIN");
+      txActive = true;
+
       const docResult = await client.query(
-        `SELECT * FROM ${T.docs} WHERE id = $1`,
+        `SELECT * FROM ${T.docs} WHERE id = $1 FOR UPDATE`,
         [id]
       );
       if (docResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res.status(404).json({ message: "Document not found" });
       }
       const doc = docResult.rows[0];
       if (doc.status !== "active") {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res
           .status(400)
           .json({ message: "Cannot submit a cancelled document" });
       }
       if (doc.einvoice_status === "valid" || doc.einvoice_status === "pending") {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res.status(400).json({
           message: `Document already has e-invoice status '${doc.einvoice_status}'. Cancel or update status first.`,
         });
@@ -919,12 +1201,16 @@ async function resolveReferencedDocument(client, doc) {
         [doc.customerid]
       );
       if (custResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res.status(400).json({
           message: `Customer ${doc.customerid} not found in cache. Cannot build e-invoice.`,
         });
       }
       const customer = custResult.rows[0];
       if (!customer.tin_number || !customer.id_number) {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res.status(400).json({
           message:
             "Customer must have both TIN and ID number to submit individual e-invoice.",
@@ -933,6 +1219,8 @@ async function resolveReferencedDocument(client, doc) {
 
       const referenced = await resolveReferencedDocument(client, doc);
       if (!referenced) {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res.status(400).json({
           message:
             "Original invoice has no valid e-invoice UUID yet. Submit the original (or wait for consolidation) before submitting the adjustment.",
@@ -944,6 +1232,8 @@ async function resolveReferencedDocument(client, doc) {
       try {
         xml = await EInvoiceAdjustmentNoteTemplate(doc, customer, referenced, SUPPLIER);
       } catch (templateError) {
+        await client.query("ROLLBACK");
+        txActive = false;
         return res.status(400).json({
           message: templateError?.message || "Failed to generate XML",
           code: templateError?.code || "TEMPLATE_ERROR",
@@ -960,6 +1250,8 @@ async function resolveReferencedDocument(client, doc) {
             WHERE id = $2`,
           [submissionResult.submissionUid || null, id]
         );
+        await client.query("COMMIT");
+        txActive = false;
         return res.status(400).json({
           message: submissionResult.message || "MyInvois submission failed",
           submissionResult,
@@ -999,6 +1291,9 @@ async function resolveReferencedDocument(client, doc) {
         ]
       );
 
+      await client.query("COMMIT");
+      txActive = false;
+
       res.json({
         success: true,
         message: `Submitted ${id} to MyInvois (status: ${status})`,
@@ -1008,6 +1303,9 @@ async function resolveReferencedDocument(client, doc) {
         submissionResult,
       });
     } catch (error) {
+      if (txActive) {
+        try { await client.query("ROLLBACK"); } catch (_) {}
+      }
       console.error(`Error submitting adjustment doc ${id}:`, error);
       res.status(500).json({ message: error.message });
     } finally {
@@ -1166,10 +1464,34 @@ async function resolveReferencedDocument(client, doc) {
         [id]
       );
 
+      // If this is a consolidated wrapper, the children currently share its
+      // UUID/long_id/etc. — propagate the cancelled e-invoice state so the UI
+      // and reports don't show them as 'valid' against a dead MyInvois doc.
+      let childCascade = 0;
+      if (doc.is_consolidated) {
+        const childIds = Array.isArray(doc.consolidated_adjustments)
+          ? doc.consolidated_adjustments
+          : doc.consolidated_adjustments
+          ? JSON.parse(doc.consolidated_adjustments)
+          : [];
+        if (childIds.length > 0) {
+          const result = await client.query(
+            `UPDATE ${T.docs}
+                SET einvoice_status = 'cancelled'
+              WHERE id = ANY($1::text[])
+                AND uuid = $2`,
+            [childIds, doc.uuid]
+          );
+          childCascade = result.rowCount || 0;
+        }
+      }
+
       await client.query("COMMIT");
       res.json({
         success: true,
-        message: `E-invoice cancelled at MyInvois for ${id}. Local accounting impact remains until you cancel the document.`,
+        message: doc.is_consolidated
+          ? `E-invoice cancelled at MyInvois for consolidated wrapper ${id}. ${childCascade} child document(s) marked cancelled. Local accounting impact on children remains until you cancel the wrapper.`
+          : `E-invoice cancelled at MyInvois for ${id}. Local accounting impact remains until you cancel the document.`,
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -1305,13 +1627,15 @@ async function resolveReferencedDocument(client, doc) {
       const parentId = [...parentIds][0];
 
       const parentResult = await client.query(
-        `SELECT id, uuid, einvoice_status FROM ${T.invoices} WHERE id = $1`,
+        `SELECT id, uuid, einvoice_status, invoice_status FROM ${T.invoices}
+          WHERE id = $1 FOR UPDATE`,
         [parentId]
       );
       if (
         parentResult.rows.length === 0 ||
         !parentResult.rows[0].uuid ||
-        parentResult.rows[0].einvoice_status !== "valid"
+        parentResult.rows[0].einvoice_status !== "valid" ||
+        parentResult.rows[0].invoice_status === "cancelled"
       ) {
         throw new Error("Parent consolidated invoice has no valid UUID");
       }
@@ -1341,6 +1665,24 @@ async function resolveReferencedDocument(client, doc) {
         parent: { id: parent.id, uuid: parent.uuid },
         supplierInfo: SUPPLIER,
       });
+
+      // Final re-check immediately before the MyInvois network round-trip:
+      // the parent could have been cancelled between the earlier fetch and
+      // here (it's a different row, not held by our FOR UPDATE on docs).
+      const parentRecheck = await client.query(
+        `SELECT einvoice_status, invoice_status FROM ${T.invoices} WHERE id = $1`,
+        [parent.id]
+      );
+      const pr = parentRecheck.rows[0];
+      if (
+        !pr ||
+        pr.einvoice_status !== "valid" ||
+        pr.invoice_status === "cancelled"
+      ) {
+        throw new Error(
+          "Parent consolidated invoice was cancelled or invalidated mid-flow; aborting submission."
+        );
+      }
 
       const submissionResult = await submissionHandler.submitAndPollDocuments(xml);
       if (!submissionResult.success) {
