@@ -1,5 +1,11 @@
 // src/pages/Payroll/PayrollPage.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconChevronsDown,
@@ -80,6 +86,7 @@ const PayrollPage: React.FC = () => {
     Record<string, MidMonthPayroll | null>
   >({});
   const [isFetchingMidMonth, setIsFetchingMidMonth] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -368,6 +375,46 @@ const PayrollPage: React.FC = () => {
   useEffect(() => {
     setSelectedEmployeePayrolls({});
   }, [searchTerm]);
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+
+      const tagName = target.tagName.toLowerCase();
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target.isContentEditable
+      );
+    };
+
+    const handleSearchTypingShortcut = (event: KeyboardEvent): void => {
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.key.length !== 1 ||
+        !searchInputRef.current ||
+        isStatusDialogOpen ||
+        showFinalizeDialog ||
+        showMissingTaxDialog ||
+        isEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      setSearchTerm((prev) => `${prev}${event.key}`);
+    };
+
+    document.addEventListener("keydown", handleSearchTypingShortcut);
+    return () => {
+      document.removeEventListener("keydown", handleSearchTypingShortcut);
+    };
+  }, [isStatusDialogOpen, showFinalizeDialog, showMissingTaxDialog]);
 
   const handleToggleAllJobs = (expanded: boolean) => {
     if (!payroll?.employeePayrolls) return;
@@ -773,6 +820,7 @@ const PayrollPage: React.FC = () => {
             />
             <div className="relative">
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search employees..."
                 value={searchTerm}
