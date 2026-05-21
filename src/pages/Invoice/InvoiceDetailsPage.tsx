@@ -1405,6 +1405,22 @@ const InvoiceDetailsPage: React.FC = () => {
     (doc: AdjustmentDocument) =>
       doc.status === "active" && !doc.is_consolidated
   );
+  const activeInvoiceAdjustmentDocs: AdjustmentDocument[] = adjustmentDocs.filter(
+    (doc: AdjustmentDocument) =>
+      doc.status === "active" &&
+      !doc.is_consolidated &&
+      (doc.type === "credit_note" || doc.type === "debit_note")
+  );
+  const hasActiveDebitNote: boolean = activeInvoiceAdjustmentDocs.some(
+    (doc: AdjustmentDocument) => doc.type === "debit_note"
+  );
+  const hasActiveCreditNote: boolean = activeInvoiceAdjustmentDocs.some(
+    (doc: AdjustmentDocument) => doc.type === "credit_note"
+  );
+  const refundNotePaymentDocs: AdjustmentDocument[] = adjustmentDocs.filter(
+    (doc: AdjustmentDocument) =>
+      doc.type === "refund_note" && !doc.is_consolidated
+  );
   const isEligibleForEinvoiceByDate = isInvoiceDateEligibleForEinvoice(
     invoiceData.createddate
   );
@@ -1563,10 +1579,10 @@ const InvoiceDetailsPage: React.FC = () => {
                 variant="outline"
                 color="amber"
                 size="md"
-                disabled={isLoading || hasActiveAdjustmentDocs}
+                disabled={isLoading || hasActiveDebitNote}
                 title={
-                  hasActiveAdjustmentDocs
-                    ? "Cancel the existing adjustment document before creating another"
+                  hasActiveDebitNote
+                    ? "Cancel the active Debit Note before creating another"
                     : "Issue a Debit Note (additional charge)"
                 }
               >
@@ -1582,10 +1598,10 @@ const InvoiceDetailsPage: React.FC = () => {
                 variant="outline"
                 color="rose"
                 size="md"
-                disabled={isLoading || hasActiveAdjustmentDocs}
+                disabled={isLoading || hasActiveCreditNote}
                 title={
-                  hasActiveAdjustmentDocs
-                    ? "Cancel the existing adjustment document before creating another"
+                  hasActiveCreditNote
+                    ? "Cancel the active Credit Note before creating another"
                     : "Issue a Credit Note (sales return / reduction)"
                 }
               >
@@ -1604,12 +1620,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   variant="outline"
                   color="sky"
                   size="md"
-                  disabled={isLoading || hasActiveAdjustmentDocs}
-                  title={
-                    hasActiveAdjustmentDocs
-                      ? "Cancel the existing adjustment document before creating another"
-                      : "Refund overpaid amount"
-                  }
+                  disabled={isLoading}
+                  title="Refund overpaid amount"
                 >
                   Refund Note
                 </Button>
@@ -1962,6 +1974,7 @@ const InvoiceDetailsPage: React.FC = () => {
             grandTotal={invoiceData.totalamountpayable}
             onRoundingChange={() => {}}
             readOnly={true}
+            adjustments={activeInvoiceAdjustmentDocs}
           />
         </div>
 
@@ -2113,7 +2126,7 @@ const InvoiceDetailsPage: React.FC = () => {
           <h2 className="text-base font-semibold mb-3 text-gray-800 dark:text-gray-100">
             Payment History
           </h2>
-          {payments.length === 0 ? (
+          {payments.length === 0 && refundNotePaymentDocs.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400 italic">
               No payments recorded yet.
             </p>
@@ -2284,6 +2297,74 @@ const InvoiceDetailsPage: React.FC = () => {
                             </Button>
                           )}
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {refundNotePaymentDocs.map((doc: AdjustmentDocument) => (
+                    <tr
+                      key={doc.id}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                        doc.status === "cancelled"
+                          ? "bg-gray-50 dark:bg-gray-900/50 text-gray-400 dark:text-gray-500 line-through"
+                          : "bg-rose-50/40 dark:bg-rose-900/10"
+                      }`}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {formatDisplayDate(new Date(Number(doc.createddate)))}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 capitalize">
+                          {(doc.refund_method || "refund").replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
+                        {doc.refund_reference || doc.id}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            doc.status === "cancelled"
+                              ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                              : "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300"
+                          }`}
+                        >
+                          {doc.status === "cancelled" ? "Cancelled" : "Refunded"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {doc.journal_entry_id ? (
+                          <button
+                            onClick={() =>
+                              navigate(`/accounting/journal-entries/${doc.journal_entry_id}`)
+                            }
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            title="View journal entry"
+                          >
+                            <IconReceipt size={14} />
+                            <span className="font-mono">#{doc.journal_entry_id}</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
+                        {doc.reason ||
+                          (doc.paired_with_id
+                            ? `Paired with ${doc.paired_with_id}`
+                            : doc.linked_payment_id
+                            ? `Linked to payment #${doc.linked_payment_id}`
+                            : "Refund Note")}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-rose-600 dark:text-rose-400">
+                        -{formatCurrency(doc.totalamountpayable)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => navigate(`/sales/adjustment-docs/${doc.id}`)}
+                          className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                        >
+                          Open
+                        </button>
                       </td>
                     </tr>
                   ))}

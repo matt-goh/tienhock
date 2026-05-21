@@ -38,6 +38,7 @@ This plan introduces a dedicated **Adjustment Documents** ecosystem across all t
 | 4 | Individual E-Invoice templates + submission (TH) | **DONE** |
 | 5 | Consolidated E-Invoice templates + auto-consolidation (TH) | **DONE** (manual modal tabs deferred) |
 | 6 | Jelly Polly Replication | **DONE** |
+| 6.5 | Pre-Phase-7 edge case audit + fixes | **DONE** |
 | 7 | Green Target Implementation | Not started |
 
 ### Phase 1 — what shipped
@@ -75,6 +76,44 @@ This plan introduces a dedicated **Adjustment Documents** ecosystem across all t
 - **[src/components/AdjustmentDocs/InvoiceAdjustmentDocsSection.tsx](../src/components/AdjustmentDocs/InvoiceAdjustmentDocsSection.tsx)** — new reusable section component that fetches all adjustment documents for an invoice (`GET /api/adjustment-docs?original_invoice_id=...&include_cancelled=true`) and renders a compact table with type/status badges and click-through navigation. Accepts a `basePath` prop so JP/GT can pass their prefixed paths. Hides itself entirely when there are no related docs (zero-state reduces noise on every invoice).
 - **InvoiceDetailsPage** also renders `<InvoiceAdjustmentDocsSection invoiceId={...} />` below the main invoice card (acceptable substitute for the originally-planned position; placing inline would have required restructuring the existing card layout).
 - **[src/components/ChangelogModal.tsx](../src/components/ChangelogModal.tsx)** — new bilingual entry dated 2026-05-20 announcing Adjustment Documents to end users.
+
+### Phase 6.5 — Pre-Phase-7 edge case audit and hardening (2026-05-21)
+
+Critical and high-severity edge cases identified in the audit ([plans/alright-we-need-to-wiggly-spring.md](../../plans/alright-we-need-to-wiggly-spring.md)) have been fixed. All changes are **scoped to the buggy edge cases** — happy-path / single-user behaviour for normal CN/DN/RN flows is byte-identical.
+
+**Backend ([src/routes/sales/adjustment-docs/index.js](../src/routes/sales/adjustment-docs/index.js)):**
+- `#1 Wrapper cancellation` — `/:id/cancel` now branches on `doc.is_consolidated`. Wrapper cancellation skips balance/credit/journal reversal (children own those) and instead clears the children's `uuid`/`submission_uid`/`long_id`/`datetime_validated`/`einvoice_status` so they're re-consolidate-able. Previously corrupted the parent invoice's balance_due.
+- `#2 Concurrent submit-einvoice` — `/:id/submit-einvoice` now wraps the whole flow in `BEGIN ... COMMIT` and fetches the doc row with `FOR UPDATE`. Concurrent clicks on the same doc serialise; the second sees the first's status update and bails with a clear "already has e-invoice status" error.
+- `#3 Multi-RN cumulative cap` — Standalone Refund Note creation now sums all prior active RNs against the same `linked_payment_id` and rejects if `prior_total + new_amount > overpaid_amount`. Single-RN flows unaffected (sum is 0).
+- `#5 Wrapper cancel-einvoice cascade` — `/:id/cancel-einvoice` now, when the target is a wrapper, propagates `einvoice_status='cancelled'` to all children sharing the wrapper's UUID. Non-wrapper docs unaffected.
+- `#6 Snapshot refresh` — `resolveReferencedDocument` detects stale `references_consolidated_id` (parent cancelled or invalidated), falls through to live JSONB lookup, and persists the refreshed parent id back to the doc. Reports and subsequent operations see the live parent.
+- `#7 Linked payment status surfaced` — `GET /:id` now joins `payments` and includes a `linked_payment` object on the response so the UI can warn when a standalone RN's source payment has been cancelled.
+- `#8 Parent re-validation pre-submit` — `/submit-consolidated` re-queries the parent consolidated invoice immediately before the MyInvois network call and aborts if the parent was cancelled mid-flow.
+- `#10 Validation tightening` — `validateLineItems` now rejects `qty <= 0` (except OTH/LESS/REFUND, which are amount-only) and `price < 0` (except LESS, which by convention is negative). Same rule mirrored in the form's `validate()`.
+
+**Invoice cancel handler (TH + JP):**
+- `#4 Block invoice cancel when active adjustment docs exist` — `DELETE /:id` on both [src/routes/sales/invoices/invoices.js](../src/routes/sales/invoices/invoices.js) and [src/routes/jellypolly/invoices.js](../src/routes/jellypolly/invoices.js) now queries active adjustment_documents for the invoice and returns a clear 400 error listing the offending document IDs. Cascade-cancel is intentionally NOT implemented (riskier) — users cancel docs first.
+
+**Auto-consolidation cron ([src/utils/invoice/autoAdjustmentConsolidation.js](../src/utils/invoice/autoAdjustmentConsolidation.js)):**
+- `#9 Idempotency guard` — When a group's eligible children carry a non-null `submission_uid` (suggests a prior partial run), the group is skipped with a warning logged for manual review. Prevents accidental double-submission to MyInvois.
+
+**Frontend:**
+- `#7 Stale linked payment warning` — [src/pages/AdjustmentDocs/AdjustmentDocsDetailsPage.tsx](../src/pages/AdjustmentDocs/AdjustmentDocsDetailsPage.tsx) now renders an amber warning banner on Refund Note details when `linked_payment.status === 'cancelled'`.
+- `#10 Form validation` — [src/pages/AdjustmentDocs/AdjustmentDocsFormPage.tsx](../src/pages/AdjustmentDocs/AdjustmentDocsFormPage.tsx) `validate()` rejects qty<=0 / negative price with line-specific error messages.
+
+**Types ([src/types/types.ts](../src/types/types.ts)):**
+- `AdjustmentDocument` interface gained the optional `linked_payment` joined field.
+
+**Deferred (low risk, would change intended behaviour):**
+- `#11 Cumulative CN cap vs invoice total` — Would block legitimate partial-CN-over-time workflows; only the over-credit case is buggy and is rare.
+- `#13 Wrapper pill on list page` — Pure UX, no behaviour change required.
+- `#14 Remove credit_used clamp` — Behaviour shift that affects how customer reports compute "amount owed"; needs explicit user direction.
+- `#15-20` — Polish items; safe to ship later.
+
+**Verification done:**
+- `node --check` passes on all modified backend files.
+- `tsc --noEmit` runs clean (no new TypeScript errors).
+- Code review confirms no edits to the happy-path code; all changes are guarded by `is_consolidated`, `paired_with_id`, `linked_payment_id`, transaction wrappers, or specific status checks.
 
 ### Phase 3.1 (post-Phase-3 fix) — Invoice picker on the form page
 
