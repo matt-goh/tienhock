@@ -569,38 +569,6 @@ export default function (pool) {
         }
       });
 
-      // CUTI TAHUNAN (23) - Leave records
-      const cutiTahunanEmployees = processedData.filter(
-        (emp) => emp.cuti_tahunan_amount > 0,
-      );
-      cutiTahunanEmployees.forEach((emp) => {
-        if (
-          !locationData["23"].employees.find((e) => e.staff_id === emp.staff_id)
-        ) {
-          locationData["23"].employees.push({
-            ...emp,
-            gaji: 0,
-            ot: 0,
-            bonus: 0,
-            comm: emp.cuti_tahunan_amount,
-            epf_majikan: 0,
-            epf_pekerja: 0,
-            socso_majikan: 0,
-            socso_pekerja: 0,
-            sip_majikan: 0,
-            sip_pekerja: 0,
-            pcb: 0,
-            gaji_kasar: emp.cuti_tahunan_amount,
-            gaji_bersih: emp.cuti_tahunan_amount,
-            jumlah: emp.cuti_tahunan_amount,
-          });
-          locationData["23"].totals.comm += emp.cuti_tahunan_amount;
-          locationData["23"].totals.gaji_kasar += emp.cuti_tahunan_amount;
-          locationData["23"].totals.gaji_bersih += emp.cuti_tahunan_amount;
-          locationData["23"].totals.jumlah += emp.cuti_tahunan_amount;
-        }
-      });
-
       // Convert locationData object to array for response
       const locationsArray = allLocations.map((loc) => locationData[loc]);
 
@@ -1341,38 +1309,6 @@ export default function (pool) {
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.jumlah += commAmount;
           }
-        }
-      });
-
-      // CUTI TAHUNAN (23) - Leave records
-      const cutiTahunanEmployees = processedData.filter(
-        (emp) => emp.cuti_tahunan_amount > 0,
-      );
-      cutiTahunanEmployees.forEach((emp) => {
-        if (
-          !locationData["23"].employees.find((e) => e.staff_id === emp.staff_id)
-        ) {
-          locationData["23"].employees.push({
-            ...emp,
-            gaji: 0,
-            ot: 0,
-            bonus: 0,
-            comm: emp.cuti_tahunan_amount,
-            epf_majikan: 0,
-            epf_pekerja: 0,
-            socso_majikan: 0,
-            socso_pekerja: 0,
-            sip_majikan: 0,
-            sip_pekerja: 0,
-            pcb: 0,
-            gaji_kasar: emp.cuti_tahunan_amount,
-            gaji_bersih: emp.cuti_tahunan_amount,
-            jumlah: emp.cuti_tahunan_amount,
-          });
-          locationData["23"].totals.comm += emp.cuti_tahunan_amount;
-          locationData["23"].totals.gaji_kasar += emp.cuti_tahunan_amount;
-          locationData["23"].totals.gaji_bersih += emp.cuti_tahunan_amount;
-          locationData["23"].totals.jumlah += emp.cuti_tahunan_amount;
         }
       });
 

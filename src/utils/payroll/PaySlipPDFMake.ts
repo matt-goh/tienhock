@@ -538,18 +538,7 @@ const buildMainPayrollPage = (
 
   // Mid-month and final calculations
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
-  const isMainten =
-    payroll.job_type === "MAINTEN" || payroll.job_type?.includes("MAINTEN");
-  const cutiTahunanRecords = leaveRecordsArray.filter(
-    (record) => record.leave_type === "cuti_tahunan",
-  );
-  const cutiTahunanAmount = cutiTahunanRecords.reduce(
-    (sum, record) => sum + record.total_amount,
-    0,
-  );
-  const additionalMaintenDeduction = isMainten ? cutiTahunanAmount : 0;
-  const finalPayment =
-    payroll.net_pay - midMonthPayment - additionalMaintenDeduction;
+  const finalPayment = payroll.net_pay - midMonthPayment;
 
   // Build table body
   const tableBody: TableCell[][] = [];
@@ -969,55 +958,19 @@ const buildMainPayrollPage = (
   ]);
 
   // Commission deduction rows (merged duplicates).
-  // For MAINTEN, attach Cuti Tahunan only to the first commission row.
   if (mergedCommissionRecords.length > 0) {
-    const cutiTahunanRecordsForCommission = leaveRecordsArray.filter(
-      (record) => record.leave_type === "cuti_tahunan",
-    );
-    const cutiTahunanAmountForCommission =
-      cutiTahunanRecordsForCommission.reduce(
-        (sum, record) => sum + record.total_amount,
-        0,
-      );
-    mergedCommissionRecords.forEach((commission, idx) => {
-      const attachCuti =
-        isMainten && idx === 0 && cutiTahunanRecordsForCommission.length > 0;
-      const totalAmount = attachCuti
-        ? commission.merged_amount + cutiTahunanAmountForCommission
-        : commission.merged_amount;
-      const description = attachCuti
-        ? `${commission.description} + Cuti Tahunan (Advance)`
-        : `${commission.description} (Advance)`;
-
+    mergedCommissionRecords.forEach((commission) => {
       tableBody.push([
-        { text: description, fontSize: 8 },
+        { text: `${commission.description} (Advance)`, fontSize: 8 },
         { text: "", fontSize: 8 },
         { text: "", fontSize: 8 },
         {
-          text: `(${formatCurrency(totalAmount)})`,
+          text: `(${formatCurrency(commission.merged_amount)})`,
           alignment: "right",
           fontSize: 8,
         },
       ]);
     });
-  }
-
-  // Cuti Tahunan deduction for MAINTEN without commission (also skip if cuti tahunan already wasn't attached above)
-  if (
-    mergedCommissionRecords.length === 0 &&
-    isMainten &&
-    cutiTahunanAmount > 0
-  ) {
-    tableBody.push([
-      { text: "Cuti Tahunan (Advance)", fontSize: 8 },
-      { text: "", fontSize: 8 },
-      { text: "", fontSize: 8 },
-      {
-        text: `(${formatCurrency(cutiTahunanAmount)})`,
-        alignment: "right",
-        fontSize: 8,
-      },
-    ]);
   }
 
   // Mid-month payment deduction
@@ -1037,8 +990,7 @@ const buildMainPayrollPage = (
   // Jumlah row (raw final payment before rounding)
   if (
     midMonthPayroll ||
-    commissionRecords.length > 0 ||
-    (isMainten && cutiTahunanAmount > 0)
+    commissionRecords.length > 0
   ) {
     tableBody.push([
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },

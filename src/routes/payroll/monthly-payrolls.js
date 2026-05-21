@@ -133,11 +133,23 @@ export default function (pool) {
       AND p.type != 'OTH'
     `;
 
-      const [dailyResult, monthlyResult, productionResult] = await Promise.all([
-        pool.query(dailyEligibleQuery, [startDate, endDate]),
-        pool.query(monthlyEligibleQuery, [month, year]),
-        pool.query(productionEligibleQuery, [startDate, endDate]),
-      ]);
+      const packingCutiEligibleQuery = `
+      SELECT DISTINCT lr.employee_id,
+        REPLACE(lr.notes, 'PACKING_CUTI:', '') as job_id
+      FROM leave_records lr
+      WHERE lr.leave_date BETWEEN $1 AND $2
+        AND lr.status = 'approved'
+        AND lr.amount_paid > 0
+        AND lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING')
+    `;
+
+      const [dailyResult, monthlyResult, productionResult, packingCutiResult] =
+        await Promise.all([
+          pool.query(dailyEligibleQuery, [startDate, endDate]),
+          pool.query(monthlyEligibleQuery, [month, year]),
+          pool.query(productionEligibleQuery, [startDate, endDate]),
+          pool.query(packingCutiEligibleQuery, [startDate, endDate]),
+        ]);
 
       // Group employees by job type (combine daily, monthly, and production results)
       const jobEmployeeMap = {};
@@ -160,6 +172,13 @@ export default function (pool) {
 
       // Add production entry workers (MEE_PACKING and BH_PACKING)
       productionResult.rows.forEach((row) => {
+        if (!jobEmployeeMap[row.job_id]) {
+          jobEmployeeMap[row.job_id] = new Set();
+        }
+        jobEmployeeMap[row.job_id].add(row.employee_id);
+      });
+
+      packingCutiResult.rows.forEach((row) => {
         if (!jobEmployeeMap[row.job_id]) {
           jobEmployeeMap[row.job_id] = new Set();
         }
@@ -1290,10 +1309,14 @@ export default function (pool) {
               client.query(
                 `
               SELECT SUM(amount_paid) as total FROM leave_records
-              WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
-                AND EXTRACT(MONTH FROM leave_date) = $3 AND status = 'approved'
+              WHERE employee_id IN (
+                SELECT id FROM staffs WHERE name = $1
+              )
+                AND EXTRACT(YEAR FROM leave_date) = $2
+                AND EXTRACT(MONTH FROM leave_date) = $3
+                AND status = 'approved'
             `,
-                [primaryEmployee.employeeId, year, month],
+                [employeeName, year, month],
               ),
               client.query(
                 `
@@ -1501,31 +1524,13 @@ export default function (pool) {
             midMonthResult.rows[0]?.amount || 0,
           );
 
-          // Get unique job types to check for MAINTEN
           const uniqueJobTypes = [
             ...new Set(employeeJobCombos.map((c) => c.jobType)),
           ].sort();
           const jobTypes = uniqueJobTypes.join(", ");
-          const isMainten =
-            jobTypes === "MAINTEN" || jobTypes.includes("MAINTEN");
-
-          // For MAINTEN, get cuti_tahunan advance (approved annual leave amount)
-          let cutiTahunanAdvance = 0;
-          if (isMainten) {
-            const cutiResult = await client.query(
-              `
-              SELECT COALESCE(SUM(amount_paid), 0) as total FROM leave_records
-              WHERE employee_id = $1 AND EXTRACT(YEAR FROM leave_date) = $2
-                AND EXTRACT(MONTH FROM leave_date) = $3 AND status = 'approved'
-                AND leave_type = 'cuti_tahunan'
-            `,
-              [primaryEmployee.employeeId, year, month],
-            );
-            cutiTahunanAdvance = parseFloat(cutiResult.rows[0]?.total || 0);
-          }
 
           // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
-          const jumlah = netPay - midMonthAmount - cutiTahunanAdvance;
+          const jumlah = netPay - midMonthAmount;
           const setelahDigenapkan = Math.ceil(jumlah);
           const digenapkan = setelahDigenapkan - jumlah;
 
