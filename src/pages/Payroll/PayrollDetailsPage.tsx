@@ -1162,89 +1162,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Cuti Tahunan Advance with Tooltip (MAINTEN only) */}
-              {payroll.job_type === "MAINTEN" &&
-                monthlyLeaveRecords.filter(
-                  (record) => record.leave_type === "cuti_tahunan",
-                ).length > 0 && (
-                  <div className="group relative flex justify-between text-sm">
-                    <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                      Cuti Tahunan Advance
-                      <IconInfoCircle
-                        size={14}
-                        className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
-                      />
-                    </span>
-                    <span className="font-medium text-rose-600 dark:text-rose-400">
-                      -{" "}
-                      {formatCurrency(
-                        monthlyLeaveRecords
-                          .filter(
-                            (record) => record.leave_type === "cuti_tahunan",
-                          )
-                          .reduce((sum, record) => sum + record.amount_paid, 0),
-                      )}
-                    </span>
-                    {/* Tooltip - appears below */}
-                    <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-64">
-                      <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
-                        <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
-                        <div className="font-semibold mb-2 text-default-100">
-                          Cuti Tahunan Advance
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-default-300">Amount:</span>
-                            <span>
-                              {formatCurrency(
-                                monthlyLeaveRecords
-                                  .filter(
-                                    (record) =>
-                                      record.leave_type === "cuti_tahunan",
-                                  )
-                                  .reduce(
-                                    (sum, record) => sum + record.amount_paid,
-                                    0,
-                                  ),
-                              )}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-default-300">Days:</span>
-                            <span>
-                              {monthlyLeaveRecords
-                                .filter(
-                                  (record) =>
-                                    record.leave_type === "cuti_tahunan",
-                                )
-                                .reduce(
-                                  (sum, record) => sum + record.days_taken,
-                                  0,
-                                )}{" "}
-                              day
-                              {monthlyLeaveRecords
-                                .filter(
-                                  (record) =>
-                                    record.leave_type === "cuti_tahunan",
-                                )
-                                .reduce(
-                                  (sum, record) => sum + record.days_taken,
-                                  0,
-                                ) !== 1
-                                ? "s"
-                                : ""}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
-                          Annual leave payment for MAINTEN employees, treated as
-                          advance.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
               {/* Total Deductions */}
               <div className="border-t border-default-200 dark:border-gray-600 mt-2 pt-2">
                 <div className="flex justify-between text-sm">
@@ -1265,17 +1182,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           0,
                         );
                         const midMonthAdvance = midMonthPayroll?.amount || 0;
-                        const cutiTahunanAdvance =
-                          payroll.job_type === "MAINTEN"
-                            ? monthlyLeaveRecords
-                                .filter((r) => r.leave_type === "cuti_tahunan")
-                                .reduce((sum, r) => sum + r.amount_paid, 0)
-                            : 0;
                         return (
                           statutoryDeductions +
                           commissionAdvance +
-                          midMonthAdvance +
-                          cutiTahunanAdvance
+                          midMonthAdvance
                         );
                       })(),
                     )}
@@ -1286,13 +1196,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
             {/* Digenapkan (Rounding) - Only show if there's an adjustment */}
             {(() => {
-              const isMainten = payroll.job_type === "MAINTEN";
-              const cutiTahunanAmount = monthlyLeaveRecords
-                .filter((record) => record.leave_type === "cuti_tahunan")
-                .reduce((sum, record) => sum + record.amount_paid, 0);
-              const additionalMaintenDeduction = isMainten
-                ? cutiTahunanAmount
-                : 0;
               const commissionAdvance = commissionRecords.reduce(
                 (sum, r) => sum + Number(r.amount),
                 0,
@@ -1300,7 +1203,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               const finalPayment =
                 payroll.net_pay -
                 (midMonthPayroll?.amount || 0) -
-                additionalMaintenDeduction -
                 commissionAdvance;
               // Use stored rounding values if available, otherwise calculate
               const digenapkan =
@@ -1327,15 +1229,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
                   {formatCurrency(
                     (() => {
-                      const isMainten = payroll.job_type === "MAINTEN";
-                      const cutiTahunanAmount = monthlyLeaveRecords
-                        .filter(
-                          (record) => record.leave_type === "cuti_tahunan",
-                        )
-                        .reduce((sum, record) => sum + record.amount_paid, 0);
-                      const additionalMaintenDeduction = isMainten
-                        ? cutiTahunanAmount
-                        : 0;
                       const commissionAdvance = commissionRecords.reduce(
                         (sum, r) => sum + Number(r.amount),
                         0,
@@ -1343,7 +1236,6 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       const finalPayment =
                         payroll.net_pay -
                         (midMonthPayroll?.amount || 0) -
-                        additionalMaintenDeduction -
                         commissionAdvance;
                       // Use stored rounding values if available, otherwise calculate on-the-fly
                       return (

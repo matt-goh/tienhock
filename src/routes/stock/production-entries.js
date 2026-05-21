@@ -8,6 +8,38 @@ const STOCK_ONLY_PRODUCT_IDS = new Set([
   "SBH",
   "SMEE",
 ]);
+const PACKING_JOB_BY_PRODUCT_TYPE = {
+  MEE: "MEE_PACKING",
+  BH: "BH_PACKING",
+};
+
+const getPackingCutiConflicts = async (client, date, productId, workerIds) => {
+  const activeWorkerIds = workerIds.filter(Boolean);
+  if (activeWorkerIds.length === 0) return [];
+
+  const productResult = await client.query(
+    "SELECT type FROM products WHERE id = $1",
+    [productId],
+  );
+  const productType = productResult.rows[0]?.type;
+  const packingJob = PACKING_JOB_BY_PRODUCT_TYPE[productType];
+  if (!packingJob) return [];
+
+  const conflictResult = await client.query(
+    `
+      SELECT DISTINCT lr.employee_id
+      FROM leave_records lr
+      JOIN staffs s ON s.id = lr.employee_id
+      WHERE lr.leave_date = $1
+        AND lr.employee_id = ANY($2::text[])
+        AND lr.status = 'approved'
+        AND s.job::jsonb ? $3
+    `,
+    [date, activeWorkerIds, packingJob],
+  );
+
+  return conflictResult.rows.map((row) => row.employee_id);
+};
 
 export default function (pool) {
   const router = Router();
@@ -298,6 +330,25 @@ export default function (pool) {
         });
       }
 
+      if (Number(bags_packed) > 0) {
+        const conflictEmployeeIds = await getPackingCutiConflicts(
+          pool,
+          entry_date,
+          product_id,
+          [worker_id],
+        );
+
+        if (conflictEmployeeIds.length > 0) {
+          const conflictError = new Error(
+            `Cannot save production because ${conflictEmployeeIds.join(
+              ", ",
+            )} already has cuti recorded for this date`,
+          );
+          conflictError.status = 400;
+          throw conflictError;
+        }
+      }
+
       const query = `
         INSERT INTO production_entries (entry_date, product_id, worker_id, bags_packed, created_by)
         VALUES ($1, $2, $3, $4, $5)
@@ -322,8 +373,8 @@ export default function (pool) {
       });
     } catch (error) {
       console.error("Error creating production entry:", error);
-      res.status(500).json({
-        message: "Error creating production entry",
+      res.status(error.status || 500).json({
+        message: error.status ? error.message : "Error creating production entry",
         error: error.message,
       });
     }
@@ -394,6 +445,26 @@ export default function (pool) {
           });
         }
 
+        const positiveWorkerIds = entries
+          .filter((entry) => Number(entry.bags_packed) > 0)
+          .map((entry) => entry.worker_id);
+        const conflictEmployeeIds = await getPackingCutiConflicts(
+          client,
+          date,
+          product_id,
+          positiveWorkerIds,
+        );
+
+        if (conflictEmployeeIds.length > 0) {
+          const conflictError = new Error(
+            `Cannot save production because ${conflictEmployeeIds.join(
+              ", ",
+            )} already has cuti recorded for this date`,
+          );
+          conflictError.status = 400;
+          throw conflictError;
+        }
+
         for (const entry of entries) {
           const { worker_id, bags_packed } = entry;
 
@@ -448,8 +519,8 @@ export default function (pool) {
       }
     } catch (error) {
       console.error("Error batch saving production entries:", error);
-      res.status(500).json({
-        message: "Error saving production entries",
+      res.status(error.status || 500).json({
+        message: error.status ? error.message : "Error saving production entries",
         error: error.message,
       });
     }
@@ -465,6 +536,39 @@ export default function (pool) {
         return res.status(400).json({
           message: "bags_packed is required",
         });
+      }
+
+      if (Number(bags_packed) > 0) {
+        const currentEntryResult = await pool.query(
+          `
+            SELECT entry_date, product_id, worker_id
+            FROM production_entries
+            WHERE id = $1
+          `,
+          [id],
+        );
+
+        if (currentEntryResult.rows.length === 0) {
+          return res.status(404).json({
+            message: "Production entry not found",
+          });
+        }
+
+        const currentEntry = currentEntryResult.rows[0];
+        const conflictEmployeeIds = await getPackingCutiConflicts(
+          pool,
+          currentEntry.entry_date,
+          currentEntry.product_id,
+          [currentEntry.worker_id],
+        );
+
+        if (conflictEmployeeIds.length > 0) {
+          return res.status(400).json({
+            message: `Cannot save production because ${conflictEmployeeIds.join(
+              ", ",
+            )} already has cuti recorded for this date`,
+          });
+        }
       }
 
       const query = `
