@@ -695,16 +695,22 @@ const ProductionListPage: React.FC = () => {
 
                                     {isExpanded && (
                                       <tr className="bg-default-50/70 dark:bg-gray-900/30">
-                                        <td />
-                                        <td colSpan={4} className="px-3 py-2">
-                                          <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
+                                        <td colSpan={5} className="px-3 py-2">
+                                          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                                             {group.rows.map((entry: ProductionEntry) => (
                                               <div
                                                 key={entry.id || `${entry.product_id}-${entry.worker_id || "stock"}`}
                                                 className="flex items-center justify-between rounded border border-default-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
                                               >
                                                 <div className="min-w-0">
-                                                  <div className="truncate font-medium text-default-800 dark:text-gray-100">
+                                                  <div
+                                                    className="truncate font-medium text-default-800 dark:text-gray-100"
+                                                    title={
+                                                      entry.worker_name ||
+                                                      entry.worker_id ||
+                                                      "Stock-only quantity"
+                                                    }
+                                                  >
                                                     {entry.worker_name ||
                                                       entry.worker_id ||
                                                       "Stock-only quantity"}

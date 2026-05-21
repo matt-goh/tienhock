@@ -95,13 +95,15 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
     {}
   );
 
-  // Pay codes available: Tambahan + Overtime, active only
+  // Pay codes available: Base + Tambahan + Overtime, active only
   const availablePayCodes = useMemo(() => {
     return payCodes
       .filter(
         (pc) =>
           pc.is_active &&
-          (pc.pay_type === "Tambahan" || pc.pay_type === "Overtime")
+          (pc.pay_type === "Base" ||
+            pc.pay_type === "Tambahan" ||
+            pc.pay_type === "Overtime")
       )
       .sort((a, b) => a.description.localeCompare(b.description));
   }, [payCodes]);
