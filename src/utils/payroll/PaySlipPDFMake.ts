@@ -1046,36 +1046,20 @@ const buildMainPayrollPage = (
     // Company name
     { text: companyName, style: "companyName", margin: [0, 0, 0, 6] },
 
-    // Employee info table
+    // Employee info (compact single-line layout with bold labels and bullet separators)
     {
-      columns: [
-        { width: 55, text: "Employee" },
-        { width: 10, text: ":" },
-        { width: "*", text: staffDetails?.name || payroll.employee_name },
-      ],
-      margin: [0, 0, 0, 3],
-    },
-    {
-      columns: [
-        { width: 55, text: "IC No." },
-        { width: 10, text: ":" },
-        { width: "*", text: staffDetails?.icNo || "N/A" },
-      ],
-      margin: [0, 0, 0, 3],
-    },
-    {
-      columns: [
-        { width: 55, text: "Kerja" },
-        { width: 10, text: ":" },
-        { width: "*", text: staffDetails?.jobName || payroll.job_type },
-      ],
-      margin: [0, 0, 0, 3],
-    },
-    {
-      columns: [
-        { width: 55, text: "Bahagian" },
-        { width: 10, text: ":" },
-        { width: "*", text: staffDetails?.section || payroll.section },
+      text: [
+        { text: "Pekerja: ", bold: true },
+        staffDetails?.name || payroll.employee_name,
+        "  •  ",
+        { text: "IC No.: ", bold: true },
+        staffDetails?.icNo || "N/A",
+        "  •  ",
+        { text: "Kerja: ", bold: true },
+        staffDetails?.jobName || payroll.job_type,
+        "  •  ",
+        { text: "Bahagian: ", bold: true },
+        staffDetails?.section || payroll.section,
       ],
       margin: [0, 0, 0, 5],
     },
@@ -1514,39 +1498,20 @@ const buildIndividualJobPage = (
     // Company name
     { text: companyName, style: "companyName", margin: [0, 0, 0, 6] },
 
-    // Employee info
+    // Employee info (compact single-line layout separated by |)
     {
-      columns: [
-        { width: 55, text: "Employee" },
-        { width: 10, text: ":" },
-        {
-          width: "*",
-          text: `${staffDetails?.name || payroll.employee_name}${jobEmployeeId ? ` (${jobEmployeeId})` : ""}`,
-        },
-      ],
-      margin: [0, 0, 0, 3],
-    },
-    {
-      columns: [
-        { width: 55, text: "IC No." },
-        { width: 10, text: ":" },
-        { width: "*", text: staffDetails?.icNo || "N/A" },
-      ],
-      margin: [0, 0, 0, 3],
-    },
-    {
-      columns: [
-        { width: 55, text: "Kerja" },
-        { width: 10, text: ":" },
-        { width: "*", text: individualJob.job_type },
-      ],
-      margin: [0, 0, 0, 3],
-    },
-    {
-      columns: [
-        { width: 55, text: "Bahagian" },
-        { width: 10, text: ":" },
-        { width: "*", text: staffDetails?.section || payroll.section },
+      text: [
+        { text: "Pekerja: ", bold: true },
+        `${staffDetails?.name || payroll.employee_name}${jobEmployeeId ? ` (${jobEmployeeId})` : ""}`,
+        "  •  ",
+        { text: "IC No.: ", bold: true },
+        staffDetails?.icNo || "N/A",
+        "  •  ",
+        { text: "Kerja: ", bold: true },
+        individualJob.job_type,
+        "  •  ",
+        { text: "Bahagian: ", bold: true },
+        staffDetails?.section || payroll.section,
       ],
       margin: [0, 0, 0, 5],
     },
