@@ -619,9 +619,10 @@ export default function (pool) {
 
       // Get all leave records for these payrolls in a single query
       const leaveRecordsQuery = `
-      SELECT 
+      SELECT
         ep.id as employee_payroll_id,
         to_char(lr.leave_date, 'YYYY-MM-DD') as date,
+        lr.employee_id,
         lr.leave_type,
         lr.days_taken,
         lr.amount_paid,
@@ -654,6 +655,7 @@ export default function (pool) {
           }
           acc[record.employee_payroll_id].push({
             date: record.date,
+            employee_id: record.employee_id,
             leave_type: record.leave_type,
             days_taken: parseFloat(record.days_taken),
             amount_paid: parseFloat(record.amount_paid || 0),
