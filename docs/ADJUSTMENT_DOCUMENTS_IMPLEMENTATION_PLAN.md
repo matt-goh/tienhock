@@ -215,6 +215,175 @@ Critical and high-severity edge cases identified in the audit ([plans/alright-we
 
 Phase 7 (Green Target) has not been started — its database schema and field names diverge significantly from TH/JP, so it needs its own design pass and templates (see Phase 7 section above for the diverging fields).
 
+# Phase 7 — Green Target Adjustment Documents (CN / DN / RN)
+
+## Status (handover snapshot)
+
+| Sub-phase | Status | Files touched |
+|---|---|---|
+| 7.1 — DB migration + GT router + invoice cancel blocks | ✅ done | see "What's done" |
+| 7.2 — E-invoice templates + route registration | ✅ done | see "What's done" |
+| 7.3 — Auto-consolidation extension for GT | ✅ done | see "What's done" |
+| 7.4 — Forked GT pages (List / Form / Details) + inline section | ✅ done | see "What's done" |
+| 7.5 — GT invoice page integration (DN/CN buttons + embedded section + Documents button) | ⏳ **next** | not started |
+| 7.6 — Sidebar entry + register the 3 routes in `pagesRoute.tsx` | ⏳ pending | not started |
+| 7.7 — Cross-cutting (CHANGELOG, CLAUDE.md/AGENTS.md, types) | ⏳ pending | not started |
+
+---
+
+## Context (why)
+
+Phases 1–6 of the Adjustment Documents project shipped CN/DN/RN for Tien Hock and Jelly Polly. Both share a single factory router and three shared React pages. Phase 6.5 hardened concurrent submission, wrapper cancellation, cumulative RN caps, snapshot refresh, invoice-cancel blocks, and form validation. Recent uncommitted polish (InvoiceCard / InvoiceTotals / both InvoiceDetailsPage files) made invoice cards and totals adjustment-aware (strikethrough original total, ± DN/CN lines, new "Refunded / Partially Refunded / Credited / Credit Balance" badges).
+
+**Green Target is forked, not shared**, because nearly every column name differs (invoice_id integer vs string id, date_issued date vs createddate unix ms text, amount_before_tax / total_amount vs total_excluding_tax / totalamountpayable, no salesperson, no journal_entries table, no customers.credit_used, no 'overpaid' payment status, line items are description-driven with no code system, no rounding column).
+
+**Decisions confirmed with user (2026-05-21):**
+1. **Refund Notes**: paired-RN only — no standalone "overpaid payment" trigger. CN form has the same "Issue paired Refund Note" toggle when invoice has any active payment.
+2. **Accounting**: no journals, no customer credit cascade. GT adjustment docs only mutate `greentarget.invoices.balance_due` and re-derive invoice status.
+3. **Pages**: forked under `src/pages/GreenTarget/AdjustmentDocs/`. Match GT inline-edit + confirmation-dialog conventions.
+4. **Auto-consolidation**: add a GT block to `autoAdjustmentConsolidation.js` even though GT invoices aren't auto-consolidated today — future-proofs the cron.
+
+---
+
+## What's done
+
+### 7.1 — Database + backend router + invoice cancel blocks
+
+**Migration applied to dev DB:**
+- [migrations/003_create_gt_adjustment_documents.sql](../../tienhock/migrations/003_create_gt_adjustment_documents.sql) — creates `greentarget.adjustment_documents` and `greentarget.adjustment_document_lines`, indexes, and reuses the shared `adjustment_documents_touch_updated_at()` trigger function from migration 001. **Applied.**
+- Schema diffs vs TH/JP: `original_invoice_id` is `INTEGER` (FK to `greentarget.invoices.invoice_id`), `original_invoice_number` snapshot column, `customer_id` integer (nullable), `customer_name` snapshot, `date_issued` DATE, `amount_before_tax` / `tax_amount` / `total_amount` (no `rounding`), no `salespersonid`, no `journal_entry_id`, no `linked_payment_id` (paired-RN only). All e-invoice/wrapper columns mirror TH.
+
+**Backend router:**
+- [src/routes/greentarget/adjustment-docs.js](../../tienhock/src/routes/greentarget/adjustment-docs.js) — full fork of TH's router (~1100 lines). All 11 endpoints implemented: `next-number/:type`, `GET /`, `GET /:id`, `POST /`, `POST /:id/cancel`, `POST /:id/submit-einvoice`, `POST /:id/update-status`, `POST /:id/cancel-einvoice`, `POST /:id/clear-einvoice-status`, `GET /eligible-for-consolidation`, `POST /submit-consolidated`, `GET /consolidated-history`.
+- **No journal posting, no customer credit updates** — only `applyBalanceDelta` mutates `greentarget.invoices.balance_due` and re-derives status (`paid` if ≤ tolerance, preserves `cancelled`/`overdue`, otherwise `active`).
+- Paired-RN only: standalone-RN guard rejects when `paired_credit_note_id` is missing for `type=refund_note`.
+- GT submission handler returns `{ success, submissionUid, document: { uuid, longId, dateTimeValidated } }` (singular `document`, not `acceptedDocuments[0]`) — handled in `submit-einvoice` and `submit-consolidated`.
+- ID prefixes: `GT-CN-YYYY-NNNN`, `GT-DN-...`, `GT-RN-...`. Consolidated wrapper: `CON-GT-{CN|DN|RN}-YYYYMM-N`.
+- All Phase 6.5 hardenings carried forward: `FOR UPDATE` lock on submit, wrapper cancellation behaviour split, snapshot refresh in `resolveReferencedDocument`, parent re-validation before consolidated MyInvois call.
+
+**Invoice cancel blocks:**
+- [src/routes/greentarget/invoices.js](../../tienhock/src/routes/greentarget/invoices.js) — both `PUT /:invoice_id/cancel` (~line 982) and `DELETE /:invoice_id` (~line 1111) now reject when active (non-consolidated) adjustment documents reference the invoice, returning a 400 with the offending doc IDs.
+
+### 7.2 — E-invoice templates + route registration
+
+**Templates:**
+- [src/utils/greenTarget/einvoice/GTEInvoiceAdjustmentNoteTemplate.js](../../tienhock/src/utils/greenTarget/einvoice/GTEInvoiceAdjustmentNoteTemplate.js) — fork of TH's adjustment template. Uses `GREENTARGET_INFO`, `date_issued` (DATE), no rounding, description-driven lines (no OTH/LESS/REFUND code handling).
+- [src/utils/greenTarget/einvoice/GTEInvoiceConsolidatedAdjustmentTemplate.js](../../tienhock/src/utils/greenTarget/einvoice/GTEInvoiceConsolidatedAdjustmentTemplate.js) — fork of TH's consolidated template. Each child becomes one InvoiceLine; description includes `original_invoice_number` (not numeric `original_invoice_id`).
+
+**Route registration:**
+- [src/routes/index.js](../../tienhock/src/routes/index.js) — imports `greenTargetAdjustmentDocsRouter` (lowercase `./greentarget/` to match disk convention; `utils/greenTarget/` is capitalised, routes/`greentarget/` is lowercase) and mounts at `/greentarget/api/adjustment-docs` with `myInvoisGTConfig`.
+- Smoke tested via `node -e "import(...).then(...)"`.
+
+### 7.3 — Auto-consolidation extension for GT
+
+- [src/utils/invoice/autoAdjustmentConsolidation.js](../../tienhock/src/utils/invoice/autoAdjustmentConsolidation.js) gained:
+  - New imports: `GTEInvoiceApiClientFactory`, `GTEInvoiceSubmissionHandler`, `GTEInvoiceConsolidatedAdjustmentTemplate`, `GREENTARGET_INFO`, `MYINVOIS_GT_CLIENT_ID/SECRET`.
+  - New `processGreenTargetAdjustmentConsolidation(pool, cfg)` function (parallel to `processCompany`, not a parameterised reuse — too many column differences) that uses GT field names (`date_issued`, `amount_before_tax`, `total_amount`, `original_invoice_number`, `invoice_id`), GT submission handler shape, and `CON-GT-...-AUTO` ID prefix.
+  - Cron entry point `checkAndProcessDueAdjustmentConsolidations(pool)` now calls it after TH and JP.
+- All TH/JP behaviour is untouched.
+
+### 7.4 — Forked GT frontend pages
+
+- [src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage.tsx](../../tienhock/src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage.tsx) — list with 4 type tabs, date_issued filter, search, status/einvoice-status dropdowns, table. Reuses the shared `AdjustmentDocTypeBadge` / `AdjustmentDocStatusBadge` from `src/components/AdjustmentDocs/AdjustmentDocBadge` (same shape works for GT). No "New Refund Note" button (paired-only).
+- [src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage.tsx](../../tienhock/src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage.tsx) — create form with invoice picker (queries `/greentarget/api/invoices`), date_issued picker (defaults today), description-driven line table (no code column), CN paired-refund toggle (default ON when invoice has any active payment), refund-method/bank/reference fields, sen-safe totals. Pre-fills a single line for CN/DN using rental description summary. For replacement RN (`?creditNoteId=...`), pre-fills REFUND line with refundable excess.
+- [src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage.tsx](../../tienhock/src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage.tsx) — read-only view with all the e-invoice action buttons (Submit / Clear & Retry / Re-submit / Update Status / Cancel e-Invoice / Cancel Document / Reissue Refund Note). Paired-doc panel, refund details panel, line items table, totals + e-invoice metadata.
+- [src/components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection.tsx](../../tienhock/src/components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection.tsx) — forked inline section to render on GT InvoiceDetailsPage. Hides itself when no docs exist.
+
+All pages use direct paths (no path helper):
+- API base: `/greentarget/api/adjustment-docs`
+- UI base: `/greentarget/adjustment-docs`
+- Invoice API: `/greentarget/api/invoices`
+- Invoice UI: `/greentarget/invoice/{invoice_id}` (GT navigates by integer invoice_id)
+
+---
+
+## What's left
+
+### 7.5 — GT invoice page integration  ← **NEXT**
+
+**File**: [src/pages/GreenTarget/Invoices/InvoiceListPage.tsx](../../tienhock/src/pages/GreenTarget/Invoices/InvoiceListPage.tsx)
+- Add a **"Documents"** mini button in the action bar (look for the existing Consolidated / Refresh cluster; match TH's pattern at `src/pages/Invoice/InvoiceListPage.tsx`). Pure navigation to `/greentarget/adjustment-docs`. Use `IconFileText`, size `sm`, variant `outline`.
+
+**File**: [src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx](../../tienhock/src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx)
+- Action bar (next to existing Print/Pay/Cancel cluster — find by grepping for the existing button cluster around line 590–650 per the original explore report) — add two buttons, both gated on `invoice.status !== 'cancelled'`:
+  - **Debit Note** (`IconFilePlus`, amber outline) → `/greentarget/adjustment-docs/new?type=debit&invoiceId={invoice_id}`
+  - **Credit Note** (`IconFileMinus`, rose outline) → `/greentarget/adjustment-docs/new?type=credit&invoiceId={invoice_id}`
+  - **No Refund Note button** (paired-only model — RN is reached through the CN form or via the "Issue/Reissue Refund Note" action on a CN's details page).
+- Render `<GTInvoiceAdjustmentDocsSection invoiceId={invoice.invoice_id} />` below the main invoice card (or in a sensible spot near the Payments section). Import from `../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection`.
+
+### 7.6 — Sidebar + routes
+
+**File**: [src/pages/pagesRoute.tsx](../../tienhock/src/pages/pagesRoute.tsx)
+- Register three routes:
+  - `/greentarget/adjustment-docs` → `GTAdjustmentDocsListPage`
+  - `/greentarget/adjustment-docs/new` → `GTAdjustmentDocsFormPage`
+  - `/greentarget/adjustment-docs/:id` → `GTAdjustmentDocsDetailsPage`
+
+**File**: GT sidebar — check whether the active file is `src/pages/GreenTarget/GreenTargetSidebarData.tsx` or `src/pages/GreenTargetNavData.tsx` (the explore report flagged both; check which one is actually imported in `App.tsx` / `pagesRoute.tsx`). Add a "Adjustment Documents" entry between **Invoices** and **Payments**, path `/greentarget/adjustment-docs`. Use `IconFileText` or `IconFileInvoice` for the icon.
+
+### 7.7 — Cross-cutting
+
+- **CHANGELOG**: prepend a bilingual (ms + en) entry to `CHANGELOG_ENTRIES` in [src/components/ChangelogModal.tsx](../../tienhock/src/components/ChangelogModal.tsx), dated when shipped. End-user phrasing — mirror the existing TH and JP adjustment-docs entries (commits `c5843932` for TH and `d043f62c` for JP).
+- **CLAUDE.md / AGENTS.md** schema sections: add `greentarget.adjustment_documents` and `greentarget.adjustment_document_lines` under the Green Target subsection. Per CLAUDE.md rule 13.
+- **Types** ([src/types/types.ts](../../tienhock/src/types/types.ts)): optional — add `GTAdjustmentDocument` interface if it would clean up the inline types in the GT pages. Currently each page defines its own interface inline; that's acceptable for forked pages, but a shared interface might be tidier.
+
+---
+
+## Critical files / patterns to remember
+
+### Backend
+- [src/routes/sales/adjustment-docs/index.js](../../tienhock/src/routes/sales/adjustment-docs/index.js) — TH source of truth. GT router was a careful fork; behaviour should match endpoint-for-endpoint except for the documented divergences (no journals, no credit cascade, paired-RN only).
+- [src/routes/greentarget/adjustment-docs.js](../../tienhock/src/routes/greentarget/adjustment-docs.js) — the GT router itself.
+- [src/utils/invoice/autoAdjustmentConsolidation.js](../../tienhock/src/utils/invoice/autoAdjustmentConsolidation.js) — `processGreenTargetAdjustmentConsolidation` is the GT-specific function; `processCompany` is unchanged and still handles TH + JP.
+
+### Templates
+- [src/utils/greenTarget/einvoice/GTEInvoiceAdjustmentNoteTemplate.js](../../tienhock/src/utils/greenTarget/einvoice/GTEInvoiceAdjustmentNoteTemplate.js)
+- [src/utils/greenTarget/einvoice/GTEInvoiceConsolidatedAdjustmentTemplate.js](../../tienhock/src/utils/greenTarget/einvoice/GTEInvoiceConsolidatedAdjustmentTemplate.js)
+
+### Frontend
+- [src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage.tsx](../../tienhock/src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage.tsx)
+- [src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage.tsx](../../tienhock/src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage.tsx)
+- [src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage.tsx](../../tienhock/src/pages/GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage.tsx)
+- [src/components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection.tsx](../../tienhock/src/components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection.tsx)
+
+### Shared (used unchanged by GT)
+- [src/components/AdjustmentDocs/AdjustmentDocBadge.tsx](../../tienhock/src/components/AdjustmentDocs/AdjustmentDocBadge.tsx) — `AdjustmentDocTypeBadge`, `AdjustmentDocStatusBadge`, `ADJUSTMENT_DOC_TYPE_META`. Same shape works for GT.
+- [src/components/ConfirmationDialog.tsx](../../tienhock/src/components/ConfirmationDialog.tsx) — used for cancel confirmations.
+
+### GT integration reference (read before doing 7.5)
+- [src/pages/Invoice/InvoiceDetailsPage.tsx](../../tienhock/src/pages/Invoice/InvoiceDetailsPage.tsx) and [src/pages/JellyPolly/InvoiceDetailsPage.tsx](../../tienhock/src/pages/JellyPolly/InvoiceDetailsPage.tsx) — TH/JP patterns for the DN/CN/RN button cluster and `<InvoiceAdjustmentDocsSection ... />` placement.
+- [src/pages/Invoice/InvoiceListPage.tsx](../../tienhock/src/pages/Invoice/InvoiceListPage.tsx) — the "Documents" mini button between Consolidated and Refresh.
+
+---
+
+## Smoke tests already done
+
+- `node --check` clean on all new/modified JS files.
+- `node -e "import('./src/routes/greentarget/adjustment-docs.js')..."` resolves all imports.
+- `node -e "import('./src/utils/invoice/autoAdjustmentConsolidation.js')..."` resolves all imports.
+- Migration successfully applied to dev DB.
+
+---
+
+## Verification once 7.5–7.7 are done
+
+1. Open `/greentarget/adjustment-docs` → list page loads (empty until first doc is created).
+2. From any non-cancelled GT invoice, click **Credit Note** → form loads with the invoice pre-selected; pre-filled with one line. Submit → CN row appears, `greentarget.invoices.balance_due` drops by the CN amount.
+3. From a paid GT invoice, create a Credit Note with paired-refund toggle ON → CN + RN both inserted with matched `paired_with_id`s; net balance change = (CN − RN).
+4. Cancel RN (must come first), then CN → balance reversed to original. **Verify no `journal_entries` row was ever touched** (GT is outside the ledger).
+5. Cancel a GT invoice that has an active adjustment doc → 400 with `adjustment_documents: ['GT-CN-...']` list.
+6. Submit individual e-invoice for a CN against a GT invoice with a valid UUID → BillingReference XML contains `original_invoice_number` + UUID; persisted uuid/long_id/status.
+7. Days-3-7 cron window: manually invoke `checkAndProcessDueAdjustmentConsolidations(pool)` and confirm GT block executes (label "Green Target" appears in logs).
+8. CHANGELOG modal shows the new entry in both BM and EN.
+
+## Out of scope (deferred)
+
+- Standalone Refund Notes for GT (would require an "overpaid" payment status concept that doesn't exist today).
+- Customer credit cascade on GT (no `credit_used` column).
+- `greentarget.journal_entries` table (GT remains outside the shared ledger).
+- Bulk e-invoice batch submit on the GT list page.
+- Sales summary / aging report netting of GT adjustments.
+
 ---
 
 ## Phase 1 — Database + Backend Foundation (Tien Hock)

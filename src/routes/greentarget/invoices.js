@@ -979,6 +979,24 @@ export default function (pool, defaultConfig) {
           .json({ message: "Invoice is already cancelled" });
       }
 
+      // Block cancellation when active adjustment documents reference this
+      // invoice — caller must cancel those first.
+      const adjDocsCheck = await client.query(
+        `SELECT id FROM greentarget.adjustment_documents
+          WHERE original_invoice_id = $1
+            AND status = 'active'
+            AND COALESCE(is_consolidated, false) = false`,
+        [numericInvoiceId]
+      );
+      if (adjDocsCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Cannot cancel invoice: it has active adjustment document(s). Cancel them first.",
+          adjustment_documents: adjDocsCheck.rows.map((r) => r.id),
+        });
+      }
+
       // Check if there are any *active* payments for this invoice
       const paymentsCheck = await client.query(
         "SELECT COUNT(*) FROM greentarget.payments WHERE invoice_id = $1 AND (status IS NULL OR status = 'active')",
@@ -1103,8 +1121,25 @@ export default function (pool, defaultConfig) {
       
       if (invoice.status !== "cancelled") {
         await client.query("ROLLBACK");
-        return res.status(400).json({ 
-          message: "Only cancelled invoices can be deleted" 
+        return res.status(400).json({
+          message: "Only cancelled invoices can be deleted"
+        });
+      }
+
+      // Block hard-delete when any adjustment documents (even cancelled ones)
+      // still FK-reference this invoice — DB FK would block the DELETE anyway;
+      // returning a friendly error early is better UX.
+      const adjDocsRefCheck = await client.query(
+        `SELECT id, status FROM greentarget.adjustment_documents
+          WHERE original_invoice_id = $1`,
+        [numericInvoiceId]
+      );
+      if (adjDocsRefCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message:
+            "Cannot delete invoice: adjustment document(s) reference it. Delete them first or keep the invoice in cancelled state.",
+          adjustment_documents: adjDocsRefCheck.rows,
         });
       }
 
