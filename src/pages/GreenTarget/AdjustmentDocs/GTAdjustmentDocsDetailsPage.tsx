@@ -19,7 +19,11 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
-import { AdjustmentDocType } from "../../../types/types";
+import type {
+  AdjustmentDocType,
+  AdjustmentDocument,
+  EInvoiceStatus,
+} from "../../../types/types";
 import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
@@ -51,9 +55,9 @@ interface GTAdjDoc {
   submission_uid: string | null;
   long_id: string | null;
   datetime_validated: string | null;
-  einvoice_status: string | null;
+  einvoice_status: EInvoiceStatus;
   is_consolidated: boolean;
-  status: string;
+  status: AdjustmentDocument["status"];
   cancellation_date: string | null;
   cancellation_reason: string | null;
   lines?: Array<{
