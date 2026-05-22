@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconCopy,
+  IconExternalLink,
   IconPlus,
   IconTrash,
   IconSquare,
@@ -30,7 +31,10 @@ import {
   sumMoney,
   roundMoney,
 } from "../../utils/moneyUtils";
-import { AdjustmentDocTypeBadge } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
+import {
+  AdjustmentDocTypeBadge,
+  AdjustmentDocStatusBadge,
+} from "../../components/AdjustmentDocs/AdjustmentDocBadge";
 import {
   AdjustmentDocsCompany,
   getAdjustmentDocsPaths,
@@ -923,13 +927,18 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
 
         {/* Original invoice summary */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-default-50/60 dark:bg-gray-900/30">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Original Invoice
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100">
+              <div
+                className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 w-fit"
+                onClick={() => navigate(`${paths.invoiceUiBase}/${invoice.id}`)}
+                title="Open invoice"
+              >
                 {invoice.id}
+                <IconExternalLink size={14} className="text-sky-600 dark:text-sky-400" />
               </div>
             </div>
             <div>
@@ -954,6 +963,21 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 RM {Number(invoice.balance_due).toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-0.5">
+                Invoice e-Status
+              </div>
+              <div className="font-medium text-default-900 dark:text-gray-100">
+                <AdjustmentDocStatusBadge
+                  status={
+                    (invoice.invoice_status === "cancelled"
+                      ? "cancelled"
+                      : "active") as "active" | "cancelled"
+                  }
+                  einvoiceStatus={invoice.einvoice_status ?? null}
+                />
               </div>
             </div>
           </div>
