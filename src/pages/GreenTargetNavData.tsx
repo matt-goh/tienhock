@@ -7,6 +7,7 @@ import {
   IconUsers,
   IconCash,
   IconReceipt,
+  IconFileText,
 } from "@tabler/icons-react";
 import { SidebarItem } from "./pagesRoute";
 
@@ -28,6 +29,9 @@ import GTMonthlyLogEntryPage from "./GreenTarget/Payroll/GTMonthlyLogEntryPage";
 import DriverTripEntryPage from "./GreenTarget/Payroll/DriverTripEntryPage";
 import GTPayrollDetailsPage from "./GreenTarget/Payroll/GTPayrollDetailsPage";
 import PayrollRulesPage from "./GreenTarget/Payroll/PayrollRulesPage";
+import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
+import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
+import GTAdjustmentDocsDetailsPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsDetailsPage";
 
 export const GreenTargetNavData: SidebarItem[] = [
   {
@@ -81,6 +85,25 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Invoice Details",
         path: "/invoices/:id",
         component: GreenTargetInvoiceDetailsPage,
+      },
+    ],
+  },
+  {
+    name: "Documents",
+    icon: IconFileText,
+    path: "/adjustment-docs",
+    component: GTAdjustmentDocsListPage,
+    subItems: [
+      {
+        name: "Create Adjustment Document",
+        path: "/adjustment-docs/new",
+        component: GTAdjustmentDocsFormPage,
+        showInPopover: true,
+      },
+      {
+        name: "Adjustment Document Details",
+        path: "/adjustment-docs/:id",
+        component: GTAdjustmentDocsDetailsPage,
       },
     ],
   },

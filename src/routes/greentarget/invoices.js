@@ -256,19 +256,25 @@ export default function (pool, defaultConfig) {
               c.id_type,
               c.additional_info,
               -- Aggregate rental information for multi-rental invoices
-              COALESCE(
-                json_agg(
-                  json_build_object(
-                    'rental_id', r.rental_id,
-                    'tong_no', r.tong_no,
-                    'driver', r.driver,
-                    'date_placed', r.date_placed,
-                    'date_picked', r.date_picked,
-                    'location_address', l.address,
-                    'location_phone_number', l.phone_number
-                  ) ORDER BY r.rental_id
-                ) FILTER (WHERE r.rental_id IS NOT NULL),
-                '[]'::json
+              (
+                SELECT COALESCE(
+                  json_agg(
+                    json_build_object(
+                      'rental_id', r2.rental_id,
+                      'tong_no', r2.tong_no,
+                      'driver', r2.driver,
+                      'date_placed', r2.date_placed,
+                      'date_picked', r2.date_picked,
+                      'location_address', l2.address,
+                      'location_phone_number', l2.phone_number
+                    ) ORDER BY r2.rental_id
+                  ),
+                  '[]'::json
+                )
+                FROM greentarget.invoice_rentals ir2
+                JOIN greentarget.rentals r2 ON ir2.rental_id = r2.rental_id
+                LEFT JOIN greentarget.locations l2 ON r2.location_id = l2.location_id
+                WHERE ir2.invoice_id = i.invoice_id
               ) as rental_details,
               -- Calculate paid amount correctly using non-cancelled payments
               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
@@ -286,12 +292,33 @@ export default function (pool, defaultConfig) {
                   AND con.status != 'cancelled'
                   AND con.consolidated_invoices ? i.invoice_number
                 LIMIT 1
-              ) as consolidated_part_of
+              ) as consolidated_part_of,
+              (
+                SELECT COALESCE(
+                  jsonb_agg(
+                    jsonb_build_object(
+                      'id', a.id,
+                      'type', a.type,
+                      'total_amount', a.total_amount,
+                      'status', a.status,
+                      'is_consolidated', a.is_consolidated,
+                      'paired_with_id', a.paired_with_id,
+                      'paired_status', p2.status,
+                      'refund_method', a.refund_method,
+                      'refund_reference', a.refund_reference,
+                      'reason', a.reason,
+                      'created_at', a.created_at
+                    )
+                    ORDER BY a.created_at DESC
+                  ),
+                  '[]'::jsonb
+                )
+                FROM greentarget.adjustment_documents a
+                LEFT JOIN greentarget.adjustment_documents p2 ON a.paired_with_id = p2.id
+                WHERE a.original_invoice_id = i.invoice_id
+              ) as adjustment_docs
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
-        LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
-        LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         -- LEFT JOIN ensures invoices without payments are included
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
         WHERE (i.is_consolidated IS NOT TRUE OR i.is_consolidated IS NULL)
@@ -366,25 +393,28 @@ export default function (pool, defaultConfig) {
 
       const result = await pool.query(query, queryParams);
 
-      // Calculate current balance for each invoice AFTER fetching
+      // Use the stored balance_due from the DB - it is maintained atomically
+      // by payments, cancellations, and adjustment documents (CN/DN/RN).
       const invoicesWithBalance = result.rows.map((invoice) => {
-        const totalAmount = parseFloat(invoice.total_amount || 0);
-        const amountPaid = parseFloat(invoice.amount_paid || 0); // Use the calculated amount_paid
-        const balance = totalAmount - amountPaid;
-
-        // Ensure balance_due in the returned object is consistent
-        // If the DB 'balance_due' isn't updated by payments, calculate it here.
-        // If it *is* updated by payments/cancellations, prefer the DB value unless status is cancelled.
-        let finalBalanceDue = invoice.status === "cancelled" ? 0 : balance;
-        // Clamp balance to zero if slightly negative due to float issues
-        finalBalanceDue = Math.max(0, parseFloat(finalBalanceDue.toFixed(2)));
+        const amountPaid = parseFloat(invoice.amount_paid || 0);
+        const finalBalanceDue =
+          invoice.status === "cancelled"
+            ? 0
+            : parseFloat(parseFloat(invoice.balance_due || 0).toFixed(2));
 
         return {
           ...invoice,
-          amount_paid: parseFloat(amountPaid.toFixed(2)), // Ensure correct format
-          current_balance: finalBalanceDue, // Use the calculated and clamped balance
-          balance_due: finalBalanceDue, // Keep balance_due consistent
+          amount_paid: parseFloat(amountPaid.toFixed(2)),
+          current_balance: finalBalanceDue,
+          balance_due: finalBalanceDue,
           consolidated_part_of: invoice.consolidated_part_of,
+          adjustmentDocs: (Array.isArray(invoice.adjustment_docs)
+            ? invoice.adjustment_docs
+            : []
+          ).map((doc) => ({
+            ...doc,
+            total_amount: parseFloat(doc.total_amount || 0),
+          })),
         };
       });
 
@@ -439,19 +469,25 @@ export default function (pool, defaultConfig) {
             c.id_number,
             c.id_type,
             -- Aggregate rental information for multi-rental invoices
-            COALESCE(
-              json_agg(
-                json_build_object(
-                  'rental_id', r.rental_id,
-                  'tong_no', r.tong_no,
-                  'date_placed', r.date_placed,
-                  'date_picked', r.date_picked,
-                  'driver', r.driver,
-                  'location_address', l.address,
-                  'location_phone_number', l.phone_number
-                ) ORDER BY r.rental_id
-              ) FILTER (WHERE r.rental_id IS NOT NULL),
-              '[]'::json
+            (
+              SELECT COALESCE(
+                json_agg(
+                  json_build_object(
+                    'rental_id', r2.rental_id,
+                    'tong_no', r2.tong_no,
+                    'date_placed', r2.date_placed,
+                    'date_picked', r2.date_picked,
+                    'driver', r2.driver,
+                    'location_address', l2.address,
+                    'location_phone_number', l2.phone_number
+                  ) ORDER BY r2.rental_id
+                ),
+                '[]'::json
+              )
+              FROM greentarget.invoice_rentals ir2
+              JOIN greentarget.rentals r2 ON ir2.rental_id = r2.rental_id
+              LEFT JOIN greentarget.locations l2 ON r2.location_id = l2.location_id
+              WHERE ir2.invoice_id = i.invoice_id
             ) as rental_details,
             -- Calculate paid amount correctly using non-cancelled payments
             COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
@@ -472,9 +508,6 @@ export default function (pool, defaultConfig) {
             ) as consolidated_part_of
       FROM greentarget.invoices i
       JOIN greentarget.customers c ON i.customer_id = c.customer_id
-      LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
-      LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
-      LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
       LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
       WHERE i.invoice_id IN (${placeholders})
       GROUP BY i.invoice_id, c.customer_id
@@ -482,16 +515,12 @@ export default function (pool, defaultConfig) {
 
       const result = await pool.query(invoiceQuery, validIds);
 
-      // Calculate current balance for each invoice
       const invoicesWithBalance = result.rows.map((invoice) => {
-        const totalAmount = parseFloat(invoice.total_amount || 0);
         const amountPaid = parseFloat(invoice.amount_paid || 0);
-        const balance = totalAmount - amountPaid;
-
-        // Ensure balance_due is consistent
-        let finalBalanceDue = invoice.status === "cancelled" ? 0 : balance;
-        // Clamp balance to zero if slightly negative due to float issues
-        finalBalanceDue = Math.max(0, parseFloat(finalBalanceDue.toFixed(2)));
+        const finalBalanceDue =
+          invoice.status === "cancelled"
+            ? 0
+            : Math.max(0, parseFloat(parseFloat(invoice.balance_due || 0).toFixed(2)));
 
         return {
           ...invoice,
@@ -531,19 +560,25 @@ export default function (pool, defaultConfig) {
               c.tin_number,
               c.id_number,
               -- Aggregate rental information for multi-rental invoices
-              COALESCE(
-                json_agg(
-                  json_build_object(
-                    'rental_id', r.rental_id,
-                    'tong_no', r.tong_no,
-                    'date_placed', r.date_placed,
-                    'date_picked', r.date_picked,
-                    'driver', r.driver,
-                    'location_address', l.address,
-                    'location_phone_number', l.phone_number
-                  ) ORDER BY r.rental_id
-                ) FILTER (WHERE r.rental_id IS NOT NULL),
-                '[]'::json
+              (
+                SELECT COALESCE(
+                  json_agg(
+                    json_build_object(
+                      'rental_id', r2.rental_id,
+                      'tong_no', r2.tong_no,
+                      'date_placed', r2.date_placed,
+                      'date_picked', r2.date_picked,
+                      'driver', r2.driver,
+                      'location_address', l2.address,
+                      'location_phone_number', l2.phone_number
+                    ) ORDER BY r2.rental_id
+                  ),
+                  '[]'::json
+                )
+                FROM greentarget.invoice_rentals ir2
+                JOIN greentarget.rentals r2 ON ir2.rental_id = r2.rental_id
+                LEFT JOIN greentarget.locations l2 ON r2.location_id = l2.location_id
+                WHERE ir2.invoice_id = i.invoice_id
               ) as rental_details,
               -- Calculate paid amount correctly using non-cancelled payments
               COALESCE(SUM(CASE WHEN p.status IS NULL OR p.status = 'active' THEN p.amount_paid ELSE 0 END) FILTER (WHERE p.payment_id IS NOT NULL), 0) as amount_paid,
@@ -561,12 +596,33 @@ export default function (pool, defaultConfig) {
                   AND con.status != 'cancelled'
                   AND con.consolidated_invoices ? i.invoice_number
                 LIMIT 1
-              ) as consolidated_part_of
+              ) as consolidated_part_of,
+              (
+                SELECT COALESCE(
+                  jsonb_agg(
+                    jsonb_build_object(
+                      'id', a.id,
+                      'type', a.type,
+                      'total_amount', a.total_amount,
+                      'status', a.status,
+                      'is_consolidated', a.is_consolidated,
+                      'paired_with_id', a.paired_with_id,
+                      'paired_status', p2.status,
+                      'refund_method', a.refund_method,
+                      'refund_reference', a.refund_reference,
+                      'reason', a.reason,
+                      'created_at', a.created_at
+                    )
+                    ORDER BY a.created_at DESC
+                  ),
+                  '[]'::jsonb
+                )
+                FROM greentarget.adjustment_documents a
+                LEFT JOIN greentarget.adjustment_documents p2 ON a.paired_with_id = p2.id
+                WHERE a.original_invoice_id = i.invoice_id
+              ) as adjustment_docs
         FROM greentarget.invoices i
         JOIN greentarget.customers c ON i.customer_id = c.customer_id
-        LEFT JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
-        LEFT JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
-        LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
         LEFT JOIN greentarget.payments p ON i.invoice_id = p.invoice_id
         WHERE i.invoice_id = $1
         GROUP BY i.invoice_id, c.customer_id
@@ -590,18 +646,24 @@ export default function (pool, defaultConfig) {
         numericInvoiceId,
       ]);
 
-      // Calculate current balance based on total_amount and calculated amount_paid
       const invoice = invoiceResult.rows[0];
-      const totalAmount = parseFloat(invoice.total_amount || 0);
-      const amountPaid = parseFloat(invoice.amount_paid || 0); // Use calculated amount_paid
-      let currentBalance = totalAmount - amountPaid;
-      currentBalance = Math.max(0, parseFloat(currentBalance.toFixed(2))); // Clamp >= 0
+      const amountPaid = parseFloat(invoice.amount_paid || 0);
+      const currentBalance =
+        invoice.status === "cancelled"
+          ? 0
+          : parseFloat(parseFloat(invoice.balance_due || 0).toFixed(2));
 
-      // Set balance_due consistently
       invoice.current_balance = currentBalance;
-      invoice.balance_due = invoice.status === "cancelled" ? 0 : currentBalance;
-      invoice.amount_paid = parseFloat(amountPaid.toFixed(2)); // Ensure format
+      invoice.balance_due = currentBalance;
+      invoice.amount_paid = parseFloat(amountPaid.toFixed(2));
       invoice.consolidated_part_of = invoice.consolidated_part_of;
+      invoice.adjustmentDocs = (Array.isArray(invoice.adjustment_docs)
+        ? invoice.adjustment_docs
+        : []
+      ).map((doc) => ({
+        ...doc,
+        total_amount: parseFloat(doc.total_amount || 0),
+      }));
 
       res.json({
         invoice: invoice,

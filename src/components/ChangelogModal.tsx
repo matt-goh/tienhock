@@ -19,6 +19,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-22",
+    ms: "Pembetulan: Butiran rental dalam Invois Green Target tidak lagi berganda apabila invois mempunyai lebih daripada satu rekod bayaran yang dibatalkan.",
+    en: "Fix: Green Target invoice rental details no longer duplicate when an invoice has more than one cancelled payment record.",
+  },
+  {
+    date: "2026-05-22",
+    ms: "Pembetulan: Penyerahan e-Invoice untuk Nota Kredit, Nota Debit dan Nota Refund Green Target kini menggunakan alamat lokasi invois sebagai alamat pembeli, supaya dokumen tidak gagal kerana alamat pembeli kosong.",
+    en: "Fix: Green Target Credit Note, Debit Note, and Refund Note e-Invoice submissions now use the invoice location address as the buyer address, preventing failures caused by a blank buyer address.",
+  },
+  {
+    date: "2026-05-22",
+    ms: "Halaman Senarai dan Butiran Invois Green Target kini memaparkan status pelarasan seperti Credited, Refunded dan Partially Refunded, menunjukkan jumlah dan baki asal yang dipotong apabila invois berubah, memaparkan Nota Refund dalam sejarah bayaran, dan menghalang tindakan yang bercanggah apabila dokumen pelarasan masih aktif.",
+    en: "Green Target Invoice List and Details now show adjustment statuses like Credited, Refunded, and Partially Refunded, strike through the original amount and balance when the invoice changes, show Refund Notes in payment history, and prevent conflicting actions while adjustment documents are still active.",
+  },
+  {
     date: "2026-05-21",
     ms: "Pembetulan: Cuti Tahunan yang ditambah dalam Log Bulanan kini dikira sebagai bayaran cuti biasa, bukan sebagai pendahuluan. Hanya rekod Cuti Tahunan daripada Others (Advance) dikira sebagai pendahuluan.",
     en: "Fix: Annual Leave added in Monthly Logs is now treated as regular leave pay, not an advance. Only Annual Leave records from Others (Advance) are treated as advances.",
@@ -30,18 +45,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-05-21",
-    ms: 'Rekod "Others (Advance)" dengan lokasi "23 - Cuti Tahunan" kini ditolak daripada baki Cuti Tahunan pekerja dalam Leave Management dan laporan PDF cuti. Setiap rekod dikira sebagai 1 hari, tanpa mengira jumlah RM.',
-    en: '"Others (Advance)" records under "23 - Cuti Tahunan" now deduct from the staff member\'s annual leave balance in Leave Management and leave report PDFs. Each record counts as 1 day, regardless of the RM amount.',
-  },
-  {
-    date: "2026-05-21",
     ms: "Log Bulanan kini boleh menetapkan jumlah bayaran cuti semasa menambah cuti, dengan RM65 sebagai jumlah asal. Jumlah cuti baharu dan yang sudah disimpan boleh diedit dan digunakan dalam pengiraan gaji.",
     en: "Monthly Logs can now set a leave payment amount when adding leave, with RM65 as the default. New and saved leave amounts can be edited and used in payroll calculations.",
-  },
-  {
-    date: "2026-05-20",
-    ms: 'Dokumen Pelarasan kini tersedia untuk Jelly Polly juga: Nota Kredit, Nota Debit dan Nota Refund boleh dikeluarkan untuk invois Jelly Polly dengan aliran kerja yang sama seperti Tien Hock, termasuk e-invois MyInvois (individu dan konsolidasi) menggunakan kredensial Jelly Polly.',
-    en: "Adjustment Documents now also available for Jelly Polly: Credit, Debit, and Refund Notes can be issued for Jelly Polly invoices with the same workflow as Tien Hock, including MyInvois e-invoice (individual and consolidated) using Jelly Polly's credentials.",
   },
   {
     date: "2026-05-20",

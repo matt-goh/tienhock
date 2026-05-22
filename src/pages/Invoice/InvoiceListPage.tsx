@@ -42,7 +42,6 @@ import {
   IconFileInvoice,
   IconUser,
   IconFileExport,
-  IconFileText,
 } from "@tabler/icons-react";
 import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 // Import the specific utilities needed
@@ -1769,6 +1768,7 @@ const InvoiceListPage: React.FC = () => {
                   aria-label="Cancel Selected Invoices"
                   title="Cancel"
                 >
+                  Cancel
                 </Button>
                 {hasCancelledUnsynced() && (
                   <Button
@@ -1858,7 +1858,7 @@ const InvoiceListPage: React.FC = () => {
               title="Consolidated Invoice"
               aria-label="Consolidated Invoice"
             >
-              Consolidated
+              Consolidate
             </Button>
             <Button
               onClick={handleRefresh}

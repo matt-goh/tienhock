@@ -430,7 +430,7 @@ export const TienHockNavData: SidebarItem[] = [
         component: PaymentPage,
       },
       {
-        name: "Adjustment Documents",
+        name: "Adjustment Docs",
         path: "/sales/adjustment-docs",
         component: AdjustmentDocsListPage,
         subItems: [

@@ -12,6 +12,7 @@ import {
   IconSend,
   IconRotateClockwise,
   IconRefresh,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
@@ -32,7 +33,7 @@ import {
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
-const INVOICE_UI_BASE = "/greentarget/invoice";
+const INVOICE_UI_BASE = "/greentarget/invoices";
 
 interface GTAdjDoc {
   id: string;
@@ -90,6 +91,8 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const [doc, setDoc] = useState<GTAdjDoc | null>(null);
   const [pairedDoc, setPairedDoc] = useState<GTAdjDoc | null>(null);
+  const [originalInvoiceEinvoiceStatus, setOriginalInvoiceEinvoiceStatus] =
+    useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -106,17 +109,19 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
     try {
       const data: GTAdjDoc = await api.get(`${API_BASE}/${id}`);
       setDoc(data);
-      if (data.paired_with_id) {
-        try {
-          const paired: GTAdjDoc = await api.get(
-            `${API_BASE}/${data.paired_with_id}`
-          );
-          setPairedDoc(paired);
-        } catch {
-          setPairedDoc(null);
-        }
-      } else {
-        setPairedDoc(null);
+      const [pairedResult, invoiceResult] = await Promise.allSettled([
+        data.paired_with_id
+          ? api.get(`${API_BASE}/${data.paired_with_id}`)
+          : Promise.resolve(null),
+        api.get(`/greentarget/api/invoices/${data.original_invoice_id}`),
+      ]);
+      setPairedDoc(
+        pairedResult.status === "fulfilled" ? pairedResult.value : null
+      );
+      if (invoiceResult.status === "fulfilled" && invoiceResult.value) {
+        setOriginalInvoiceEinvoiceStatus(
+          invoiceResult.value.einvoice_status ?? null
+        );
       }
     } catch (error: any) {
       toast.error(error?.message || "Failed to load document");
@@ -201,10 +206,14 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
       const response = await api.post(`${API_BASE}/${doc.id}/cancel-einvoice`, {
         reason: einvoiceCancelReason || null,
       });
-      toast.success(response.message || "E-invoice cancelled", {
-        id: toastId,
-        duration: 6000,
-      });
+      toast.success(
+        response.message ||
+          "E-invoice cancelled. Use Cancel Document next to reverse the adjustment.",
+        {
+          id: toastId,
+          duration: 6000,
+        }
+      );
       setShowCancelEinvoiceDialog(false);
       setEinvoiceCancelReason("");
       fetchDoc();
@@ -248,9 +257,75 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
     doc.type === "credit_note" &&
     doc.status === "active" &&
     pairedDoc?.status !== "active";
+  const requiresEinvoiceCancellationBeforeDocumentCancel: boolean =
+    doc.status === "active" && doc.einvoice_status === "valid";
 
   const originalInvoicePath = `${INVOICE_UI_BASE}/${doc.original_invoice_id}`;
   const handleOpenOriginalInvoice = () => navigate(originalInvoicePath);
+  const eInvoicePortalHref =
+    doc.uuid && doc.long_id
+      ? `https://myinvois.hasil.gov.my/${doc.uuid}/share/${doc.long_id}`
+      : null;
+  const eInvoiceCardClassName = `group block rounded-lg border border-default-200 bg-default-50 p-4 transition-colors dark:border-gray-700 dark:bg-gray-900/30 ${
+    eInvoicePortalHref
+      ? "cursor-pointer hover:border-sky-300 hover:bg-sky-50/70 dark:hover:border-sky-400/40 dark:hover:bg-sky-400/10"
+      : ""
+  }`;
+  const eInvoiceCardContent = (
+    <>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100">
+          e-Invoice
+        </h3>
+        {eInvoicePortalHref && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 transition-colors group-hover:text-sky-700 dark:text-sky-300 dark:group-hover:text-sky-200">
+            MyInvois
+            <IconExternalLink size={13} stroke={2} />
+          </span>
+        )}
+      </div>
+      <dl className="text-sm space-y-1">
+        <div className="flex justify-between">
+          <dt className="text-default-500 dark:text-gray-400">Status</dt>
+          <dd>
+            <AdjustmentDocStatusBadge
+              status={doc.status}
+              einvoiceStatus={doc.einvoice_status}
+            />
+          </dd>
+        </div>
+        {doc.uuid && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-default-500 dark:text-gray-400">UUID</dt>
+            <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
+              {doc.uuid}
+            </dd>
+          </div>
+        )}
+        {doc.long_id && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-default-500 dark:text-gray-400">Long ID</dt>
+            <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
+              {doc.long_id}
+            </dd>
+          </div>
+        )}
+        {doc.datetime_validated && (
+          <div className="flex justify-between">
+            <dt className="text-default-500 dark:text-gray-400">Validated</dt>
+            <dd className="text-default-900 dark:text-gray-100">
+              {new Date(doc.datetime_validated).toLocaleString()}
+            </dd>
+          </div>
+        )}
+        {!doc.einvoice_status && (
+          <div className="text-xs text-default-500 dark:text-gray-400 pt-2">
+            Not yet submitted to MyInvois. Use the action bar to submit.
+          </div>
+        )}
+      </dl>
+    </>
+  );
 
   return (
     <div className="space-y-4">
@@ -269,31 +344,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
               />
             </h1>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {doc.status === "active" && !doc.einvoice_status && (
-              <Button
-                onClick={handleSubmitEinvoice}
-                icon={IconSend}
-                variant="outline"
-                color="sky"
-                size="md"
-                disabled={isSubmittingEinvoice}
-                title="Submit this document to MyInvois"
-              >
-                {isSubmittingEinvoice ? "Submitting..." : "Submit e-Invoice"}
-              </Button>
-            )}
-            {doc.status === "active" && doc.einvoice_status === "invalid" && (
-              <>
-                <Button
-                  onClick={handleClearStatus}
-                  icon={IconRefresh}
-                  variant="outline"
-                  size="md"
-                  title="Clear invalid status to retry"
-                >
-                  Clear & Retry
-                </Button>
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <div className="flex items-center gap-2 flex-wrap md:justify-end">
+              {doc.status === "active" && !doc.einvoice_status && (
                 <Button
                   onClick={handleSubmitEinvoice}
                   icon={IconSend}
@@ -301,70 +354,108 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   color="sky"
                   size="md"
                   disabled={isSubmittingEinvoice}
+                  title="Submit this document to MyInvois"
                 >
-                  {isSubmittingEinvoice ? "Submitting..." : "Re-submit"}
+                  {isSubmittingEinvoice ? "Submitting..." : "Submit e-Invoice"}
                 </Button>
-              </>
-            )}
-            {doc.status === "active" && doc.einvoice_status === "pending" && (
-              <Button
-                onClick={handleUpdateStatus}
-                icon={IconRotateClockwise}
-                variant="outline"
-                size="md"
-                disabled={isUpdatingStatus}
-              >
-                {isUpdatingStatus ? "Checking..." : "Update Status"}
-              </Button>
-            )}
-            {doc.status === "active" &&
-              (doc.einvoice_status === "valid" ||
-                doc.einvoice_status === "invalid") && (
+              )}
+              {doc.status === "active" && doc.einvoice_status === "invalid" && (
+                <>
+                  <Button
+                    onClick={handleClearStatus}
+                    icon={IconRefresh}
+                    variant="outline"
+                    size="md"
+                    title="Clear invalid status to retry"
+                  >
+                    Clear & Retry
+                  </Button>
+                  <Button
+                    onClick={handleSubmitEinvoice}
+                    icon={IconSend}
+                    variant="outline"
+                    color="sky"
+                    size="md"
+                    disabled={isSubmittingEinvoice}
+                  >
+                    {isSubmittingEinvoice ? "Submitting..." : "Re-submit"}
+                  </Button>
+                </>
+              )}
+              {doc.status === "active" && doc.einvoice_status === "pending" && (
                 <Button
-                  onClick={() => setShowCancelEinvoiceDialog(true)}
+                  onClick={handleUpdateStatus}
+                  icon={IconRotateClockwise}
+                  variant="outline"
+                  size="md"
+                  disabled={isUpdatingStatus}
+                >
+                  {isUpdatingStatus ? "Checking..." : "Update Status"}
+                </Button>
+              )}
+              {doc.status === "active" &&
+                (doc.einvoice_status === "valid" ||
+                  doc.einvoice_status === "invalid") && (
+                  <Button
+                    onClick={() => setShowCancelEinvoiceDialog(true)}
+                    icon={IconBan}
+                    variant="outline"
+                    color="rose"
+                    size="md"
+                    disabled={isCancellingEinvoice}
+                    title="Cancel only the MyInvois e-Invoice first"
+                  >
+                    Cancel e-Invoice Only
+                  </Button>
+                )}
+
+              {canCancel && (
+                <Button
+                  onClick={() => setShowCancelDialog(true)}
                   icon={IconBan}
                   variant="outline"
                   color="rose"
                   size="md"
-                  disabled={isCancellingEinvoice}
-                  title="Cancel the e-invoice at MyInvois"
+                  disabled={cnBlockedByPaired}
+                  title={
+                    cnBlockedByPaired
+                      ? `Cancel paired Refund Note ${pairedDoc?.id} first`
+                      : "Cancel this document"
+                  }
                 >
-                  Cancel e-Invoice
+                  Cancel Document
                 </Button>
               )}
-
-            {canCancel && (
-              <Button
-                onClick={() => setShowCancelDialog(true)}
-                icon={IconBan}
-                variant="outline"
-                color="rose"
-                size="md"
-                disabled={cnBlockedByPaired}
-                title={
-                  cnBlockedByPaired
-                    ? `Cancel paired Refund Note ${pairedDoc?.id} first`
-                    : "Cancel this document"
-                }
-              >
-                Cancel Document
-              </Button>
-            )}
-            {canIssuePairedRefund && (
-              <Button
-                onClick={() =>
-                  navigate(
-                    `${UI_BASE}/new?type=refund&invoiceId=${doc.original_invoice_id}&creditNoteId=${doc.id}`
-                  )
-                }
-                icon={IconRotate2}
-                variant="outline"
-                color="sky"
-                size="md"
-                title={`Create a new Refund Note for Credit Note ${doc.id}`}
-              >
-                {pairedDoc ? "Reissue Refund Note" : "Issue Refund Note"}
-              </Button>
+              {canIssuePairedRefund && (
+                <Button
+                  onClick={() =>
+                    navigate(
+                      `${UI_BASE}/new?type=refund&invoiceId=${doc.original_invoice_id}&creditNoteId=${doc.id}`
+                    )
+                  }
+                  icon={IconRotate2}
+                  variant="outline"
+                  color="sky"
+                  size="md"
+                  title={`Create a new Refund Note for Credit Note ${doc.id}`}
+                >
+                  {pairedDoc ? "Reissue Refund Note" : "Issue Refund Note"}
+                </Button>
+              )}
+            </div>
+            {requiresEinvoiceCancellationBeforeDocumentCancel && (
+              <div className="flex max-w-xl items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200">
+                <IconInfoCircle
+                  size={15}
+                  stroke={2}
+                  className="mt-0.5 flex-shrink-0"
+                />
+                <span>
+                  To reverse this document, cancel the e-Invoice first. After
+                  MyInvois marks it cancelled, use Cancel Document to reverse
+                  the invoice balance.
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -380,7 +471,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
           className="p-4 border-b border-default-200 dark:border-gray-700 cursor-pointer transition hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500 dark:hover:bg-gray-700/50"
           title="Open invoice"
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Original Invoice
@@ -419,8 +510,24 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                 {formatCurrency(doc.total_amount)}
               </div>
             </div>
+            <div>
+              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
+                Invoice e-Status
+              </div>
+              <div className="mt-0.5">
+                <AdjustmentDocStatusBadge
+                  status="active"
+                  einvoiceStatus={
+                    originalInvoiceEinvoiceStatus as
+                      | import("../../../types/types").EInvoiceStatus
+                      | null
+                      | undefined
+                  }
+                />
+              </div>
+            </div>
             {doc.references_consolidated_id && (
-              <div className="col-span-2 md:col-span-4">
+              <div className="col-span-2 md:col-span-5">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                   Referenced Consolidated Invoice
                 </div>
@@ -430,7 +537,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
               </div>
             )}
             {doc.reason && (
-              <div className="col-span-2 md:col-span-4">
+              <div className="col-span-2 md:col-span-5">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                   Reason
                 </div>
@@ -569,51 +676,19 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
 
         {/* Totals + e-invoice */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-default-50 dark:bg-gray-900/30 rounded-lg p-4 border border-default-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
-              e-Invoice
-            </h3>
-            <dl className="text-sm space-y-1">
-              <div className="flex justify-between">
-                <dt className="text-default-500 dark:text-gray-400">Status</dt>
-                <dd>
-                  <AdjustmentDocStatusBadge
-                    status={doc.status}
-                    einvoiceStatus={doc.einvoice_status}
-                  />
-                </dd>
-              </div>
-              {doc.uuid && (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-default-500 dark:text-gray-400">UUID</dt>
-                  <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
-                    {doc.uuid}
-                  </dd>
-                </div>
-              )}
-              {doc.long_id && (
-                <div className="flex justify-between gap-2">
-                  <dt className="text-default-500 dark:text-gray-400">Long ID</dt>
-                  <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
-                    {doc.long_id}
-                  </dd>
-                </div>
-              )}
-              {doc.datetime_validated && (
-                <div className="flex justify-between">
-                  <dt className="text-default-500 dark:text-gray-400">Validated</dt>
-                  <dd className="text-default-900 dark:text-gray-100">
-                    {new Date(doc.datetime_validated).toLocaleString()}
-                  </dd>
-                </div>
-              )}
-              {!doc.einvoice_status && (
-                <div className="text-xs text-default-500 dark:text-gray-400 pt-2">
-                  Not yet submitted to MyInvois. Use the action bar to submit.
-                </div>
-              )}
-            </dl>
-          </div>
+          {eInvoicePortalHref ? (
+            <a
+              href={eInvoicePortalHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={eInvoiceCardClassName}
+              title="View in MyInvois Portal"
+            >
+              {eInvoiceCardContent}
+            </a>
+          ) : (
+            <div className={eInvoiceCardClassName}>{eInvoiceCardContent}</div>
+          )}
 
           <div className="bg-default-50 dark:bg-gray-900/30 rounded-lg p-4 border border-default-200 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
@@ -687,10 +762,10 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
           }
         }}
         onConfirm={handleCancelEinvoice}
-        title={`Cancel e-invoice for ${doc.id}?`}
-        message="This sets the MyInvois document state to cancelled. The local document balance impact stays intact — cancel the document separately if you want to reverse it."
+        title={`Cancel e-Invoice only for ${doc.id}?`}
+        message="This only cancels the MyInvois e-Invoice. The adjustment document will remain active and the invoice balance will not be reversed yet. After MyInvois marks it cancelled, use Cancel Document if you also want to reverse the adjustment."
         confirmButtonText={
-          isCancellingEinvoice ? "Cancelling..." : "Cancel e-Invoice"
+          isCancellingEinvoice ? "Cancelling..." : "Cancel e-Invoice Only"
         }
         variant="danger"
       />

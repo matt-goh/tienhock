@@ -332,7 +332,7 @@ const DailyLogListPage: React.FC<DailyLogListPageProps> = ({ jobType }) => {
         </div>
       ) : workLogs.length > 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
-          <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
+          <div>
             <table className="min-w-full table-fixed">
               <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                 <tr>

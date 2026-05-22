@@ -1409,9 +1409,20 @@ export default function (pool, myInvoisGTConfig) {
       }
       const custResult = await client.query(
         `SELECT customer_id, name, tin_number, id_type, id_number,
-                phone_number, email, state
+                phone_number, email, state,
+                (
+                  SELECT l.address
+                    FROM greentarget.invoice_rentals ir
+                    JOIN greentarget.rentals r ON ir.rental_id = r.rental_id
+                    JOIN greentarget.locations l ON r.location_id = l.location_id
+                   WHERE ir.invoice_id = $2
+                     AND l.address IS NOT NULL
+                     AND BTRIM(l.address) <> ''
+                   ORDER BY r.rental_id
+                   LIMIT 1
+                ) AS location_address
            FROM greentarget.customers WHERE customer_id = $1`,
-        [doc.customer_id]
+        [doc.customer_id, doc.original_invoice_id]
       );
       if (custResult.rows.length === 0) {
         await client.query("ROLLBACK");
@@ -1420,7 +1431,10 @@ export default function (pool, myInvoisGTConfig) {
           message: `Customer ${doc.customer_id} not found. Cannot build e-invoice.`,
         });
       }
-      const customer = custResult.rows[0];
+      const customer = {
+        ...custResult.rows[0],
+        address: custResult.rows[0].location_address || "Tong Location",
+      };
       if (!customer.tin_number || !customer.id_number) {
         await client.query("ROLLBACK");
         txActive = false;
