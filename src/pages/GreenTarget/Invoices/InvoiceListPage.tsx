@@ -29,6 +29,7 @@ import {
   IconCircleCheck,
   IconUser,
   IconTrash,
+  IconFileText,
 } from "@tabler/icons-react";
 import {
   Dialog,
@@ -41,7 +42,11 @@ import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import { greenTargetApi } from "../../../routes/greentarget/api";
-import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
+import {
+  EInvoiceSubmissionResult,
+  InvoiceGT,
+  GTAdjDocSummary,
+} from "../../../types/types";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import GTConsolidatedInvoiceModal from "../../../components/GreenTarget/GTConsolidatedInvoiceModal";
 import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
@@ -74,6 +79,162 @@ interface InvoiceFilters {
 }
 
 const STORAGE_KEY = "greentarget_invoice_filters";
+
+const MONEY_TOLERANCE: number = 0.005;
+
+type GTDisplayStatus =
+  | "cancelled"
+  | "paid"
+  | "refunded"
+  | "partially_refunded"
+  | "credited"
+  | "credit_balance"
+  | "overdue"
+  | "unpaid";
+
+interface GTStatusStyle {
+  bannerBg: string;
+  border: string;
+  label: string;
+  balanceText: string;
+  balanceBg: string;
+}
+
+const GT_STATUS_STYLES: Record<GTDisplayStatus, GTStatusStyle> = {
+  paid: {
+    bannerBg: "bg-green-500",
+    border: "border-green-400 dark:border-green-500",
+    label: "Paid",
+    balanceText: "text-green-700 dark:text-green-400",
+    balanceBg: "bg-green-50 dark:bg-green-900/30 border-green-100 dark:border-green-800",
+  },
+  refunded: {
+    bannerBg: "bg-green-500",
+    border: "border-green-400 dark:border-green-500",
+    label: "Refunded",
+    balanceText: "text-green-700 dark:text-green-400",
+    balanceBg: "bg-green-50 dark:bg-green-900/30 border-green-100 dark:border-green-800",
+  },
+  partially_refunded: {
+    bannerBg: "bg-teal-500",
+    border: "border-teal-400 dark:border-teal-500",
+    label: "Partially Refunded",
+    balanceText: "text-teal-700 dark:text-teal-400",
+    balanceBg: "bg-teal-50 dark:bg-teal-900/30 border-teal-100 dark:border-teal-800",
+  },
+  credited: {
+    bannerBg: "bg-indigo-500",
+    border: "border-indigo-400 dark:border-indigo-500",
+    label: "Credited",
+    balanceText: "text-indigo-700 dark:text-indigo-400",
+    balanceBg: "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-800",
+  },
+  credit_balance: {
+    bannerBg: "bg-indigo-500",
+    border: "border-indigo-400 dark:border-indigo-500",
+    label: "Credit Balance",
+    balanceText: "text-indigo-700 dark:text-indigo-400",
+    balanceBg: "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-100 dark:border-indigo-800",
+  },
+  overdue: {
+    bannerBg: "bg-red-500",
+    border: "border-red-400 dark:border-red-500",
+    label: "Overdue",
+    balanceText: "text-red-700 dark:text-red-400",
+    balanceBg: "bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800",
+  },
+  cancelled: {
+    bannerBg: "bg-default-500 dark:bg-gray-600",
+    border: "border-default-400 dark:border-gray-600",
+    label: "Cancelled",
+    balanceText: "text-default-700 dark:text-gray-300",
+    balanceBg: "bg-default-50 dark:bg-gray-800 border-default-100 dark:border-gray-700",
+  },
+  unpaid: {
+    bannerBg: "bg-amber-500",
+    border: "border-amber-400 dark:border-amber-500",
+    label: "Unpaid",
+    balanceText: "text-amber-700 dark:text-amber-400",
+    balanceBg: "bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800",
+  },
+};
+
+function getGTDisplayStatus(invoice: InvoiceGT): GTDisplayStatus {
+  if (invoice.status === "cancelled") return "cancelled";
+  const docs: GTAdjDocSummary[] = (invoice.adjustmentDocs || []).filter(
+    (doc: GTAdjDocSummary) => doc.status === "active" && !doc.is_consolidated
+  );
+  const pairedRefundTotal: number = docs
+    .filter(
+      (doc: GTAdjDocSummary) =>
+        doc.type === "refund_note" &&
+        !!doc.paired_with_id &&
+        doc.paired_status === "active"
+    )
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const invoiceTotal: number = Number(invoice.total_amount || 0);
+  const balanceDue: number = Number(invoice.balance_due || 0);
+  const hasActiveUnrefundedCN: boolean = docs.some(
+    (doc: GTAdjDocSummary) =>
+      doc.type === "credit_note" && doc.paired_status !== "active"
+  );
+  const hasActivePairedRN: boolean = docs.some(
+    (doc: GTAdjDocSummary) =>
+      doc.type === "refund_note" &&
+      !!doc.paired_with_id &&
+      doc.paired_status === "active"
+  );
+  if (hasActivePairedRN && balanceDue <= MONEY_TOLERANCE) {
+    return pairedRefundTotal >= invoiceTotal - MONEY_TOLERANCE
+      ? "refunded"
+      : "partially_refunded";
+  }
+  if (hasActiveUnrefundedCN) {
+    return balanceDue < -MONEY_TOLERANCE ? "credit_balance" : "credited";
+  }
+  if (balanceDue <= MONEY_TOLERANCE) return "paid";
+  if (invoice.status === "overdue") return "overdue";
+  return "unpaid";
+}
+
+function getGTBalanceAdjustment(invoice: InvoiceGT): {
+  originalBalanceDue: number;
+  hasAdjustment: boolean;
+} {
+  const docs: GTAdjDocSummary[] = (invoice.adjustmentDocs || []).filter(
+    (doc: GTAdjDocSummary) => doc.status === "active" && !doc.is_consolidated
+  );
+  const debitTotal: number = docs
+    .filter((doc: GTAdjDocSummary) => doc.type === "debit_note")
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const creditTotal: number = docs
+    .filter((doc: GTAdjDocSummary) => doc.type === "credit_note")
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const pairedRefundTotal: number = docs
+    .filter(
+      (doc: GTAdjDocSummary) =>
+        doc.type === "refund_note" &&
+        !!doc.paired_with_id &&
+        doc.paired_status === "active"
+    )
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const adjustedBalanceDue: number = Number(invoice.balance_due || 0);
+
+  return {
+    originalBalanceDue: parseFloat(
+      (
+        adjustedBalanceDue -
+        debitTotal +
+        creditTotal -
+        pairedRefundTotal
+      ).toFixed(2)
+    ),
+    hasAdjustment:
+      debitTotal > 0 ||
+      creditTotal > 0 ||
+      pairedRefundTotal > 0,
+  };
+}
 
 const InvoiceCard = ({
   invoice,
@@ -181,8 +342,23 @@ const InvoiceCard = ({
     );
   };
 
-  const isPaid = invoice.current_balance <= 0;
-  const isCancelled = invoice.status === "cancelled";
+  const displayStatus: GTDisplayStatus = getGTDisplayStatus(invoice);
+  const statusStyle: GTStatusStyle = GT_STATUS_STYLES[displayStatus];
+  const balanceAdjustment: ReturnType<typeof getGTBalanceAdjustment> =
+    getGTBalanceAdjustment(invoice);
+  const isCancelled: boolean = displayStatus === "cancelled";
+  const canRecordPayment: boolean =
+    !isCancelled && Number(invoice.current_balance || 0) > MONEY_TOLERANCE;
+  const hasAdjustedBalanceDisplay: boolean =
+    balanceAdjustment.hasAdjustment &&
+    !isCancelled &&
+    Math.abs(
+      balanceAdjustment.originalBalanceDue - Number(invoice.current_balance || 0)
+    ) > MONEY_TOLERANCE;
+  const balanceLabel: string =
+    isCancelled || Number(invoice.current_balance || 0) <= MONEY_TOLERANCE
+      ? statusStyle.label
+      : formatCurrency(invoice.current_balance);
 
   return (
     <div
@@ -192,30 +368,14 @@ const InvoiceCard = ({
         ? "shadow-md ring-2 ring-sky-400 ring-offset-1 dark:ring-offset-gray-900" // Clear visual indication when selected
         : "shadow-sm hover:shadow-md"
     }
-    ${
-      isCancelled
-        ? "border-default-400 dark:border-gray-600"
-        : isPaid
-        ? "border-green-400 dark:border-green-500"
-        : invoice.status === "overdue"
-        ? "border-red-400 dark:border-red-500"
-        : "border-amber-400 dark:border-amber-500"
-    }`}
+    ${statusStyle.border}`}
       onMouseEnter={() => setIsCardHovered(true)}
       onMouseLeave={() => setIsCardHovered(false)}
       onClick={handleCardSelection}
     >
       {/* Status banner */}
       <div
-        className={`w-full py-2 px-4 text-sm font-medium text-white ${
-          isCancelled
-            ? "bg-default-500 dark:bg-gray-600"
-            : isPaid
-            ? "bg-green-500"
-            : invoice.status === "overdue"
-            ? "bg-red-500"
-            : "bg-amber-500"
-        }`}
+        className={`w-full py-2 px-4 text-sm font-medium text-white ${statusStyle.bannerBg}`}
       >
         <div className="flex justify-between items-center">
           <span>{invoice.invoice_number}</span>
@@ -227,14 +387,8 @@ const InvoiceCard = ({
             }}
             className="flex items-center justify-center gap-1.5"
           >
-            <span className="text-xs py-0.5 px-2 bg-white dark:bg-gray-800/20 rounded-full">
-              {isCancelled
-                ? "Cancelled"
-                : isPaid
-                ? "Paid"
-                : invoice.status === "overdue"
-                ? "Overdue"
-                : "Unpaid"}
+            <span className="text-xs py-0.5 px-2 bg-white/20 dark:bg-gray-800/20 rounded-full">
+              {statusStyle.label}
             </span>
             {isSelected ? (
               <IconSquareCheckFilled
@@ -528,38 +682,33 @@ const InvoiceCard = ({
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-default-50 dark:bg-gray-900/50 p-2 border border-default-100 dark:border-gray-700 rounded-md">
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Date Issued</p>
-            <p className="font-medium text-default-900 dark:text-gray-100">{formatDate(invoice.date_issued)}</p>
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">
+              Date Issued
+            </p>
+            <p className="font-medium text-default-900 dark:text-gray-100">
+              {formatDate(invoice.date_issued)}
+            </p>
           </div>
           <div
-            className={`p-2 border rounded-md ${
-              isCancelled
-                ? "bg-default-50 dark:bg-gray-800 border-default-100 dark:border-gray-700"
-                : isPaid
-                ? "bg-green-50 dark:bg-green-900/30 border-green-100 dark:border-green-800"
-                : invoice.status === "overdue"
-                ? "bg-red-50 dark:bg-red-900/30 border-red-100 dark:border-red-800"
-                : "bg-amber-50 dark:bg-amber-900/30 border-amber-100 dark:border-amber-800"
-            }`}
+            className={`p-2 border rounded-md ${statusStyle.balanceBg}`}
           >
-            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">Balance</p>
-            <p
-              className={`font-medium ${
-                isCancelled
-                  ? "text-default-700 dark:text-gray-300"
-                  : isPaid
-                  ? "text-green-700 dark:text-green-400"
-                  : invoice.status === "overdue"
-                  ? "text-red-700 dark:text-red-400"
-                  : "text-amber-700 dark:text-amber-400"
-              }`}
-            >
-              {invoice.status === "cancelled"
-                ? "Cancelled"
-                : invoice.current_balance === 0
-                ? "Paid"
-                : formatCurrency(invoice.current_balance)}
+            <p className="text-xs text-default-500 dark:text-gray-400 mb-1">
+              Balance
             </p>
+            {hasAdjustedBalanceDisplay ? (
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-sm text-default-400 dark:text-gray-500 line-through">
+                  {formatCurrency(balanceAdjustment.originalBalanceDue)}
+                </span>
+                <span className={`font-medium ${statusStyle.balanceText}`}>
+                  {balanceLabel}
+                </span>
+              </div>
+            ) : (
+              <p className={`font-medium ${statusStyle.balanceText}`}>
+                {balanceLabel}
+              </p>
+            )}
           </div>
         </div>
 
@@ -645,7 +794,7 @@ const InvoiceCard = ({
             <IconFileDownload size={18} stroke={1.5} />
           </button>
 
-          {!isPaid && (
+          {canRecordPayment && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1746,7 +1895,7 @@ const InvoiceListPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-clip">
       {/* Revised Header Layout - 2 rows total on desktop */}
       <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 md:-mx-6 md:px-6 pt-1 -mt-1">
         {/* Row 1: Header with title, filters, search and action buttons */}
@@ -2010,6 +2159,15 @@ const InvoiceListPage: React.FC = () => {
               Statement
             </Button>
             <Button
+              onClick={() => navigate("/greentarget/adjustment-docs")}
+              icon={IconFileText}
+              variant="outline"
+              size="sm"
+              title="Open Adjustment Documents (Credit / Debit / Refund Notes)"
+            >
+              Documents
+            </Button>
+            <Button
               onClick={() => fetchInvoices()}
               icon={IconRefresh}
               variant="outline"
@@ -2030,8 +2188,9 @@ const InvoiceListPage: React.FC = () => {
             </Button>
           </div>
         </div>
+      </div>
 
-        {filteredInvoices.length === 0 ? (
+      {filteredInvoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-default-200 dark:border-gray-700">
             <IconFileInvoice
               size={64}
@@ -2048,7 +2207,7 @@ const InvoiceListPage: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
             {paginatedInvoices.map((invoice) => (
               <InvoiceCard
                 key={invoice.invoice_id}
@@ -2068,7 +2227,6 @@ const InvoiceListPage: React.FC = () => {
             ))}
           </div>
         )}
-      </div>
 
       {filteredInvoices.length > 0 && (
         <div className="mt-6 flex justify-between items-center text-default-700 dark:text-gray-200">

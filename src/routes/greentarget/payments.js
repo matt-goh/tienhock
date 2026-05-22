@@ -1,6 +1,20 @@
 // src/routes/greentarget/payments.js
 import { Router } from "express";
 
+const fetchActiveAdjustmentForInvoice = async (client, invoiceId) => {
+  const result = await client.query(
+    `SELECT id, type
+       FROM greentarget.adjustment_documents
+      WHERE original_invoice_id = $1
+        AND status = 'active'
+        AND COALESCE(is_consolidated, false) = false
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [invoiceId]
+  );
+  return result.rows[0] || null;
+};
+
 export default function (pool) {
   const router = Router();
 
@@ -497,7 +511,23 @@ export default function (pool) {
       }
 
       const payment = paymentResult.rows[0];
-      const { invoice_id, amount_paid } = payment;
+      const { invoice_id, amount_paid, invoice_status } = payment;
+
+      if (invoice_status === "cancelled") {
+        throw new Error(
+          `Cannot cancel payment for a cancelled invoice (${invoice_id}).`
+        );
+      }
+
+      const existingAdjustment = await fetchActiveAdjustmentForInvoice(
+        client,
+        invoice_id
+      );
+      if (existingAdjustment) {
+        throw new Error(
+          `Cannot cancel payment for invoice ${invoice_id} because active adjustment document ${existingAdjustment.id} exists. Cancel the adjustment document first.`
+        );
+      }
 
       // Set payment status to cancelled
       const updatePaymentQuery = `
@@ -544,8 +574,12 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error cancelling payment:", error);
-      res.status(500).json({
-        message: "Error cancelling payment",
+      const isUserError =
+        typeof error.message === "string" &&
+        (error.message.startsWith("Cannot cancel payment") ||
+          error.message.includes("active adjustment document"));
+      res.status(isUserError ? 400 : 500).json({
+        message: isUserError ? error.message : "Error cancelling payment",
         error: error.message,
       });
     } finally {

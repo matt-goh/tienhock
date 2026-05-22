@@ -187,7 +187,7 @@ const CustomerListPage = () => {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[calc(100vh-200px)] overflow-y-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead className="bg-default-50 dark:bg-gray-900/50 sticky top-0 z-10">
                 <tr>
@@ -211,63 +211,59 @@ const CustomerListPage = () => {
                   </th>
                 </tr>
               </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
+                {filteredCustomers.map((customer) => (
+                  <tr
+                    key={customer.customer_id}
+                    onClick={() =>
+                      navigate(`/greentarget/customers/${customer.customer_id}`)
+                    }
+                    className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    <td className="px-6 py-2 whitespace-nowrap">
+                      <div className="font-medium text-default-900 dark:text-gray-100">
+                        {customer.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
+                      {customer.customer_id}
+                    </td>
+                    <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
+                      {customer.phone_number || "N/A"}
+                    </td>
+                    <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
+                      {formatDate(customer.last_activity_date)}
+                    </td>
+                    <td className="px-6 py-2 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          customer.has_active_rental
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {customer.has_active_rental ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-2 whitespace-nowrap text-right font-medium">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteDialog(true);
+                          setCustomerToDelete(customer);
+                        }}
+                        variant="outline"
+                        color="rose"
+                        size="sm"
+                        icon={IconTrash}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
-            <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
-              <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                  {filteredCustomers.map((customer) => (
-                    <tr
-                      key={customer.customer_id}
-                      onClick={() =>
-                        navigate(`/greentarget/customers/${customer.customer_id}`)
-                      }
-                      className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer"
-                    >
-                      <td className="px-6 py-2 whitespace-nowrap">
-                        <div className="font-medium text-default-900 dark:text-gray-100">
-                          {customer.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
-                        {customer.customer_id}
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
-                        {customer.phone_number || "N/A"}
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap text-default-600 dark:text-gray-300">
-                        {formatDate(customer.last_activity_date)}
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full font-medium ${
-                            customer.has_active_rental
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                          }`}
-                        >
-                          {customer.has_active_rental ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap text-right font-medium">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowDeleteDialog(true);
-                            setCustomerToDelete(customer);
-                          }}
-                          variant="outline"
-                          color="rose"
-                          size="sm"
-                          icon={IconTrash}
-                        >
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       )}

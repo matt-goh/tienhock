@@ -71,9 +71,9 @@ interface FilterState {
 
 const TYPE_TABS: Array<{ id: FilterState["type"]; label: string; icon: any }> = [
   { id: "all", label: "All", icon: IconLayoutGrid },
-  { id: "debit_note", label: "Debit Notes", icon: IconFilePlus },
-  { id: "credit_note", label: "Credit Notes", icon: IconFileMinus },
-  { id: "refund_note", label: "Refund Notes", icon: IconRotate2 },
+  { id: "debit_note", label: "DN", icon: IconFilePlus },
+  { id: "credit_note", label: "CN", icon: IconFileMinus },
+  { id: "refund_note", label: "RN", icon: IconRotate2 },
 ];
 
 function toIsoDate(d: Date): string {
@@ -191,11 +191,51 @@ const GTAdjustmentDocsListPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <IconFileText size={28} className="text-gray-700 dark:text-gray-200" />
-          Adjustment Documents
-        </h1>
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <IconFileText size={28} className="text-gray-700 dark:text-gray-200" />
+            Adjustment Docs
+          </h1>
+          <span className="hidden sm:inline text-default-300 dark:text-gray-600 text-2xl font-light">
+            |
+          </span>
+          <div className="flex gap-1 bg-default-100 dark:bg-gray-900/50 rounded-lg p-1">
+            {TYPE_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = filters.type === tab.id;
+              const count = counts[tab.id] || 0;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() =>
+                    setFilters((prev) => ({ ...prev, type: tab.id }))
+                  }
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5 ${
+                    active
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-sky-700 dark:text-sky-400 font-semibold"
+                      : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <Icon size={16} />
+                  {tab.label}
+                  {count > 0 && (
+                    <span
+                      className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
+                        active
+                          ? "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
+                          : "bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             onClick={() => navigate(`${UI_BASE}/new?type=debit`)}
@@ -214,40 +254,6 @@ const GTAdjustmentDocsListPage: React.FC = () => {
             New Credit Note
           </Button>
         </div>
-      </div>
-
-      {/* Type tabs */}
-      <div className="flex gap-1 w-fit bg-default-100 dark:bg-gray-900/50 rounded-lg p-1">
-        {TYPE_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const active = filters.type === tab.id;
-          const count = counts[tab.id] || 0;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setFilters((prev) => ({ ...prev, type: tab.id }))}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors duration-150 flex items-center gap-1.5 ${
-                active
-                  ? "bg-white dark:bg-gray-700 shadow-sm text-sky-700 dark:text-sky-400 font-semibold"
-                  : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-200"
-              }`}
-            >
-              <Icon size={16} />
-              {tab.label}
-              {count > 0 && (
-                <span
-                  className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
-                    active
-                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300"
-                      : "bg-default-200 dark:bg-gray-700 text-default-700 dark:text-gray-300"
-                  }`}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
       </div>
 
       {/* Filters */}
