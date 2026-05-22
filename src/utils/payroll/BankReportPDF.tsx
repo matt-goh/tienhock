@@ -362,7 +362,7 @@ const PaymentGroup: React.FC<{
   if (data.length === 0) return null;
 
   return (
-    <View style={styles.groupSection} wrap={false}>
+    <View style={styles.groupSection}>
       <View style={styles.groupHeader}>
         <Text style={styles.groupTitle}>{title} Payment</Text>
       </View>
@@ -439,7 +439,7 @@ const BankReportPDF: React.FC<{
         />
 
         {/* Enhanced Footer Summary */}
-        <View style={styles.footerSection}>
+        <View style={styles.footerSection} wrap={false}>
           <Text style={styles.footerTitle}>Payroll Report Summary</Text>
 
           {/* Main Summary Row */}
