@@ -419,7 +419,7 @@ const MidMonthPayrollReportPDF: React.FC<{
           }}
         />
 
-        <View style={styles.footerSection}>
+        <View style={styles.footerSection} wrap={false}>
           <Text style={styles.footerTitle}>
             Mid-Month Payroll Report Summary
           </Text>
