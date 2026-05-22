@@ -1658,7 +1658,7 @@ const InvoiceDetailsPage: React.FC = () => {
               size="md"
               disabled={isLoading}
             >
-              {showPaymentForm ? "Cancel Payment" : "Record Payment"}
+              {showPaymentForm ? "Cancel" : "Payment"}
             </Button>
           )}
           {!isCancelled && (

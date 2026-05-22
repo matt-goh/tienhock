@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  IconExternalLink,
   IconPlus,
   IconTrash,
   IconSquare,
@@ -29,12 +30,15 @@ import {
   sumMoney,
   roundMoney,
 } from "../../../utils/moneyUtils";
-import { AdjustmentDocTypeBadge } from "../../../components/AdjustmentDocs/AdjustmentDocBadge";
+import {
+  AdjustmentDocTypeBadge,
+  AdjustmentDocStatusBadge,
+} from "../../../components/AdjustmentDocs/AdjustmentDocBadge";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
 const INVOICES_API = "/greentarget/api/invoices";
-const INVOICE_UI_BASE = "/greentarget/invoice";
+const INVOICE_UI_BASE = "/greentarget/invoices";
 
 const MONEY_TOLERANCE = 0.005;
 
@@ -84,6 +88,9 @@ interface GTInvoice {
   total_amount: number;
   balance_due: number;
   status: string;
+  einvoice_status?: string | null;
+  uuid?: string | null;
+  long_id?: string | null;
   rental_details?: Array<{
     rental_id: number;
     tong_no?: string;
@@ -131,10 +138,7 @@ const createBlankLine = (): LineState => ({
 
 const todayIso = (): string => {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 const GTAdjustmentDocsFormPage: React.FC = () => {
@@ -160,7 +164,6 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
   const [pickerLoading, setPickerLoading] = useState(false);
 
   const [reason, setReason] = useState("");
-  const [dateIssued, setDateIssued] = useState<string>(todayIso());
   const [lines, setLines] = useState<LineState[]>([]);
   const [hasLineUserEdits, setHasLineUserEdits] = useState<boolean>(false);
 
@@ -554,7 +557,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
       const payload: any = {
         type,
         original_invoice_id: invoice.invoice_id,
-        date_issued: dateIssued,
+        date_issued: todayIso(),
         reason: reason || null,
         lines: lines.map((l) => ({
           description: l.description,
@@ -768,26 +771,33 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               <AdjustmentDocTypeBadge type={type} />
             </h1>
           </div>
-          <Button
-            onClick={handleSubmit}
-            variant="filled"
-            color="sky"
-            size="md"
-            disabled={isSaving}
-          >
-            {isSaving ? "Saving..." : `Create ${TYPE_LABEL[type]}`}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleSubmit}
+              variant="filled"
+              color="sky"
+              size="md"
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : `Create ${TYPE_LABEL[type]}`}
+            </Button>
+          </div>
         </div>
 
         {/* Original invoice summary */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-default-50/60 dark:bg-gray-900/30">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
                 Original Invoice
               </div>
-              <div className="font-medium text-default-900 dark:text-gray-100">
+              <div
+                className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 w-fit"
+                onClick={() => navigate(`${INVOICE_UI_BASE}/${invoice.invoice_id}`)}
+                title="Open invoice"
+              >
                 {invoice.invoice_number}
+                <IconExternalLink size={14} className="text-sky-600 dark:text-sky-400" />
               </div>
             </div>
             <div>
@@ -815,6 +825,28 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                 RM {Number(invoice.balance_due).toFixed(2)}
               </div>
             </div>
+            <div>
+              <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-0.5">
+                Invoice e-Status
+              </div>
+              <div className="font-medium text-default-900 dark:text-gray-100">
+                <AdjustmentDocStatusBadge
+                  status={
+                    (invoice.status === "cancelled"
+                      ? "cancelled"
+                      : "active") as "active" | "cancelled"
+                  }
+                  einvoiceStatus={
+                    (invoice.einvoice_status ?? null) as
+                      | "valid"
+                      | "pending"
+                      | "invalid"
+                      | "cancelled"
+                      | null
+                  }
+                />
+              </div>
+            </div>
           </div>
           {pairedCreditNote && (
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
@@ -828,21 +860,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           )}
         </div>
 
-        {/* Date + Reason */}
-        <div className="p-4 border-b border-default-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Reason */}
+        <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <div>
-            <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-              Date Issued
-            </label>
-            <input
-              type="date"
-              value={dateIssued}
-              onChange={(e) => setDateIssued(e.target.value)}
-              className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-              disabled={isSaving}
-            />
-          </div>
-          <div className="md:col-span-2">
             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
               Reason / Description
             </label>
@@ -881,6 +901,15 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               Add Line
             </Button>
           </div>
+          {!isRN && (
+            <div className="mb-3 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-900/20 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
+              Enter only the amounts relevant to this adjustment. For a price
+              correction, use the quantity involved and the per-unit price
+              difference. For a rental cancellation or return, use the quantity
+              and original unit price. A Debit Note adds to the invoice balance;
+              a Credit Note reduces it.
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg">
               <thead className="bg-default-50 dark:bg-gray-900/50">
@@ -931,7 +960,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                     <td className="px-2 py-1">
                       <input
                         type="number"
-                        step="0.01"
+                        step="1"
                         value={line.price ?? 0}
                         onChange={(e) =>
                           updateLine(line.uid, { price: Number(e.target.value) })
@@ -943,7 +972,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                     <td className="px-2 py-1">
                       <input
                         type="number"
-                        step="0.01"
+                        step="1"
                         value={line.tax ?? 0}
                         onChange={(e) =>
                           updateLine(line.uid, { tax: Number(e.target.value) })

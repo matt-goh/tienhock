@@ -21,6 +21,9 @@ import {
   IconDeviceFloppy,
   IconSquare,
   IconSquareCheckFilled,
+  IconFilePlus,
+  IconFileMinus,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
@@ -39,12 +42,17 @@ import clsx from "clsx"; // Added clsx
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { SelectOption } from "../../../components/FormComponents";
-import { EInvoiceSubmissionResult, InvoiceGT } from "../../../types/types";
+import {
+  EInvoiceSubmissionResult,
+  InvoiceGT,
+  GTAdjDocSummary,
+} from "../../../types/types";
 import GTPrintPDFOverlay from "../../../utils/greenTarget/PDF/GTPrintPDFOverlay";
 import GTInvoicePDF from "../../../utils/greenTarget/PDF/GTInvoicePDF"; // For PDF structure
 import { generateGTPDFFilename } from "../../../utils/greenTarget/PDF/generateGTPDFFilename";
 import { pdf, Document } from "@react-pdf/renderer";
 import { generateQRDataUrl } from "../../../utils/invoice/einvoice/generateQRCode";
+import GTInvoiceAdjustmentDocsSection from "../../../components/AdjustmentDocs/GTInvoiceAdjustmentDocsSection";
 
 interface Payment {
   payment_id: number;
@@ -74,6 +82,123 @@ const paymentMethodOptions: SelectOption[] = [
   { id: "bank_transfer", name: "Bank Transfer" },
   { id: "online", name: "Online Payment" },
 ];
+
+const MONEY_TOLERANCE: number = 0.005;
+
+type GTDisplayStatus =
+  | "cancelled"
+  | "paid"
+  | "refunded"
+  | "partially_refunded"
+  | "credited"
+  | "credit_balance"
+  | "overdue"
+  | "unpaid";
+
+function getGTDisplayStatusLabel(status: GTDisplayStatus): string {
+  if (status === "partially_refunded") return "Partially Refunded";
+  if (status === "credit_balance") return "Credit Balance";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function getActiveGTAdjustmentDocs(invoice: InvoiceGT): GTAdjDocSummary[] {
+  return (invoice.adjustmentDocs || []).filter(
+    (doc: GTAdjDocSummary) => doc.status === "active" && !doc.is_consolidated
+  );
+}
+
+function getGTPairedRefundTotal(invoice: InvoiceGT): number {
+  return getActiveGTAdjustmentDocs(invoice)
+    .filter(
+      (doc: GTAdjDocSummary) =>
+        doc.type === "refund_note" &&
+        !!doc.paired_with_id &&
+        doc.paired_status === "active"
+    )
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+}
+
+function getGTDisplayStatus(invoice: InvoiceGT): GTDisplayStatus {
+  if (invoice.status === "cancelled") return "cancelled";
+
+  const docs: GTAdjDocSummary[] = getActiveGTAdjustmentDocs(invoice);
+  const pairedRefundTotal: number = getGTPairedRefundTotal(invoice);
+  const invoiceTotal: number = Number(invoice.total_amount || 0);
+  const balanceDue: number = Number(invoice.balance_due || 0);
+  const hasActiveUnrefundedCN: boolean = docs.some(
+    (doc: GTAdjDocSummary) =>
+      doc.type === "credit_note" && doc.paired_status !== "active"
+  );
+  const hasActivePairedRN: boolean = pairedRefundTotal > MONEY_TOLERANCE;
+
+  if (hasActivePairedRN && balanceDue <= MONEY_TOLERANCE) {
+    return pairedRefundTotal >= invoiceTotal - MONEY_TOLERANCE
+      ? "refunded"
+      : "partially_refunded";
+  }
+
+  if (hasActiveUnrefundedCN) {
+    return balanceDue < -MONEY_TOLERANCE ? "credit_balance" : "credited";
+  }
+
+  if (balanceDue <= MONEY_TOLERANCE) return "paid";
+  if (invoice.status === "overdue") return "overdue";
+  return "unpaid";
+}
+
+function getGTBalanceAdjustment(invoice: InvoiceGT): {
+  originalBalanceDue: number;
+  hasAdjustment: boolean;
+} {
+  const docs: GTAdjDocSummary[] = getActiveGTAdjustmentDocs(invoice);
+  const debitTotal: number = docs
+    .filter((doc: GTAdjDocSummary) => doc.type === "debit_note")
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const creditTotal: number = docs
+    .filter((doc: GTAdjDocSummary) => doc.type === "credit_note")
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const pairedRefundTotal: number = getGTPairedRefundTotal(invoice);
+  const adjustedBalanceDue: number = Number(invoice.balance_due || 0);
+
+  return {
+    originalBalanceDue: parseFloat(
+      (
+        adjustedBalanceDue -
+        debitTotal +
+        creditTotal -
+        pairedRefundTotal
+      ).toFixed(2)
+    ),
+    hasAdjustment:
+      debitTotal > 0 ||
+      creditTotal > 0 ||
+      pairedRefundTotal > 0,
+  };
+}
+
+function getGTTotalAdjustment(invoice: InvoiceGT): {
+  adjustedTotal: number;
+  hasAdjustment: boolean;
+} {
+  const docs: GTAdjDocSummary[] = getActiveGTAdjustmentDocs(invoice);
+  const debitTotal: number = docs
+    .filter((doc: GTAdjDocSummary) => doc.type === "debit_note")
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const creditTotal: number = docs
+    .filter((doc: GTAdjDocSummary) => doc.type === "credit_note")
+    .reduce((sum: number, doc: GTAdjDocSummary) => sum + doc.total_amount, 0);
+  const invoiceTotal: number = Number(invoice.total_amount || 0);
+  const adjustedTotal: number = parseFloat(
+    (invoiceTotal + debitTotal - creditTotal).toFixed(2)
+  );
+
+  return {
+    adjustedTotal,
+    hasAdjustment:
+      (debitTotal > 0 || creditTotal > 0) &&
+      Math.abs(adjustedTotal - invoiceTotal) > MONEY_TOLERANCE,
+  };
+}
 
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -1063,9 +1188,14 @@ const InvoiceDetailsPage: React.FC = () => {
 
       // Refresh the invoice details to update balances
       fetchInvoiceDetails(invoice.invoice_id);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error cancelling payment:", error);
-      toast.error("Failed to cancel payment");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to cancel payment"
+      );
     } finally {
       setIsCancellingPayment(false);
       setIsCancelPaymentDialogOpen(false);
@@ -1105,9 +1235,21 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const handleCancelPaymentClick = (payment: Payment) => {
+    if (invoice?.status === "cancelled") {
+      toast.error("Cannot cancel payment for a cancelled invoice.");
+      return;
+    }
+
     // Don't allow cancelling already cancelled payments
     if (payment.status === "cancelled") {
       toast.error("This payment is already cancelled");
+      return;
+    }
+
+    if (hasActiveAdjustmentDocs) {
+      toast.error(
+        "Cancel the active adjustment document before cancelling payments."
+      );
       return;
     }
 
@@ -1495,16 +1637,42 @@ const InvoiceDetailsPage: React.FC = () => {
   const getGTStatusBadgeStyle = (status?: string) => {
     switch (status?.toLowerCase()) {
       case "paid": // Assuming you derive 'paid' from balance
-        return "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300";
+      case "refunded":
+        return "border-green-200 bg-green-100 text-green-800 dark:border-green-400/25 dark:bg-green-400/10 dark:text-green-200";
+      case "partially_refunded":
+        return "border-teal-200 bg-teal-100 text-teal-800 dark:border-teal-400/25 dark:bg-teal-400/10 dark:text-teal-200";
+      case "credited":
+      case "credit_balance":
+        return "border-indigo-200 bg-indigo-100 text-indigo-800 dark:border-indigo-400/25 dark:bg-indigo-400/10 dark:text-indigo-200";
       case "cancelled":
-        return "bg-default-200 dark:bg-gray-700 text-default-800 dark:text-gray-300";
+        return "border-default-300 bg-default-200 text-default-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200";
       case "overdue":
-        return "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"; // Example: Red style
+        return "border-red-200 bg-red-100 text-red-800 dark:border-red-400/25 dark:bg-red-400/10 dark:text-red-200"; // Example: Red style
       case "active":
       default: // Treat active/default as Unpaid visually if balance > 0
         return invoice && invoice.current_balance > 0
-          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300" // Unpaid style
-          : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"; // Default/Unknown style
+          ? "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200" // Unpaid style
+          : "border-gray-200 bg-gray-100 text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"; // Default/Unknown style
+    }
+  };
+
+  const getGTBalanceTextStyle = (status: GTDisplayStatus): string => {
+    switch (status) {
+      case "paid":
+      case "refunded":
+        return "text-green-600 dark:text-green-400";
+      case "partially_refunded":
+        return "text-teal-600 dark:text-teal-400";
+      case "credited":
+      case "credit_balance":
+        return "text-indigo-600 dark:text-indigo-400";
+      case "cancelled":
+        return "text-rose-600 dark:text-rose-400";
+      case "overdue":
+        return "text-red-600 dark:text-red-400";
+      case "unpaid":
+      default:
+        return "text-amber-600 dark:text-amber-400";
     }
   };
 
@@ -1591,6 +1759,139 @@ const InvoiceDetailsPage: React.FC = () => {
   const paymentMethodDisplayValue = selectedPaymentMethod
     ? selectedPaymentMethod.name
     : "Select Payment Method";
+  const invoiceDisplayStatus: GTDisplayStatus = getGTDisplayStatus(invoice);
+  const invoiceDisplayStatusLabel: string =
+    getGTDisplayStatusLabel(invoiceDisplayStatus);
+  const activeAdjustmentDocs: GTAdjDocSummary[] =
+    getActiveGTAdjustmentDocs(invoice);
+  const activeInvoiceAdjustmentDocs: GTAdjDocSummary[] =
+    activeAdjustmentDocs.filter(
+      (doc: GTAdjDocSummary) =>
+        doc.type === "credit_note" || doc.type === "debit_note"
+    );
+  const hasActiveAdjustmentDocs: boolean = activeAdjustmentDocs.length > 0;
+  const hasActiveDebitNote: boolean = activeInvoiceAdjustmentDocs.some(
+    (doc: GTAdjDocSummary) => doc.type === "debit_note"
+  );
+  const hasActiveCreditNote: boolean = activeInvoiceAdjustmentDocs.some(
+    (doc: GTAdjDocSummary) => doc.type === "credit_note"
+  );
+  const refundNotePaymentDocs: GTAdjDocSummary[] = (
+    invoice.adjustmentDocs || []
+  ).filter(
+    (doc: GTAdjDocSummary) =>
+      doc.type === "refund_note" && !doc.is_consolidated
+  );
+  const balanceAdjustment: ReturnType<typeof getGTBalanceAdjustment> =
+    getGTBalanceAdjustment(invoice);
+  const totalAdjustment: ReturnType<typeof getGTTotalAdjustment> =
+    getGTTotalAdjustment(invoice);
+  const hasAdjustedBalanceDisplay: boolean =
+    balanceAdjustment.hasAdjustment &&
+    invoiceDisplayStatus !== "cancelled" &&
+    Math.abs(
+      balanceAdjustment.originalBalanceDue - Number(invoice.current_balance || 0)
+    ) > MONEY_TOLERANCE;
+  const balanceTextStyle: string = getGTBalanceTextStyle(invoiceDisplayStatus);
+  const balanceStatusLabel: string =
+    invoiceDisplayStatus === "cancelled" ||
+    Number(invoice.current_balance || 0) <= MONEY_TOLERANCE
+      ? invoiceDisplayStatusLabel
+      : "";
+  const eInvoiceStatusDetails: {
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+    panelClassName: string;
+    iconClassName: string;
+    badgeClassName: string;
+  } =
+    invoice.einvoice_status === "valid"
+      ? {
+          title: "Valid e-Invoice",
+          description:
+            "MyInvois has validated this invoice and the portal document is ready.",
+          icon: <IconCircleCheck size={20} stroke={2} />,
+          panelClassName:
+            "border-emerald-200 bg-emerald-50/80 dark:border-emerald-400/20 dark:bg-emerald-400/10",
+          iconClassName:
+            "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-200 dark:ring-emerald-300/20",
+          badgeClassName:
+            "border-emerald-200 bg-white/75 text-emerald-700 dark:border-emerald-300/20 dark:bg-emerald-950/30 dark:text-emerald-200",
+        }
+      : invoice.einvoice_status === "pending"
+      ? {
+          title: "Pending Validation",
+          description:
+            "This e-invoice has been submitted and is waiting for MyInvois validation.",
+          icon: <IconClock size={20} stroke={2} />,
+          panelClassName:
+            "border-sky-200 bg-sky-50/80 dark:border-sky-400/20 dark:bg-sky-400/10",
+          iconClassName:
+            "bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-400/15 dark:text-sky-200 dark:ring-sky-300/20",
+          badgeClassName:
+            "border-sky-200 bg-white/75 text-sky-700 dark:border-sky-300/20 dark:bg-sky-950/30 dark:text-sky-200",
+        }
+      : invoice.einvoice_status === "invalid"
+      ? {
+          title: "Invalid e-Invoice",
+          description:
+            "MyInvois rejected this invoice. Review the submission details before retrying.",
+          icon: <IconAlertTriangle size={20} stroke={2} />,
+          panelClassName:
+            "border-rose-200 bg-rose-50/80 dark:border-rose-400/20 dark:bg-rose-400/10",
+          iconClassName:
+            "bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-400/15 dark:text-rose-200 dark:ring-rose-300/20",
+          badgeClassName:
+            "border-rose-200 bg-white/75 text-rose-700 dark:border-rose-300/20 dark:bg-rose-950/30 dark:text-rose-200",
+        }
+      : invoice.einvoice_status === "cancelled"
+      ? {
+          title: "Cancelled e-Invoice",
+          description:
+            "This e-invoice was cancelled in MyInvois, but its identifiers are kept for reference.",
+          icon: <IconCancel size={20} stroke={2} />,
+          panelClassName:
+            "border-default-200 bg-default-50/80 dark:border-gray-700 dark:bg-gray-800/80",
+          iconClassName:
+            "bg-default-100 text-default-700 ring-default-200 dark:bg-gray-700 dark:text-gray-200 dark:ring-white/10",
+          badgeClassName:
+            "border-default-200 bg-white/75 text-default-700 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-200",
+        }
+      : {
+          title: "e-Invoice Status",
+          description: "The invoice has e-invoice submission information.",
+          icon: <IconFileInvoice size={20} stroke={2} />,
+          panelClassName:
+            "border-default-200 bg-default-50/80 dark:border-gray-700 dark:bg-gray-800/80",
+          iconClassName:
+            "bg-default-100 text-default-700 ring-default-200 dark:bg-gray-700 dark:text-gray-200 dark:ring-white/10",
+          badgeClassName:
+            "border-default-200 bg-white/75 text-default-700 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-200",
+        };
+  const eInvoiceMetaItems: Array<{
+    label: string;
+    value: string | null | undefined;
+    isMono?: boolean;
+  }> = [
+    { label: "UUID", value: invoice.uuid, isMono: true },
+    { label: "Submission UID", value: invoice.submission_uid, isMono: true },
+    { label: "Long ID", value: invoice.long_id, isMono: true },
+    {
+      label: "Validation Date",
+      value: invoice.datetime_validated
+        ? new Date(invoice.datetime_validated).toLocaleString()
+        : null,
+    },
+  ].filter(
+    (
+      item: {
+        label: string;
+        value: string | null | undefined;
+        isMono?: boolean;
+      }
+    ) => Boolean(item.value)
+  );
 
   return (
     <div className="space-y-4">
@@ -1599,19 +1900,22 @@ const InvoiceDetailsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <BackButton onClick={() => navigate("/greentarget/invoices")} />
           <div className="h-6 w-px bg-default-300 dark:bg-default-700"></div>
-          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100 flex items-center">
-            <IconFileInvoice size={28} className="mr-2 text-default-600 dark:text-gray-300" />
-            Invoice
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100 flex flex-wrap items-center gap-2 min-w-0">
+            <IconFileInvoice
+              size={28}
+              className="text-default-600 dark:text-gray-300 flex-shrink-0"
+            />
+            <span>Invoice</span>
             <span
-              className="pl-1.5 truncate max-w-[150px] md:max-w-[300px] inline-block"
+              className="truncate max-w-[150px] md:max-w-[300px] inline-block"
               title={invoice.invoice_number}
             >
               {invoice.invoice_number}
             </span>
             {/* Status Badge */}
             <span
-              className={`ml-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${getGTStatusBadgeStyle(
-                invoice?.status
+              className={`inline-flex h-7 items-center gap-1.5 px-2.5 rounded-md border border-current/15 text-xs font-semibold shadow-sm ${getGTStatusBadgeStyle(
+                invoiceDisplayStatus
               )}`}
               title={
                 invoice?.status === "cancelled" && invoice.cancellation_date
@@ -1619,45 +1923,41 @@ const InvoiceDetailsPage: React.FC = () => {
                   : undefined
               }
             >
-              {invoice?.status === "cancelled"
-                ? `Cancelled${
+              {invoiceDisplayStatus === "cancelled"
+                ? `${invoiceDisplayStatusLabel}${
                     invoice.cancellation_date
                       ? ` (${formatDate(invoice.cancellation_date)})`
                       : ""
                   }`
-                : invoice?.status === "overdue"
-                ? "Overdue"
-                : invoice?.current_balance <= 0
-                ? "Paid"
-                : "Unpaid"}
+                : invoiceDisplayStatusLabel}
             </span>
             {/* e-Invoice status badges */}
             {invoice.einvoice_status === "valid" && (
-              <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+              <span
+                className="inline-flex h-7 max-w-[190px] items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-950/[0.02] dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-200 dark:shadow-none dark:ring-white/5"
                 title="e-Invoice Valid"
               >
-                <IconCheck size={18} stroke={1.5} />
-                <span className="truncate">e-Invoice</span>
-              </button>
+                <IconCircleCheck size={14} stroke={2} className="flex-shrink-0" />
+                <span className="truncate">e-Invoice Valid</span>
+              </span>
             )}
             {invoice.einvoice_status === "pending" && (
-              <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-sky-100 dark:bg-sky-900/50 border border-sky-300 dark:border-sky-700 text-sky-600 dark:text-sky-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+              <span
+                className="inline-flex h-7 max-w-[190px] items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-semibold text-amber-700 shadow-sm ring-1 ring-amber-950/[0.02] dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200 dark:shadow-none dark:ring-white/5"
                 title="e-Invoice Pending"
               >
-                <IconClock size={18} stroke={1.5} />
+                <IconClock size={14} stroke={2} className="flex-shrink-0" />
                 <span className="truncate">e-Invoice Pending</span>
-              </button>
+              </span>
             )}
             {invoice.einvoice_status === "invalid" && (
-              <button
-                className="ml-3 px-3 py-1.5 text-xs font-medium bg-rose-100 dark:bg-rose-900/50 border border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 rounded-full cursor-default gap-1 flex items-center max-w-[180px]"
+              <span
+                className="inline-flex h-7 max-w-[190px] items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-semibold text-rose-700 shadow-sm ring-1 ring-rose-950/[0.02] dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200 dark:shadow-none dark:ring-white/5"
                 title="e-Invoice Invalid"
               >
-                <IconAlertTriangle size={18} stroke={1.5} />
+                <IconAlertTriangle size={14} stroke={2} className="flex-shrink-0" />
                 <span className="truncate">e-Invoice Invalid</span>
-              </button>
+              </span>
             )}
             {/* Consolidated badge */}
             {consolidatedInfo &&
@@ -1666,10 +1966,10 @@ const InvoiceDetailsPage: React.FC = () => {
                   href={`https://myinvois.hasil.gov.my/${consolidatedInfo.uuid}/share/${consolidatedInfo.long_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-3 px-3 py-1.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center gap-1 max-w-[180px]"
+                  className="inline-flex h-7 max-w-[190px] items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 shadow-sm ring-1 ring-indigo-950/[0.02] transition-colors hover:border-indigo-300 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-400/25 dark:bg-indigo-400/10 dark:text-indigo-200 dark:shadow-none dark:ring-white/5 dark:hover:border-indigo-300/35 dark:hover:bg-indigo-400/15 dark:hover:text-indigo-100"
                   title={`Part of consolidated invoice ${consolidatedInfo.invoice_number}`}
                 >
-                  <IconFiles size={18} stroke={1.5} />
+                  <IconFiles size={14} stroke={2} className="flex-shrink-0" />
                   <span className="truncate">Consolidated</span>
                 </a>
               )}
@@ -1757,6 +2057,48 @@ const InvoiceDetailsPage: React.FC = () => {
 
           {/* Invoice action buttons */}
           <div className="flex flex-wrap gap-3 md:flex-nowrap">
+            {invoice.status !== "cancelled" && (
+              <>
+                <Button
+                  onClick={() =>
+                    navigate(
+                      `/greentarget/adjustment-docs/new?type=debit&invoiceId=${invoice.invoice_id}`
+                    )
+                  }
+                  icon={IconFilePlus}
+                  variant="outline"
+                  color="amber"
+                  className="flex-1 sm:flex-none"
+                  disabled={hasActiveDebitNote}
+                  title={
+                    hasActiveDebitNote
+                      ? "Cancel the active Debit Note before creating another"
+                      : "Issue a Debit Note against this invoice"
+                  }
+                >
+                  DN
+                </Button>
+                <Button
+                  onClick={() =>
+                    navigate(
+                      `/greentarget/adjustment-docs/new?type=credit&invoiceId=${invoice.invoice_id}`
+                    )
+                  }
+                  icon={IconFileMinus}
+                  variant="outline"
+                  color="rose"
+                  className="flex-1 sm:flex-none"
+                  disabled={hasActiveCreditNote}
+                  title={
+                    hasActiveCreditNote
+                      ? "Cancel the active Credit Note before creating another"
+                      : "Issue a Credit Note against this invoice"
+                  }
+                >
+                  CN
+                </Button>
+              </>
+            )}
             {invoice.current_balance > 0 && (
               <Button
                 onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -1766,7 +2108,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={invoice.status === "cancelled"}
                 className="flex-1 sm:flex-none"
               >
-                {showPaymentForm ? "Cancel" : "Record Payment"}
+                {showPaymentForm ? "Cancel" : "Payment"}
               </Button>
             )}
             {invoice.status !== "cancelled" ? (
@@ -1777,7 +2119,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 color="rose"
                 className="flex-1 sm:flex-none"
               >
-                Cancel Invoice
+                Cancel
               </Button>
             ) : (
               <Button
@@ -1787,7 +2129,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 color="rose"
                 className="flex-1 sm:flex-none"
               >
-                Delete Invoice
+                Delete
               </Button>
             )}
           </div>
@@ -2171,11 +2513,24 @@ const InvoiceDetailsPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center">
-                  <span className="text-gray-900 dark:text-gray-100 font-semibold">
-                    {formatCurrency(
-                      parseFloat(invoice.total_amount.toString())
-                    )}
-                  </span>
+                  {totalAdjustment.hasAdjustment ? (
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-sm text-default-400 dark:text-gray-500 line-through">
+                        {formatCurrency(
+                          parseFloat(invoice.total_amount.toString())
+                        )}
+                      </span>
+                      <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                        {formatCurrency(totalAdjustment.adjustedTotal)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-900 dark:text-gray-100 font-semibold">
+                      {formatCurrency(
+                        parseFloat(invoice.total_amount.toString())
+                      )}
+                    </span>
+                  )}
                   {invoice.status !== "cancelled" && (
                     <button
                       onClick={handleEditAmount}
@@ -2193,27 +2548,21 @@ const InvoiceDetailsPage: React.FC = () => {
                 Balance Due
               </span>
               <div className="flex items-center">
-                <span
-                  className={`font-semibold ${
-                    invoice.current_balance <= 0 ||
-                    invoice.status === "cancelled"
-                      ? "text-green-600"
-                      : invoice.status === "overdue"
-                      ? "text-red-600"
-                      : "text-amber-600"
-                  }`}
-                >
+                {hasAdjustedBalanceDisplay && (
+                  <span className="mr-2 text-sm text-default-400 dark:text-gray-500 line-through">
+                    {formatCurrency(balanceAdjustment.originalBalanceDue)}
+                  </span>
+                )}
+                <span className={`font-semibold ${balanceTextStyle}`}>
                   {formatCurrency(invoice.current_balance)}
                 </span>
-                {invoice.current_balance <= 0 &&
-                  invoice.status !== "cancelled" && (
-                    <span className="ml-2 text-green-600 dark:text-green-400 text-xs font-medium px-2 py-0.5 bg-green-50 dark:bg-green-900/50 rounded-full">
-                      Paid in Full
-                    </span>
-                  )}
-                {invoice.status === "cancelled" && (
-                  <span className="ml-2 text-rose-600 dark:text-rose-400 text-xs font-medium px-2 py-0.5 bg-rose-50 dark:bg-rose-900/50 rounded-full">
-                    Cancelled
+                {balanceStatusLabel && (
+                  <span
+                    className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${getGTStatusBadgeStyle(
+                      invoiceDisplayStatus
+                    )}`}
+                  >
+                    {balanceStatusLabel}
                   </span>
                 )}
               </div>
@@ -2484,7 +2833,7 @@ const InvoiceDetailsPage: React.FC = () => {
       <div className="mt-8">
         <h2 className="text-xl font-medium mb-4">Payment History</h2>
 
-        {payments.length === 0 ? (
+        {payments.length === 0 && refundNotePaymentDocs.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 border border-dashed border-default-200 dark:border-gray-700 rounded-lg p-6 text-center">
             <p className="text-default-500 dark:text-gray-400">No payments recorded yet.</p>
           </div>
@@ -2679,7 +3028,16 @@ const InvoiceDetailsPage: React.FC = () => {
                                 e.stopPropagation();
                                 handleCancelPaymentClick(payment);
                               }}
-                              title="Cancel Payment"
+                              disabled={
+                                isCancellingPayment ||
+                                invoice.status === "cancelled" ||
+                                hasActiveAdjustmentDocs
+                              }
+                              title={
+                                hasActiveAdjustmentDocs
+                                  ? "Cancel the active adjustment document before cancelling payments"
+                                  : "Cancel Payment"
+                              }
                               className="px-2"
                             >
                               <span className="flex items-center gap-1">
@@ -2696,6 +3054,71 @@ const InvoiceDetailsPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+                  {refundNotePaymentDocs.map((doc: GTAdjDocSummary) => (
+                    <tr
+                      key={doc.id}
+                      className={`hover:bg-default-50 dark:hover:bg-gray-800 transition-colors ${
+                        doc.status === "cancelled"
+                          ? "bg-default-50 dark:bg-gray-800 text-default-400 dark:text-gray-500"
+                          : "bg-rose-50/40 dark:bg-rose-900/10"
+                      }`}
+                      title={
+                        doc.status === "cancelled"
+                          ? "Refund Note cancelled"
+                          : doc.paired_with_id
+                          ? `Refund Note paired with ${doc.paired_with_id}`
+                          : "Refund Note"
+                      }
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {formatDate(doc.created_at)}
+                      </td>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                          doc.status === "cancelled"
+                            ? "text-default-400 line-through"
+                            : "text-rose-600 dark:text-rose-400"
+                        }`}
+                      >
+                        -{formatCurrency(doc.total_amount)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 capitalize">
+                          {(doc.refund_method || "refund").replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600 dark:text-gray-300 font-mono">
+                        {doc.refund_reference || doc.id}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600 dark:text-gray-300">
+                        {doc.paired_with_id
+                          ? `Paired with ${doc.paired_with_id}`
+                          : "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            doc.status === "cancelled"
+                              ? "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
+                              : "bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300"
+                          }`}
+                        >
+                          {doc.status === "cancelled" ? "Cancelled" : "Refunded"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/greentarget/adjustment-docs/${doc.id}`);
+                          }}
+                          className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -2703,127 +3126,86 @@ const InvoiceDetailsPage: React.FC = () => {
         )}
       </div>
 
+      {/* Adjustment Documents (CN / DN / RN) inline list */}
+      <GTInvoiceAdjustmentDocsSection invoiceId={invoice.invoice_id} />
+
       {/* e-Invoice Details Section */}
       {invoice.einvoice_status && (
         <div className="mt-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
+          <div className="overflow-hidden rounded-lg border border-default-200 bg-white shadow-sm ring-1 ring-default-900/[0.02] dark:border-gray-700 dark:bg-gray-900 dark:ring-white/5">
             <div
-              className={`p-4 ${
-                invoice.einvoice_status === "valid"
-                  ? "bg-green-50 dark:bg-green-900/30 border-b border-green-200 dark:border-green-800"
-                  : invoice.einvoice_status === "pending"
-                  ? "bg-sky-50 dark:bg-sky-900/30 border-b border-sky-200 dark:border-sky-800"
-                  : invoice.einvoice_status === "invalid"
-                  ? "bg-rose-50 dark:bg-rose-900/30 border-b border-rose-200 dark:border-rose-800"
-                  : invoice.einvoice_status === "cancelled"
-                  ? "bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700"
-                  : "bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700"
-              }`}
+              className={`border-b p-5 ${eInvoiceStatusDetails.panelClassName}`}
             >
-              <div className="flex items-center">
-                {invoice.einvoice_status === "valid" ? (
-                  <IconCheck size={22} className="text-green-600 mr-3" />
-                ) : invoice.einvoice_status === "pending" ? (
-                  <IconClock size={22} className="text-sky-600 dark:text-sky-400 mr-3" />
-                ) : invoice.einvoice_status === "invalid" ? (
-                  <IconAlertTriangle size={22} className="text-rose-600 mr-3" />
-                ) : invoice.einvoice_status === "cancelled" ? (
-                  <IconCancel size={22} className="text-default-600 dark:text-gray-300 mr-3" />
-                ) : null}
-                <div>
-                  <h3 className="text-lg font-medium">
-                    {invoice.einvoice_status === "valid"
-                      ? "Valid e-Invoice"
-                      : invoice.einvoice_status === "pending"
-                      ? "Pending Validation"
-                      : invoice.einvoice_status === "invalid"
-                      ? "Invalid e-Invoice"
-                      : invoice.einvoice_status === "cancelled"
-                      ? "Cancelled e-Invoice"
-                      : "e-Invoice Status"}
-                  </h3>
-                  {invoice.einvoice_status === "pending" && (
-                    <p className="text-sm text-sky-600 dark:text-sky-400 mt-1">
-                      This e-invoice has been submitted but is still pending
-                      validation.
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div
+                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ring-1 ${eInvoiceStatusDetails.iconClassName}`}
+                  >
+                    {eInvoiceStatusDetails.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-default-900 dark:text-gray-100">
+                        {eInvoiceStatusDetails.title}
+                      </h3>
+                      <span
+                        className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-semibold uppercase tracking-wide ${eInvoiceStatusDetails.badgeClassName}`}
+                      >
+                        {invoice.einvoice_status}
+                      </span>
+                    </div>
+                    <p className="mt-1 max-w-2xl text-sm leading-5 text-default-600 dark:text-gray-300">
+                      {eInvoiceStatusDetails.description}
                     </p>
-                  )}
-                  {invoice.einvoice_status === "invalid" && (
-                    <p className="text-sm text-rose-600 mt-1">
-                      This e-invoice has been rejected or marked as invalid.
-                    </p>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {invoice.uuid && (
-                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
-                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
-                      UUID
-                    </label>
-                    <div
-                      className="font-mono text-sm truncate"
-                      title={invoice.uuid}
-                    >
-                      {invoice.uuid}
-                    </div>
-                  </div>
-                )}
-                {invoice.submission_uid && (
-                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
-                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
-                      Submission UID
-                    </label>
-                    <div
-                      className="font-mono text-sm truncate"
-                      title={invoice.submission_uid}
-                    >
-                      {invoice.submission_uid}
-                    </div>
-                  </div>
-                )}
-                {invoice.long_id && (
-                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
-                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
-                      Long ID
-                    </label>
-                    <div
-                      className="font-mono text-sm truncate"
-                      title={invoice.long_id}
-                    >
-                      {invoice.long_id}
-                    </div>
-                  </div>
-                )}
-                {invoice.datetime_validated && (
-                  <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-200 dark:border-gray-700">
-                    <label className="block text-xs text-default-500 dark:text-gray-400 mb-1">
-                      Validation Date
-                    </label>
-                    <div className="text-sm">
-                      {new Date(invoice.datetime_validated).toLocaleString()}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Add MyInvois portal link if valid */}
-              {(invoice.einvoice_status === "valid" ||
-                invoice.einvoice_status === "cancelled") &&
-                invoice.long_id && (
-                  <div className="mt-4 text-center">
+                {(invoice.einvoice_status === "valid" ||
+                  invoice.einvoice_status === "cancelled") &&
+                  invoice.long_id && (
                     <a
                       href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 hover:underline"
+                      className="inline-flex h-9 flex-shrink-0 items-center justify-center gap-2 rounded-md border border-default-300 bg-white px-3 text-sm font-medium text-default-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-gray-600 dark:bg-gray-900/80 dark:text-gray-200 dark:shadow-none dark:hover:border-sky-400/40 dark:hover:bg-sky-400/10 dark:hover:text-sky-100"
                     >
-                      View in MyInvois Portal
+                      <IconExternalLink size={16} stroke={2} />
+                      <span>MyInvois Portal</span>
                     </a>
+                  )}
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {eInvoiceMetaItems.map(
+                  (item: {
+                    label: string;
+                    value: string | null | undefined;
+                    isMono?: boolean;
+                  }) => (
+                    <div
+                      key={item.label}
+                      className="min-w-0 rounded-md border border-default-200 bg-default-50/70 p-3 dark:border-gray-700 dark:bg-gray-950/40"
+                    >
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
+                        {item.label}
+                      </p>
+                      <p
+                        className={`truncate text-sm text-default-900 dark:text-gray-100 ${
+                          item.isMono ? "font-mono" : "font-medium"
+                        }`}
+                        title={item.value || undefined}
+                      >
+                        {item.value}
+                      </p>
+                    </div>
+                  )
+                )}
+                {eInvoiceMetaItems.length === 0 && (
+                  <div className="rounded-md border border-dashed border-default-300 bg-default-50/70 p-4 text-sm text-default-500 dark:border-gray-700 dark:bg-gray-950/40 dark:text-gray-400">
+                    No MyInvois identifiers have been stored for this invoice.
                   </div>
                 )}
+              </div>
             </div>
           </div>
         </div>

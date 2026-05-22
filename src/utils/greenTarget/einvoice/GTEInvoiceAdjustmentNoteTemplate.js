@@ -393,7 +393,7 @@ export async function GTEInvoiceAdjustmentNoteTemplate(
         <cbc:PostalZone></cbc:PostalZone>
         <cbc:CountrySubentityCode>${escapeXml(customerData.state || "")}</cbc:CountrySubentityCode>
         <cac:AddressLine>
-          <cbc:Line></cbc:Line>
+          <cbc:Line>${escapeXml(customerData.address || "")}</cbc:Line>
         </cac:AddressLine>
         <cac:AddressLine>
           <cbc:Line></cbc:Line>

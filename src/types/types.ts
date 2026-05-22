@@ -628,6 +628,21 @@ export interface InvoiceGT {
   }>;
   cancellation_date?: string | null;
   cancellation_reason?: string;
+  adjustmentDocs?: GTAdjDocSummary[];
+}
+
+export interface GTAdjDocSummary {
+  id: string;
+  type: "credit_note" | "debit_note" | "refund_note";
+  total_amount: number;
+  status: "active" | "cancelled";
+  is_consolidated: boolean;
+  paired_with_id: string | null;
+  paired_status?: string | null;
+  refund_method?: string | null;
+  refund_reference?: string | null;
+  reason?: string | null;
+  created_at?: string | null;
 }
 
 // Define the type for submission results
