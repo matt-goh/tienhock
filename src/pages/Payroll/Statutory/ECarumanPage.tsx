@@ -459,43 +459,33 @@ const ECarumanPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">e-Caruman</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Generate contribution files for government submission
-        </p>
-      </div>
-
-      {/* Month/Year Selection */}
-      <div className="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-3">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">Select Period</span>
-          <span className="text-gray-300 dark:text-gray-600">|</span>
-          <YearNavigator
-            selectedYear={selectedYear}
-            onChange={handleYearChange}
-            showGoToCurrentButton={false}
-            size="sm"
-          />
-          <span className="text-gray-300 dark:text-gray-600">|</span>
-          <MonthNavigator
-            selectedMonth={selectedDate}
-            onChange={setSelectedDate}
-            showGoToCurrentButton={false}
-            size="sm"
-            formatDisplay={(date) =>
-              date.toLocaleDateString("en-MY", { month: "long" })
-            }
-          />
-          <span className="text-gray-300 dark:text-gray-600 ml-auto">|</span>
-          <Link
-            to="/catalogue/contribution-rates"
-            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap"
-          >
-            <IconExternalLink size={14} />
-            Contribution Rates
-          </Link>
-        </div>
+      <div className="mb-4 flex items-center gap-4">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">e-Caruman</h1>
+        <span className="text-gray-300 dark:text-gray-600">|</span>
+        <YearNavigator
+          selectedYear={selectedYear}
+          onChange={handleYearChange}
+          showGoToCurrentButton={false}
+          size="sm"
+        />
+        <span className="text-gray-300 dark:text-gray-600">|</span>
+        <MonthNavigator
+          selectedMonth={selectedDate}
+          onChange={setSelectedDate}
+          showGoToCurrentButton={false}
+          size="sm"
+          formatDisplay={(date) =>
+            date.toLocaleDateString("en-MY", { month: "long" })
+          }
+        />
+        <span className="text-gray-300 dark:text-gray-600 ml-auto">|</span>
+        <Link
+          to="/catalogue/contribution-rates"
+          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap"
+        >
+          <IconExternalLink size={14} />
+          Contribution Rates
+        </Link>
       </div>
 
       {/* Download Contribution Files Section */}
@@ -587,7 +577,7 @@ const ECarumanPage: React.FC = () => {
               {/* EPF Detailed Tooltip */}
               {hoveredCard === "epf" && preview.epf && preview.epf.data.length > 0 && (
                 <div
-                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[600px]"
+                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[720px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -697,7 +687,7 @@ const ECarumanPage: React.FC = () => {
               {/* SOCSO Detailed Tooltip */}
               {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
                 <div
-                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[550px]"
+                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[640px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -805,7 +795,7 @@ const ECarumanPage: React.FC = () => {
               {/* SIP Detailed Tooltip */}
               {hoveredCard === "sip" && preview.sip && preview.sip.data.length > 0 && (
                 <div
-                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[640px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
@@ -901,7 +891,7 @@ const ECarumanPage: React.FC = () => {
               {/* Income Tax Detailed Tooltip */}
               {hoveredCard === "income_tax" && preview.income_tax && preview.income_tax.data.length > 0 && (
                 <div
-                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[500px]"
+                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[640px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
