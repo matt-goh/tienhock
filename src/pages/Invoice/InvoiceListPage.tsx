@@ -1440,22 +1440,24 @@ const InvoiceListPage: React.FC = () => {
     <div className="space-y-3">
       <div className="space-y-3">
         {/* --- Combined Header and Filters --- */}
-        <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-3 flex-shrink-0">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 flex-shrink-0">
           {/* Left: Count + Title + Date Controls */}
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="truncate min-w-0 text-xl font-semibold text-default-900 dark:text-gray-100">
               {totalItems > 0 && !isLoading ? `${totalItems} ` : ""}Invoices
             </h1>
-            <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-            <DateRangePicker
-              dateRange={{
-                start: filters.dateRange.start || new Date(),
-                end: filters.dateRange.end || new Date(),
-              }}
-              onDateChange={handleDateChange}
-            />
-            <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
-            <div className="flex items-center gap-1">
+            <span className="flex-shrink-0 hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+            <div className="flex-shrink-0">
+              <DateRangePicker
+                dateRange={{
+                  start: filters.dateRange.start || new Date(),
+                  end: filters.dateRange.end || new Date(),
+                }}
+                onDateChange={handleDateChange}
+              />
+            </div>
+            <span className="flex-shrink-0 hidden sm:inline text-default-300 dark:text-gray-600">|</span>
+            <div className="flex-shrink-0 flex items-center gap-1">
               <DateNavigator
                 selectedDate={filters.dateRange.start || new Date()}
                 onChange={handleDateNavigatorChange}
@@ -1474,10 +1476,10 @@ const InvoiceListPage: React.FC = () => {
           </div>
 
           {/* Right: Search and Filters */}
-          <div className="flex flex-wrap items-center gap-2 h-10">
+          <div className="flex items-center gap-2 h-10">
             {/* Search Input */}
             <div
-              className="relative w-full sm:w-48 h-10"
+              className="relative flex-1 xl:flex-none xl:w-48 h-10"
               title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
             >
               <IconSearch
@@ -1487,7 +1489,7 @@ const InvoiceListPage: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search"
-                className="w-full h-10 pl-9 pr-8 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
+                className="w-full h-10 pl-9 pr-6 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
                 value={searchTerm}
                 onChange={handleSearchChange}
                 onBlur={handleSearchBlur}
@@ -1505,7 +1507,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Salesman Filter */}
-            <div className="w-full sm:w-36 h-10">
+            <div className="w-36 h-10">
               <StyledListbox
                 value={selectedSalesmanId}
                 onChange={handleSalesmanChange}
@@ -1517,7 +1519,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Filter Menu Button */}
-            <div className="relative w-full sm:w-auto sm:flex-shrink-0 h-10">
+            <div className="relative flex-shrink-0 h-10">
               <InvoiceFilterMenu
                   currentFilters={filters}
                   onFilterChange={handleApplyFilters}
@@ -1767,7 +1769,6 @@ const InvoiceListPage: React.FC = () => {
                   aria-label="Cancel Selected Invoices"
                   title="Cancel"
                 >
-                  Cancel
                 </Button>
                 {hasCancelledUnsynced() && (
                   <Button
@@ -1799,7 +1800,7 @@ const InvoiceListPage: React.FC = () => {
                   aria-label="Submit Selected for E-Invoice"
                   title="Submit e-Invoice"
                 >
-                  Submit e-Invoice
+                  e-Invoice
                 </Button>
                 <Button
                   size="sm"
@@ -1860,17 +1861,6 @@ const InvoiceListPage: React.FC = () => {
               Consolidated
             </Button>
             <Button
-              onClick={() => navigate("/sales/adjustment-docs")}
-              icon={IconFileText}
-              variant="outline"
-              disabled={isLoading || isExporting}
-              size="sm"
-              title="Adjustment Documents (Credit / Debit / Refund Notes)"
-              aria-label="Adjustment Documents"
-            >
-              Documents
-            </Button>
-            <Button
               onClick={handleRefresh}
               icon={IconRefresh}
               variant="outline"
@@ -1890,7 +1880,7 @@ const InvoiceListPage: React.FC = () => {
               title="Create New Invoice"
               aria-label="Create New Invoice"
             >
-              Create New
+              Create
             </Button>
           </div>
         </div>
