@@ -19,21 +19,6 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
-    date: "2026-05-22",
-    ms: "Pembetulan: Butiran rental dalam Invois Green Target tidak lagi berganda apabila invois mempunyai lebih daripada satu rekod bayaran yang dibatalkan.",
-    en: "Fix: Green Target invoice rental details no longer duplicate when an invoice has more than one cancelled payment record.",
-  },
-  {
-    date: "2026-05-22",
-    ms: "Pembetulan: Penyerahan e-Invoice untuk Nota Kredit, Nota Debit dan Nota Refund Green Target kini menggunakan alamat lokasi invois sebagai alamat pembeli, supaya dokumen tidak gagal kerana alamat pembeli kosong.",
-    en: "Fix: Green Target Credit Note, Debit Note, and Refund Note e-Invoice submissions now use the invoice location address as the buyer address, preventing failures caused by a blank buyer address.",
-  },
-  {
-    date: "2026-05-22",
-    ms: "Halaman Senarai dan Butiran Invois Green Target kini memaparkan status pelarasan seperti Credited, Refunded dan Partially Refunded, menunjukkan jumlah dan baki asal yang dipotong apabila invois berubah, memaparkan Nota Refund dalam sejarah bayaran, dan menghalang tindakan yang bercanggah apabila dokumen pelarasan masih aktif.",
-    en: "Green Target Invoice List and Details now show adjustment statuses like Credited, Refunded, and Partially Refunded, strike through the original amount and balance when the invoice changes, show Refund Notes in payment history, and prevent conflicting actions while adjustment documents are still active.",
-  },
-  {
     date: "2026-05-21",
     ms: "Pembetulan: Cuti Tahunan yang ditambah dalam Log Bulanan kini dikira sebagai bayaran cuti biasa, bukan sebagai pendahuluan. Hanya rekod Cuti Tahunan daripada Others (Advance) dikira sebagai pendahuluan.",
     en: "Fix: Annual Leave added in Monthly Logs is now treated as regular leave pay, not an advance. Only Annual Leave records from Others (Advance) are treated as advances.",
