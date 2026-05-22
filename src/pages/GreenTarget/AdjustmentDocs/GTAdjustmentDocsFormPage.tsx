@@ -301,23 +301,11 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           setPairedCreditNote(creditNote);
         }
 
-        // Default CN paired-refund toggle: ON when invoice has received payment
-        // and a full credit would create refundable excess.
+        // Default CN paired-refund toggle: OFF. The option remains available
+        // when the Credit Note exceeds the outstanding balance, but the user
+        // must opt in.
         if (isCN) {
-          const currentBalance = roundMoney(Number(inv.balance_due || 0));
-          const hasPaidAny = (pays || []).some(
-            (p) => !p.status || p.status === "active"
-          );
-          const originalCreditTotal = roundMoney(
-            Number(inv.total_amount || 0) +
-              adjDocs
-                .filter((d) => d.type === "debit_note" && d.status === "active")
-                .reduce((sum, d) => sum + Number(d.total_amount || 0), 0)
-          );
-          setIssuePairedRefund(
-            hasPaidAny &&
-              originalCreditTotal - Math.max(currentBalance, 0) > MONEY_TOLERANCE
-          );
+          setIssuePairedRefund(false);
         }
         setHasLineUserEdits(false);
 
