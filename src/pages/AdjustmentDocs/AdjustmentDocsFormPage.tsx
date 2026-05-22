@@ -349,25 +349,10 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           setLinkedPayment(lp);
         }
 
-        // Default CN pair toggle: ON when there is paid money and a full
-        // original-credit would create a refundable excess.
+        // Default CN pair toggle: OFF. The option remains available when the
+        // Credit Note exceeds the outstanding balance, but the user must opt in.
         if (isCN) {
-          const currentBalanceDue: number = roundMoney(
-            Number(inv.balance_due || 0)
-          );
-          const hasPaidAny: boolean =
-            inv.paymenttype === "CASH" ||
-            (pays || []).some((p: Payment) =>
-              ["active", "overpaid"].includes(p.status || "")
-            );
-          const originalCreditTotal: number = roundMoney(
-            getMaxCreditNoteAmount(invoiceWithAdjustments)
-          );
-          setIssuePairedRefund(
-            hasPaidAny &&
-              originalCreditTotal - Math.max(currentBalanceDue, 0) >
-                MONEY_TOLERANCE
-          );
+          setIssuePairedRefund(false);
         }
         setHasLineUserEdits(false);
 
@@ -432,14 +417,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             },
           ]);
         } else if ((isCN || isDN) && inv.products && inv.products.length > 0) {
-          const canUsePairedOriginalLines: boolean =
-            inv.paymenttype === "CASH" ||
-            (pays || []).some((p: Payment) =>
-              ["active", "overpaid"].includes(p.status || "")
-            );
-          const useOriginalLines: boolean =
-            isCN && canUsePairedOriginalLines;
-          setLines(buildInvoiceProductLines(invoiceWithAdjustments, useOriginalLines));
+          setLines(buildInvoiceProductLines(invoiceWithAdjustments, false));
         } else {
           setLines([createBlankAdjustmentLine()]);
         }

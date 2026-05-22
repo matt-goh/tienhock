@@ -102,6 +102,28 @@ const getActivityIdentity = (
     activity.hoursApplied ?? "",
   ].join("|");
 
+const getEmployeeHourValues = (
+  employee: EmployeeEntry,
+  includeDayTypeHours: boolean,
+): number[] => [
+  employee.totalHours || 0,
+  employee.overtimeHours || 0,
+  ...(includeDayTypeHours
+    ? [
+        employee.ahadHours || 0,
+        employee.ahadOvertimeHours || 0,
+        employee.umumHours || 0,
+        employee.umumOvertimeHours || 0,
+      ]
+    : []),
+];
+
+const hasSelectedActivityAmount = (activities: ActivityItem[]): boolean =>
+  activities.some(
+    (activity: ActivityItem) =>
+      activity.isSelected && Number(activity.calculatedAmount || 0) > 0,
+  );
+
 interface LeaveEntry {
   id?: number;
   employeeId: string;
@@ -1004,7 +1026,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       const umumOvertimeHours = supportsDayTypeHours
         ? emp.umumOvertimeHours || 0
         : 0;
-      const hourValues = [
+      const hourValues: number[] = [
         regularHours,
         overtimeHours,
         ahadHours,
@@ -1012,14 +1034,22 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         umumHours,
         umumOvertimeHours,
       ];
+      const hasActivityAmount: boolean = hasSelectedActivityAmount(
+        employeeActivities[emp.employeeId] || [],
+      );
 
       if (hourValues.some((hours) => hours < 0)) {
         toast.error(`Hours cannot be negative for ${emp.employeeName}`);
         return;
       }
 
-      if (hourValues.reduce((sum, hours) => sum + hours, 0) <= 0) {
-        toast.error(`Please enter valid hours for ${emp.employeeName}`);
+      if (
+        hourValues.reduce((sum, hours) => sum + hours, 0) <= 0 &&
+        !hasActivityAmount
+      ) {
+        toast.error(
+          `Please enter valid hours or a paid activity for ${emp.employeeName}`,
+        );
         return;
       }
     }
@@ -1187,18 +1217,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   const hasHoursValidationError = Object.values(employeeEntries).some(
     (e) =>
       e.selected &&
-      [
-        e.totalHours || 0,
-        e.overtimeHours || 0,
-        ...(supportsDayTypeHours
-          ? [
-              e.ahadHours || 0,
-              e.ahadOvertimeHours || 0,
-              e.umumHours || 0,
-              e.umumOvertimeHours || 0,
-            ]
-          : []),
-      ].some((hours) => hours < 0),
+      getEmployeeHourValues(e, supportsDayTypeHours).some(
+        (hours: number) => hours < 0,
+      ),
   );
 
   const renderHourInput = (

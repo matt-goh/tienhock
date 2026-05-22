@@ -25,6 +25,15 @@ export default function (pool) {
     umumOvertimeHours: Number(entry.umumOvertimeHours) || 0,
   });
 
+  const hasSelectedActivityAmount = (entry) =>
+    Array.isArray(entry.activities) &&
+    entry.activities.some(
+      (activity) =>
+        activity &&
+        activity.isSelected !== false &&
+        Number(activity.calculatedAmount || 0) > 0
+    );
+
   const getMonthlyEntryHoursError = (entry) => {
     const {
       totalHours,
@@ -48,8 +57,11 @@ export default function (pool) {
       return "Monthly log hours cannot be negative";
     }
 
-    if (hourValues.reduce((sum, hours) => sum + hours, 0) <= 0) {
-      return "At least one monthly log hour value is required";
+    if (
+      hourValues.reduce((sum, hours) => sum + hours, 0) <= 0 &&
+      !hasSelectedActivityAmount(entry)
+    ) {
+      return "At least one monthly log hour value or paid activity is required";
     }
 
     return null;
