@@ -743,7 +743,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
           id: record.id,
           employeeId: record.employee_id,
           employeeName: record.employee_name,
-          leaveDate: record.leave_date.split("T")[0],
+          leaveDate: format(new Date(record.leave_date), "yyyy-MM-dd"),
           leaveType: record.leave_type,
           amountPaid: Number(record.amount_paid || 0),
           isNew: false,
