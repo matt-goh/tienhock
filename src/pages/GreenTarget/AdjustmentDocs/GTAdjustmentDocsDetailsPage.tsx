@@ -13,6 +13,7 @@ import {
   IconRotateClockwise,
   IconRefresh,
   IconInfoCircle,
+  IconPrinter,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
@@ -30,6 +31,8 @@ import {
   AdjustmentDocStatusBadge,
   ADJUSTMENT_DOC_TYPE_META,
 } from "../../../components/AdjustmentDocs/AdjustmentDocBadge";
+import GTAdjustmentDocPDFHandler from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
+import GTAdjustmentDocPrintOverlay from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPrintOverlay";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -102,6 +105,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
   const [isCancellingEinvoice, setIsCancellingEinvoice] = useState(false);
   const [showCancelEinvoiceDialog, setShowCancelEinvoiceDialog] = useState(false);
   const [einvoiceCancelReason, setEinvoiceCancelReason] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const fetchDoc = useCallback(async () => {
     if (!id) return;
@@ -346,6 +350,17 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
           </div>
           <div className="flex flex-col items-start gap-2 md:items-end">
             <div className="flex items-center gap-2 flex-wrap md:justify-end">
+              <Button
+                onClick={() => setIsPrinting(true)}
+                icon={IconPrinter}
+                variant="outline"
+                size="md"
+                disabled={loading || isPrinting}
+                title="Print this document"
+              >
+                {isPrinting ? "Printing..." : "Print"}
+              </Button>
+              <GTAdjustmentDocPDFHandler docs={[doc]} disabled={loading} />
               {doc.status === "active" && !doc.einvoice_status && (
                 <Button
                   onClick={handleSubmitEinvoice}
@@ -769,6 +784,13 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         }
         variant="danger"
       />
+
+      {isPrinting && doc && (
+        <GTAdjustmentDocPrintOverlay
+          docs={[doc]}
+          onComplete={() => setIsPrinting(false)}
+        />
+      )}
     </div>
   );
 };
