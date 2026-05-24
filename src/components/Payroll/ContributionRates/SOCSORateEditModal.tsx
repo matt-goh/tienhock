@@ -29,6 +29,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
     wage_from: "",
     wage_to: "",
     employee_rate: "",
+    employee_rate_skbbk: "",
     employer_rate: "",
     employer_rate_over_60: "",
   });
@@ -41,6 +42,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
         wage_from: rate.wage_from.toString(),
         wage_to: rate.wage_to >= 999999 ? "999999" : rate.wage_to.toString(),
         employee_rate: rate.employee_rate.toString(),
+        employee_rate_skbbk: rate.employee_rate_skbbk.toString(),
         employer_rate: rate.employer_rate.toString(),
         employer_rate_over_60: rate.employer_rate_over_60.toString(),
       });
@@ -59,6 +61,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
         wage_from: parseFloat(formData.wage_from),
         wage_to: parseFloat(formData.wage_to),
         employee_rate: parseFloat(formData.employee_rate),
+        employee_rate_skbbk: parseFloat(formData.employee_rate_skbbk),
         employer_rate: parseFloat(formData.employer_rate),
         employer_rate_over_60: parseFloat(formData.employer_rate_over_60),
       };
@@ -109,7 +112,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+              <DialogPanel className="w-full max-w-xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                 <DialogTitle
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
@@ -144,18 +147,52 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                     />
                   </div>
 
-                  <FormInput
-                    name="employee_rate"
-                    label="Employee Rate (RM)"
-                    type="number"
-                    value={formData.employee_rate}
-                    onChange={(e) =>
-                      handleChange("employee_rate", e.target.value)
-                    }
-                    step="0.01"
-                    min={0}
-                    required
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormInput
+                      name="employee_rate"
+                      label="Employee Rate — Keilatan (RM)"
+                      type="number"
+                      value={formData.employee_rate}
+                      onChange={(e) =>
+                        handleChange("employee_rate", e.target.value)
+                      }
+                      step="0.01"
+                      min={0}
+                      required
+                    />
+
+                    <FormInput
+                      name="employee_rate_skbbk"
+                      label="Employee Rate — SKBBK (RM)"
+                      type="number"
+                      value={formData.employee_rate_skbbk}
+                      onChange={(e) =>
+                        handleChange("employee_rate_skbbk", e.target.value)
+                      }
+                      step="0.01"
+                      min={0}
+                      required
+                    />
+                  </div>
+
+                  <div className="-mt-2 text-xs text-default-500 dark:text-gray-400">
+                    Employee Total (&lt;60) ={" "}
+                    <span className="font-medium text-sky-700 dark:text-sky-300">
+                      RM{" "}
+                      {(
+                        (parseFloat(formData.employee_rate) || 0) +
+                        (parseFloat(formData.employee_rate_skbbk) || 0)
+                      ).toFixed(2)}
+                    </span>
+                    {"  •  "}
+                    Employee Total (≥60) ={" "}
+                    <span className="font-medium text-sky-700 dark:text-sky-300">
+                      RM{" "}
+                      {(parseFloat(formData.employee_rate_skbbk) || 0).toFixed(
+                        2
+                      )}
+                    </span>
+                  </div>
 
                   <FormInput
                     name="employer_rate"

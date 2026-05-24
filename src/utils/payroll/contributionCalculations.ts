@@ -136,25 +136,43 @@ export const calculateEPF = (
 };
 
 // Calculate SOCSO contribution
+//
+// Employee total = KEILATAN + SKBBK for under-60, just SKBBK for 60+.
+// Returns keilatan/skbbk split so callers can write it into rate_info for the
+// combined SOCSO+SIP+SKBBK government export.
 export const calculateSOCSO = (
   socsoRate: SOCSORRate,
   wageAmount: number,
   isOver60: boolean = false
-): { employee: number; employer: number } => {
-  if (!socsoRate) return { employee: 0, employer: 0 };
+): {
+  employee: number;
+  employer: number;
+  keilatan: number;
+  skbbk: number;
+} => {
+  if (!socsoRate)
+    return { employee: 0, employer: 0, keilatan: 0, skbbk: 0 };
 
-  // For employees 60 and above: employee pays 0, employer uses special rate
+  const skbbk = Math.round(Number(socsoRate.employee_rate_skbbk) * 100) / 100;
+
+  // For employees 60 and above: employer uses special rate, employee pays
+  // SKBBK only (Keilatan does not apply).
   if (isOver60) {
     return {
-      employee: 0, // Employees >= 60 pay nothing for SOCSO
-      employer: Math.round(socsoRate.employer_rate_over_60 * 100) / 100,
+      employee: skbbk,
+      employer: Math.round(Number(socsoRate.employer_rate_over_60) * 100) / 100,
+      keilatan: 0,
+      skbbk,
     };
   }
 
-  // For employees under 60: both pay their respective rates
+  // For employees under 60: employee pays KEILATAN + SKBBK.
+  const keilatan = Math.round(Number(socsoRate.employee_rate) * 100) / 100;
   return {
-    employee: Math.round(socsoRate.employee_rate * 100) / 100,
-    employer: Math.round(socsoRate.employer_rate * 100) / 100,
+    employee: Math.round((keilatan + skbbk) * 100) / 100,
+    employer: Math.round(Number(socsoRate.employer_rate) * 100) / 100,
+    keilatan,
+    skbbk,
   };
 };
 
