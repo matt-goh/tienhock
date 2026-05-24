@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-24",
+    ms: "Caruman SOCSO kini termasuk amaun SKBBK baharu yang diwajibkan PERKESO. Bagi pekerja di bawah 60 tahun, jumlah caruman pekerja kini ialah Keilatan + SKBBK; pekerja 60 tahun ke atas kini membayar SKBBK sahaja (sebelum ini RM0). Eksport SOCSO dan SIP kerajaan telah digabungkan menjadi satu fail SOCSO-SIP{MMYY}.TXT dalam folder SOCSO-SIP/. Kedua-dua kad SOCSO dan SIP di halaman e-Caruman kini memuat turun fail gabungan yang sama. Halaman Contribution Rates juga dikemas kini untuk menunjukkan kadar SKBBK baharu, yang boleh diedit.",
+    en: "SOCSO contributions now include the new SKBBK amount required by PERKESO. For employees under 60, the employee contribution is now Keilatan + SKBBK; employees 60 and above now pay SKBBK (previously RM0). The SOCSO and SIP government exports were merged into a single SOCSO-SIP{MMYY}.TXT file in the new SOCSO-SIP/ folder, and both the SOCSO and SIP cards on the e-Caruman page now download that same combined file. The Contribution Rates page was updated to show and allow editing of the new SKBBK rate.",
+  },
+  {
     date: "2026-05-23",
     ms: "Pembetulan: Tarikh cuti dalam Log Bulanan kadangkala dipaparkan sehari lebih awal daripada tarikh yang disimpan apabila halaman dibuka semula. Tarikh kini dipaparkan dengan betul.",
     en: "Fix: Leave dates in Monthly Logs sometimes displayed one day earlier than the saved date when the page was reopened. Dates now display correctly.",

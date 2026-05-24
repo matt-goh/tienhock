@@ -414,10 +414,11 @@ export class PayrollCalculationService {
     // 2. Calculate SOCSO (using total gross pay including overtime)
     const socsoRate = findSOCSORRate(socsoRates, totalGrossPay);
     if (socsoRate) {
+      const isOver60 = age >= 60;
       const socsoContribution = calculateSOCSO(
         socsoRate,
         totalGrossPay,
-        age >= 60
+        isOver60
       );
       deductions.push({
         deduction_type: "socso",
@@ -426,12 +427,13 @@ export class PayrollCalculationService {
         wage_amount: totalGrossPay,
         rate_info: {
           rate_id: socsoRate.id,
-          employee_rate: age >= 60 ? "RM0.00" : `RM${socsoRate.employee_rate}`,
-          employer_rate:
-            age >= 60
-              ? `RM${socsoRate.employer_rate_over_60}`
-              : `RM${socsoRate.employer_rate}`,
-          age_group: age >= 60 ? "60_and_above" : "under_60",
+          employee_rate: `RM${socsoContribution.employee.toFixed(2)}`,
+          employer_rate: `RM${socsoContribution.employer.toFixed(2)}`,
+          age_group: isOver60 ? "60_and_above" : "under_60",
+          // Numeric split so the SOCSO+EIS+SKBBK government export can output
+          // Keilatan and SKBBK as separate fields without re-deriving rates.
+          keilatan_amount: socsoContribution.keilatan,
+          skbbk_amount: socsoContribution.skbbk,
         },
       });
     }

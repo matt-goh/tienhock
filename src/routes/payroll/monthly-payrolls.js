@@ -1414,28 +1414,38 @@ export default function (pool) {
             }
           }
 
-          // SOCSO
+          // SOCSO (Keilatan + SKBBK split, both contribute to employee_amount).
           const socsoRate = findRateByWage(socsoRates, grossPay);
           if (socsoRate) {
             const isOver60 = age >= 60;
+            const skbbk =
+              Math.round(
+                parseFloat(socsoRate.employee_rate_skbbk || 0) * 100
+              ) / 100;
+            const keilatan = isOver60
+              ? 0
+              : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
+                100;
+            const employee_amount =
+              Math.round((keilatan + skbbk) * 100) / 100;
+            const employer_amount = isOver60
+              ? Math.round(
+                  parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
+                ) / 100
+              : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
+                100;
             deductions.push({
               deduction_type: "socso",
-              employee_amount: isOver60
-                ? 0
-                : parseFloat(socsoRate.employee_rate) || 0,
-              employer_amount: isOver60
-                ? parseFloat(socsoRate.employer_rate_over_60) || 0
-                : parseFloat(socsoRate.employer_rate) || 0,
+              employee_amount,
+              employer_amount,
               wage_amount: grossPay,
               rate_info: {
                 rate_id: socsoRate.id,
-                employee_rate: isOver60
-                  ? "RM0.00"
-                  : `RM${socsoRate.employee_rate}`,
-                employer_rate: isOver60
-                  ? `RM${socsoRate.employer_rate_over_60}`
-                  : `RM${socsoRate.employer_rate}`,
+                employee_rate: `RM${employee_amount.toFixed(2)}`,
+                employer_rate: `RM${employer_amount.toFixed(2)}`,
                 age_group: isOver60 ? "60_and_above" : "under_60",
+                keilatan_amount: keilatan,
+                skbbk_amount: skbbk,
               },
             });
           }

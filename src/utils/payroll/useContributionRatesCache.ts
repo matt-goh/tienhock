@@ -12,7 +12,9 @@ export interface ContributionRatesData {
   timestamp: number;
 }
 
-const CACHE_KEY = "contribution_rates_cache";
+// v2: schema added `socso_rates.employee_rate_skbbk` (SKBBK gazette).
+// Bumping the key forces clients to drop pre-SKBBK cached payloads on next load.
+const CACHE_KEY = "contribution_rates_cache_v2";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const RATES_UPDATED_EVENT = "contribution-rates-updated";
 

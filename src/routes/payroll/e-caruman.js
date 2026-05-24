@@ -54,155 +54,72 @@ export default function (pool) {
     return Math.round(parseFloat(amount || 0) * 100);
   };
 
-  // Format date as DDMMYYYY for SIP fixed-width file
-  const formatDateDDMMYYYY = (dateStr) => {
-    if (!dateStr) return "        "; // 8 spaces if no date
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "        ";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}${month}${year}`;
-  };
-
-  // Format date as DD/MM/YYYY for SIP CSV file
-  const formatDateSlash = (dateStr) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
-
   /**
-   * Generate SOCSO fixed-width text file content
-   * Format: 223 characters per line
-   * Fields:
-   * 1. Employer Code (12) pos 1-12
-   * 2. MyCoID/SSM Number (20) pos 13-32
-   * 3. IC Number (12) pos 33-44 - uses SOCSO number for foreign workers
-   * 4. Employee Name (150) pos 45-194
-   * 5. Month Contribution MMYYYY (6) pos 195-200
-   * 6. Employee Salary in cents (14) pos 201-214
-   * 7. Filler (9 blank spaces) pos 215-223
+   * Generate the combined SOCSO + EIS + SKBBK fixed-width text file
+   * (PERKESO 2026 gazette format).
+   * 278 characters per line, detail records only (no header/footer).
+   *
+   * Field layout (per PERKESO spec):
+   *   1  Employer Code              12  pos 1-12     alphanumeric, left-justified
+   *   2  MyCoID/SSM Number          20  pos 13-32    alphanumeric, left-justified (blank allowed)
+   *   3  ID / SSFW No.              12  pos 33-44    IC for Malaysians, socso_no for foreigners
+   *   4  Employee Name             150  pos 45-194   left-justified
+   *   5  Month Contribution MMYYYY   6  pos 195-200
+   *   6  Employee Salary (cents)    14  pos 201-214  numeric, right-justified (zero padded)
+   *   7  SOCSO Employer (cents)      6  pos 215-220  numeric, right-justified
+   *   8  SOCSO Employee (Keilatan)   6  pos 221-226  numeric, right-justified
+   *   9  EIS Employer (cents)        6  pos 227-232  numeric, right-justified
+   *  10  EIS Employee (cents)        6  pos 233-238  numeric, right-justified
+   *  11  SKBBK Employee (cents)      6  pos 239-244  numeric, right-justified
+   *  12  Filler 1                   14  pos 245-258  blank
+   *  13  Filler 2                   20  pos 259-278  blank
    */
-  const generateSOCSOContent = (rows, employerCode, month, year) => {
+  const generateCombinedSOCSOSIPContent = (
+    rows,
+    employerCode,
+    myCoId,
+    month,
+    year
+  ) => {
     const lines = [];
     const monthContribution = String(month).padStart(2, "0") + String(year);
 
     rows.forEach((row) => {
-      // Field 1: Employer Code (12 chars, left justified)
-      const field1 = padLeft(employerCode, 12);
-      // Field 2: MyCoID/SSM Number (20 chars, left justified) - optional, leave blank
-      const field2 = padLeft("", 20);
-      // Field 3: IC Number (12 chars, alphanumeric)
-      // For foreign workers, use SOCSO number instead of IC number
       const isForeign = (row.nationality || "").toLowerCase() !== "malaysian";
-      const idNumber = isForeign ? (row.socso_no || row.ic_no) : row.ic_no;
-      const field3 = padLeft(stripIC(idNumber), 12);
-      // Field 4: Employee Name (150 chars, left justified)
-      const field4 = padLeft(row.name, 150);
-      // Field 5: Month Contribution MMYYYY (6 chars)
-      const field5 = monthContribution;
-      // Field 6: Employee Salary in cents (14 chars, right justified)
-      const field6 = padRight(toCents(row.salary), 14);
-      // Field 7: 9 blank spaces (pos 215-223)
-      const field7 = padLeft("", 9);
+      const idNumber = isForeign ? row.socso_no || row.ic_no : row.ic_no;
 
-      lines.push(
-        field1 +
-        field2 +
-        field3 +
-        field4 +
-        field5 +
-        field6 +
-        field7
-      );
-    });
-
-    return lines.join("\n");
-  };
-
-  /**
-   * Generate SIP fixed-width text file content (SIP*.TXT)
-   * Format: 223 characters per line
-   * Fields:
-   * 1. Employer Code (12) pos 1-12
-   * 2. MyCoID/SSM Number (20) pos 13-32
-   * 3. IC Number (12) pos 33-44
-   * 4. Employee Name (150) pos 45-194
-   * 5. Month Contribution MMYYYY (6) pos 195-200
-   * 6. SIP Amount in cents (14) pos 201-214
-   * 7. Employment Start Date DDMMYYYY (8) pos 215-222
-   * 8. Indicator (1) pos 223 - 'B' for new or space
-   */
-  const generateSIPContent = (rows, employerCode, myCoId, month, year) => {
-    const lines = [];
-    const monthContribution = String(month).padStart(2, "0") + String(year);
-
-    rows.forEach((row) => {
-      // Field 1: Employer Code (12 chars, left justified)
       const field1 = padLeft(employerCode, 12);
-      // Field 2: MyCoID/SSM Number (20 chars, left justified)
-      const field2 = padLeft(myCoId, 20);
-      // Field 3: IC Number (12 chars)
-      const field3 = padLeft(stripIC(row.ic_no), 12);
-      // Field 4: Employee Name (150 chars, left justified)
+      const field2 = padLeft(myCoId || "", 20);
+      const field3 = padLeft(stripIC(idNumber), 12);
       const field4 = padLeft(row.name, 150);
-      // Field 5: Month Contribution MMYYYY (6 chars)
       const field5 = monthContribution;
-      // Field 6: SIP Amount in cents (14 chars, right justified) - total EIS contribution
-      const sipAmount = toCents(parseFloat(row.eis_employer || 0) + parseFloat(row.eis_employee || 0));
-      const field6 = padRight(sipAmount, 14);
-      // Field 7: Employment Start Date DDMMYYYY (8 chars)
-      const field7 = formatDateDDMMYYYY(row.date_joined);
-      // Field 8: Indicator (1 char) - 'B' for new employees or space
-      const field8 = row.indicator || " ";
+      const field6 = padRight(toCents(row.salary), 14);
+      const field7 = padRight(toCents(row.socso_employer), 6);
+      const field8 = padRight(toCents(row.keilatan_amount), 6);
+      const field9 = padRight(toCents(row.eis_employer), 6);
+      const field10 = padRight(toCents(row.eis_employee), 6);
+      const field11 = padRight(toCents(row.skbbk_amount), 6);
+      const field12 = "".padEnd(14, " ");
+      const field13 = "".padEnd(20, " ");
 
       lines.push(
         field1 +
-        field2 +
-        field3 +
-        field4 +
-        field5 +
-        field6 +
-        field7 +
-        field8
+          field2 +
+          field3 +
+          field4 +
+          field5 +
+          field6 +
+          field7 +
+          field8 +
+          field9 +
+          field10 +
+          field11 +
+          field12 +
+          field13
       );
     });
 
     return lines.join("\n");
-  };
-
-  /**
-   * Generate SIP CSV file content (SIPE*.TXT)
-   * Format: Row,EmployerCode,MyCoID,ICNo,Name,Month,Amount,StartDate,Indicator
-   */
-  const generateSIPEContent = (rows, employerCode, myCoId, month, year) => {
-    const lines = [];
-    const monthContribution = String(month).padStart(2, "0") + String(year);
-
-    rows.forEach((row, index) => {
-      const rowNum = index + 1;
-      // SIP amount with decimal (RM), right-padded with spaces
-      const sipAmount = (parseFloat(row.eis_employer || 0) + parseFloat(row.eis_employee || 0)).toFixed(2);
-      const sipAmountPadded = sipAmount.padStart(14, " ");
-      // Start date in DD/MM/YYYY format (empty if no date)
-      const startDate = formatDateSlash(row.date_joined);
-      // Indicator padded to 10 chars
-      const indicator = (row.indicator || "").padEnd(10, " ");
-      // Name padded to 130 chars total (including name characters)
-      const namePadded = (row.name || "").substring(0, 130).padEnd(130, " ");
-
-      lines.push(
-        `${rowNum},${employerCode},${padLeft(myCoId, 20)},${stripIC(row.ic_no)},${namePadded},${monthContribution},${sipAmountPadded},${startDate},${indicator}`
-      );
-    });
-
-    // Add SUB character (ASCII 26 / 0x1A) at end of file as per PERKESO format
-    return lines.join("\n") + "\n\x1A";
   };
 
   /**
@@ -375,7 +292,11 @@ export default function (pool) {
         ORDER BY s.id, ep.id DESC
       `;
 
-      // SOCSO Query
+      // SOCSO Query.
+      // employee_amount is the COMBINED Keilatan+SKBBK. Pull the split out
+      // of rate_info so the preview can show the breakdown. For historical
+      // pre-SKBBK deductions, keilatan defaults to the full employee_amount
+      // and skbbk defaults to 0.
       const socsoQuery = `
         SELECT
           s.id as employee_id,
@@ -386,6 +307,12 @@ export default function (pool) {
           COALESCE(socso.wage_amount, eis.wage_amount, 0) as salary,
           COALESCE(socso.employer_amount, 0) as socso_employer,
           COALESCE(socso.employee_amount, 0) as socso_employee,
+          COALESCE(
+            (socso.rate_info->>'keilatan_amount')::numeric,
+            socso.employee_amount,
+            0
+          ) as keilatan_amount,
+          COALESCE((socso.rate_info->>'skbbk_amount')::numeric, 0) as skbbk_amount,
           COALESCE(eis.employer_amount, 0) as eis_employer,
           COALESCE(eis.employee_amount, 0) as eis_employee
         FROM employee_payrolls ep
@@ -480,11 +407,21 @@ export default function (pool) {
           acc.salary += parseFloat(row.salary || 0);
           acc.socso_employer += parseFloat(row.socso_employer || 0);
           acc.socso_employee += parseFloat(row.socso_employee || 0);
+          acc.keilatan_amount += parseFloat(row.keilatan_amount || 0);
+          acc.skbbk_amount += parseFloat(row.skbbk_amount || 0);
           acc.eis_employer += parseFloat(row.eis_employer || 0);
           acc.eis_employee += parseFloat(row.eis_employee || 0);
           return acc;
         },
-        { salary: 0, socso_employer: 0, socso_employee: 0, eis_employer: 0, eis_employee: 0 }
+        {
+          salary: 0,
+          socso_employer: 0,
+          socso_employee: 0,
+          keilatan_amount: 0,
+          skbbk_amount: 0,
+          eis_employer: 0,
+          eis_employee: 0,
+        }
       );
 
       // Calculate SIP totals
@@ -529,6 +466,8 @@ export default function (pool) {
             salary: parseFloat(row.salary || 0),
             socso_employer: parseFloat(row.socso_employer || 0),
             socso_employee: parseFloat(row.socso_employee || 0),
+            keilatan_amount: parseFloat(row.keilatan_amount || 0),
+            skbbk_amount: parseFloat(row.skbbk_amount || 0),
             eis_employer: parseFloat(row.eis_employer || 0),
             eis_employee: parseFloat(row.eis_employee || 0),
           })),
@@ -537,6 +476,8 @@ export default function (pool) {
             socso_employer: Math.round(socsoTotals.socso_employer * 100) / 100,
             socso_employee: Math.round(socsoTotals.socso_employee * 100) / 100,
             socso_total: Math.round((socsoTotals.socso_employer + socsoTotals.socso_employee) * 100) / 100,
+            keilatan_amount: Math.round(socsoTotals.keilatan_amount * 100) / 100,
+            skbbk_amount: Math.round(socsoTotals.skbbk_amount * 100) / 100,
             eis_employer: Math.round(socsoTotals.eis_employer * 100) / 100,
             eis_employee: Math.round(socsoTotals.eis_employee * 100) / 100,
             eis_total: Math.round((socsoTotals.eis_employer + socsoTotals.eis_employee) * 100) / 100,
@@ -946,28 +887,32 @@ export default function (pool) {
   });
 
   /**
-   * Get SOCSO+EIS data for folder-based export (returns JSON with file content)
-   * @query month - Month (1-12)
-   * @query year - Year
-   * @query company - Company code (default: TH)
-   * @query employerCode - SOCSO employer code (required)
+   * Get combined SOCSO + EIS + SKBBK data for folder-based export.
+   * Replaces the old /socso/export (BRG8A.TXT) and /sip/export (SIP*.TXT, SIPE*.TXT)
+   * with a single PERKESO 2026 combined file: SOCSO-SIP{MMYY}.TXT.
+   *
+   * @query month        Month (1-12)
+   * @query year         Year
+   * @query company      Company code (default: TH)
+   * @query employerCode PERKESO employer code (required)
+   * @query myCoId       Company SSM/MyCoID number (optional but recommended)
    */
-  router.get("/socso/export", async (req, res) => {
-    const { month, year, company = "TH", employerCode } = req.query;
+  router.get("/socso-sip/export", async (req, res) => {
+    const { month, year, company = "TH", employerCode, myCoId } = req.query;
 
     if (!month || !year) {
-      return res.status(400).json({
-        message: "Month and year are required",
-      });
+      return res.status(400).json({ message: "Month and year are required" });
     }
-
     if (!employerCode) {
-      return res.status(400).json({
-        message: "Employer code is required for SOCSO export",
-      });
+      return res
+        .status(400)
+        .json({ message: "Employer code is required for SOCSO-SIP export" });
     }
 
     try {
+      // Unified query: every employee with a SOCSO OR SIP deduction in the
+      // month. Pull the Keilatan/SKBBK split from socso.rate_info JSON.
+      // SIP rows are stored with deduction_type = 'sip' (Malaysian, under 60).
       const query = `
         SELECT
           s.id as employee_id,
@@ -975,16 +920,24 @@ export default function (pool) {
           s.socso_no,
           s.nationality,
           s.name,
-          COALESCE(socso.wage_amount, eis.wage_amount, 0) as salary,
+          COALESCE(socso.wage_amount, sip.wage_amount, 0) as salary,
           COALESCE(socso.employer_amount, 0) as socso_employer,
-          COALESCE(socso.employee_amount, 0) as socso_employee,
-          COALESCE(eis.employer_amount, 0) as eis_employer,
-          COALESCE(eis.employee_amount, 0) as eis_employee
+          COALESCE(socso.employee_amount, 0) as socso_employee_total,
+          COALESCE(
+            (socso.rate_info->>'keilatan_amount')::numeric,
+            socso.employee_amount,
+            0
+          ) as keilatan_amount,
+          COALESCE((socso.rate_info->>'skbbk_amount')::numeric, 0) as skbbk_amount,
+          COALESCE(sip.employer_amount, 0) as eis_employer,
+          COALESCE(sip.employee_amount, 0) as eis_employee
         FROM employee_payrolls ep
         JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
         JOIN staffs s ON ep.employee_id = s.id
-        LEFT JOIN payroll_deductions socso ON socso.employee_payroll_id = ep.id AND socso.deduction_type = 'socso'
-        LEFT JOIN payroll_deductions eis ON eis.employee_payroll_id = ep.id AND eis.deduction_type = 'eis'
+        LEFT JOIN payroll_deductions socso
+          ON socso.employee_payroll_id = ep.id AND socso.deduction_type = 'socso'
+        LEFT JOIN payroll_deductions sip
+          ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
         WHERE mp.month = $1
           AND mp.year = $2
           AND (
@@ -992,8 +945,10 @@ export default function (pool) {
             OR (s.socso_no IS NOT NULL AND s.socso_no != '')
           )
           AND (
-            (socso.employer_amount IS NOT NULL AND socso.employer_amount > 0)
-            OR (socso.employee_amount IS NOT NULL AND socso.employee_amount > 0)
+            COALESCE(socso.employer_amount, 0) > 0
+            OR COALESCE(socso.employee_amount, 0) > 0
+            OR COALESCE(sip.employer_amount, 0) > 0
+            OR COALESCE(sip.employee_amount, 0) > 0
           )
         ORDER BY s.name
       `;
@@ -1002,162 +957,49 @@ export default function (pool) {
 
       if (result.rows.length === 0) {
         return res.status(404).json({
-          message: "No SOCSO contribution data found for the specified period",
+          message:
+            "No SOCSO / EIS contribution data found for the specified period",
         });
       }
 
-      // Format month as 2 digits (01-12)
       const monthStr = String(month).padStart(2, "0");
+      const filePrefix = `${monthStr}${String(year).slice(-2)}`;
 
-      // Generate the fixed-width text file content
-      const content = generateSOCSOContent(result.rows, employerCode, month, year);
+      const content = generateCombinedSOCSOSIPContent(
+        result.rows,
+        employerCode,
+        myCoId,
+        month,
+        year
+      );
 
-      // Build response with folder structure info
       const files = [
         {
-          path: `SOCSO/${year}/${company}/${monthStr}`,
-          filename: "BRG8A.TXT",
-          content: content,
+          path: `SOCSO-SIP/${year}/${company}/${monthStr}`,
+          filename: `SOCSO-SIP${filePrefix}.TXT`,
+          content,
           count: result.rows.length,
         },
       ];
 
-      // Calculate totals for response
       const totals = result.rows.reduce(
         (acc, row) => {
           acc.socso_employer += parseFloat(row.socso_employer || 0);
-          acc.socso_employee += parseFloat(row.socso_employee || 0);
+          acc.socso_employee += parseFloat(row.socso_employee_total || 0);
+          acc.keilatan_amount += parseFloat(row.keilatan_amount || 0);
+          acc.skbbk_amount += parseFloat(row.skbbk_amount || 0);
           acc.eis_employer += parseFloat(row.eis_employer || 0);
           acc.eis_employee += parseFloat(row.eis_employee || 0);
           return acc;
         },
-        { socso_employer: 0, socso_employee: 0, eis_employer: 0, eis_employee: 0 }
-      );
-
-      res.json({
-        success: true,
-        year,
-        month: monthStr,
-        company,
-        employerCode,
-        files,
-        totalEmployees: result.rows.length,
-        totals: {
-          socso: Math.round((totals.socso_employer + totals.socso_employee) * 100) / 100,
-          eis: Math.round((totals.eis_employer + totals.eis_employee) * 100) / 100,
-        },
-      });
-    } catch (error) {
-      console.error("Error generating SOCSO export data:", error);
-      res.status(500).json({
-        message: "Error generating SOCSO export data",
-        error: error.message,
-      });
-    }
-  });
-
-  // ============================================
-  // SIP/EIS ROUTES
-  // ============================================
-
-  /**
-   * Get SIP/EIS data for folder-based export (returns JSON with file content)
-   * Generates both SIP*.TXT (fixed-width) and SIPE*.TXT (CSV) files
-   * @query month - Month (1-12)
-   * @query year - Year
-   * @query company - Company code (default: TH)
-   * @query employerCode - SIP employer code (required)
-   * @query myCoId - Company SSM/MyCoID number (required)
-   */
-  router.get("/sip/export", async (req, res) => {
-    const { month, year, company = "TH", employerCode, myCoId } = req.query;
-
-    if (!month || !year) {
-      return res.status(400).json({
-        message: "Month and year are required",
-      });
-    }
-
-    if (!employerCode) {
-      return res.status(400).json({
-        message: "Employer code is required for SIP export",
-      });
-    }
-
-    if (!myCoId) {
-      return res.status(400).json({
-        message: "MyCoID/SSM number is required for SIP export",
-      });
-    }
-
-    try {
-      // Note: deduction_type is 'sip' in the database
-      // SIP only applies to Malaysian citizens
-      const query = `
-        SELECT
-          s.id as employee_id,
-          s.ic_no,
-          s.name,
-          s.date_joined,
-          COALESCE(sip.employer_amount, 0) as eis_employer,
-          COALESCE(sip.employee_amount, 0) as eis_employee
-        FROM employee_payrolls ep
-        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-        JOIN staffs s ON ep.employee_id = s.id
-        JOIN payroll_deductions sip ON sip.employee_payroll_id = ep.id AND sip.deduction_type = 'sip'
-        WHERE mp.month = $1
-          AND mp.year = $2
-          AND s.ic_no IS NOT NULL
-          AND s.ic_no != ''
-          AND s.nationality = 'Malaysian'
-          AND (
-            (sip.employer_amount IS NOT NULL AND sip.employer_amount > 0)
-            OR (sip.employee_amount IS NOT NULL AND sip.employee_amount > 0)
-          )
-        ORDER BY s.name
-      `;
-
-      const result = await pool.query(query, [month, year]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          message: "No SIP/EIS contribution data found for the specified period",
-        });
-      }
-
-      // Format month as 2 digits (01-12)
-      const monthStr = String(month).padStart(2, "0");
-
-      // Generate both file contents
-      const sipContent = generateSIPContent(result.rows, employerCode, myCoId, month, year);
-      const sipeContent = generateSIPEContent(result.rows, employerCode, myCoId, month, year);
-
-      // Build response with folder structure info
-      // File naming: SIP{month}{year}.TXT and SIPE{month}{year}.TXT (e.g., SIP1125.TXT for Nov 2025)
-      const filePrefix = `${monthStr}${String(year).slice(-2)}`;
-      const files = [
         {
-          path: `SIP/${year}/${company}/${monthStr}`,
-          filename: `SIP${filePrefix}.TXT`,
-          content: sipContent,
-          count: result.rows.length,
-        },
-        {
-          path: `SIP/${year}/${company}/${monthStr}`,
-          filename: `SIPE${filePrefix}.TXT`,
-          content: sipeContent,
-          count: result.rows.length,
-        },
-      ];
-
-      // Calculate totals for response
-      const totals = result.rows.reduce(
-        (acc, row) => {
-          acc.eis_employer += parseFloat(row.eis_employer || 0);
-          acc.eis_employee += parseFloat(row.eis_employee || 0);
-          return acc;
-        },
-        { eis_employer: 0, eis_employee: 0 }
+          socso_employer: 0,
+          socso_employee: 0,
+          keilatan_amount: 0,
+          skbbk_amount: 0,
+          eis_employer: 0,
+          eis_employee: 0,
+        }
       );
 
       res.json({
@@ -1170,18 +1012,51 @@ export default function (pool) {
         files,
         totalEmployees: result.rows.length,
         totals: {
+          socso_employer: Math.round(totals.socso_employer * 100) / 100,
+          socso_employee: Math.round(totals.socso_employee * 100) / 100,
+          keilatan_amount: Math.round(totals.keilatan_amount * 100) / 100,
+          skbbk_amount: Math.round(totals.skbbk_amount * 100) / 100,
           eis_employer: Math.round(totals.eis_employer * 100) / 100,
           eis_employee: Math.round(totals.eis_employee * 100) / 100,
-          sip_total: Math.round((totals.eis_employer + totals.eis_employee) * 100) / 100,
+          combined_total:
+            Math.round(
+              (totals.socso_employer +
+                totals.socso_employee +
+                totals.eis_employer +
+                totals.eis_employee) *
+                100
+            ) / 100,
         },
       });
     } catch (error) {
-      console.error("Error generating SIP export data:", error);
+      console.error("Error generating SOCSO-SIP export data:", error);
       res.status(500).json({
-        message: "Error generating SIP export data",
+        message: "Error generating SOCSO-SIP export data",
         error: error.message,
       });
     }
+  });
+
+  // Deprecated. PERKESO replaced the standalone BRG8A.TXT (SOCSO) format with
+  // the combined SOCSO + EIS + SKBBK file at /socso-sip/export.
+  router.get("/socso/export", (_req, res) => {
+    res.status(410).json({
+      message:
+        "Replaced by /api/e-caruman/socso-sip/export (combined SOCSO+EIS+SKBBK).",
+    });
+  });
+
+  // ============================================
+  // SIP/EIS ROUTES
+  // ============================================
+
+  // Deprecated. PERKESO replaced the standalone SIP/SIPE files with the
+  // combined SOCSO + EIS + SKBBK file at /socso-sip/export.
+  router.get("/sip/export", (_req, res) => {
+    res.status(410).json({
+      message:
+        "Replaced by /api/e-caruman/socso-sip/export (combined SOCSO+EIS+SKBBK).",
+    });
   });
 
   // ============================================
