@@ -93,4 +93,6 @@ END $$;
 ALTER TABLE socso_rates
   ALTER COLUMN employee_rate_skbbk SET NOT NULL;
 
+DELETE FROM bookmarks WHERE name = 'Stock Movement';
+
 COMMIT;
