@@ -534,6 +534,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
   }
 };
 
+export { recalculateAndUpdatePayroll };
+
 export default function (pool) {
   const router = Router();
 
