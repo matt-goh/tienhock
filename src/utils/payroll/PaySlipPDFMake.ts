@@ -418,9 +418,7 @@ const calculateBaseRateSummary = (
   // Hourly rows can repeat the same hours across multiple tasks, so keep using
   // one representative hour quantity rather than summing duplicated hours.
   const representativeHours: number =
-    summaryItems.length > 0
-      ? Number(summaryItems[0].total_quantity) || 0
-      : 0;
+    summaryItems.length > 0 ? Number(summaryItems[0].total_quantity) || 0 : 0;
   return {
     averageRate:
       representativeHours > 0 ? totalAmount / representativeHours : 0,
@@ -551,12 +549,14 @@ const appendBasePayRows = (
 ): void => {
   if (consolidatedBaseItems.length === 0) return;
 
-  const baseRateSummaryUnits: BaseRateSummaryUnit[] =
-    getBaseRateSummaryUnits(consolidatedBaseItems);
+  const baseRateSummaryUnits: BaseRateSummaryUnit[] = getBaseRateSummaryUnits(
+    consolidatedBaseItems,
+  );
 
   baseRateSummaryUnits.forEach((unit, index) => {
-    const unitItems: ConsolidatedPayrollItem[] =
-      consolidatedBaseItems.filter((item) => item.rate_unit === unit);
+    const unitItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
+      (item) => item.rate_unit === unit,
+    );
 
     unitItems.forEach((item, itemIndex) => {
       const row: TableCell[] = createItemRow(
@@ -600,9 +600,7 @@ const appendBasePayRows = (
   });
 
   if (otherItems.length > 0 && baseRateSummaryUnits.length > 0) {
-    tableBody.push(
-      createBaseSubtotalRow("Jumlah Lain-lain", otherTotalAmount),
-    );
+    tableBody.push(createBaseSubtotalRow("Jumlah lain-lain", otherTotalAmount));
   }
 
   const shouldShowFinalSubtotal: boolean =
@@ -910,7 +908,7 @@ const buildMainPayrollPage = (
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         {
-          text: "Jumlah Lain-lain",
+          text: "Jumlah lain-lain",
           bold: true,
           fillColor: "#f8f9fa",
           fontSize: 8,
@@ -1139,10 +1137,7 @@ const buildMainPayrollPage = (
   }
 
   // Jumlah row (raw final payment before rounding)
-  if (
-    midMonthPayroll ||
-    commissionRecords.length > 0
-  ) {
+  if (midMonthPayroll || commissionRecords.length > 0) {
     tableBody.push([
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
@@ -1252,7 +1247,7 @@ const buildMainPayrollPage = (
               (descText.includes("Rate/") ||
                 descText === "Subtotal" ||
                 descText === "Jumlah Cuti" ||
-                descText === "Jumlah Lain-lain" ||
+                descText === "Jumlah lain-lain" ||
                 descText === "Jumlah Base" ||
                 descText === "Jumlah Gaji Kasar")
             ) {
@@ -1520,7 +1515,7 @@ const buildIndividualJobPage = (
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         {
-          text: "Jumlah Lain-lain",
+          text: "Jumlah lain-lain",
           bold: true,
           fillColor: "#f8f9fa",
           fontSize: 8,
@@ -1651,7 +1646,7 @@ const buildIndividualJobPage = (
               (descText.includes("Rate/") ||
                 descText === "Subtotal" ||
                 descText === "Jumlah Cuti" ||
-                descText === "Jumlah Lain-lain" ||
+                descText === "Jumlah lain-lain" ||
                 descText === "Jumlah Base" ||
                 descText.includes("Gross Pay") ||
                 descText === "Jumlah Gaji Kasar")

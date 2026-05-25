@@ -667,8 +667,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             : item.rate_unit === "Percent"
               ? `${item.rate}%`
               : item.rate_unit === "Fixed" && item.item_count > 1
-              ? `Fixed (${formatCurrency(item.rate)})`
-              : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                ? `Fixed (${formatCurrency(item.rate)})`
+                : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {fixedDirectAmountSummary ? (
@@ -769,8 +769,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               : item.rate_unit === "Percent"
                 ? `${item.rate}%`
                 : item.rate_unit === "Fixed" && item.quantity > 1
-                ? "Fixed"
-                : `${formatCurrency(item.rate)}/${item.rate_unit}`}
+                  ? "Fixed"
+                  : `${formatCurrency(item.rate)}/${item.rate_unit}`}
           </td>
           <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
             {item.rate_unit === "Fixed" ? (
@@ -888,7 +888,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           colSpan={3}
           className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
         >
-          Jumlah Lain-lain
+          Jumlah lain-lain
         </td>
         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
           {formatCurrency(otherTotalAmount)}
@@ -951,8 +951,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     totalLabel: string,
   ): React.ReactElement[] => {
     const rows: React.ReactElement[] = [];
-    const summaryUnits: BaseRateSummaryUnit[] =
-      getBaseRateSummaryUnits(consolidatedBaseItems);
+    const summaryUnits: BaseRateSummaryUnit[] = getBaseRateSummaryUnits(
+      consolidatedBaseItems,
+    );
 
     summaryUnits.forEach((unit) => {
       const unitItems: PayrollItem[] = getSortedItemsWithSeparators(
@@ -2458,8 +2459,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         (sum, r) => sum + (Number(r.days_taken) || 0),
                         0,
                       )}{" "}
-                      hari
-                      )
+                      hari )
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(

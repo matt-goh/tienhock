@@ -19,36 +19,6 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
-    date: "2026-05-25",
-    ms: "Label jumlah dalam Payroll Details dan slip gaji kini menggunakan Jumlah Cuti untuk cuti dan Jumlah Lain-lain untuk bayaran lain supaya ringkasan lebih jelas.",
-    en: "Payroll Details and payslip total labels now use Jumlah Cuti for leave and Jumlah Lain-lain for other pay so summaries are clearer.",
-  },
-  {
-    date: "2026-05-25",
-    ms: "Payroll Details kini mengingati paparan Summary/Detailed dan kedudukan skrol apabila pengguna membuka log lain lalu kembali semula.",
-    en: "Payroll Details now remembers the Summary/Detailed view and scroll position when users open another log and come back.",
-  },
-  {
-    date: "2026-05-25",
-    ms: "Ringkasan Base Pay kini memaparkan Jumlah Lain-lain untuk bayaran Base selain Bag/Jam, kemudian jumlah keseluruhan Base supaya jumlah bercampur lebih mudah dibaca.",
-    en: "Base Pay summaries now show a Jumlah Lain-lain total for Base pay outside Bag/Hour, followed by the overall Base total so mixed pay is easier to read.",
-  },
-  {
-    date: "2026-05-25",
-    ms: "Rekod cuti dalam Payroll Details kini boleh ditekan pada tarikh untuk membuka log gaji atau halaman Packing Cuti tempat cuti itu direkod.",
-    en: "Leave records in Payroll Details now link from the date to the payroll log or Packing Cuti page where the leave was recorded.",
-  },
-  {
-    date: "2026-05-25",
-    ms: "Pembetulan: Jadual Base Pay dalam Payroll Details kini menyusun Bag/Jam dahulu, memaparkan ringkasan unit tersebut sebelum bayaran Base lain, dan kadar purata hanya dikira menggunakan jumlah bagi unit tersebut.",
-    en: "Fix: The Base Pay table in Payroll Details now lists Bag/Hour pay first, shows that unit summary before other Base pay, and calculates average rates only from the matching unit totals.",
-  },
-  {
-    date: "2026-05-25",
-    ms: "Pembetulan: Slip gaji PDF kini memaparkan bayaran Fixed yang dimasukkan sebagai amaun terus sebagai Ikut amaun dengan kuantiti '-' supaya jumlah seperti komisen tambahan tidak kelihatan seperti kuantiti palsu.",
-    en: "Fix: Payslip PDFs now show Fixed pay entered as direct amounts as Ikut amaun with quantity '-' so items like extra commission no longer look like fake quantities.",
-  },
-  {
     date: "2026-05-24",
     ms: "Caruman SOCSO kini termasuk amaun SKBBK baharu yang diwajibkan PERKESO. Bagi pekerja di bawah 60 tahun, jumlah caruman pekerja kini ialah Keilatan + SKBBK; pekerja 60 tahun ke atas kini membayar SKBBK sahaja (sebelum ini RM0). Eksport SOCSO dan SIP kerajaan telah digabungkan menjadi satu fail SOCSO-SIP{MMYY}.TXT dalam folder SOCSO-SIP/. Kedua-dua kad SOCSO dan SIP di halaman e-Caruman kini memuat turun fail gabungan yang sama. Halaman Contribution Rates juga dikemas kini untuk menunjukkan kadar SKBBK baharu, yang boleh diedit.",
     en: "SOCSO contributions now include the new SKBBK amount required by PERKESO. For employees under 60, the employee contribution is now Keilatan + SKBBK; employees 60 and above now pay SKBBK (previously RM0). The SOCSO and SIP government exports were merged into a single SOCSO-SIP{MMYY}.TXT file in the new SOCSO-SIP/ folder, and both the SOCSO and SIP cards on the e-Caruman page now download that same combined file. The Contribution Rates page was updated to show and allow editing of the new SKBBK rate.",
