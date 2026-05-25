@@ -1,5 +1,6 @@
 // src/hooks/useBookmarks.ts
 import { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import { useCompany } from "../contexts/CompanyContext";
 import { api } from "../routes/utils/api";
@@ -135,39 +136,73 @@ export const useBookmarks = () => {
       if (!user?.id) return;
 
       if (isBookmarked) {
-        // Add to local state
+        const itemData = findNavItem(navData, name);
+        if (!itemData) return;
+
+        // Optimistic update with a temporary id; replaced with the DB id below
+        const tempId = Date.now();
+        const tempBookmark = { id: tempId, name };
         setBookmarkedItems((prev) => {
           const newSet = new Set(prev);
           newSet.add(name);
           return newSet;
         });
+        setBookmarks((prev) => [...prev, tempBookmark]);
 
-        const itemData = findNavItem(navData, name);
-        if (itemData) {
-          const newBookmark = { id: Date.now(), name };
-          setBookmarks((prev) => [...prev, newBookmark]);
+        try {
+          const saved: Bookmark = await api.post("/api/bookmarks", {
+            staffId: user.id,
+            name,
+          });
 
-          // Update cache
-          const cachedBookmarks = getBookmarksFromCache(user.id) || [
-            ...bookmarks,
-          ];
-          saveBookmarksToCache(user.id, [...cachedBookmarks, newBookmark]);
+          setBookmarks((prev) =>
+            prev.map((b) => (b.id === tempId ? { id: saved.id, name } : b))
+          );
+
+          const cached = getBookmarksFromCache(user.id) || [];
+          saveBookmarksToCache(user.id, [
+            ...cached.filter((b) => b.name !== name),
+            { id: saved.id, name },
+          ]);
+        } catch (error) {
+          // Revert
+          setBookmarkedItems((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(name);
+            return newSet;
+          });
+          setBookmarks((prev) => prev.filter((b) => b.id !== tempId));
+          console.error("Error adding bookmark:", error);
+          toast.error("Failed to add bookmark");
         }
       } else {
-        // Remove from local state
+        // Snapshot for revert
+        const previousBookmarks = bookmarks;
+        const updatedBookmarks = bookmarks.filter((b) => b.name !== name);
+
         setBookmarkedItems((prev) => {
           const newSet = new Set(prev);
           newSet.delete(name);
           return newSet;
         });
-
-        const updatedBookmarks = bookmarks.filter(
-          (bookmark) => bookmark.name !== name
-        );
         setBookmarks(updatedBookmarks);
 
-        // Update cache
-        saveBookmarksToCache(user.id, updatedBookmarks);
+        try {
+          await api.delete(
+            `/api/bookmarks/${encodeURIComponent(user.id)}/${encodeURIComponent(name)}`
+          );
+          saveBookmarksToCache(user.id, updatedBookmarks);
+        } catch (error) {
+          // Revert
+          setBookmarkedItems((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(name);
+            return newSet;
+          });
+          setBookmarks(previousBookmarks);
+          console.error("Error removing bookmark:", error);
+          toast.error("Failed to remove bookmark");
+        }
       }
     },
     [user?.id, bookmarks, navData, findNavItem]
