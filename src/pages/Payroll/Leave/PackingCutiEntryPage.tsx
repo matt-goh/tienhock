@@ -5,6 +5,7 @@ import {
   IconSearch,
   IconX,
 } from "@tabler/icons-react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
@@ -82,6 +83,10 @@ const formatDateLocal = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+const isValidDateString = (dateStr: string | null): dateStr is string => {
+  return Boolean(dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr));
+};
+
 const parseLocalDate = (dateStr: string): Date => {
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -141,9 +146,13 @@ const isInteractiveClickTarget = (target: EventTarget | null): boolean => {
 const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
   jobType,
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>(
-    formatDateLocal(new Date()),
-  );
+  const [searchParams] = useSearchParams();
+  const queryDateParam: string | null = searchParams.get("date");
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return isValidDateString(queryDateParam)
+      ? queryDateParam
+      : formatDateLocal(new Date());
+  });
   const [workers, setWorkers] = useState<PackingWorker[]>([]);
   const [rowState, setRowState] = useState<Record<string, RowState>>({});
   const [originalRowState, setOriginalRowState] = useState<
@@ -162,6 +171,12 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
     jobType === "MEE_PACKING" ? "MEE Packing Cuti" : "Bihun Packing Cuti";
   const pageSubtitle =
     jobType === "MEE_PACKING" ? "Packing Mee" : "Packing Bihun";
+
+  useEffect(() => {
+    if (isValidDateString(queryDateParam)) {
+      setSelectedDate(queryDateParam);
+    }
+  }, [queryDateParam]);
 
   const fetchData = useCallback(async (): Promise<void> => {
     setIsLoading(true);
