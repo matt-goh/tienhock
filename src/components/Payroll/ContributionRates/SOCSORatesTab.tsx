@@ -50,10 +50,9 @@ const SOCSORatesTab: React.FC = () => {
 
   return (
     <div className="mt-4">
-      <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
-            <thead className="bg-default-50 dark:bg-gray-900/50">
+      <div className="border border-default-200 dark:border-gray-700 rounded-lg">
+        <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
+            <thead className="bg-default-50 dark:bg-gray-900 sticky top-0 z-10">
               <tr>
                 <th
                   rowSpan={2}
@@ -150,7 +149,6 @@ const SOCSORatesTab: React.FC = () => {
               })}
             </tbody>
           </table>
-        </div>
       </div>
 
       {/* Edit Modal */}
