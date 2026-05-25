@@ -550,6 +550,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     );
   };
 
+  const shouldShowBaseRateSummary = (
+    summaryItems: ConsolidatedPayrollItem[],
+    unit: BaseRateSummaryUnit,
+  ): boolean => {
+    return unit !== "Bag" || summaryItems.length > 1;
+  };
+
   const calculateBaseRateSummary = (
     baseItems: ConsolidatedPayrollItem[],
     unit: BaseRateSummaryUnit,
@@ -921,7 +928,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         rowIndex += 1;
       });
 
-      rows.push(renderBaseSummaryRow(baseItems, unit, totalLabel));
+      if (shouldShowBaseRateSummary(unitItems, unit)) {
+        rows.push(renderBaseSummaryRow(baseItems, unit, totalLabel));
+      }
       hasRenderedSection = true;
     });
 
@@ -964,7 +973,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         rows.push(renderDetailedRow(item, index, items, false));
       });
 
-      rows.push(renderBaseSummaryRow(consolidatedBaseItems, unit, totalLabel));
+      const consolidatedUnitItems: ConsolidatedPayrollItem[] =
+        consolidatedBaseItems.filter((item) => item.rate_unit === unit);
+
+      if (shouldShowBaseRateSummary(consolidatedUnitItems, unit)) {
+        rows.push(renderBaseSummaryRow(consolidatedBaseItems, unit, totalLabel));
+      }
     });
 
     const otherItems: PayrollItem[] = getSortedItemsWithSeparators(

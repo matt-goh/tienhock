@@ -401,6 +401,13 @@ const getBaseRateSummaryUnits = (
   );
 };
 
+const shouldShowBaseRateSummary = (
+  summaryItems: ConsolidatedPayrollItem[],
+  summaryUnit: BaseRateSummaryUnit,
+): boolean => {
+  return summaryUnit !== "Bag" || summaryItems.length > 1;
+};
+
 const calculateBaseRateSummary = (
   consolidatedBaseItems: ConsolidatedPayrollItem[],
   summaryUnit: BaseRateSummaryUnit,
@@ -582,9 +589,14 @@ const appendBasePayRows = (
       );
     });
 
-    tableBody.push(
-      createBaseRateSummaryRow(unit, calculateBaseRateSummary(unitItems, unit)),
-    );
+    if (shouldShowBaseRateSummary(unitItems, unit)) {
+      tableBody.push(
+        createBaseRateSummaryRow(
+          unit,
+          calculateBaseRateSummary(unitItems, unit),
+        ),
+      );
+    }
   });
 
   const otherItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
