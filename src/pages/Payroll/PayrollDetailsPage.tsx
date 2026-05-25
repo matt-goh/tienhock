@@ -1,6 +1,11 @@
 // src/pages/Payroll/EmployeePayrollDetailsPage.tsx
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   IconPlus,
   IconTrash,
@@ -31,7 +36,6 @@ import {
   ConsolidatedPayrollItem,
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import {
   EmployeePayroll,
@@ -43,6 +47,9 @@ import {
   DownloadPayslipButton,
   PrintPayslipButton,
 } from "../../utils/payroll/PayslipButtons";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+
+type PayrollDetailsViewMode = "consolidated" | "detailed";
 
 interface PayrollItem {
   id?: number;
@@ -56,9 +63,15 @@ interface PayrollItem {
   is_manual: boolean;
   pay_type?: string;
   job_type?: string;
+  source_employee_id?: string | null;
   source_date?: string | null;
   work_log_id?: number | null;
   work_log_type?: "daily" | "monthly" | null;
+}
+
+interface FixedDirectAmountSummary {
+  paidEntries: number;
+  totalEntries: number;
 }
 
 interface MonthlyLeaveRecord {
@@ -69,13 +82,17 @@ interface MonthlyLeaveRecord {
   days_taken: number;
   amount_paid: number;
   status: string;
-  work_log_id?: number;
+  work_log_id?: number | null;
+  work_log_type?: "daily" | "monthly" | "packing_cuti" | null;
+  work_log_section?: string | null;
+  notes?: string | null;
   holiday_description?: string | null;
 }
 
 const EmployeePayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [payroll, setPayroll] = useState<EmployeePayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,9 +109,34 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     CommissionRecord[]
   >([]);
   const [othersRecords, setOthersRecords] = useState<OthersRecord[]>([]);
-  const [viewMode, setViewMode] = useState<"consolidated" | "detailed">(
-    "consolidated",
+  const [viewMode, setViewMode] = useState<PayrollDetailsViewMode>(() =>
+    searchParams.get("view") === "detailed" ? "detailed" : "consolidated",
   );
+
+  const scrollRestorationKey: string = useMemo(() => {
+    return `payroll-details:${id || "unknown"}:${viewMode}`;
+  }, [id, viewMode]);
+
+  useScrollRestoration(scrollRestorationKey, !isLoading && !!payroll);
+
+  const handleViewModeChange = (nextViewMode: PayrollDetailsViewMode): void => {
+    setViewMode(nextViewMode);
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextViewMode === "detailed") {
+      nextParams.set("view", "detailed");
+    } else {
+      nextParams.delete("view");
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  useEffect(() => {
+    const nextViewMode: PayrollDetailsViewMode =
+      searchParams.get("view") === "detailed" ? "detailed" : "consolidated";
+    setViewMode((currentViewMode) =>
+      currentViewMode === nextViewMode ? currentViewMode : nextViewMode,
+    );
+  }, [searchParams]);
 
   useEffect(() => {
     fetchEmployeePayrollComprehensive();
@@ -205,6 +247,79 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     return `/payroll/${routePath}/${item.work_log_id}`;
   };
 
+  const getDailyLeaveRoutePath = (
+    section: string | null | undefined,
+  ): string | null => {
+    switch (section) {
+      case "MEE":
+        return "mee-production";
+      case "BIHUN":
+        return "bihun-production";
+      case "BOILER":
+        return "boiler-production";
+      case "SALES":
+      case "SALESMAN":
+        return "salesman-production";
+      default:
+        return null;
+    }
+  };
+
+  const getMonthlyLeaveRoutePath = (
+    section: string | null | undefined,
+  ): string | null => {
+    switch (section) {
+      case "MAINTENANCE":
+      case "MAINTEN":
+        return "maintenance-monthly";
+      case "OFFICE":
+        return "office-monthly";
+      case "SAPU":
+      case "TUKANG_SAPU":
+        return "tukang-sapu-monthly";
+      default:
+        return null;
+    }
+  };
+
+  const getPackingCutiRoutePath = (
+    section: string | null | undefined,
+  ): string | null => {
+    switch (section) {
+      case "MEE_PACKING":
+        return "mee-packing-cuti";
+      case "BH_PACKING":
+        return "bihun-packing-cuti";
+      default:
+        return null;
+    }
+  };
+
+  const getLeaveRecordUrl = (record: MonthlyLeaveRecord): string | null => {
+    if (record.work_log_type === "daily" && record.work_log_id) {
+      const routePath: string | null = getDailyLeaveRoutePath(
+        record.work_log_section,
+      );
+      return routePath ? `/payroll/${routePath}/${record.work_log_id}` : null;
+    }
+
+    if (record.work_log_type === "monthly" && record.work_log_id) {
+      const routePath: string | null = getMonthlyLeaveRoutePath(
+        record.work_log_section,
+      );
+      return routePath ? `/payroll/${routePath}/${record.work_log_id}` : null;
+    }
+
+    if (record.work_log_type === "packing_cuti") {
+      const routePath: string | null = getPackingCutiRoutePath(
+        record.work_log_section,
+      );
+      return routePath ? `/payroll/${routePath}?date=${record.date}` : null;
+    }
+
+    return null;
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -267,6 +382,65 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const consolidatedItems = consolidatePayrollItems(payroll.items);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
+
+  const getPayrollItemGroupKey = (
+    payCodeId: string,
+    rate: number,
+    rateUnit: string,
+  ): string => {
+    return `${payCodeId}_${rate}_${rateUnit}`;
+  };
+
+  const getPayrollItemKey = (
+    item: Pick<PayrollItem, "pay_code_id" | "rate" | "rate_unit">,
+  ): string => {
+    return getPayrollItemGroupKey(item.pay_code_id, item.rate, item.rate_unit);
+  };
+
+  const isMoneyEqual = (left: number, right: number): boolean => {
+    return Math.abs(left - right) < 0.005;
+  };
+
+  const directAmountFixedKeys: Set<string> = new Set(
+    payroll.items
+      .filter((item: PayrollItem) => {
+        const amount: number = Number(item.amount) || 0;
+        const quantity: number = Number(item.quantity) || 0;
+        return (
+          item.rate_unit === "Fixed" &&
+          Number(item.rate) === 0 &&
+          amount > 0 &&
+          isMoneyEqual(quantity, amount)
+        );
+      })
+      .map((item: PayrollItem) => getPayrollItemKey(item)),
+  );
+
+  const isDirectAmountFixedItem = (
+    item: Pick<PayrollItem, "pay_code_id" | "rate" | "rate_unit">,
+  ): boolean => {
+    return directAmountFixedKeys.has(getPayrollItemKey(item));
+  };
+
+  const getFixedDirectAmountSummary = (
+    item: ConsolidatedPayrollItem,
+  ): FixedDirectAmountSummary | null => {
+    if (!isDirectAmountFixedItem(item)) return null;
+
+    const matchingItems: PayrollItem[] = payroll.items.filter(
+      (payrollItem: PayrollItem) =>
+        payrollItem.pay_code_id === item.pay_code_id &&
+        payrollItem.rate === item.rate &&
+        payrollItem.rate_unit === item.rate_unit,
+    );
+
+    return {
+      paidEntries: matchingItems.filter(
+        (payrollItem: PayrollItem) => Number(payrollItem.amount) > 0,
+      ).length,
+      totalEntries: matchingItems.length,
+    };
+  };
 
   // Detect if this is a combined job payroll (multiple job types)
   const uniqueJobTypes = [
@@ -338,9 +512,21 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     0,
   );
 
-  type BaseBagSummary = {
+  type BaseRateSummaryUnit = "Bag" | "Hour";
+
+  type BaseRateSummary = {
+    unit: BaseRateSummaryUnit;
     averageRate: number;
-    totalBags: number;
+    totalUnits: number;
+    totalAmount: number;
+  };
+
+  const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Hour"];
+
+  const isBaseRateSummaryUnit = (
+    rateUnit: string,
+  ): rateUnit is BaseRateSummaryUnit => {
+    return rateUnit === "Bag" || rateUnit === "Hour";
   };
 
   const formatUnitQuantity = (quantity: number): string => {
@@ -356,32 +542,51 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     return quantity + focUnits;
   };
 
-  const getBaseBagSummary = (
+  const getBaseRateSummaryUnits = (
     baseItems: ConsolidatedPayrollItem[],
-  ): BaseBagSummary | null => {
-    const bagItems: ConsolidatedPayrollItem[] = baseItems.filter(
-      (item) => item.rate_unit === "Bag",
+  ): BaseRateSummaryUnit[] => {
+    return BASE_RATE_SUMMARY_UNITS.filter((unit) =>
+      baseItems.some((item) => item.rate_unit === unit),
     );
-    const hourItems: ConsolidatedPayrollItem[] = baseItems.filter(
-      (item) => item.rate_unit === "Hour",
+  };
+
+  const calculateBaseRateSummary = (
+    baseItems: ConsolidatedPayrollItem[],
+    unit: BaseRateSummaryUnit,
+  ): BaseRateSummary => {
+    const unitItems: ConsolidatedPayrollItem[] = baseItems.filter(
+      (item) => item.rate_unit === unit,
     );
-    const isBagBased: boolean = bagItems.length > hourItems.length;
-
-    if (!isBagBased) return null;
-
-    const bagTotals: { amount: number; bags: number } = bagItems.reduce(
-      (totals, item) => ({
-        amount: totals.amount + (Number(item.total_amount) || 0),
-        bags: totals.bags + getTotalUnitQuantity(item),
-      }),
-      { amount: 0, bags: 0 },
+    const totalAmount: number = unitItems.reduce(
+      (sum, item) => sum + (Number(item.total_amount) || 0),
+      0,
     );
 
-    if (bagTotals.bags <= 0) return null;
+    if (unit === "Bag") {
+      const totalUnits: number = unitItems.reduce(
+        (sum, item) => sum + getTotalUnitQuantity(item),
+        0,
+      );
+
+      return {
+        unit,
+        averageRate: totalUnits > 0 ? totalAmount / totalUnits : 0,
+        totalUnits,
+        totalAmount,
+      };
+    }
+
+    // Hourly rows can repeat the same hours across multiple tasks, so use one
+    // representative quantity instead of summing duplicated hours.
+    const representativeHours: number =
+      unitItems.length > 0 ? Number(unitItems[0].total_quantity) || 0 : 0;
 
     return {
-      averageRate: bagTotals.amount / bagTotals.bags,
-      totalBags: bagTotals.bags,
+      unit,
+      averageRate:
+        representativeHours > 0 ? totalAmount / representativeHours : 0,
+      totalUnits: representativeHours,
+      totalAmount,
     };
   };
 
@@ -410,7 +615,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const renderConsolidatedRow = (
     item: ConsolidatedPayrollItem,
     index: number,
+    options: { sectionTopBorder?: boolean } = {},
   ) => {
+    const fixedDirectAmountSummary: FixedDirectAmountSummary | null =
+      getFixedDirectAmountSummary(item);
     // Find the original item for deletion (only for single manual items)
     const canDelete = item.is_manual && item.item_count === 1 && isEditable;
     const originalItem = canDelete
@@ -426,7 +634,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     return (
       <tr
         key={`${item.pay_code_id}-${item.rate}-${index}`}
-        className="hover:bg-default-50 dark:hover:bg-gray-700"
+        className={`hover:bg-default-50 dark:hover:bg-gray-700 ${
+          options.sectionTopBorder
+            ? "border-t border-default-300 dark:border-gray-600"
+            : ""
+        }`}
       >
         <td className="px-3 py-2">
           <span
@@ -450,14 +662,18 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           </span>
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Percent"
-            ? `${item.rate}%`
-            : item.rate_unit === "Fixed" && item.item_count > 1
+          {fixedDirectAmountSummary
+            ? "Ikut amaun"
+            : item.rate_unit === "Percent"
+              ? `${item.rate}%`
+              : item.rate_unit === "Fixed" && item.item_count > 1
               ? `Fixed (${formatCurrency(item.rate)})`
               : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Fixed" && item.item_count > 1 ? (
+          {fixedDirectAmountSummary ? (
+            `${fixedDirectAmountSummary.paidEntries} paid / ${fixedDirectAmountSummary.totalEntries} entries`
+          ) : item.rate_unit === "Fixed" && item.item_count > 1 ? (
             item.item_count
           ) : (
             <>
@@ -548,15 +764,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </span>
           </td>
           <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-            {item.rate_unit === "Percent"
-              ? `${item.rate}%`
-              : item.rate_unit === "Fixed" && item.quantity > 1
+            {isDirectAmountFixedItem(item)
+              ? "Ikut amaun"
+              : item.rate_unit === "Percent"
+                ? `${item.rate}%`
+                : item.rate_unit === "Fixed" && item.quantity > 1
                 ? "Fixed"
                 : `${formatCurrency(item.rate)}/${item.rate_unit}`}
           </td>
           <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-            {item.rate_unit === "Fixed" && item.quantity > 1 ? (
-              formatCurrency(item.quantity)
+            {item.rate_unit === "Fixed" ? (
+              "-"
             ) : (
               <>
                 {item.quantity}
@@ -589,64 +807,55 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     );
   };
 
-  const getHourlyAverageBaseRate = (): number | null => {
-    const baseGroupedByHours: { hours: number; amount: number }[] =
-      groupedItems["Base"]
-        .filter(
-          (item) => item.rate_unit === "Hour" || item.rate_unit === "Bill",
-        )
-        .reduce((acc, item) => {
-          const existing = acc.find((group) => group.hours === item.quantity);
-          if (existing) existing.amount += item.amount;
-          else acc.push({ hours: item.quantity, amount: item.amount });
-          return acc;
-        }, [] as { hours: number; amount: number }[]);
+  const shouldShowBaseFinalTotal = (
+    baseItems: ConsolidatedPayrollItem[],
+  ): boolean => {
+    const summaryUnits: BaseRateSummaryUnit[] =
+      getBaseRateSummaryUnits(baseItems);
+    const otherItems: ConsolidatedPayrollItem[] = baseItems.filter(
+      (item) => !isBaseRateSummaryUnit(item.rate_unit),
+    );
 
-    if (baseGroupedByHours.length === 0) return null;
-
-    const maxHoursGroup: { hours: number; amount: number } =
-      baseGroupedByHours.reduce(
-        (max, curr) => (curr.hours > max.hours ? curr : max),
-        baseGroupedByHours[0],
-      );
-
-    return maxHoursGroup.hours > 0 ? baseTotal / maxHoursGroup.hours : 0;
+    return otherItems.length > 0 || summaryUnits.length !== 1;
   };
 
-  const renderBaseFooter = (
+  const renderBaseSummaryRow = (
     baseItems: ConsolidatedPayrollItem[],
+    unit: BaseRateSummaryUnit,
+    totalLabel: string,
+  ): React.ReactElement => {
+    const summary: BaseRateSummary = calculateBaseRateSummary(baseItems, unit);
+    const unitLabel: string = unit === "Bag" ? "Bag" : "Jam";
+    const summaryLabel: string = shouldShowBaseFinalTotal(baseItems)
+      ? `${unitLabel} Summary`
+      : totalLabel;
+
+    return (
+      <tr
+        key={`base-${unit}-summary`}
+        className="bg-default-50 dark:bg-gray-800 border-y border-default-300 dark:border-gray-600"
+      >
+        {viewMode === "detailed" && <td className="px-3 py-2" />}
+        <td className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300">
+          {summaryLabel}
+        </td>
+        <td className="px-3 py-2 text-center text-sm font-semibold text-default-800 dark:text-gray-100">
+          Rate/{unitLabel}: {formatCurrency(summary.averageRate)}
+        </td>
+        <td className="px-3 py-2 text-center text-sm font-medium text-default-600 dark:text-gray-300">
+          Jumlah {unitLabel}: {formatUnitQuantity(summary.totalUnits)}
+        </td>
+        <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
+          {formatCurrency(summary.totalAmount)}
+        </td>
+      </tr>
+    );
+  };
+
+  const renderBaseTotalRow = (
     totalAmount: number,
     totalLabel: string,
-    showHourlyAverage: boolean,
   ): React.ReactElement => {
-    const bagSummary: BaseBagSummary | null = getBaseBagSummary(baseItems);
-
-    if (bagSummary) {
-      return (
-        <tr>
-          {viewMode === "detailed" && (
-            <td className="px-3 py-2 bg-default-50 dark:bg-gray-800" />
-          )}
-          <td className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300">
-            {totalLabel}
-          </td>
-          <td className="px-3 py-2 text-center text-sm font-semibold text-default-800 dark:text-gray-100">
-            Rate/Bag: {formatCurrency(bagSummary.averageRate)}
-          </td>
-          <td className="px-3 py-2 text-center text-sm font-medium text-default-600 dark:text-gray-300">
-            Jumlah Bag: {formatUnitQuantity(bagSummary.totalBags)}
-          </td>
-          <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
-            {formatCurrency(totalAmount)}
-          </td>
-        </tr>
-      );
-    }
-
-    const hourlyAverageRate: number | null = showHourlyAverage
-      ? getHourlyAverageBaseRate()
-      : null;
-
     return (
       <tr>
         <td
@@ -654,17 +863,124 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
         >
           {totalLabel}
-          {hourlyAverageRate !== null && (
-            <div className="text-xs text-default-400 dark:text-gray-400">
-              Avg: {formatCurrency(hourlyAverageRate)}/hr
-            </div>
-          )}
         </td>
         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
           {formatCurrency(totalAmount)}
         </td>
       </tr>
     );
+  };
+
+  const renderBaseOtherSubtotalRow = (
+    baseItems: ConsolidatedPayrollItem[],
+  ): React.ReactElement => {
+    const otherTotalAmount: number = baseItems
+      .filter((item) => !isBaseRateSummaryUnit(item.rate_unit))
+      .reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
+
+    return (
+      <tr
+        key="base-other-subtotal"
+        className="bg-default-50 dark:bg-gray-800 border-y border-default-300 dark:border-gray-600"
+      >
+        {viewMode === "detailed" && <td className="px-3 py-2" />}
+        <td
+          colSpan={3}
+          className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
+        >
+          Jumlah Lain-lain
+        </td>
+        <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
+          {formatCurrency(otherTotalAmount)}
+        </td>
+      </tr>
+    );
+  };
+
+  const renderBaseConsolidatedRows = (
+    baseItems: ConsolidatedPayrollItem[],
+    totalLabel: string,
+  ): React.ReactElement[] => {
+    const rows: React.ReactElement[] = [];
+    const summaryUnits: BaseRateSummaryUnit[] =
+      getBaseRateSummaryUnits(baseItems);
+    let rowIndex = 0;
+    let hasRenderedSection = false;
+
+    summaryUnits.forEach((unit) => {
+      const unitItems: ConsolidatedPayrollItem[] = baseItems.filter(
+        (item) => item.rate_unit === unit,
+      );
+
+      unitItems.forEach((item, itemIndex) => {
+        rows.push(
+          renderConsolidatedRow(item, rowIndex, {
+            sectionTopBorder: hasRenderedSection && itemIndex === 0,
+          }),
+        );
+        rowIndex += 1;
+      });
+
+      rows.push(renderBaseSummaryRow(baseItems, unit, totalLabel));
+      hasRenderedSection = true;
+    });
+
+    const otherItems: ConsolidatedPayrollItem[] = baseItems.filter(
+      (item) => !isBaseRateSummaryUnit(item.rate_unit),
+    );
+
+    otherItems.forEach((item, itemIndex) => {
+      rows.push(
+        renderConsolidatedRow(item, rowIndex, {
+          sectionTopBorder: hasRenderedSection && itemIndex === 0,
+        }),
+      );
+      rowIndex += 1;
+    });
+
+    if (otherItems.length > 0 && summaryUnits.length > 0) {
+      rows.push(renderBaseOtherSubtotalRow(baseItems));
+    }
+
+    return rows;
+  };
+
+  const renderBaseDetailedRows = (
+    detailedBaseItems: PayrollItem[],
+    consolidatedBaseItems: ConsolidatedPayrollItem[],
+    totalLabel: string,
+  ): React.ReactElement[] => {
+    const rows: React.ReactElement[] = [];
+    const summaryUnits: BaseRateSummaryUnit[] =
+      getBaseRateSummaryUnits(consolidatedBaseItems);
+
+    summaryUnits.forEach((unit) => {
+      const unitItems: PayrollItem[] = getSortedItemsWithSeparators(
+        detailedBaseItems.filter((item) => item.rate_unit === unit),
+      );
+
+      unitItems.forEach((item, index, items) => {
+        rows.push(renderDetailedRow(item, index, items, false));
+      });
+
+      rows.push(renderBaseSummaryRow(consolidatedBaseItems, unit, totalLabel));
+    });
+
+    const otherItems: PayrollItem[] = getSortedItemsWithSeparators(
+      detailedBaseItems.filter(
+        (item) => !isBaseRateSummaryUnit(item.rate_unit),
+      ),
+    );
+
+    otherItems.forEach((item, index, items) => {
+      rows.push(renderDetailedRow(item, index, items, false));
+    });
+
+    if (otherItems.length > 0 && summaryUnits.length > 0) {
+      rows.push(renderBaseOtherSubtotalRow(consolidatedBaseItems));
+    }
+
+    return rows;
   };
 
   return (
@@ -685,7 +1001,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           {/* View Mode Toggle */}
           <div className="flex rounded-lg border border-default-300 dark:border-gray-600 overflow-hidden">
             <button
-              onClick={() => setViewMode("consolidated")}
+              onClick={() => handleViewModeChange("consolidated")}
               className={`px-3 py-1.5 flex items-center gap-1.5 text-sm ${
                 viewMode === "consolidated"
                   ? "bg-sky-500 text-white"
@@ -697,7 +1013,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               Summary
             </button>
             <button
-              onClick={() => setViewMode("detailed")}
+              onClick={() => handleViewModeChange("detailed")}
               className={`px-3 py-1.5 flex items-center gap-1.5 text-sm ${
                 viewMode === "detailed"
                   ? "bg-sky-500 text-white"
@@ -1339,24 +1655,23 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                           {viewMode === "consolidated"
-                            ? jobConsolidatedItems?.["Base"]?.map(
-                                (item, index) =>
-                                  renderConsolidatedRow(item, index),
+                            ? renderBaseConsolidatedRows(
+                                jobConsolidatedItems?.["Base"] || [],
+                                "Total Base",
                               )
-                            : getSortedItemsWithSeparators(
+                            : renderBaseDetailedRows(
                                 jobGroupedItems["Base"],
-                              ).map((item, index, arr) =>
-                                renderDetailedRow(item, index, arr, false),
+                                jobConsolidatedItems?.["Base"] || [],
+                                "Total Base",
                               )}
                         </tbody>
-                        <tfoot className="bg-default-50 dark:bg-gray-800">
-                          {renderBaseFooter(
-                            jobConsolidatedItems?.["Base"] || [],
-                            jobBaseTotal,
-                            "Total Base",
-                            false,
-                          )}
-                        </tfoot>
+                        {shouldShowBaseFinalTotal(
+                          jobConsolidatedItems?.["Base"] || [],
+                        ) && (
+                          <tfoot className="bg-default-50 dark:bg-gray-800">
+                            {renderBaseTotalRow(jobBaseTotal, "Total Base")}
+                          </tfoot>
+                        )}
                       </table>
                     </div>
                   </div>
@@ -1610,23 +1925,23 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
-                        ? groupedConsolidatedItems["Base"].map((item, index) =>
-                            renderConsolidatedRow(item, index),
+                        ? renderBaseConsolidatedRows(
+                            groupedConsolidatedItems["Base"],
+                            "Total Base Pay",
                           )
-                        : getSortedItemsWithSeparators(
+                        : renderBaseDetailedRows(
                             groupedItems["Base"],
-                          ).map((item, index, arr) =>
-                            renderDetailedRow(item, index, arr, false),
+                            groupedConsolidatedItems["Base"],
+                            "Total Base Pay",
                           )}
                     </tbody>
-                    <tfoot className="bg-default-50 dark:bg-gray-800">
-                      {renderBaseFooter(
-                        groupedConsolidatedItems["Base"],
-                        baseTotal,
-                        "Total Base Pay",
-                        true,
-                      )}
-                    </tfoot>
+                    {shouldShowBaseFinalTotal(
+                      groupedConsolidatedItems["Base"],
+                    ) && (
+                      <tfoot className="bg-default-50 dark:bg-gray-800">
+                        {renderBaseTotalRow(baseTotal, "Total Base Pay")}
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </div>
@@ -2090,15 +2405,27 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           return "bg-default-100 text-default-700 dark:bg-gray-700 dark:text-gray-300";
                       }
                     };
+                    const leaveRecordUrl: string | null =
+                      getLeaveRecordUrl(record);
+                    const leaveDateLabel: string = format(
+                      new Date(record.date.replace(/-/g, "/")),
+                      "dd MMM yyyy",
+                    );
                     return (
                       <tr
                         key={index}
                         className="hover:bg-default-50 dark:hover:bg-gray-700"
                       >
                         <td className="px-3 py-2 text-sm text-default-800 dark:text-gray-100">
-                          {format(
-                            new Date(record.date.replace(/-/g, "/")),
-                            "dd MMM yyyy",
+                          {leaveRecordUrl ? (
+                            <Link
+                              to={leaveRecordUrl}
+                              className="text-sky-600 dark:text-sky-400 hover:underline"
+                            >
+                              {leaveDateLabel}
+                            </Link>
+                          ) : (
+                            leaveDateLabel
                           )}
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -2126,18 +2453,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       colSpan={3}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
-                      Total (
+                      Jumlah Cuti (
                       {monthlyLeaveRecords.reduce(
                         (sum, r) => sum + (Number(r.days_taken) || 0),
                         0,
                       )}{" "}
-                      day
-                      {monthlyLeaveRecords.reduce(
-                        (sum, r) => sum + (Number(r.days_taken) || 0),
-                        0,
-                      ) !== 1
-                        ? "s"
-                        : ""}
+                      hari
                       )
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">

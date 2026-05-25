@@ -909,9 +909,44 @@ export default function (pool) {
             lr.leave_type,
             lr.days_taken,
             lr.amount_paid,
+            COALESCE(lr.work_log_id, inferred_mwl.id) as work_log_id,
+            CASE
+              WHEN dwl.id IS NOT NULL THEN 'daily'
+              WHEN linked_mwl.id IS NOT NULL OR inferred_mwl.id IS NOT NULL THEN 'monthly'
+              WHEN lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING') THEN 'packing_cuti'
+              ELSE NULL
+            END as work_log_type,
+            COALESCE(
+              dwl.section,
+              linked_mwl.section,
+              inferred_mwl.section,
+              CASE
+                WHEN lr.notes = 'PACKING_CUTI:MEE_PACKING' THEN 'MEE_PACKING'
+                WHEN lr.notes = 'PACKING_CUTI:BH_PACKING' THEN 'BH_PACKING'
+                ELSE NULL
+              END
+            ) as work_log_section,
+            lr.notes,
             h.description as holiday_description
           FROM leave_records lr
           JOIN staffs s ON s.id = lr.employee_id
+          LEFT JOIN daily_work_logs dwl
+            ON dwl.id = lr.work_log_id
+            AND dwl.log_date = lr.leave_date
+          LEFT JOIN monthly_work_logs linked_mwl
+            ON linked_mwl.id = lr.work_log_id
+            AND linked_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND linked_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+          LEFT JOIN monthly_work_logs inferred_mwl
+            ON lr.work_log_id IS NULL
+            AND inferred_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND inferred_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+            AND inferred_mwl.section = CASE
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'MAINTEN' THEN 'MAINTENANCE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'OFFICE' THEN 'OFFICE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'SAPU' THEN 'SAPU'
+              ELSE NULL
+            END
           LEFT JOIN holiday_calendar h
             ON lr.leave_type = 'cuti_umum'
             AND h.holiday_date = lr.leave_date
@@ -1213,9 +1248,44 @@ export default function (pool) {
             lr.leave_type,
             lr.days_taken,
             lr.amount_paid,
+            COALESCE(lr.work_log_id, inferred_mwl.id) as work_log_id,
+            CASE
+              WHEN dwl.id IS NOT NULL THEN 'daily'
+              WHEN linked_mwl.id IS NOT NULL OR inferred_mwl.id IS NOT NULL THEN 'monthly'
+              WHEN lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING') THEN 'packing_cuti'
+              ELSE NULL
+            END as work_log_type,
+            COALESCE(
+              dwl.section,
+              linked_mwl.section,
+              inferred_mwl.section,
+              CASE
+                WHEN lr.notes = 'PACKING_CUTI:MEE_PACKING' THEN 'MEE_PACKING'
+                WHEN lr.notes = 'PACKING_CUTI:BH_PACKING' THEN 'BH_PACKING'
+                ELSE NULL
+              END
+            ) as work_log_section,
+            lr.notes,
             h.description as holiday_description
           FROM leave_records lr
           JOIN staffs s ON s.id = lr.employee_id
+          LEFT JOIN daily_work_logs dwl
+            ON dwl.id = lr.work_log_id
+            AND dwl.log_date = lr.leave_date
+          LEFT JOIN monthly_work_logs linked_mwl
+            ON linked_mwl.id = lr.work_log_id
+            AND linked_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND linked_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+          LEFT JOIN monthly_work_logs inferred_mwl
+            ON lr.work_log_id IS NULL
+            AND inferred_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND inferred_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+            AND inferred_mwl.section = CASE
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'MAINTEN' THEN 'MAINTENANCE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'OFFICE' THEN 'OFFICE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'SAPU' THEN 'SAPU'
+              ELSE NULL
+            END
           LEFT JOIN holiday_calendar h
             ON lr.leave_type = 'cuti_umum'
             AND h.holiday_date = lr.leave_date

@@ -361,7 +361,19 @@ const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
 interface BaseRateSummary {
   averageRate: number;
   totalUnits: number;
+  totalAmount: number;
 }
+
+type BaseRateSummaryUnit = "Bag" | "Hour";
+type BaseSectionCell = TableCell & { baseSectionBorder?: boolean };
+
+const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Hour"];
+
+const isBaseRateSummaryUnit = (
+  rateUnit: string,
+): rateUnit is BaseRateSummaryUnit => {
+  return rateUnit === "Bag" || rateUnit === "Hour";
+};
 
 const formatUnitQuantity = (quantity: number): string => {
   return new Intl.NumberFormat("en-MY", {
@@ -370,41 +382,236 @@ const formatUnitQuantity = (quantity: number): string => {
   }).format(quantity);
 };
 
+const getBaseRateSummaryUnits = (
+  consolidatedBaseItems: ConsolidatedPayrollItem[],
+): BaseRateSummaryUnit[] => {
+  return BASE_RATE_SUMMARY_UNITS.filter((unit) =>
+    consolidatedBaseItems.some((item) => item.rate_unit === unit),
+  );
+};
+
 const calculateBaseRateSummary = (
   consolidatedBaseItems: ConsolidatedPayrollItem[],
-  baseTotalAmount: number,
-  isBagBased: boolean,
+  summaryUnit: BaseRateSummaryUnit,
 ): BaseRateSummary => {
-  if (isBagBased) {
-    const bagTotals: { amount: number; units: number } = consolidatedBaseItems
-      .filter((item) => item.rate_unit === "Bag")
-      .reduce(
-        (totals, item) => ({
-          amount: totals.amount + (Number(item.total_amount) || 0),
-          units: totals.units + getTotalUnitQuantity(item),
-        }),
-        { amount: 0, units: 0 },
-      );
+  const summaryItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
+    (item) => item.rate_unit === summaryUnit,
+  );
+  const totalAmount: number = summaryItems.reduce(
+    (sum, item) => sum + (Number(item.total_amount) || 0),
+    0,
+  );
+
+  if (summaryUnit === "Bag") {
+    const totalUnits: number = summaryItems.reduce(
+      (sum, item) => sum + getTotalUnitQuantity(item),
+      0,
+    );
 
     return {
-      averageRate: bagTotals.units > 0 ? bagTotals.amount / bagTotals.units : 0,
-      totalUnits: bagTotals.units,
+      averageRate: totalUnits > 0 ? totalAmount / totalUnits : 0,
+      totalUnits,
+      totalAmount,
     };
   }
 
   // Hourly rows can repeat the same hours across multiple tasks, so keep using
   // one representative hour quantity rather than summing duplicated hours.
-  const hourBasedItemsForRate: ConsolidatedPayrollItem[] =
-    consolidatedBaseItems.filter((item) => item.rate_unit === "Hour");
   const representativeHours: number =
-    hourBasedItemsForRate.length > 0
-      ? Number(hourBasedItemsForRate[0].total_quantity) || 0
+    summaryItems.length > 0
+      ? Number(summaryItems[0].total_quantity) || 0
       : 0;
   return {
     averageRate:
-      representativeHours > 0 ? baseTotalAmount / representativeHours : 0,
+      representativeHours > 0 ? totalAmount / representativeHours : 0,
     totalUnits: representativeHours,
+    totalAmount,
   };
+};
+
+const createBaseRateSummaryRow = (
+  baseRateSummaryUnit: BaseRateSummaryUnit,
+  baseRateSummary: BaseRateSummary,
+): TableCell[] => {
+  if (baseRateSummaryUnit === "Bag") {
+    return [
+      { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+      {
+        text: `Rate/Bag: ${baseRateSummary.averageRate.toFixed(2)}`,
+        alignment: "right",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+      {
+        text: `Jumlah Bag: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+      {
+        text: formatCurrency(baseRateSummary.totalAmount),
+        alignment: "right",
+        bold: true,
+        fillColor: "#f8f9fa",
+        fontSize: 8,
+      },
+    ];
+  }
+
+  return [
+    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+    {
+      text: `Rate/Jam: ${baseRateSummary.averageRate.toFixed(2)}`,
+      bold: true,
+      fillColor: "#f8f9fa",
+      fontSize: 8,
+    },
+    {
+      text: formatCurrency(baseRateSummary.totalAmount),
+      alignment: "right",
+      bold: true,
+      fillColor: "#f8f9fa",
+      fontSize: 8,
+    },
+  ];
+};
+
+const createBaseSubtotalRow = (
+  label: string,
+  totalAmount: number,
+): TableCell[] => {
+  return [
+    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+    { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+    {
+      text: label,
+      bold: true,
+      fillColor: "#f8f9fa",
+      fontSize: 8,
+    },
+    {
+      text: formatCurrency(totalAmount),
+      alignment: "right",
+      bold: true,
+      fillColor: "#f8f9fa",
+      fontSize: 8,
+    },
+  ];
+};
+
+const isDirectAmountFixedItem = (item: ConsolidatedPayrollItem): boolean => {
+  return (
+    item.rate_unit === "Fixed" &&
+    Number(item.rate) === 0 &&
+    Number(item.total_amount) > 0
+  );
+};
+
+const getConsolidatedRateLabel = (item: ConsolidatedPayrollItem): string => {
+  if (isDirectAmountFixedItem(item)) return "Ikut amaun";
+  if (item.rate_unit === "Percent") return `${item.rate}%`;
+  return item.rate.toFixed(2);
+};
+
+const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
+  if (isDirectAmountFixedItem(item)) return "-";
+
+  if (item.rate_unit === "Bag") {
+    return `${item.total_quantity} Bag${item.total_quantity > 1 ? "s" : ""}`;
+  }
+
+  if (item.rate_unit === "Hour") {
+    return `${item.total_quantity} Jam`;
+  }
+
+  return `${item.total_quantity} ${item.rate_unit}`;
+};
+
+const getTambahanItemQuantityLabel = (
+  item: ConsolidatedPayrollItem,
+  monthName: string,
+): string => {
+  if (isDirectAmountFixedItem(item)) return "-";
+  if (item.rate_unit === "Fixed") return monthName;
+  return `${item.total_quantity} ${item.rate_unit}`;
+};
+
+const markBaseSectionBorder = (row: TableCell[]): TableCell[] => {
+  (row[0] as BaseSectionCell).baseSectionBorder = true;
+  return row;
+};
+
+const appendBasePayRows = (
+  tableBody: TableCell[][],
+  consolidatedBaseItems: ConsolidatedPayrollItem[],
+  baseTotalAmount: number,
+  options: { showFinalSubtotal?: boolean } = {},
+): void => {
+  if (consolidatedBaseItems.length === 0) return;
+
+  const baseRateSummaryUnits: BaseRateSummaryUnit[] =
+    getBaseRateSummaryUnits(consolidatedBaseItems);
+
+  baseRateSummaryUnits.forEach((unit, index) => {
+    const unitItems: ConsolidatedPayrollItem[] =
+      consolidatedBaseItems.filter((item) => item.rate_unit === unit);
+
+    unitItems.forEach((item, itemIndex) => {
+      const row: TableCell[] = createItemRow(
+        item.description,
+        getConsolidatedRateLabel(item),
+        getBaseItemQuantityLabel(item),
+        formatCurrency(item.total_amount),
+      );
+
+      tableBody.push(
+        index > 0 && itemIndex === 0 ? markBaseSectionBorder(row) : row,
+      );
+    });
+
+    tableBody.push(
+      createBaseRateSummaryRow(unit, calculateBaseRateSummary(unitItems, unit)),
+    );
+  });
+
+  const otherItems: ConsolidatedPayrollItem[] = consolidatedBaseItems.filter(
+    (item) => !isBaseRateSummaryUnit(item.rate_unit),
+  );
+  const otherTotalAmount: number = otherItems.reduce(
+    (sum, item) => sum + (Number(item.total_amount) || 0),
+    0,
+  );
+
+  otherItems.forEach((item, itemIndex) => {
+    const row: TableCell[] = createItemRow(
+      item.description,
+      getConsolidatedRateLabel(item),
+      getBaseItemQuantityLabel(item),
+      formatCurrency(item.total_amount),
+    );
+
+    tableBody.push(
+      baseRateSummaryUnits.length > 0 && itemIndex === 0
+        ? markBaseSectionBorder(row)
+        : row,
+    );
+  });
+
+  if (otherItems.length > 0 && baseRateSummaryUnits.length > 0) {
+    tableBody.push(
+      createBaseSubtotalRow("Jumlah Lain-lain", otherTotalAmount),
+    );
+  }
+
+  const shouldShowFinalSubtotal: boolean =
+    options.showFinalSubtotal ??
+    (otherItems.length > 0 || baseRateSummaryUnits.length !== 1);
+
+  if (shouldShowFinalSubtotal) {
+    tableBody.push(createBaseSubtotalRow("Jumlah Base", baseTotalAmount));
+  }
 };
 
 // Build main payroll page content
@@ -470,16 +677,6 @@ const buildMainPayrollPage = (
     0,
   );
 
-  // Detect predominant rate unit for Base items (Hour vs Bag) - use consolidated items
-  const bagBasedItems = consolidatedBaseItems.filter(
-    (item) => item.rate_unit === "Bag",
-  );
-  const hourBasedItems = consolidatedBaseItems.filter(
-    (item) => item.rate_unit === "Hour",
-  );
-  const isBagBased = bagBasedItems.length > hourBasedItems.length;
-  const rateUnitLabel = isBagBased ? "Bag" : "Jam";
-
   // Leave records
   const groupedLeaveRecords = (payroll.leave_records || []).reduce(
     (acc, record) => {
@@ -528,18 +725,6 @@ const buildMainPayrollPage = (
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
-  const combinedTambahanTotal =
-    tambahanTotalAmount +
-    leaveTotalAmount +
-    commissionTotalAmount +
-    othersTotalAmount;
-
-  const baseRateSummary: BaseRateSummary = calculateBaseRateSummary(
-    consolidatedBaseItems,
-    baseTotalAmount,
-    isBagBased,
-  );
-
   // Mid-month and final calculations
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
   const finalPayment = payroll.net_pay - midMonthPayment;
@@ -567,98 +752,42 @@ const buildMainPayrollPage = (
     },
   ]);
 
-  // Base Pay Items - Using consolidated items for cleaner display
-  baseItemsByJob.forEach((jobGroup) => {
-    const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
-    const jobTotal = jobItems.reduce(
-      (sum, item) => sum + (item.total_amount || 0),
-      0,
-    );
-    const jobTypeLabel = jobGroup.jobType || "Shared";
-
-    // Job category header for grouped payrolls
-    if (isGroupedPayroll && jobGroup.jobType) {
-      tableBody.push(
-        createJobCategoryRow(
-          jobGroup.jobType,
-          getEmployeeIdForJob(jobGroup.jobType),
-        ),
+  // Base Pay Items - grouped payrolls show per-job sections.
+  if (isGroupedPayroll) {
+    baseItemsByJob.forEach((jobGroup) => {
+      const jobItems = jobGroup.items as ConsolidatedPayrollItem[];
+      const jobTotal = jobItems.reduce(
+        (sum, item) => sum + (item.total_amount || 0),
+        0,
       );
-    } else if (isGroupedPayroll && !jobGroup.jobType && jobItems.length > 0) {
-      tableBody.push(createJobCategoryRow("Shared", null));
-    }
+      const jobTypeLabel = jobGroup.jobType || "Shared";
 
-    // Display consolidated items with total quantities
-    jobItems.forEach((item) => {
-      const qtyLabel =
-        item.rate_unit === "Bag"
-          ? `${item.total_quantity} Bag${item.total_quantity > 1 ? "s" : ""}`
-          : item.rate_unit === "Hour"
-            ? `${item.total_quantity} Jam`
-            : `${item.total_quantity} ${item.rate_unit}`;
-      tableBody.push(
-        createItemRow(
-          item.description,
-          item.rate_unit === "Percent" ? `${item.rate}%` : item.rate.toFixed(2),
-          qtyLabel,
-          formatCurrency(item.total_amount),
-        ),
-      );
+      if (jobGroup.jobType) {
+        tableBody.push(
+          createJobCategoryRow(
+            jobGroup.jobType,
+            getEmployeeIdForJob(jobGroup.jobType),
+          ),
+        );
+      } else if (jobItems.length > 0) {
+        tableBody.push(createJobCategoryRow("Shared", null));
+      }
+
+      appendBasePayRows(tableBody, jobItems, jobTotal, {
+        showFinalSubtotal: false,
+      });
+
+      if (jobItems.length > 0) {
+        tableBody.push(
+          createJobSubtotalRow(jobTypeLabel, formatCurrency(jobTotal)),
+        );
+      }
     });
-
-    // Add job subtotal row for combined payrolls (only when there are items)
-    if (isGroupedPayroll && jobItems.length > 0) {
-      tableBody.push(
-        createJobSubtotalRow(jobTypeLabel, formatCurrency(jobTotal)),
-      );
-    }
-  });
+  }
 
   // Base subtotal row (only for single-job payrolls; combined payrolls show per-job subtotals)
   if (consolidatedBaseItems.length > 0 && !isGroupedPayroll) {
-    tableBody.push(
-      isBagBased
-        ? [
-            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-            {
-              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
-              alignment: "right",
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-            {
-              text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-            {
-              text: formatCurrency(baseTotalAmount),
-              alignment: "right",
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-          ]
-        : [
-            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-            {
-              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-            {
-              text: formatCurrency(baseTotalAmount),
-              alignment: "right",
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-          ],
-    );
+    appendBasePayRows(tableBody, consolidatedBaseItems, baseTotalAmount);
   }
 
   // Tambahan Items - Using consolidated items
@@ -691,17 +820,11 @@ const buildMainPayrollPage = (
       }
 
       jobItems.forEach((item) => {
-        const qtyLabel =
-          item.rate_unit === "Fixed"
-            ? monthName
-            : `${item.total_quantity} ${item.rate_unit}`;
         tableBody.push(
           createItemRow(
             item.description,
-            item.rate_unit === "Percent"
-              ? `${item.rate}%`
-              : item.rate.toFixed(2),
-            qtyLabel,
+            getConsolidatedRateLabel(item),
+            getTambahanItemQuantityLabel(item, monthName),
             formatCurrency(item.total_amount),
           ),
         );
@@ -759,19 +882,43 @@ const buildMainPayrollPage = (
       );
     });
 
-    // Tambahan subtotal - only show if more than one item total
-    const totalTambahanItems =
+    const totalNonLeaveTambahanItems =
       (groupedConsolidatedItems.Tambahan?.length || 0) +
-      leaveRecordsArray.length +
       mergedCommissionRecords.length +
       mergedOthersRecords.length;
-    if (totalTambahanItems > 1) {
+
+    if (leaveRecordsArray.length > 0) {
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Subtotal", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah Cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
         {
-          text: formatCurrency(combinedTambahanTotal),
+          text: formatCurrency(leaveTotalAmount),
+          alignment: "right",
+          bold: true,
+          fillColor: "#f8f9fa",
+          fontSize: 8,
+        },
+      ]);
+    }
+
+    if (
+      totalNonLeaveTambahanItems > 1 ||
+      (totalNonLeaveTambahanItems > 0 && leaveRecordsArray.length > 0)
+    ) {
+      tableBody.push([
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        {
+          text: "Jumlah Lain-lain",
+          bold: true,
+          fillColor: "#f8f9fa",
+          fontSize: 8,
+        },
+        {
+          text: formatCurrency(
+            tambahanTotalAmount + commissionTotalAmount + othersTotalAmount,
+          ),
           alignment: "right",
           bold: true,
           fillColor: "#f8f9fa",
@@ -808,13 +955,13 @@ const buildMainPayrollPage = (
       }
 
       jobItems.forEach((item) => {
-        const qtyLabel = `${item.total_quantity} Jam OT`;
+        const qtyLabel = isDirectAmountFixedItem(item)
+          ? "-"
+          : `${item.total_quantity} Jam OT`;
         tableBody.push(
           createItemRow(
             item.description,
-            item.rate_unit === "Percent"
-              ? `${item.rate}%`
-              : item.rate.toFixed(2),
+            getConsolidatedRateLabel(item),
             qtyLabel,
             formatCurrency(item.total_amount),
           ),
@@ -1088,6 +1235,11 @@ const buildMainPayrollPage = (
           if (i === 0 || i === node.table.body.length) return 1; // Outer borders
           if (i === 1) return 1; // Below header
 
+          const row = node.table.body[i];
+          if (row && Array.isArray(row) && row[0]?.baseSectionBorder) {
+            return 0.5;
+          }
+
           // Check row above the line (row i-1) for border below specific rows
           const prevRow = node.table.body[i - 1];
           if (prevRow && Array.isArray(prevRow)) {
@@ -1098,7 +1250,10 @@ const buildMainPayrollPage = (
             if (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
-                descText.includes("Jumlah Bag") ||
+                descText === "Subtotal" ||
+                descText === "Jumlah Cuti" ||
+                descText === "Jumlah Lain-lain" ||
+                descText === "Jumlah Base" ||
                 descText === "Jumlah Gaji Kasar")
             ) {
               return 0.5;
@@ -1110,7 +1265,6 @@ const buildMainPayrollPage = (
           }
 
           // Add thin line above rows with fillColor (subtotals, totals, category headers)
-          const row = node.table.body[i];
           if (row && Array.isArray(row) && row[0]?.fillColor) {
             return 0.5;
           }
@@ -1201,16 +1355,6 @@ const buildIndividualJobPage = (
     0,
   );
 
-  // Detect predominant rate unit for Base items (Hour vs Bag) - use consolidated items
-  const bagBasedItems = consolidatedBaseItems.filter(
-    (item) => item.rate_unit === "Bag",
-  );
-  const hourBasedItems = consolidatedBaseItems.filter(
-    (item) => item.rate_unit === "Hour",
-  );
-  const isBagBased = bagBasedItems.length > hourBasedItems.length;
-  const rateUnitLabel = isBagBased ? "Bag" : "Jam";
-
   // Leave records
   const groupedLeaveRecords = (individualJob.leave_records || []).reduce(
     (acc, record) => {
@@ -1260,18 +1404,6 @@ const buildIndividualJobPage = (
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
-  const combinedTambahanTotal =
-    tambahanTotalAmount +
-    leaveTotalAmount +
-    commissionTotalAmount +
-    othersTotalAmount;
-
-  const baseRateSummary: BaseRateSummary = calculateBaseRateSummary(
-    consolidatedBaseItems,
-    baseTotalAmount,
-    isBagBased,
-  );
-
   // Build table body
   const tableBody: TableCell[][] = [];
 
@@ -1295,69 +1427,9 @@ const buildIndividualJobPage = (
     },
   ]);
 
-  // Base Pay Items - Using consolidated items for cleaner display
-  consolidatedBaseItems.forEach((item) => {
-    const qtyLabel =
-      item.rate_unit === "Bag"
-        ? `${item.total_quantity} Bag${item.total_quantity > 1 ? "s" : ""}`
-        : item.rate_unit === "Hour"
-          ? `${item.total_quantity} Jam`
-          : `${item.total_quantity} ${item.rate_unit}`;
-    tableBody.push(
-      createItemRow(
-        item.description,
-        item.rate_unit === "Percent" ? `${item.rate}%` : item.rate.toFixed(2),
-        qtyLabel,
-        formatCurrency(item.total_amount),
-      ),
-    );
-  });
-
   // Base subtotal
   if (consolidatedBaseItems.length > 0) {
-    tableBody.push(
-      isBagBased
-        ? [
-            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-            {
-              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
-              alignment: "right",
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-            {
-              text: `Jumlah ${rateUnitLabel}: ${formatUnitQuantity(baseRateSummary.totalUnits)}`,
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-            {
-              text: formatCurrency(baseTotalAmount),
-              alignment: "right",
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-          ]
-        : [
-            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-            { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-            {
-              text: `Rate/${rateUnitLabel}: ${baseRateSummary.averageRate.toFixed(2)}`,
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-            {
-              text: formatCurrency(baseTotalAmount),
-              alignment: "right",
-              bold: true,
-              fillColor: "#f8f9fa",
-              fontSize: 8,
-            },
-          ],
-    );
+    appendBasePayRows(tableBody, consolidatedBaseItems, baseTotalAmount);
   }
 
   // Tambahan Items - Using consolidated items
@@ -1369,15 +1441,11 @@ const buildIndividualJobPage = (
     othersRecords.length > 0
   ) {
     consolidatedTambahanItems.forEach((item) => {
-      const qtyLabel =
-        item.rate_unit === "Fixed"
-          ? monthName
-          : `${item.total_quantity} ${item.rate_unit}`;
       tableBody.push(
         createItemRow(
           item.description,
-          item.rate_unit === "Percent" ? `${item.rate}%` : item.rate.toFixed(2),
-          qtyLabel,
+          getConsolidatedRateLabel(item),
+          getTambahanItemQuantityLabel(item, monthName),
           formatCurrency(item.total_amount),
         ),
       );
@@ -1424,19 +1492,43 @@ const buildIndividualJobPage = (
       );
     });
 
-    // Tambahan subtotal - only show if more than one item total
-    const totalTambahanItems =
+    const totalNonLeaveTambahanItems =
       consolidatedTambahanItems.length +
-      leaveRecordsArray.length +
       mergedCommissionRecords.length +
       mergedOthersRecords.length;
-    if (totalTambahanItems > 1) {
+
+    if (leaveRecordsArray.length > 0) {
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Subtotal", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah Cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
         {
-          text: formatCurrency(combinedTambahanTotal),
+          text: formatCurrency(leaveTotalAmount),
+          alignment: "right",
+          bold: true,
+          fillColor: "#f8f9fa",
+          fontSize: 8,
+        },
+      ]);
+    }
+
+    if (
+      totalNonLeaveTambahanItems > 1 ||
+      (totalNonLeaveTambahanItems > 0 && leaveRecordsArray.length > 0)
+    ) {
+      tableBody.push([
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        {
+          text: "Jumlah Lain-lain",
+          bold: true,
+          fillColor: "#f8f9fa",
+          fontSize: 8,
+        },
+        {
+          text: formatCurrency(
+            tambahanTotalAmount + commissionTotalAmount + othersTotalAmount,
+          ),
           alignment: "right",
           bold: true,
           fillColor: "#f8f9fa",
@@ -1450,11 +1542,13 @@ const buildIndividualJobPage = (
   const consolidatedOvertimeItems = groupedConsolidatedItems.Overtime || [];
   if (consolidatedOvertimeItems.length > 0) {
     consolidatedOvertimeItems.forEach((item) => {
-      const qtyLabel = `${item.total_quantity} Jam OT`;
+      const qtyLabel = isDirectAmountFixedItem(item)
+        ? "-"
+        : `${item.total_quantity} Jam OT`;
       tableBody.push(
         createItemRow(
           item.description,
-          item.rate_unit === "Percent" ? `${item.rate}%` : item.rate.toFixed(2),
+          getConsolidatedRateLabel(item),
           qtyLabel,
           formatCurrency(item.total_amount),
         ),
@@ -1540,6 +1634,11 @@ const buildIndividualJobPage = (
           if (i === 0 || i === node.table.body.length) return 1; // Outer borders
           if (i === 1) return 1; // Below header
 
+          const row = node.table.body[i];
+          if (row && Array.isArray(row) && row[0]?.baseSectionBorder) {
+            return 0.5;
+          }
+
           // Check row above the line (row i-1) for border below specific rows
           const prevRow = node.table.body[i - 1];
           if (prevRow && Array.isArray(prevRow)) {
@@ -1550,7 +1649,10 @@ const buildIndividualJobPage = (
             if (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
-                descText.includes("Jumlah Bag") ||
+                descText === "Subtotal" ||
+                descText === "Jumlah Cuti" ||
+                descText === "Jumlah Lain-lain" ||
+                descText === "Jumlah Base" ||
                 descText.includes("Gross Pay") ||
                 descText === "Jumlah Gaji Kasar")
             ) {
@@ -1559,7 +1661,6 @@ const buildIndividualJobPage = (
           }
 
           // Add thin line above rows with fillColor (subtotals, totals)
-          const row = node.table.body[i];
           if (row && Array.isArray(row) && row[0]?.fillColor) {
             return 0.5;
           }

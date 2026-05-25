@@ -797,6 +797,10 @@ export interface LeaveRecord {
   leave_type: string;
   days_taken: number;
   amount_paid: number;
+  work_log_id?: number | null;
+  work_log_type?: "daily" | "monthly" | "packing_cuti" | null;
+  work_log_section?: string | null;
+  notes?: string | null;
   holiday_description?: string | null;
 }
 
