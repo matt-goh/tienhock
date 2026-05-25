@@ -2142,9 +2142,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   size={18}
                   className="text-teal-600 dark:text-teal-400"
                 />
-                {mergedCommissionRecords
-                  .map((record) => record.description)
-                  .join(" + ")}
+                <Link
+                  to={`/payroll/commission?year=${payroll.year}&month=${payroll.month}`}
+                  className="hover:underline"
+                  title="Open Others (Advance) input page"
+                >
+                  {mergedCommissionRecords
+                    .map((record) => record.description)
+                    .join(" + ")}
+                </Link>
               </h3>
             </div>
             <div className="overflow-x-auto">
