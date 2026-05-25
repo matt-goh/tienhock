@@ -335,6 +335,8 @@ export class PayrollCalculationService {
    * @param sipRates Array of SIP rates
    * @param incomeTaxRates Array of Income Tax rates (optional, default is empty)
    * @param leaveRecords Array of leave records for additional gross pay calculation (optional)
+   * @param payrollMonth Payroll month used for effective-dated SOCSO rates (optional)
+   * @param payrollYear Payroll year used for effective-dated SOCSO rates (optional)
    * @returns Array of calculated deductions
    */
   static calculateContributions(
@@ -345,7 +347,9 @@ export class PayrollCalculationService {
     socsoRates: SOCSORRate[],
     sipRates: SIPRate[],
     incomeTaxRates: IncomeTaxRate[] = [],
-    leaveRecords?: LeaveRecord[]
+    leaveRecords?: LeaveRecord[],
+    payrollMonth?: number,
+    payrollYear?: number
   ): PayrollDeduction[] {
     const deductions: PayrollDeduction[] = [];
 
@@ -418,7 +422,9 @@ export class PayrollCalculationService {
       const socsoContribution = calculateSOCSO(
         socsoRate,
         totalGrossPay,
-        isOver60
+        isOver60,
+        payrollYear,
+        payrollMonth
       );
       deductions.push({
         deduction_type: "socso",
@@ -575,7 +581,9 @@ export class PayrollCalculationService {
       socsoRates,
       sipRates,
       incomeTaxRates,
-      leaveRecords
+      leaveRecords,
+      month,
+      year
     );
 
     // Calculate total employee deductions

@@ -6,26 +6,28 @@ import { SOCSORRate } from "../../../types/types";
 import LoadingSpinner from "../../LoadingSpinner";
 import SOCSORateEditModal from "./SOCSORateEditModal";
 
+const SOCSO_SKBBK_EFFECTIVE_LABEL: string = "Applies from June 2026 payroll";
+
 const SOCSORatesTab: React.FC = () => {
   const { socsoRates, isLoading, error } = useContributionRatesCache();
   const [editingRate, setEditingRate] = useState<SOCSORRate | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const handleEditRate = (rate: SOCSORRate) => {
+  const handleEditRate = (rate: SOCSORRate): void => {
     setEditingRate(rate);
     setShowEditModal(true);
   };
 
-  const handleCloseModal = () => {
+  const handleCloseModal = (): void => {
     setShowEditModal(false);
     setEditingRate(null);
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number): string => {
     return `RM ${Number(amount).toFixed(2)}`;
   };
 
-  const formatWageRange = (from: number, to: number) => {
+  const formatWageRange = (from: number, to: number): string => {
     if (to >= 999999) {
       return `${formatCurrency(from)} and above`;
     }
@@ -50,6 +52,9 @@ const SOCSORatesTab: React.FC = () => {
 
   return (
     <div className="mt-4">
+      <div className="mb-3 text-sm text-default-600 dark:text-gray-300">
+        SKBBK: {SOCSO_SKBBK_EFFECTIVE_LABEL}
+      </div>
       <div className="border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
             <thead className="bg-default-50 dark:bg-gray-900 sticky top-0 z-10">

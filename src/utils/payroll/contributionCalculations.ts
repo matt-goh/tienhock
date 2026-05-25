@@ -1,6 +1,17 @@
 // src/utils/payroll/contributionCalculations.ts
 import { EPFRate, SOCSORRate, SIPRate, IncomeTaxRate } from "../../types/types";
 
+export const SOCSO_SKBBK_EFFECTIVE_YEAR: number = 2026;
+export const SOCSO_SKBBK_EFFECTIVE_MONTH: number = 6;
+
+export const isSOCSOSKBBKEffective = (year: number, month: number): boolean => {
+  return (
+    year > SOCSO_SKBBK_EFFECTIVE_YEAR ||
+    (year === SOCSO_SKBBK_EFFECTIVE_YEAR &&
+      month >= SOCSO_SKBBK_EFFECTIVE_MONTH)
+  );
+};
+
 // Helper to determine employee type based on nationality and age
 export const getEmployeeType = (nationality: string, age: number): string => {
   const isLocal = nationality.toLowerCase() === "malaysian";
@@ -137,13 +148,16 @@ export const calculateEPF = (
 
 // Calculate SOCSO contribution
 //
-// Employee total = KEILATAN + SKBBK for under-60, just SKBBK for 60+.
+// From June 2026 onward, employee total = KEILATAN + SKBBK for under-60,
+// and just SKBBK for 60+. Before June 2026, SKBBK is RM0.
 // Returns keilatan/skbbk split so callers can write it into rate_info for the
 // combined SOCSO+SIP+SKBBK government export.
 export const calculateSOCSO = (
   socsoRate: SOCSORRate,
   wageAmount: number,
-  isOver60: boolean = false
+  isOver60: boolean = false,
+  payrollYear?: number,
+  payrollMonth?: number
 ): {
   employee: number;
   employer: number;
@@ -153,10 +167,16 @@ export const calculateSOCSO = (
   if (!socsoRate)
     return { employee: 0, employer: 0, keilatan: 0, skbbk: 0 };
 
-  const skbbk = Math.round(Number(socsoRate.employee_rate_skbbk) * 100) / 100;
+  const shouldApplySKBBK =
+    payrollYear === undefined || payrollMonth === undefined
+      ? false
+      : isSOCSOSKBBKEffective(payrollYear, payrollMonth);
+  const skbbk = shouldApplySKBBK
+    ? Math.round(Number(socsoRate.employee_rate_skbbk) * 100) / 100
+    : 0;
 
-  // For employees 60 and above: employer uses special rate, employee pays
-  // SKBBK only (Keilatan does not apply).
+  // For employees 60 and above: employer uses special rate; employee pays
+  // only the effective SKBBK amount (Keilatan does not apply).
   if (isOver60) {
     return {
       employee: skbbk,
@@ -166,7 +186,7 @@ export const calculateSOCSO = (
     };
   }
 
-  // For employees under 60: employee pays KEILATAN + SKBBK.
+  // For employees under 60: employee pays KEILATAN + effective SKBBK.
   const keilatan = Math.round(Number(socsoRate.employee_rate) * 100) / 100;
   return {
     employee: Math.round((keilatan + skbbk) * 100) / 100,
