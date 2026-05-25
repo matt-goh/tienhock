@@ -3,7 +3,13 @@
 // documents linked to the current invoice.
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconFileText, IconExternalLink } from "@tabler/icons-react";
+import {
+  IconFileText,
+  IconExternalLink,
+  IconPrinter,
+  IconDownload,
+} from "@tabler/icons-react";
+import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import type { AdjustmentDocument } from "../../types/types";
 import {
@@ -16,6 +22,11 @@ import type {
   AdjustmentDocsCompany,
   AdjustmentDocsPaths,
 } from "./useAdjustmentDocsPaths";
+import {
+  generateAdjustmentDocPDFBlob,
+} from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
+import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
+import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 
 interface Props {
   invoiceId: string;
@@ -48,6 +59,69 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
   const paths: AdjustmentDocsPaths = getAdjustmentDocsPaths(company);
   const [docs, setDocs] = useState<AdjustmentDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [printingDoc, setPrintingDoc] = useState<AdjustmentDocument | null>(
+    null
+  );
+
+  // The /:id endpoint returns the doc with lines; the list endpoint we
+  // already called omits them. Fetch full doc on demand for print/download.
+  const fetchDocWithLines = useCallback(
+    async (id: string): Promise<AdjustmentDocument> =>
+      (await api.get(`${paths.apiBase}/${id}`)) as AdjustmentDocument,
+    [paths.apiBase]
+  );
+
+  const handleDownload = useCallback(
+    async (doc: AdjustmentDocument) => {
+      if (downloadingId) return;
+      setDownloadingId(doc.id);
+      const toastId = toast.loading("Generating PDF...");
+      try {
+        const full = await fetchDocWithLines(doc.id);
+        const pdfBlob = await generateAdjustmentDocPDFBlob([full], company);
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.download = generateAdjustmentDocPDFFilename([full], company);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("PDF downloaded", { id: toastId });
+      } catch (error) {
+        toast.error(
+          `Failed to generate PDF: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          { id: toastId }
+        );
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [downloadingId, fetchDocWithLines, company]
+  );
+
+  const handlePrint = useCallback(
+    async (doc: AdjustmentDocument) => {
+      if (printingDoc) return;
+      const toastId = toast.loading("Loading document...");
+      try {
+        const full = await fetchDocWithLines(doc.id);
+        toast.dismiss(toastId);
+        setPrintingDoc(full);
+      } catch (error) {
+        toast.error(
+          `Failed to load document: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          { id: toastId }
+        );
+      }
+    },
+    [printingDoc, fetchDocWithLines]
+  );
 
   const fetchDocs = useCallback(async () => {
     if (!invoiceId) {
@@ -121,6 +195,9 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
                 Paired
               </th>
+              <th className="px-2 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
+                PDF
+              </th>
               <th className="w-10" />
             </tr>
           </thead>
@@ -149,6 +226,39 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                 <td className="px-4 py-2 text-sm text-default-500 dark:text-gray-400">
                   {d.paired_doc_id ? `↔ ${d.paired_doc_id}` : "—"}
                 </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrint(d);
+                      }}
+                      disabled={!!printingDoc || downloadingId === d.id}
+                      className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Print PDF"
+                      aria-label={`Print PDF for ${d.id}`}
+                    >
+                      <IconPrinter size={16} stroke={2} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload(d);
+                      }}
+                      disabled={downloadingId === d.id || !!printingDoc}
+                      className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Download PDF"
+                      aria-label={`Download PDF for ${d.id}`}
+                    >
+                      <IconDownload size={16} stroke={2} />
+                    </button>
+                  </div>
+                </td>
                 <td className="px-2 py-2 text-default-400 dark:text-gray-500">
                   <IconExternalLink size={14} />
                 </td>
@@ -157,6 +267,12 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
           </tbody>
         </table>
       </div>
+      {printingDoc && (
+        <AdjustmentDocPrintOverlay
+          docs={[printingDoc]}
+          onComplete={() => setPrintingDoc(null)}
+        />
+      )}
     </div>
   );
 };

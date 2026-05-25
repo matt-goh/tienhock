@@ -1,6 +1,19 @@
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
 
+const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
+const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
+
+const isSOCSOSKBBKEffective = (year, month) => {
+  const payrollYear = Number(year);
+  const payrollMonth = Number(month);
+  return (
+    payrollYear > SOCSO_SKBBK_EFFECTIVE_YEAR ||
+    (payrollYear === SOCSO_SKBBK_EFFECTIVE_YEAR &&
+      payrollMonth >= SOCSO_SKBBK_EFFECTIVE_MONTH)
+  );
+};
+
 // Moved to top-level to be reusable
 const saveDeductions = async (pool, employeePayrollId, deductions) => {
   if (!deductions || deductions.length === 0) {
@@ -372,29 +385,37 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       }
     }
 
-    // Calculate SOCSO
+    // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
     const socsoRate = findRateByWage(socsoRates, grossPay);
     if (socsoRate) {
       const isOver60 = age >= 60;
-      const employee_amount = isOver60
+      const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
+      const skbbk =
+        shouldApplySKBBK
+          ? Math.round(parseFloat(socsoRate.employee_rate_skbbk || 0) * 100) /
+            100
+          : 0;
+      const keilatan = isOver60
         ? 0
-        : parseFloat(socsoRate.employee_rate);
+        : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) / 100;
+      const employee_amount = Math.round((keilatan + skbbk) * 100) / 100;
       const employer_amount = isOver60
-        ? parseFloat(socsoRate.employer_rate_over_60)
-        : parseFloat(socsoRate.employer_rate);
+        ? Math.round(parseFloat(socsoRate.employer_rate_over_60 || 0) * 100) /
+          100
+        : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) / 100;
 
       deductions.push({
         deduction_type: "socso",
-        employee_amount: employee_amount || 0,
-        employer_amount: employer_amount || 0,
+        employee_amount,
+        employer_amount,
         wage_amount: grossPay,
         rate_info: {
           rate_id: socsoRate.id,
-          employee_rate: isOver60 ? "RM0.00" : `RM${socsoRate.employee_rate}`,
-          employer_rate: isOver60
-            ? `RM${socsoRate.employer_rate_over_60}`
-            : `RM${socsoRate.employer_rate}`,
+          employee_rate: `RM${employee_amount.toFixed(2)}`,
+          employer_rate: `RM${employer_amount.toFixed(2)}`,
           age_group: isOver60 ? "60_and_above" : "under_60",
+          keilatan_amount: keilatan,
+          skbbk_amount: skbbk,
         },
       });
     }
@@ -529,6 +550,8 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
     throw error;
   }
 };
+
+export { recalculateAndUpdatePayroll };
 
 export default function (pool) {
   const router = Router();
@@ -905,9 +928,44 @@ export default function (pool) {
             lr.leave_type,
             lr.days_taken,
             lr.amount_paid,
+            COALESCE(lr.work_log_id, inferred_mwl.id) as work_log_id,
+            CASE
+              WHEN dwl.id IS NOT NULL THEN 'daily'
+              WHEN linked_mwl.id IS NOT NULL OR inferred_mwl.id IS NOT NULL THEN 'monthly'
+              WHEN lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING') THEN 'packing_cuti'
+              ELSE NULL
+            END as work_log_type,
+            COALESCE(
+              dwl.section,
+              linked_mwl.section,
+              inferred_mwl.section,
+              CASE
+                WHEN lr.notes = 'PACKING_CUTI:MEE_PACKING' THEN 'MEE_PACKING'
+                WHEN lr.notes = 'PACKING_CUTI:BH_PACKING' THEN 'BH_PACKING'
+                ELSE NULL
+              END
+            ) as work_log_section,
+            lr.notes,
             h.description as holiday_description
           FROM leave_records lr
           JOIN staffs s ON s.id = lr.employee_id
+          LEFT JOIN daily_work_logs dwl
+            ON dwl.id = lr.work_log_id
+            AND dwl.log_date = lr.leave_date
+          LEFT JOIN monthly_work_logs linked_mwl
+            ON linked_mwl.id = lr.work_log_id
+            AND linked_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND linked_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+          LEFT JOIN monthly_work_logs inferred_mwl
+            ON lr.work_log_id IS NULL
+            AND inferred_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND inferred_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+            AND inferred_mwl.section = CASE
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'MAINTEN' THEN 'MAINTENANCE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'OFFICE' THEN 'OFFICE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'SAPU' THEN 'SAPU'
+              ELSE NULL
+            END
           LEFT JOIN holiday_calendar h
             ON lr.leave_type = 'cuti_umum'
             AND h.holiday_date = lr.leave_date
@@ -1209,9 +1267,44 @@ export default function (pool) {
             lr.leave_type,
             lr.days_taken,
             lr.amount_paid,
+            COALESCE(lr.work_log_id, inferred_mwl.id) as work_log_id,
+            CASE
+              WHEN dwl.id IS NOT NULL THEN 'daily'
+              WHEN linked_mwl.id IS NOT NULL OR inferred_mwl.id IS NOT NULL THEN 'monthly'
+              WHEN lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING') THEN 'packing_cuti'
+              ELSE NULL
+            END as work_log_type,
+            COALESCE(
+              dwl.section,
+              linked_mwl.section,
+              inferred_mwl.section,
+              CASE
+                WHEN lr.notes = 'PACKING_CUTI:MEE_PACKING' THEN 'MEE_PACKING'
+                WHEN lr.notes = 'PACKING_CUTI:BH_PACKING' THEN 'BH_PACKING'
+                ELSE NULL
+              END
+            ) as work_log_section,
+            lr.notes,
             h.description as holiday_description
           FROM leave_records lr
           JOIN staffs s ON s.id = lr.employee_id
+          LEFT JOIN daily_work_logs dwl
+            ON dwl.id = lr.work_log_id
+            AND dwl.log_date = lr.leave_date
+          LEFT JOIN monthly_work_logs linked_mwl
+            ON linked_mwl.id = lr.work_log_id
+            AND linked_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND linked_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+          LEFT JOIN monthly_work_logs inferred_mwl
+            ON lr.work_log_id IS NULL
+            AND inferred_mwl.log_year = EXTRACT(YEAR FROM lr.leave_date)
+            AND inferred_mwl.log_month = EXTRACT(MONTH FROM lr.leave_date)
+            AND inferred_mwl.section = CASE
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'MAINTEN' THEN 'MAINTENANCE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'OFFICE' THEN 'OFFICE'
+              WHEN COALESCE(s.job::jsonb, '[]'::jsonb) ? 'SAPU' THEN 'SAPU'
+              ELSE NULL
+            END
           LEFT JOIN holiday_calendar h
             ON lr.leave_type = 'cuti_umum'
             AND h.holiday_date = lr.leave_date

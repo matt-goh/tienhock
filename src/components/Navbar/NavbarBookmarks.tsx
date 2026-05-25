@@ -215,9 +215,20 @@ export default function NavbarBookmarks({
           {bookmarks.length === 0 ? (
             <div className="px-4 py-6 text-center text-default-500 dark:text-gray-400">
               <IconBookmark size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No bookmarks yet</p>
-              <p className="text-xs mt-1">
-                Click the bookmark icon on any menu item to save it here
+              <p className="text-sm font-medium text-default-700 dark:text-gray-300">
+                Tiada penanda buku lagi
+              </p>
+              <p className="text-xs mt-2 leading-relaxed">
+                Klik ikon{" "}
+                <IconBookmark
+                  size={12}
+                  className="inline -mt-0.5 mx-0.5"
+                />{" "}
+                pada mana-mana item menu di sebelah untuk menyimpannya di sini.
+              </p>
+              <p className="text-xs mt-2 leading-relaxed text-default-400 dark:text-gray-500">
+                Tandakan halaman yang anda kerap gunakan supaya lebih mudah dan
+                pantas untuk diakses pada bila-bila masa.
               </p>
             </div>
           ) : (

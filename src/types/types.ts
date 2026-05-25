@@ -797,6 +797,10 @@ export interface LeaveRecord {
   leave_type: string;
   days_taken: number;
   amount_paid: number;
+  work_log_id?: number | null;
+  work_log_type?: "daily" | "monthly" | "packing_cuti" | null;
+  work_log_section?: string | null;
+  notes?: string | null;
   holiday_description?: string | null;
 }
 
@@ -846,6 +850,7 @@ export interface SOCSORRate {
   wage_from: number;
   wage_to: number;
   employee_rate: number;
+  employee_rate_skbbk: number;
   employer_rate: number;
   employer_rate_over_60: number;
   is_active: boolean;
@@ -910,6 +915,9 @@ export interface PayrollDeduction {
     age_group?: string;
     wage_ceiling_used?: number;
     tax_category?: string; // e.g., "Single", "Married-K2-Unemployed"
+    // SOCSO split: Keilatan (existing) + SKBBK (new gazette). Sum = employee_amount.
+    keilatan_amount?: number;
+    skbbk_amount?: number;
   };
 }
 

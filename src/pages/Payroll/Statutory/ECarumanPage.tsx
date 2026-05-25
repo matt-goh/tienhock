@@ -68,6 +68,8 @@ interface SOCSOPreviewData {
     salary: number;
     socso_employer: number;
     socso_employee: number;
+    keilatan_amount: number;
+    skbbk_amount: number;
     eis_employer: number;
     eis_employee: number;
   }[];
@@ -76,6 +78,8 @@ interface SOCSOPreviewData {
     socso_employer: number;
     socso_employee: number;
     socso_total: number;
+    keilatan_amount: number;
+    skbbk_amount: number;
     eis_employer: number;
     eis_employee: number;
     eis_total: number;
@@ -321,89 +325,43 @@ const ECarumanPage: React.FC = () => {
           );
           break;
         }
-        case "socso": {
-          // Check if File System Access API is supported
+        case "socso":
+        case "sip": {
+          // SOCSO and SIP cards both trigger the same combined PERKESO file
+          // (SOCSO + EIS + SKBBK) — the 2026 gazette replaced the separate
+          // BRG8A.TXT and SIP*.TXT/SIPE*.TXT submissions with one file.
           if (!window.showDirectoryPicker) {
             toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
             break;
           }
 
-          // Get export data from backend
-          const socsoExportData = await api.get(
-            `/api/e-caruman/socso/export?month=${selectedMonth}&year=${selectedYear}&company=TH&employerCode=${SOCSO_EMPLOYER_CODE}`
+          const combinedExportData = await api.get(
+            `/api/e-caruman/socso-sip/export?month=${selectedMonth}&year=${selectedYear}&company=TH&employerCode=${SOCSO_EMPLOYER_CODE}&myCoId=${SIP_MYCOID}`
           );
 
-          if (!socsoExportData.files || socsoExportData.files.length === 0) {
+          if (!combinedExportData.files || combinedExportData.files.length === 0) {
             toast.error("No SOCSO/EIS contribution data found for the specified period");
             break;
           }
 
-          // Prompt user to select download folder
-          let socsoBaseDir: FileSystemDirectoryHandle;
+          let combinedBaseDir: FileSystemDirectoryHandle;
           try {
-            socsoBaseDir = await window.showDirectoryPicker();
+            combinedBaseDir = await window.showDirectoryPicker();
           } catch (err) {
-            // User cancelled the picker
             if ((err as Error).name === "AbortError") {
               break;
             }
             throw err;
           }
 
-          // Create folder structure and write files
-          let socsoCreatedCount = 0;
-          for (const file of socsoExportData.files) {
+          for (const file of combinedExportData.files) {
             const pathParts = file.path.split("/");
-            const targetDir = await createNestedDirectory(socsoBaseDir, pathParts);
+            const targetDir = await createNestedDirectory(combinedBaseDir, pathParts);
             await writeFileToDirectory(targetDir, file.filename, file.content);
-            socsoCreatedCount++;
           }
 
           toast.success(
-            `SOCSO file created successfully in SOCSO/${socsoExportData.year}/TH/${socsoExportData.month}/`
-          );
-          break;
-        }
-        case "sip": {
-          // Check if File System Access API is supported
-          if (!window.showDirectoryPicker) {
-            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
-            break;
-          }
-
-          // Get export data from backend
-          const sipExportData = await api.get(
-            `/api/e-caruman/sip/export?month=${selectedMonth}&year=${selectedYear}&company=TH&employerCode=${SOCSO_EMPLOYER_CODE}&myCoId=${SIP_MYCOID}`
-          );
-
-          if (!sipExportData.files || sipExportData.files.length === 0) {
-            toast.error("No SIP/EIS contribution data found for the specified period");
-            break;
-          }
-
-          // Prompt user to select download folder
-          let sipBaseDir: FileSystemDirectoryHandle;
-          try {
-            sipBaseDir = await window.showDirectoryPicker();
-          } catch (err) {
-            // User cancelled the picker
-            if ((err as Error).name === "AbortError") {
-              break;
-            }
-            throw err;
-          }
-
-          // Create folder structure and write files
-          let sipCreatedCount = 0;
-          for (const file of sipExportData.files) {
-            const pathParts = file.path.split("/");
-            const targetDir = await createNestedDirectory(sipBaseDir, pathParts);
-            await writeFileToDirectory(targetDir, file.filename, file.content);
-            sipCreatedCount++;
-          }
-
-          toast.success(
-            `SIP files created successfully (${sipCreatedCount} files) in SIP/${sipExportData.year}/TH/${sipExportData.month}/`
+            `Combined SOCSO-SIP file created in SOCSO-SIP/${combinedExportData.year}/TH/${combinedExportData.month}/`
           );
           break;
         }
@@ -647,6 +605,12 @@ const ECarumanPage: React.FC = () => {
                   <IconShieldCheck size={20} className="text-green-600 dark:text-green-400" />
                 </div>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">SOCSO / PERKESO</h3>
+                <span
+                  className="px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-[10px] font-medium uppercase tracking-wide"
+                  title="Downloads the combined SOCSO + EIS + SKBBK file"
+                >
+                  Combined file
+                </span>
                 <div className="ml-auto">
                   {loadingType === "socso" ? (
                     <IconLoader2 size={20} className="animate-spin text-green-600 dark:text-green-400" />
@@ -687,12 +651,12 @@ const ECarumanPage: React.FC = () => {
               {/* SOCSO Detailed Tooltip */}
               {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
                 <div
-                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[640px]"
+                  className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[760px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO File Preview (BRG8A.TXT)</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO Preview (combined SOCSO-SIP{`{MMYY}`}.TXT)</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{preview.socso.count} records</span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
@@ -703,7 +667,9 @@ const ECarumanPage: React.FC = () => {
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
                           <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
                           <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Keilatan</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">SKBBK</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -716,6 +682,12 @@ const ECarumanPage: React.FC = () => {
                             </td>
                             <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.socso_employer.toFixed(2)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                              {row.keilatan_amount.toFixed(2)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                              {row.skbbk_amount.toFixed(2)}
                             </td>
                             <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
                               {row.socso_employee.toFixed(2)}
@@ -731,6 +703,12 @@ const ECarumanPage: React.FC = () => {
                           </td>
                           <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.socso.totals.socso_employer.toFixed(2)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                            {preview.socso.totals.keilatan_amount.toFixed(2)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                            {preview.socso.totals.skbbk_amount.toFixed(2)}
                           </td>
                           <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.socso.totals.socso_employee.toFixed(2)}
@@ -755,6 +733,12 @@ const ECarumanPage: React.FC = () => {
                   <IconUmbrella size={20} className="text-purple-600 dark:text-purple-400" />
                 </div>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">SIP / EIS</h3>
+                <span
+                  className="px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-medium uppercase tracking-wide"
+                  title="Downloads the combined SOCSO + EIS + SKBBK file"
+                >
+                  Combined file
+                </span>
                 <div className="ml-auto">
                   {loadingType === "sip" ? (
                     <IconLoader2 size={20} className="animate-spin text-purple-600 dark:text-purple-400" />
@@ -800,7 +784,7 @@ const ECarumanPage: React.FC = () => {
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SIP File Preview</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SIP Preview (combined SOCSO-SIP{`{MMYY}`}.TXT)</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{preview.sip.count} records</span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
