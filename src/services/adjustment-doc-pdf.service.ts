@@ -101,11 +101,11 @@ export const prepareAdjustmentDocPDFData = async (
       tax: Number(line.tax) || 0,
     }));
 
-  const refund =
+  const refund: AdjustmentDocPDFData["doc"]["refund"] =
     doc.type === "refund_note"
       ? {
           method: doc.refund_method,
-          bank_account: doc.bank_account,
+          bank_account: doc.bank_account ?? null,
           reference: doc.refund_reference,
         }
       : undefined;
