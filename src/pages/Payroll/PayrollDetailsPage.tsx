@@ -452,13 +452,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {item.rate_unit === "Percent"
             ? `${item.rate}%`
-            : item.rate_unit === "Fixed" && item.total_quantity > 1
-              ? "Fixed"
+            : item.rate_unit === "Fixed" && item.item_count > 1
+              ? `Fixed (${formatCurrency(item.rate)})`
               : `${formatCurrency(item.rate)}/${item.rate_unit}`}
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
-          {item.rate_unit === "Fixed" && item.total_quantity > 1 ? (
-            formatCurrency(item.total_quantity)
+          {item.rate_unit === "Fixed" && item.item_count > 1 ? (
+            item.item_count
           ) : (
             <>
               {item.total_quantity}
