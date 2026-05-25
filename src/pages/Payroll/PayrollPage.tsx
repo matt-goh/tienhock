@@ -45,6 +45,7 @@ import {
 import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
 import MonthNavigator from "../../components/MonthNavigator";
 import PayrollUnifiedTable from "../../components/Payroll/PayrollUnifiedTable";
+import PayrollSectionPrintMenu from "../../components/Payroll/PayrollSectionPrintMenu";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 const PayrollPage: React.FC = () => {
@@ -717,14 +718,6 @@ const PayrollPage: React.FC = () => {
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
-                <IconBriefcase size={16} className="text-amber-600 dark:text-amber-400" />
-                <span className="font-medium text-default-700 dark:text-gray-200">
-                  {Object.keys(groupedEmployees).length}
-                </span>
-                <span className="text-default-400 dark:text-gray-400">kerja</span>
-              </div>
-              <span className="text-default-300 dark:text-gray-600">•</span>
-              <div className="flex items-center gap-1.5">
                 <IconCash size={16} className="text-emerald-600 dark:text-emerald-400" />
                 <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                   {formatCurrency(totals.grossPay)}
@@ -822,16 +815,16 @@ const PayrollPage: React.FC = () => {
                 midMonthPayrollsMap={midMonthPayrollsMap}
               />
             )}
-            <PrintBatchPayslipsButton
+            <PayrollSectionPrintMenu
               payrolls={payroll.employeePayrolls || []}
-              size="sm"
-              variant={isAllSelected ? "filled" : "outline"}
-              color="sky"
-              buttonText={
-                isFetchingMidMonth ? "Loading mid-month data..." : "Print All"
-              }
-              disabled={isFetchingMidMonth}
               midMonthPayrollsMap={midMonthPayrollsMap}
+              size="sm"
+              disabled={isFetchingMidMonth}
+              buttonLabel={
+                isFetchingMidMonth
+                  ? "Loading mid-month data..."
+                  : "Print Payslips"
+              }
             />
             <div className="relative">
               <input
