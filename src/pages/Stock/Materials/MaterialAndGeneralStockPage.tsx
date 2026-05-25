@@ -117,7 +117,7 @@ const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
 const MaterialAndGeneralStockPage: React.FC = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
-  const [activeTab, setActiveTab] = useState<StockEntryTab>("general");
+  const [activeTab, setActiveTab] = useState<StockEntryTab>("bihun");
   const [materials, setMaterials] = useState<MaterialWithStock[]>([]);
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);

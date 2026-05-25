@@ -89,6 +89,20 @@ const createBlankAdjustmentLine = (): LineState => ({
   issubtotal: false,
 });
 
+const createCreditNoteDiscountLine = (invoiceTotal: number): LineState => {
+  const discountAmount = roundMoney(Number(invoiceTotal || 0) * 0.03);
+  return {
+    uid: crypto.randomUUID(),
+    code: "DISC",
+    description: "Discount 3%",
+    quantity: 1,
+    price: discountAmount,
+    tax: 0,
+    total: discountAmount,
+    issubtotal: false,
+  };
+};
+
 const createOriginalInvoiceLine = (product: ProductItem): LineState => ({
   uid: crypto.randomUUID(),
   code: product.code,
@@ -416,7 +430,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               issubtotal: false,
             },
           ]);
-        } else if ((isCN || isDN) && inv.products && inv.products.length > 0) {
+        } else if (isCN) {
+          setLines([createCreditNoteDiscountLine(Number(inv.totalamountpayable || 0))]);
+        } else if (isDN && inv.products && inv.products.length > 0) {
           setLines(buildInvoiceProductLines(invoiceWithAdjustments, false));
         } else {
           setLines([createBlankAdjustmentLine()]);
@@ -535,8 +551,12 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     const nextIssuePairedRefund: boolean = !issuePairedRefund;
     setIssuePairedRefund(nextIssuePairedRefund);
 
-    if (!hasLineUserEdits && invoice?.products?.length) {
-      setLines(buildInvoiceProductLines(invoice, nextIssuePairedRefund));
+    if (!hasLineUserEdits && invoice) {
+      if (nextIssuePairedRefund && invoice.products?.length) {
+        setLines(buildInvoiceProductLines(invoice, true));
+      } else {
+        setLines([createCreditNoteDiscountLine(Number(invoice.totalamountpayable || 0))]);
+      }
     }
   };
 

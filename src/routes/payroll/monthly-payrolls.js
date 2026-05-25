@@ -1,5 +1,19 @@
 // src/routes/payroll/monthly-payrolls.js
 import { Router } from "express";
+import { recalculateAndUpdatePayroll } from "./employee-payrolls.js";
+
+const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
+const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
+
+const isSOCSOSKBBKEffective = (year, month) => {
+  const payrollYear = Number(year);
+  const payrollMonth = Number(month);
+  return (
+    payrollYear > SOCSO_SKBBK_EFFECTIVE_YEAR ||
+    (payrollYear === SOCSO_SKBBK_EFFECTIVE_YEAR &&
+      payrollMonth >= SOCSO_SKBBK_EFFECTIVE_MONTH)
+  );
+};
 
 // Helper function to format date to YYYY-MM-DD string
 const formatDateToYMD = (date) => {
@@ -1414,28 +1428,41 @@ export default function (pool) {
             }
           }
 
-          // SOCSO
+          // SOCSO. SKBBK applies from June 2026 payrolls onward.
           const socsoRate = findRateByWage(socsoRates, grossPay);
           if (socsoRate) {
             const isOver60 = age >= 60;
+            const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
+            const skbbk =
+              shouldApplySKBBK
+                ? Math.round(
+                    parseFloat(socsoRate.employee_rate_skbbk || 0) * 100
+                  ) / 100
+                : 0;
+            const keilatan = isOver60
+              ? 0
+              : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
+                100;
+            const employee_amount =
+              Math.round((keilatan + skbbk) * 100) / 100;
+            const employer_amount = isOver60
+              ? Math.round(
+                  parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
+                ) / 100
+              : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
+                100;
             deductions.push({
               deduction_type: "socso",
-              employee_amount: isOver60
-                ? 0
-                : parseFloat(socsoRate.employee_rate) || 0,
-              employer_amount: isOver60
-                ? parseFloat(socsoRate.employer_rate_over_60) || 0
-                : parseFloat(socsoRate.employer_rate) || 0,
+              employee_amount,
+              employer_amount,
               wage_amount: grossPay,
               rate_info: {
                 rate_id: socsoRate.id,
-                employee_rate: isOver60
-                  ? "RM0.00"
-                  : `RM${socsoRate.employee_rate}`,
-                employer_rate: isOver60
-                  ? `RM${socsoRate.employer_rate_over_60}`
-                  : `RM${socsoRate.employer_rate}`,
+                employee_rate: `RM${employee_amount.toFixed(2)}`,
+                employer_rate: `RM${employer_amount.toFixed(2)}`,
                 age_group: isOver60 ? "60_and_above" : "under_60",
+                keilatan_amount: keilatan,
+                skbbk_amount: skbbk,
               },
             });
           }
@@ -1687,6 +1714,64 @@ export default function (pool) {
         }
       }
 
+      // Orphan cleanup: employees who had a previously-processed payroll for
+      // this month but are no longer in the eligible set (e.g. their work-log
+      // entry was deleted afterwards) leave stale non-manual payroll_items
+      // behind. Those rows keep inflating gross_pay on the payslip because the
+      // comprehensive endpoint sums payroll_items + leaves + commissions.
+      // Eligibility (and the processing loop above) matches employees by name
+      // so siblings sharing the same name combine into one payroll — orphan
+      // detection has to match by name too, otherwise we'd wrongly flag the
+      // primary-id rows of grouped payrolls.
+      const orphansResult = await client.query(
+        `WITH selected_names AS (
+           SELECT DISTINCT s.name FROM staffs s WHERE s.id = ANY($1)
+         )
+         SELECT ep.id,
+           EXISTS (
+             SELECT 1 FROM payroll_items pi
+             WHERE pi.employee_payroll_id = ep.id AND pi.is_manual = true
+           ) AS has_manual_items
+         FROM employee_payrolls ep
+         JOIN staffs s ON ep.employee_id = s.id
+         WHERE ep.monthly_payroll_id = $2
+           AND s.name NOT IN (SELECT name FROM selected_names)`,
+        [selected_employees.map((e) => e.employeeId), id],
+      );
+
+      const orphansToReset = [];
+      const orphansToDelete = [];
+      for (const row of orphansResult.rows) {
+        if (row.has_manual_items) orphansToReset.push(row.id);
+        else orphansToDelete.push(row.id);
+      }
+
+      if (orphansToReset.length > 0) {
+        await client.query(
+          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1) AND is_manual = false",
+          [orphansToReset],
+        );
+        await client.query(
+          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+          [orphansToReset],
+        );
+      }
+
+      if (orphansToDelete.length > 0) {
+        await client.query(
+          "DELETE FROM payroll_items WHERE employee_payroll_id = ANY($1)",
+          [orphansToDelete],
+        );
+        await client.query(
+          "DELETE FROM payroll_deductions WHERE employee_payroll_id = ANY($1)",
+          [orphansToDelete],
+        );
+        await client.query(
+          "DELETE FROM employee_payrolls WHERE id = ANY($1)",
+          [orphansToDelete],
+        );
+      }
+
       // Update the monthly payroll's updated_at timestamp using Node.js time
       // (PostgreSQL Docker container time may be out of sync)
       const payrollId = parseInt(id);
@@ -1702,10 +1787,31 @@ export default function (pool) {
       res.json({
         success: true,
         processed_count: processedPayrolls.length,
+        pruned_count: orphansToDelete.length,
+        reset_count: orphansToReset.length,
         missing_income_tax_employees: missingIncomeTaxEmployees,
         errors,
         updated_at: serverTimestamp,
       });
+
+      // Recalculate stored gross/net/deductions for orphan payrolls that we
+      // kept (because they still hold manual items). The slip's comprehensive
+      // endpoint always recalculates on read, but the payroll list view reads
+      // the stored gross_pay/net_pay — refresh them here so both stay in sync.
+      if (orphansToReset.length > 0) {
+        setImmediate(async () => {
+          for (const orphanId of orphansToReset) {
+            try {
+              await recalculateAndUpdatePayroll(pool, orphanId);
+            } catch (err) {
+              console.error(
+                `Error recalculating pruned orphan payroll ${orphanId}:`,
+                err,
+              );
+            }
+          }
+        });
+      }
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error in unified payroll processing:", error);

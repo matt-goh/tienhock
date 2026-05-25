@@ -9,6 +9,7 @@ import {
   IconSend,
   IconRotateClockwise,
   IconRefresh,
+  IconPrinter,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import BackButton from "../../components/BackButton";
@@ -27,6 +28,8 @@ import {
   getAdjustmentDocsPaths,
 } from "../../components/AdjustmentDocs/useAdjustmentDocsPaths";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
+import AdjustmentDocPDFHandler from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
+import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 
 interface Props {
   company?: AdjustmentDocsCompany;
@@ -62,6 +65,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const [isCancellingEinvoice, setIsCancellingEinvoice] = useState(false);
   const [showCancelEinvoiceDialog, setShowCancelEinvoiceDialog] = useState(false);
   const [einvoiceCancelReason, setEinvoiceCancelReason] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const fetchDoc = useCallback(async () => {
     if (!id) return;
@@ -267,6 +271,17 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              onClick={() => setIsPrinting(true)}
+              icon={IconPrinter}
+              variant="outline"
+              size="md"
+              disabled={loading || isPrinting}
+              title="Print this document"
+            >
+              {isPrinting ? "Printing..." : "Print"}
+            </Button>
+            <AdjustmentDocPDFHandler docs={[doc]} disabled={loading} />
             {/* Submit / Update / Cancel e-Invoice */}
             {doc.status === "active" && !doc.einvoice_status && (
               <Button
@@ -778,6 +793,13 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
         }
         variant="danger"
       />
+
+      {isPrinting && doc && (
+        <AdjustmentDocPrintOverlay
+          docs={[doc]}
+          onComplete={() => setIsPrinting(false)}
+        />
+      )}
     </div>
   );
 };

@@ -111,6 +111,7 @@ export default function (pool) {
       wage_from,
       wage_to,
       employee_rate,
+      employee_rate_skbbk,
       employer_rate,
       employer_rate_over_60,
     } = req.body;
@@ -119,15 +120,17 @@ export default function (pool) {
       const query = `
       UPDATE socso_rates
       SET wage_from = $1, wage_to = $2, employee_rate = $3,
-          employer_rate = $4, employer_rate_over_60 = $5,
+          employee_rate_skbbk = $4,
+          employer_rate = $5, employer_rate_over_60 = $6,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $6
+      WHERE id = $7
       RETURNING *
     `;
       const result = await pool.query(query, [
         wage_from,
         wage_to,
         employee_rate,
+        employee_rate_skbbk,
         employer_rate,
         employer_rate_over_60,
         id,

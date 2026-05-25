@@ -1,6 +1,19 @@
 // src/routes/greentarget/monthly-payrolls.js
 import { Router } from "express";
 
+const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
+const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
+
+const isSOCSOSKBBKEffective = (year, month) => {
+  const payrollYear = Number(year);
+  const payrollMonth = Number(month);
+  return (
+    payrollYear > SOCSO_SKBBK_EFFECTIVE_YEAR ||
+    (payrollYear === SOCSO_SKBBK_EFFECTIVE_YEAR &&
+      payrollMonth >= SOCSO_SKBBK_EFFECTIVE_MONTH)
+  );
+};
+
 // Helper function to format date to YYYY-MM-DD string
 const formatDateToYMD = (date) => {
   if (!date) return null;
@@ -725,24 +738,40 @@ export default function (pool) {
             }
           }
 
-          // SOCSO
+          // SOCSO. SKBBK applies from June 2026 payrolls onward.
           const socsoRate = findRateByWage(socsoRates, grossPay);
           if (socsoRate) {
             const isOver60 = age >= 60;
+            const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
+            const skbbk =
+              shouldApplySKBBK
+                ? Math.round(
+                    parseFloat(socsoRate.employee_rate_skbbk || 0) * 100
+                  ) / 100
+                : 0;
+            const keilatan = isOver60
+              ? 0
+              : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) /
+                100;
+            const employee_amount = Math.round((keilatan + skbbk) * 100) / 100;
+            const employer_amount = isOver60
+              ? Math.round(
+                  parseFloat(socsoRate.employer_rate_over_60 || 0) * 100
+                ) / 100
+              : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) /
+                100;
             deductions.push({
               deduction_type: "socso",
-              employee_amount: isOver60 ? 0 : parseFloat(socsoRate.employee_rate) || 0,
-              employer_amount: isOver60
-                ? parseFloat(socsoRate.employer_rate_over_60) || 0
-                : parseFloat(socsoRate.employer_rate) || 0,
+              employee_amount,
+              employer_amount,
               wage_amount: grossPay,
               rate_info: {
                 rate_id: socsoRate.id,
-                employee_rate: isOver60 ? "RM0.00" : `RM${socsoRate.employee_rate}`,
-                employer_rate: isOver60
-                  ? `RM${socsoRate.employer_rate_over_60}`
-                  : `RM${socsoRate.employer_rate}`,
+                employee_rate: `RM${employee_amount.toFixed(2)}`,
+                employer_rate: `RM${employer_amount.toFixed(2)}`,
                 age_group: isOver60 ? "60_and_above" : "under_60",
+                keilatan_amount: keilatan,
+                skbbk_amount: skbbk,
               },
             });
           }

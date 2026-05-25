@@ -13,6 +13,8 @@ import {
   IconSquareMinusFilled,
   IconSquare,
   IconSquareCheckFilled,
+  IconPrinter,
+  IconDownload,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -34,6 +36,9 @@ import {
   getAdjustmentDocsPaths,
 } from "../../components/AdjustmentDocs/useAdjustmentDocsPaths";
 import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/dateUtils";
+import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
+import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
+import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
 
 interface FilterState {
   type: AdjustmentDocType | "all";
@@ -62,6 +67,10 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchPrintDocs, setBatchPrintDocs] = useState<
+    AdjustmentDocument[] | null
+  >(null);
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const now = new Date();
@@ -230,6 +239,79 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     setSelectedIds(new Set());
     fetchDocs();
   }, [eligibleSelectedDocs, paths.apiBase, fetchDocs]);
+
+  const fetchSelectedDocsWithLines = useCallback(
+    async (ids: string[]): Promise<AdjustmentDocument[]> => {
+      return Promise.all(
+        ids.map((id) =>
+          api.get(`${paths.apiBase}/${id}`) as Promise<AdjustmentDocument>
+        )
+      );
+    },
+    [paths.apiBase]
+  );
+
+  const handleBatchDownload = useCallback(async () => {
+    if (selectedIds.size === 0 || isBatchProcessing) return;
+    setIsBatchProcessing(true);
+    const ids = Array.from(selectedIds);
+    const toastId = toast.loading(
+      `Loading ${ids.length} document${ids.length === 1 ? "" : "s"}...`
+    );
+    try {
+      const fullDocs = await fetchSelectedDocsWithLines(ids);
+      toast.loading("Generating PDF...", { id: toastId });
+      const isJellyPolly =
+        typeof window !== "undefined" &&
+        window.location.pathname.includes("/jellypolly");
+      const companyContext = isJellyPolly ? "jellypolly" : "tienhock";
+      const pdfBlob = await generateAdjustmentDocPDFBlob(
+        fullDocs,
+        companyContext
+      );
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = generateAdjustmentDocPDFFilename(fullDocs, companyContext);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(pdfUrl);
+      toast.success("PDF downloaded successfully", { id: toastId });
+    } catch (error) {
+      toast.error(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines]);
+
+  const handleBatchPrint = useCallback(async () => {
+    if (selectedIds.size === 0 || isBatchProcessing) return;
+    setIsBatchProcessing(true);
+    const ids = Array.from(selectedIds);
+    const toastId = toast.loading(
+      `Loading ${ids.length} document${ids.length === 1 ? "" : "s"}...`
+    );
+    try {
+      const fullDocs = await fetchSelectedDocsWithLines(ids);
+      toast.dismiss(toastId);
+      setBatchPrintDocs(fullDocs);
+    } catch (error) {
+      toast.error(
+        `Failed to load documents: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines]);
 
   const handleMonthChange = useCallback((newDate: Date) => {
     setSelectedMonth(newDate);
@@ -419,27 +501,51 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             Refresh
           </Button>
           {selectedIds.size > 0 && (
-            <Button
-              onClick={() => {
-                if (eligibleSelectedDocs.length === 0) {
-                  toast.error(
-                    "None of the selected documents are eligible for e-invoice submission (need active + not valid/pending/cancelled)."
-                  );
-                  return;
-                }
-                setShowSubmitDialog(true);
-              }}
-              icon={IconSend}
-              variant="outline"
-              color="sky"
-              size="md"
-              disabled={isSubmitting || loading}
-              title="Submit selected documents to MyInvois"
-            >
-              {isSubmitting
-                ? "Submitting..."
-                : `Submit e-Invoice (${eligibleSelectedDocs.length})`}
-            </Button>
+            <>
+              <Button
+                onClick={handleBatchPrint}
+                icon={IconPrinter}
+                variant="outline"
+                size="md"
+                disabled={isBatchProcessing || loading}
+                title="Print selected documents"
+              >
+                {isBatchProcessing ? "Loading..." : `Print (${selectedIds.size})`}
+              </Button>
+              <Button
+                onClick={handleBatchDownload}
+                icon={IconDownload}
+                variant="outline"
+                size="md"
+                disabled={isBatchProcessing || loading}
+                title="Download a single PDF with selected documents"
+              >
+                {isBatchProcessing
+                  ? "Loading..."
+                  : `Download (${selectedIds.size})`}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (eligibleSelectedDocs.length === 0) {
+                    toast.error(
+                      "None of the selected documents are eligible for e-invoice submission (need active + not valid/pending/cancelled)."
+                    );
+                    return;
+                  }
+                  setShowSubmitDialog(true);
+                }}
+                icon={IconSend}
+                variant="outline"
+                color="sky"
+                size="md"
+                disabled={isSubmitting || loading || isBatchProcessing}
+                title="Submit selected documents to MyInvois"
+              >
+                {isSubmitting
+                  ? "Submitting..."
+                  : `Submit e-Invoice (${eligibleSelectedDocs.length})`}
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -620,6 +726,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         confirmButtonText={isSubmitting ? "Submitting..." : "Submit"}
         variant="default"
       />
+
+      {batchPrintDocs && (
+        <AdjustmentDocPrintOverlay
+          docs={batchPrintDocs}
+          onComplete={() => setBatchPrintDocs(null)}
+        />
+      )}
     </div>
   );
 };

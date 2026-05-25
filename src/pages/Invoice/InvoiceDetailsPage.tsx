@@ -44,6 +44,7 @@ import {
   IconFileMinus,
   IconFilePlus,
   IconRotate2,
+  IconDownload,
 } from "@tabler/icons-react";
 import InvoiceTotals from "../../components/Invoice/InvoiceTotals";
 import { api } from "../../routes/utils/api";
@@ -56,6 +57,9 @@ import LineItemsTable from "../../components/Invoice/LineItemsTable";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
 import InvoiceAdjustmentDocsSection from "../../components/AdjustmentDocs/InvoiceAdjustmentDocsSection";
+import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
+import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
+import AdjustmentDocPrintOverlay from "../../utils/adjustments/PDF/AdjustmentDocPrintOverlay";
 import {
   getInvoiceDisplayStatus,
   getInvoiceDisplayStatusLabel,
@@ -194,6 +198,10 @@ const InvoiceDetailsPage: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [adjustmentDocs, setAdjustmentDocs] = useState<AdjustmentDocument[]>(
     []
+  );
+  const [downloadingAdjId, setDownloadingAdjId] = useState<string | null>(null);
+  const [printingAdjDoc, setPrintingAdjDoc] = useState<AdjustmentDocument | null>(
+    null
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -480,6 +488,55 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const handlePrintComplete = () => {
     setIsPrinting(false);
+  };
+
+  const handleDownloadAdjustmentDoc = async (doc: AdjustmentDocument) => {
+    if (downloadingAdjId) return;
+    setDownloadingAdjId(doc.id);
+    const toastId = toast.loading("Generating PDF...");
+    try {
+      const full = (await api.get(
+        `/api/adjustment-docs/${doc.id}`
+      )) as AdjustmentDocument;
+      const pdfBlob = await generateAdjustmentDocPDFBlob([full], "tienhock");
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = generateAdjustmentDocPDFFilename([full], "tienhock");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(pdfUrl);
+      toast.success("PDF downloaded", { id: toastId });
+    } catch (error) {
+      toast.error(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+    } finally {
+      setDownloadingAdjId(null);
+    }
+  };
+
+  const handlePrintAdjustmentDoc = async (doc: AdjustmentDocument) => {
+    if (printingAdjDoc) return;
+    const toastId = toast.loading("Loading document...");
+    try {
+      const full = (await api.get(
+        `/api/adjustment-docs/${doc.id}`
+      )) as AdjustmentDocument;
+      toast.dismiss(toastId);
+      setPrintingAdjDoc(full);
+    } catch (error) {
+      toast.error(
+        `Failed to load document: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        { id: toastId }
+      );
+    }
   };
 
   const handleSyncCancellationStatus = async () => {
@@ -2359,12 +2416,40 @@ const InvoiceDetailsPage: React.FC = () => {
                         -{formatCurrency(doc.totalamountpayable)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
-                        <button
-                          onClick={() => navigate(`/sales/adjustment-docs/${doc.id}`)}
-                          className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
-                        >
-                          Open
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handlePrintAdjustmentDoc(doc)}
+                            disabled={
+                              !!printingAdjDoc || downloadingAdjId === doc.id
+                            }
+                            className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Print PDF"
+                            aria-label={`Print PDF for ${doc.id}`}
+                          >
+                            <IconPrinter size={16} stroke={2} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAdjustmentDoc(doc)}
+                            disabled={
+                              downloadingAdjId === doc.id || !!printingAdjDoc
+                            }
+                            className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Download PDF"
+                            aria-label={`Download PDF for ${doc.id}`}
+                          >
+                            <IconDownload size={16} stroke={2} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              navigate(`/sales/adjustment-docs/${doc.id}`)
+                            }
+                            className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline ml-1"
+                          >
+                            Open
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2502,6 +2587,13 @@ const InvoiceDetailsPage: React.FC = () => {
           invoices={[invoiceData]}
           customerNames={customerNamesForPDF}
           onComplete={handlePrintComplete}
+        />
+      )}
+      {/* Adjustment Doc Print Overlay (for RNs in payment history) */}
+      {printingAdjDoc && (
+        <AdjustmentDocPrintOverlay
+          docs={[printingAdjDoc]}
+          onComplete={() => setPrintingAdjDoc(null)}
         />
       )}
       {/* Order Details Edit Modal */}

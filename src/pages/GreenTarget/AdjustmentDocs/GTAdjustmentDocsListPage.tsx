@@ -15,6 +15,7 @@ import {
   IconFilePlus,
   IconRotate2,
   IconLayoutGrid,
+  IconDownload,
 } from "@tabler/icons-react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -32,6 +33,9 @@ import {
   AdjustmentDocTypeBadge,
   AdjustmentDocStatusBadge,
 } from "../../../components/AdjustmentDocs/AdjustmentDocBadge";
+import { generateGTAdjustmentDocPDFFilename } from "../../../utils/greenTarget/PDF/AdjustmentDocs/generateGTAdjustmentDocPDFFilename";
+import { generateGTAdjustmentDocPDFBlob } from "../../../utils/greenTarget/PDF/AdjustmentDocs/GTAdjustmentDocPDFHandler";
+import { GTAdjustmentDocFull } from "../../../services/gt-adjustment-doc-pdf.service";
 
 const API_BASE = "/greentarget/api/adjustment-docs";
 const UI_BASE = "/greentarget/adjustment-docs";
@@ -100,6 +104,41 @@ const GTAdjustmentDocsListPage: React.FC = () => {
   const navigate = useNavigate();
   const [docs, setDocs] = useState<GTAdjDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownloadRow = useCallback(
+    async (id: string) => {
+      if (downloadingId) return;
+      setDownloadingId(id);
+      const toastId = toast.loading("Generating PDF...");
+      try {
+        const fullDoc = (await api.get(
+          `${API_BASE}/${id}`
+        )) as GTAdjustmentDocFull;
+        const docs = [fullDoc];
+        const pdfBlob = await generateGTAdjustmentDocPDFBlob(docs);
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.download = generateGTAdjustmentDocPDFFilename(docs);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(pdfUrl);
+        toast.success("PDF downloaded", { id: toastId });
+      } catch (error) {
+        toast.error(
+          `Failed to generate PDF: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          { id: toastId }
+        );
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [downloadingId]
+  );
 
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const now = new Date();
@@ -394,6 +433,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
                     Date Issued
                   </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider w-16">
+                    PDF
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-100 dark:divide-gray-700">
@@ -436,6 +478,24 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {formatDisplay(parseIsoDate(doc.date_issued))}
+                    </td>
+                    <td
+                      className="px-4 py-3 whitespace-nowrap text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadRow(doc.id);
+                        }}
+                        disabled={downloadingId === doc.id}
+                        className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Download PDF"
+                        aria-label={`Download PDF for ${doc.id}`}
+                      >
+                        <IconDownload size={16} stroke={2} />
+                      </button>
                     </td>
                   </tr>
                 ))}
