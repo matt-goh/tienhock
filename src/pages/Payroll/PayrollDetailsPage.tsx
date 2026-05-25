@@ -2454,7 +2454,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       colSpan={3}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
-                      Jumlah Cuti (
+                      Jumlah cuti (
                       {monthlyLeaveRecords.reduce(
                         (sum, r) => sum + (Number(r.days_taken) || 0),
                         0,
