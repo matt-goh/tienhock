@@ -1,6 +1,19 @@
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
 
+const SOCSO_SKBBK_EFFECTIVE_YEAR = 2026;
+const SOCSO_SKBBK_EFFECTIVE_MONTH = 6;
+
+const isSOCSOSKBBKEffective = (year, month) => {
+  const payrollYear = Number(year);
+  const payrollMonth = Number(month);
+  return (
+    payrollYear > SOCSO_SKBBK_EFFECTIVE_YEAR ||
+    (payrollYear === SOCSO_SKBBK_EFFECTIVE_YEAR &&
+      payrollMonth >= SOCSO_SKBBK_EFFECTIVE_MONTH)
+  );
+};
+
 // Moved to top-level to be reusable
 const saveDeductions = async (pool, employeePayrollId, deductions) => {
   if (!deductions || deductions.length === 0) {
@@ -372,12 +385,16 @@ const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
       }
     }
 
-    // Calculate SOCSO (Keilatan + SKBBK split, both contribute to employee_amount).
+    // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
     const socsoRate = findRateByWage(socsoRates, grossPay);
     if (socsoRate) {
       const isOver60 = age >= 60;
+      const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
       const skbbk =
-        Math.round(parseFloat(socsoRate.employee_rate_skbbk || 0) * 100) / 100;
+        shouldApplySKBBK
+          ? Math.round(parseFloat(socsoRate.employee_rate_skbbk || 0) * 100) /
+            100
+          : 0;
       const keilatan = isOver60
         ? 0
         : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) / 100;

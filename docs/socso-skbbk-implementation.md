@@ -6,11 +6,12 @@ Full plan lives at `C:\Users\NCSTi\.claude\plans\okay-it-s-time-to-dazzling-stea
 
 PERKESO gazetted a new sub-rate **SKBBK** (Skim Bencana Bukan Kerja) that adds an employee-side amount on top of the existing KEILATAN. They also published a new **combined SOCSO + EIS + SKBBK** fixed-width text file (278 chars/line) that replaces both BRG8A.TXT and SIP*.TXT/SIPE*.TXT submissions.
 
-Rates apply **immediately** to new/recalculated payrolls. Historical `payroll_deductions` rows are not touched.
+SKBBK rates apply only to payroll periods from **June 2026 onward**. New/recalculated payrolls before June 2026 keep SKBBK at RM0. Historical `payroll_deductions` rows are not touched unless that payroll is recalculated.
 
 ## Decisions locked in
 
 - Payslip + Salary Report keep one combined "SOCSO (Pekerja)" line. The KEILATAN/SKBBK split is tracked in `payroll_deductions.rate_info` JSON.
+- SKBBK effective date is based on the payroll year/month, not the date the payroll is calculated.
 - New export folder: `SOCSO-SIP/{year}/TH/{MM}/`. New filename: `SOCSO-SIP{MMYY}.TXT`.
 - Both SOCSO and SIP preview cards on e-Caruman trigger the same combined download.
 - One new DB column: `socso_rates.employee_rate_skbbk numeric(10,2) NOT NULL`.
