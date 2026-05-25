@@ -45,6 +45,7 @@ import {
 import { createMidMonthPayrollsMap } from "../../utils/payroll/PayslipManager";
 import MonthNavigator from "../../components/MonthNavigator";
 import PayrollUnifiedTable from "../../components/Payroll/PayrollUnifiedTable";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
@@ -99,6 +100,20 @@ const PayrollPage: React.FC = () => {
   const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
     MissingIncomeTaxEmployee[]
   >([]);
+
+  // Preserve scroll position when returning to this page (e.g. from an
+  // employee payroll details page). Keyed by year-month so switching months
+  // doesn't restore a stale position from a different month.
+  const scrollKey = useMemo(() => {
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth() + 1;
+    return `payroll-page:${year}-${month}`;
+  }, [selectedMonth]);
+  useScrollRestoration(
+    scrollKey,
+    !isLoading && !!payroll,
+    '[data-scroll-container="payroll-list"]'
+  );
 
   // Handler to update selected month and URL params
   const handleMonthChange = useCallback((newMonth: Date) => {

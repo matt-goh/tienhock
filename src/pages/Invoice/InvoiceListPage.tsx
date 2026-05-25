@@ -57,6 +57,7 @@ import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMen
 import StyledListbox from "../../components/StyledListbox";
 import DateNavigator from "../../components/DateNavigator";
 import MonthNavigator from "../../components/MonthNavigator";
+import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
 // --- Constants ---
 const STORAGE_KEY = "invoiceListFilters_v2"; // Use a unique key
@@ -294,6 +295,24 @@ const InvoiceListPage: React.FC = () => {
     savedSessionState?.searchTerm || ""
   );
   const [isFetchTriggered, setIsFetchTriggered] = useState(true); // Trigger fetch on load/change
+  // Preserve scroll position when returning to this page (e.g. from an
+  // invoice detail page). Gate on the initial fetch having settled —
+  // isLoading starts false, so without this the restore fires against an
+  // empty list and scrollTop gets clamped to 0 before invoices populate.
+  useScrollRestoration(
+    "invoice-list",
+    !isLoading && !isFetchTriggered && invoices.length > 0
+  );
+  // Reset scroll when switching pagination pages. Ref-guard skips the
+  // initial mount so the scroll-restoration above isn't clobbered on return.
+  const prevPageRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevPageRef.current !== null && prevPageRef.current !== currentPage) {
+      const container = document.querySelector("main");
+      if (container) container.scrollTop = 0;
+    }
+    prevPageRef.current = currentPage;
+  }, [currentPage]);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showEInvoiceConfirm, setShowEInvoiceConfirm] = useState(false);
   const [showSubmissionResults, setShowSubmissionResults] = useState(false);
