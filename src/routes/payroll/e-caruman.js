@@ -131,9 +131,79 @@ export default function (pool) {
     return taxNo.replace(/^[A-Za-z]+-/, "");
   };
 
+  const normalizeEmployerNumber = (employerNumber) => {
+    return padRight(String(employerNumber || "").replace(/\D/g, ""), 10);
+  };
+
+  const normalizeTaxNumber = (taxNo) => {
+    const valueWithoutPrefix = stripTaxPrefix(taxNo);
+    const explicitWifeCode = valueWithoutPrefix.match(/\((\d)\)\s*$/)?.[1];
+    const digits = valueWithoutPrefix.replace(/\D/g, "");
+    if (!digits) return "00000000000";
+
+    if (explicitWifeCode) {
+      const taxReference = digits.slice(0, -1).padStart(10, "0").slice(-10);
+      return `${taxReference}${explicitWifeCode}`;
+    }
+
+    if (digits.length <= 10) {
+      return `${digits.padStart(10, "0").slice(-10)}0`;
+    }
+
+    return digits.padStart(11, "0").slice(-11);
+  };
+
+  const normalizePassport = (passport) => {
+    return String(passport || "")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .toUpperCase();
+  };
+
+  const normalizeNewICNumber = (icNo) => {
+    const digits = stripIC(icNo);
+    return digits.length === 12 ? digits : "";
+  };
+
+  const isMalaysianNationality = (nationality) => {
+    return String(nationality || "").toLowerCase() === "malaysian";
+  };
+
+  const getCountryCode = (nationality) => {
+    const normalizedNationality = String(nationality || "")
+      .trim()
+      .toLowerCase();
+
+    const countryCodes = {
+      bangladesh: "BD",
+      bangladeshi: "BD",
+      cambodia: "KH",
+      cambodian: "KH",
+      china: "CN",
+      chinese: "CN",
+      india: "IN",
+      indian: "IN",
+      indonesia: "ID",
+      indonesian: "ID",
+      myanmar: "MM",
+      nepal: "NP",
+      nepalese: "NP",
+      pakistani: "PK",
+      pakistan: "PK",
+      philippines: "PH",
+      filipino: "PH",
+      philippine: "PH",
+      thailand: "TH",
+      thai: "TH",
+      vietnam: "VN",
+      vietnamese: "VN",
+    };
+
+    return countryCodes[normalizedNationality] || "";
+  };
+
   /**
-   * Generate LHDN fixed-width text file content (LHDN*.TXT)
-   * Format based on working sample file LHDN1125.TXT
+   * Generate LHDN fixed-width text file content (LHDN*.TXT).
+   * Format follows the CP39 PCB fixed-width specification.
    *
    * Header Record (57 chars):
    * - H (1) pos 1
@@ -147,16 +217,25 @@ export default function (pool) {
    * - Total CP38 Records (5) pos 53-57 - right justify with zeros
    *
    * Detail Record (136 chars):
-   * - D (1)
-   * - Tax Number (11) - without prefix like "OG-"
-   * - Name (72)
-   * - IC Number (12) - IC for Malaysians, passport for foreigners
-   * - Foreign Info (14) - country code for foreigners (e.g., "PH"), empty for locals
-   * - PCB Amount cents (9) - left-padded with spaces
-   * - CP38 Amount cents (7) - zeros
-   * - Employee ID (10) - right-padded with spaces
+   * - D (1) pos 1
+   * - Tax Reference No. (10) pos 2-11 - without prefix like "OG-"
+   * - Wife Code (1) pos 12
+   * - Employee Name (60) pos 13-72
+   * - Old IC Number (12) pos 73-84
+   * - New IC Number (12) pos 85-96
+   * - Passport Number (12) pos 97-108
+   * - Country Code (2) pos 109-110
+   * - PCB Amount cents (8) pos 111-118
+   * - CP38 Amount cents (8) pos 119-126
+   * - Employee ID (10) pos 127-136
    */
-  const generateLHDNContent = (rows, eNumber, month, year) => {
+  const generateLHDNContent = (
+    rows,
+    eNumber,
+    month,
+    year,
+    hqENumber = eNumber
+  ) => {
     const lines = [];
 
     // Calculate totals for header
@@ -167,7 +246,8 @@ export default function (pool) {
 
     // Build Header Record (H) - 57 chars total
     const headerType = "H";
-    const eNumPadded = padRight(eNumber.replace(/\D/g, ""), 10); // E Number (10) - right justify with zeros
+    const hqENumPadded = normalizeEmployerNumber(hqENumber);
+    const eNumPadded = normalizeEmployerNumber(eNumber);
     const yearStr = String(year);
     const monthStr = String(month).padStart(2, "0");
     const totalMTDAmount = padRight(totalPCBCents, 10); // Total MTD Amount (10)
@@ -177,7 +257,7 @@ export default function (pool) {
 
     const headerLine =
       headerType +
-      eNumPadded +
+      hqENumPadded +
       eNumPadded +
       yearStr +
       monthStr +
@@ -191,41 +271,34 @@ export default function (pool) {
     // Build Detail Records (D) - 136 chars total
     rows.forEach((row) => {
       const detailType = "D";
-      // Tax number without prefix (e.g., "OG-07139779051" -> "07139779051")
-      const taxNumber = padLeft(stripTaxPrefix(row.income_tax_no), 11);
-      // Name (72 chars)
-      const name = padLeft((row.name || "").toUpperCase(), 72);
-
-      // Determine if Malaysian or foreigner
-      const isMalaysian = (row.nationality || "").toLowerCase() === "malaysian";
-
-      // IC Number (12 chars) - IC for Malaysians, empty for foreigners
-      const icNumber = isMalaysian
-        ? padLeft(stripIC(row.ic_no), 12)
-        : padLeft("", 12); // 12 empty spaces for foreigners
-
-      // Foreign info field (14 chars):
-      // - For locals: 14 empty spaces
-      // - For foreigners: Passport (9 chars padded) + 3 spaces + Country code (2 chars) = 14 chars
-      const foreignInfo = !isMalaysian
-        ? padLeft(row.ic_no || "", 9) + "   " + "PH"
-        : padLeft("", 14);
-
-      // PCB Amount in cents (9 chars, left-padded with spaces)
-      const pcbAmountCents = String(toCents(row.pcb_amount || 0)).padStart(9, " ");
-
-      // CP38 Amount in cents (7 chars of zeros)
-      const cp38AmountCents = "0000000";
-
-      // Employee ID (10 chars, right-padded with spaces)
+      const taxNumber = normalizeTaxNumber(row.income_tax_no);
+      const taxReference = taxNumber.slice(0, 10);
+      const wifeCode = taxNumber.slice(10, 11);
+      const name = padLeft((row.name || "").toUpperCase(), 60);
+      const isMalaysian = isMalaysianNationality(row.nationality);
+      const oldICNumber = padLeft("", 12);
+      const newICNumber = isMalaysian
+        ? padLeft(normalizeNewICNumber(row.ic_no), 12)
+        : padLeft("", 12);
+      const passportNumber = !isMalaysian
+        ? padLeft(normalizePassport(row.ic_no), 12)
+        : padLeft("", 12);
+      const countryCode = !isMalaysian
+        ? padLeft(getCountryCode(row.nationality), 2)
+        : padLeft("", 2);
+      const pcbAmountCents = padRight(toCents(row.pcb_amount || 0), 8);
+      const cp38AmountCents = padRight(0, 8);
       const employeeId = padLeft(String(row.employee_id || "").toUpperCase(), 10);
 
       const detailLine =
         detailType +
-        taxNumber +
+        taxReference +
+        wifeCode +
         name +
-        icNumber +
-        foreignInfo +
+        oldICNumber +
+        newICNumber +
+        passportNumber +
+        countryCode +
         pcbAmountCents +
         cp38AmountCents +
         employeeId;
@@ -1069,10 +1142,11 @@ export default function (pool) {
    * @query month - Month (1-12)
    * @query year - Year
    * @query company - Company code (default: TH)
-   * @query eNumber - LHDN E Number (employer number) - required
+   * @query eNumber - LHDN branch E Number (employer number) - required
+   * @query hqENumber - LHDN HQ E Number - optional, defaults to eNumber
    */
   router.get("/income-tax/export", async (req, res) => {
-    const { month, year, company = "TH", eNumber } = req.query;
+    const { month, year, company = "TH", eNumber, hqENumber } = req.query;
 
     if (!month || !year) {
       return res.status(400).json({
@@ -1120,7 +1194,13 @@ export default function (pool) {
       const monthStr = String(month).padStart(2, "0");
 
       // Generate the LHDN fixed-width text file content
-      const content = generateLHDNContent(result.rows, eNumber, month, year);
+      const content = generateLHDNContent(
+        result.rows,
+        eNumber,
+        month,
+        year,
+        hqENumber || eNumber
+      );
 
       // File naming: LHDN{MMYY}.TXT (e.g., LHDN1125.TXT for Nov 2025)
       const filePrefix = `${monthStr}${String(year).slice(-2)}`;
@@ -1145,6 +1225,7 @@ export default function (pool) {
         month: monthStr,
         company,
         eNumber,
+        hqENumber: hqENumber || eNumber,
         files,
         totalEmployees: result.rows.length,
         totals: {
