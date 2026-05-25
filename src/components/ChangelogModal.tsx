@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-25",
+    ms: "Halaman Payroll: butang cetak payslip pukal kini dinamakan \"Print Payslips\" dan membuka menu pilihan apabila dihover. Menu menyenaraikan semua bahagian kerja (contoh: Mee Production, Packing Mee, Packing Bihun, Office, Salesman) yang ada dalam payroll bulan tersebut. Setiap bahagian mempunyai kotak semak untuk pilih beberapa bahagian dicetak bersama dalam satu PDF, butang cetak pantas untuk mencetak bahagian itu sahaja, serta butang Select All di bahagian atas. Secara lalai semua bahagian ditandakan, jadi mengklik Print di bahagian bawah sama seperti mencetak semua payslip seperti sebelum ini.",
+    en: "Payroll page: the bulk payslip print button is now labelled \"Print Payslips\" and opens a selection menu on hover. The menu lists all work sections (e.g. Mee Production, Packing Mee, Packing Bihun, Office, Salesman) present in that month's payroll. Each section has a checkbox to pick multiple sections to print together in one PDF, a quick-print button to print just that section, and a Select All toggle at the top. All sections are checked by default, so clicking Print at the bottom prints every payslip just like before.",
+  },
+  {
     date: "2026-05-24",
     ms: "Caruman SOCSO kini termasuk amaun SKBBK baharu yang diwajibkan PERKESO untuk gaji Jun 2026 dan seterusnya. Bagi pekerja di bawah 60 tahun, jumlah caruman pekerja ialah Keilatan + SKBBK; pekerja 60 tahun ke atas membayar SKBBK sahaja. Eksport SOCSO dan SIP kerajaan telah digabungkan menjadi satu fail SOCSO-SIP{MMYY}.TXT dalam folder SOCSO-SIP/. Kedua-dua kad SOCSO dan SIP di halaman e-Caruman kini memuat turun fail gabungan yang sama. Halaman Contribution Rates juga dikemas kini untuk menunjukkan kadar SKBBK baharu, yang boleh diedit.",
     en: "SOCSO contributions now include the new SKBBK amount required by PERKESO for June 2026 payrolls onward. For employees under 60, the employee contribution is Keilatan + SKBBK; employees 60 and above pay SKBBK only. The SOCSO and SIP government exports were merged into a single SOCSO-SIP{MMYY}.TXT file in the new SOCSO-SIP/ folder, and both the SOCSO and SIP cards on the e-Caruman page now download that same combined file. The Contribution Rates page was updated to show and allow editing of the new SKBBK rate.",
