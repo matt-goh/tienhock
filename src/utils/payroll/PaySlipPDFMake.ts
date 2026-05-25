@@ -64,6 +64,17 @@ interface GroupedLeaveRecord {
   holiday_descriptions: string[];
 }
 
+// Commission records carrying this location_code are Cuti Tahunan entries
+// (recorded via the Others/Incentives page). They are still paid as advances
+// — and therefore still appear in the advance deduction at the bottom of the
+// payslip — but they should be shown alongside other leaves and counted in
+// Jumlah Cuti rather than Jumlah lain-lain.
+const CUTI_TAHUNAN_COMMISSION_LOCATION_CODE = "23";
+
+const isCutiTahunanCommission = (record: any): boolean => {
+  return record?.location_code === CUTI_TAHUNAN_COMMISSION_LOCATION_CODE;
+};
+
 interface PaySlipPDFProps {
   payroll: EmployeePayroll;
   companyName?: string;
@@ -675,7 +686,37 @@ const buildMainPayrollPage = (
     0,
   );
 
-  // Leave records
+  // Commission records (merged by description so duplicate rows collapse).
+  // Cuti Tahunan entries are recorded via the Others/Incentives page using
+  // location_code = '23'; pull them out so they can be shown as leave rather
+  // than as a generic Advance. They still flow through as commission for the
+  // advance deduction at the bottom of the payslip.
+  const commissionRecords = payroll.commission_records || [];
+  const cutiTahunanCommissions = commissionRecords.filter(
+    isCutiTahunanCommission,
+  );
+  const nonCutiCommissionRecords = commissionRecords.filter(
+    (record) => !isCutiTahunanCommission(record),
+  );
+  const commissionTotalAmount = commissionRecords.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0,
+  );
+  const nonCutiCommissionTotalAmount = nonCutiCommissionRecords.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0,
+  );
+  const cutiTahunanCommissionTotalAmount = cutiTahunanCommissions.reduce(
+    (sum, record) => sum + Number(record.amount || 0),
+    0,
+  );
+  const mergedCommissionRecords = mergeByDescription(commissionRecords);
+  const mergedNonCutiCommissionRecords = mergeByDescription(
+    nonCutiCommissionRecords,
+  );
+
+  // Leave records — merge true leave_records together with Cuti Tahunan
+  // commission entries (one day per record) so they share the same totals.
   const groupedLeaveRecords = (payroll.leave_records || []).reduce(
     (acc, record) => {
       const leaveType = record.leave_type;
@@ -701,19 +742,25 @@ const buildMainPayrollPage = (
     },
     {} as Record<string, GroupedLeaveRecord>,
   );
+  if (cutiTahunanCommissions.length > 0) {
+    const existing = groupedLeaveRecords["cuti_tahunan"];
+    if (existing) {
+      existing.total_days += cutiTahunanCommissions.length;
+      existing.total_amount += cutiTahunanCommissionTotalAmount;
+    } else {
+      groupedLeaveRecords["cuti_tahunan"] = {
+        leave_type: "cuti_tahunan",
+        total_days: cutiTahunanCommissions.length,
+        total_amount: cutiTahunanCommissionTotalAmount,
+        holiday_descriptions: [],
+      };
+    }
+  }
   const leaveRecordsArray = Object.values(groupedLeaveRecords);
   const leaveTotalAmount = leaveRecordsArray.reduce(
     (sum, record) => sum + (record.total_amount || 0),
     0,
   );
-
-  // Commission records (merged by description so duplicate rows collapse)
-  const commissionRecords = payroll.commission_records || [];
-  const commissionTotalAmount = commissionRecords.reduce(
-    (sum, record) => sum + Number(record.amount || 0),
-    0,
-  );
-  const mergedCommissionRecords = mergeByDescription(commissionRecords);
 
   // Others (Kerja Luar OT) records - treated like commission for calculation/display
   const othersRecords = (payroll as any).others_records || [];
@@ -723,9 +770,13 @@ const buildMainPayrollPage = (
   );
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
-  // Mid-month and final calculations
+  // Mid-month and final calculations. payroll.net_pay from the comprehensive
+  // endpoint is gross - statutory only (commission is NOT deducted there), so
+  // we subtract commission here to get the true post-advance amount that lines
+  // up with the stored setelah_digenapkan.
   const midMonthPayment = midMonthPayroll ? midMonthPayroll.amount : 0;
-  const finalPayment = payroll.net_pay - midMonthPayment;
+  const finalPayment =
+    payroll.net_pay - midMonthPayment - commissionTotalAmount;
 
   // Build table body
   const tableBody: TableCell[][] = [];
@@ -836,8 +887,10 @@ const buildMainPayrollPage = (
       }
     });
 
-    // Commission records (merged duplicates)
-    mergedCommissionRecords.forEach((commission) => {
+    // Commission records (merged duplicates). Cuti Tahunan commissions are
+    // omitted here — they're rendered with the leave records below and rolled
+    // into Jumlah cuti / leaveTotalAmount instead of Jumlah lain-lain.
+    mergedNonCutiCommissionRecords.forEach((commission) => {
       const desc =
         commission.merged_count > 1
           ? `${commission.description} (x${commission.merged_count})`
@@ -868,38 +921,13 @@ const buildMainPayrollPage = (
       );
     });
 
-    // Leave records
-    leaveRecordsArray.forEach((leaveRecord) => {
-      tableBody.push(
-        createItemRow(
-          getLeaveDisplayName(leaveRecord),
-          "",
-          `${leaveRecord.total_days} Hari`,
-          formatCurrency(leaveRecord.total_amount),
-        ),
-      );
-    });
-
     const totalNonLeaveTambahanItems =
       (groupedConsolidatedItems.Tambahan?.length || 0) +
-      mergedCommissionRecords.length +
+      mergedNonCutiCommissionRecords.length +
       mergedOthersRecords.length;
 
-    if (leaveRecordsArray.length > 0) {
-      tableBody.push([
-        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Jumlah Cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
-        {
-          text: formatCurrency(leaveTotalAmount),
-          alignment: "right",
-          bold: true,
-          fillColor: "#f8f9fa",
-          fontSize: 8,
-        },
-      ]);
-    }
-
+    // Jumlah lain-lain (excludes cuti) — printed above the leave block so the
+    // non-leave subtotal sits next to its own rows.
     if (
       totalNonLeaveTambahanItems > 1 ||
       (totalNonLeaveTambahanItems > 0 && leaveRecordsArray.length > 0)
@@ -915,8 +943,37 @@ const buildMainPayrollPage = (
         },
         {
           text: formatCurrency(
-            tambahanTotalAmount + commissionTotalAmount + othersTotalAmount,
+            tambahanTotalAmount +
+              nonCutiCommissionTotalAmount +
+              othersTotalAmount,
           ),
+          alignment: "right",
+          bold: true,
+          fillColor: "#f8f9fa",
+          fontSize: 8,
+        },
+      ]);
+    }
+
+    // Leave records (including Cuti Tahunan commission entries injected above)
+    leaveRecordsArray.forEach((leaveRecord) => {
+      tableBody.push(
+        createItemRow(
+          getLeaveDisplayName(leaveRecord),
+          "",
+          `${leaveRecord.total_days} Hari`,
+          formatCurrency(leaveRecord.total_amount),
+        ),
+      );
+    });
+
+    if (leaveRecordsArray.length > 0) {
+      tableBody.push([
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        {
+          text: formatCurrency(leaveTotalAmount),
           alignment: "right",
           bold: true,
           fillColor: "#f8f9fa",
@@ -1087,7 +1144,9 @@ const buildMainPayrollPage = (
     }
   }
 
-  // Jumlah Gaji Bersih (add back commission advance only; Others (Kerja Luar OT) is a regular earning already in net_pay)
+  // Jumlah Gaji Bersih = gross - statutory only. Commission is shown below as
+  // an advance deduction, so it must NOT be added back here (the comprehensive
+  // endpoint's net_pay already excludes commission from deductions).
   tableBody.push([
     { text: "", fontSize: 8, fillColor: "#f8f9fa" },
     { text: "", fontSize: 8, fillColor: "#f8f9fa" },
@@ -1098,7 +1157,7 @@ const buildMainPayrollPage = (
       fillColor: "#f8f9fa",
     },
     {
-      text: formatCurrency(payroll.net_pay + commissionTotalAmount),
+      text: formatCurrency(payroll.net_pay),
       alignment: "right",
       bold: true,
       fontSize: 8,
@@ -1246,7 +1305,7 @@ const buildMainPayrollPage = (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
                 descText === "Subtotal" ||
-                descText === "Jumlah Cuti" ||
+                descText === "Jumlah cuti" ||
                 descText === "Jumlah lain-lain" ||
                 descText === "Jumlah Base" ||
                 descText === "Jumlah Gaji Kasar")
@@ -1350,7 +1409,31 @@ const buildIndividualJobPage = (
     0,
   );
 
-  // Leave records
+  // Commission records (merged duplicates). Split out Cuti Tahunan entries
+  // (location_code = '23') so they render as leave instead of an Advance row.
+  // Individual-job pages don't show the bottom advance deduction, so we only
+  // need the non-cuti slices for display and totals.
+  const commissionRecords = individualJob.commission_records || [];
+  const cutiTahunanCommissions = commissionRecords.filter(
+    isCutiTahunanCommission,
+  );
+  const nonCutiCommissionRecords = commissionRecords.filter(
+    (record: any) => !isCutiTahunanCommission(record),
+  );
+  const nonCutiCommissionTotalAmount = nonCutiCommissionRecords.reduce(
+    (sum: number, record: any) => sum + Number(record.amount || 0),
+    0,
+  );
+  const cutiTahunanCommissionTotalAmount = cutiTahunanCommissions.reduce(
+    (sum: number, record: any) => sum + Number(record.amount || 0),
+    0,
+  );
+  const mergedNonCutiCommissionRecords = mergeByDescription(
+    nonCutiCommissionRecords,
+  );
+
+  // Leave records — merge true leave_records together with Cuti Tahunan
+  // commission entries (one day per record) so they share the same totals.
   const groupedLeaveRecords = (individualJob.leave_records || []).reduce(
     (acc, record) => {
       const leaveType = record.leave_type;
@@ -1376,20 +1459,26 @@ const buildIndividualJobPage = (
     },
     {} as Record<string, GroupedLeaveRecord>,
   );
+  if (cutiTahunanCommissions.length > 0) {
+    const existing = groupedLeaveRecords["cuti_tahunan"];
+    if (existing) {
+      existing.total_days += cutiTahunanCommissions.length;
+      existing.total_amount += cutiTahunanCommissionTotalAmount;
+    } else {
+      groupedLeaveRecords["cuti_tahunan"] = {
+        leave_type: "cuti_tahunan",
+        total_days: cutiTahunanCommissions.length,
+        total_amount: cutiTahunanCommissionTotalAmount,
+        holiday_descriptions: [],
+      };
+    }
+  }
   const leaveRecordsArray: GroupedLeaveRecord[] =
     Object.values(groupedLeaveRecords);
   const leaveTotalAmount = leaveRecordsArray.reduce(
     (sum, record) => sum + (record.total_amount || 0),
     0,
   );
-
-  // Commission records (merged duplicates)
-  const commissionRecords = individualJob.commission_records || [];
-  const commissionTotalAmount = commissionRecords.reduce(
-    (sum, record) => sum + Number(record.amount || 0),
-    0,
-  );
-  const mergedCommissionRecords = mergeByDescription(commissionRecords);
 
   // Others (Kerja Luar OT) records (merged duplicates)
   const othersRecords = individualJob.others_records || [];
@@ -1446,7 +1535,7 @@ const buildIndividualJobPage = (
       );
     });
 
-    mergedCommissionRecords.forEach((commission) => {
+    mergedNonCutiCommissionRecords.forEach((commission) => {
       const desc =
         commission.merged_count > 1
           ? `${commission.description} (x${commission.merged_count})`
@@ -1476,37 +1565,13 @@ const buildIndividualJobPage = (
       );
     });
 
-    leaveRecordsArray.forEach((leaveRecord) => {
-      tableBody.push(
-        createItemRow(
-          getLeaveDisplayName(leaveRecord),
-          "",
-          `${leaveRecord.total_days} Hari`,
-          formatCurrency(leaveRecord.total_amount),
-        ),
-      );
-    });
-
     const totalNonLeaveTambahanItems =
       consolidatedTambahanItems.length +
-      mergedCommissionRecords.length +
+      mergedNonCutiCommissionRecords.length +
       mergedOthersRecords.length;
 
-    if (leaveRecordsArray.length > 0) {
-      tableBody.push([
-        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Jumlah Cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
-        {
-          text: formatCurrency(leaveTotalAmount),
-          alignment: "right",
-          bold: true,
-          fillColor: "#f8f9fa",
-          fontSize: 8,
-        },
-      ]);
-    }
-
+    // Jumlah lain-lain (excludes cuti) — printed above the leave block so the
+    // non-leave subtotal sits next to its own rows.
     if (
       totalNonLeaveTambahanItems > 1 ||
       (totalNonLeaveTambahanItems > 0 && leaveRecordsArray.length > 0)
@@ -1522,8 +1587,36 @@ const buildIndividualJobPage = (
         },
         {
           text: formatCurrency(
-            tambahanTotalAmount + commissionTotalAmount + othersTotalAmount,
+            tambahanTotalAmount +
+              nonCutiCommissionTotalAmount +
+              othersTotalAmount,
           ),
+          alignment: "right",
+          bold: true,
+          fillColor: "#f8f9fa",
+          fontSize: 8,
+        },
+      ]);
+    }
+
+    leaveRecordsArray.forEach((leaveRecord) => {
+      tableBody.push(
+        createItemRow(
+          getLeaveDisplayName(leaveRecord),
+          "",
+          `${leaveRecord.total_days} Hari`,
+          formatCurrency(leaveRecord.total_amount),
+        ),
+      );
+    });
+
+    if (leaveRecordsArray.length > 0) {
+      tableBody.push([
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "", fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        {
+          text: formatCurrency(leaveTotalAmount),
           alignment: "right",
           bold: true,
           fillColor: "#f8f9fa",
@@ -1645,7 +1738,7 @@ const buildIndividualJobPage = (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
                 descText === "Subtotal" ||
-                descText === "Jumlah Cuti" ||
+                descText === "Jumlah cuti" ||
                 descText === "Jumlah lain-lain" ||
                 descText === "Jumlah Base" ||
                 descText.includes("Gross Pay") ||
