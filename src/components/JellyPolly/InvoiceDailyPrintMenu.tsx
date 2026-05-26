@@ -5,10 +5,13 @@ import Button from "../Button";
 import { IconCalendarEvent, IconPrinter } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
-import { InvoiceFilters } from "../../types/types";
+import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { useCustomerNames } from "../../utils/catalogue/useCustomerNames";
 import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
+import { getInvoicesByIds } from "../../utils/JellyPolly/InvoiceUtils";
+
+const DAILY_PRINT_BATCH_SIZE: number = 50;
 
 interface InvoiceDailyPrintMenuProps {
   filters: InvoiceFilters;
@@ -19,6 +22,14 @@ interface SalesmanOption {
   id: string;
   name: string;
   description?: string;
+}
+
+interface InvoiceSearchResult {
+  id: string;
+}
+
+interface InvoiceSearchResponse {
+  data: InvoiceSearchResult[];
 }
 
 const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
@@ -32,12 +43,14 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
   >({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
-  const [invoicesToPrint, setInvoicesToPrint] = useState<any[]>([]);
+  const [invoicesToPrint, setInvoicesToPrint] = useState<
+    ExtendedInvoiceData[]
+  >([]);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const customerIds = useMemo(
+  const customerIds: string[] = useMemo(
     () => invoicesToPrint.map((inv) => inv.customerid),
     [invoicesToPrint]
   );
@@ -118,14 +131,14 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
   const selectedCount = Object.values(selectedSalesmen).filter(Boolean).length;
   const allSelected = selectedCount === salesmenOptions.length;
 
-  const formatDateRange = () => {
+  const formatDateRange = (): string => {
     if (!filters.dateRange.start || !filters.dateRange.end) {
       return "No date range selected";
     }
     const start = new Date(filters.dateRange.start);
     const end = new Date(filters.dateRange.end);
 
-    const formatDate = (date: Date) => {
+    const formatDate = (date: Date): string => {
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -140,7 +153,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
     return `${formatDate(start)} - ${formatDate(end)}`;
   };
 
-  const handleGenerate = async (action: "download" | "print") => {
+  const handleGenerate = async (action: "download" | "print"): Promise<void> => {
     if (selectedCount === 0) {
       toast.error("Please select at least one salesman");
       return;
@@ -164,7 +177,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       params.append("endDate", filters.dateRange.end.getTime().toString());
 
       // Add selected salesmen
-      const selectedSalesmenIds = Object.keys(selectedSalesmen).filter(
+      const selectedSalesmenIds: string[] = Object.keys(selectedSalesmen).filter(
         (key) => selectedSalesmen[key]
       );
       params.append("salesman", selectedSalesmenIds.join(","));
@@ -177,49 +190,59 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
       setLoadingStep("Searching for invoices...");
       // Fetch invoices from JellyPolly endpoint
-      const response = await api.get(`/jellypolly/api/invoices?${params.toString()}`);
+      const response: InvoiceSearchResponse = await api.get(
+        `/jellypolly/api/invoices?${params.toString()}`
+      );
 
       if (!response || !response.data || response.data.length === 0) {
         toast.error("No invoices found for the selected criteria");
         return;
       }
 
-      setLoadingStep(`Loading details for ${response.data.length} invoices...`);
-      // Fetch full invoice details including products for each invoice
-      const invoicesWithProducts = await Promise.all(
-        response.data.map(async (invoice: any, index: number) => {
-          try {
-            // Update progress for every 10 invoices processed
-            if (index % 10 === 0) {
-              setLoadingStep(
-                `Loading invoice details (${index + 1}/${
-                  response.data.length
-                })...`
-              );
-            }
-            // Fetch full invoice details including products from JellyPolly endpoint
-            const fullInvoice = await api.get(`/jellypolly/api/invoices/${invoice.id}`);
-            return fullInvoice || invoice; // Fallback to original if fetch fails
-          } catch (error) {
-            console.error(
-              `Failed to fetch details for invoice ${invoice.id}:`,
-              error
-            );
-            return { ...invoice, products: [] }; // Return with empty products array on error
-          }
-        })
+      const invoiceIds: string[] = response.data.map(
+        (invoice: InvoiceSearchResult) => invoice.id
       );
+      const invoicesWithProducts: ExtendedInvoiceData[] = [];
+
+      setLoadingStep(`Loading details for ${invoiceIds.length} invoices...`);
+      for (
+        let index: number = 0;
+        index < invoiceIds.length;
+        index += DAILY_PRINT_BATCH_SIZE
+      ) {
+        const batchIds: string[] = invoiceIds.slice(
+          index,
+          index + DAILY_PRINT_BATCH_SIZE
+        );
+        const batchEnd: number = Math.min(
+          index + batchIds.length,
+          invoiceIds.length
+        );
+
+        setLoadingStep(
+          `Loading invoice details (${index + 1}-${batchEnd}/${
+            invoiceIds.length
+          })...`
+        );
+
+        const batchInvoices: ExtendedInvoiceData[] = await getInvoicesByIds(
+          batchIds
+        );
+        invoicesWithProducts.push(...batchInvoices);
+      }
 
       setLoadingStep("Organizing invoices by salesman...");
       // Sort invoices by salesman and then by date
-      const sortedInvoices = invoicesWithProducts.sort((a: any, b: any) => {
-        // First sort by salesman
-        if (a.salespersonid !== b.salespersonid) {
-          return a.salespersonid.localeCompare(b.salespersonid);
+      const sortedInvoices: ExtendedInvoiceData[] = invoicesWithProducts.sort(
+        (a: ExtendedInvoiceData, b: ExtendedInvoiceData): number => {
+          // First sort by salesman
+          if (a.salespersonid !== b.salespersonid) {
+            return a.salespersonid.localeCompare(b.salespersonid);
+          }
+          // Then sort by date
+          return parseInt(a.createddate) - parseInt(b.createddate);
         }
-        // Then sort by date
-        return parseInt(a.createddate) - parseInt(b.createddate);
-      });
+      );
 
       setInvoicesToPrint(sortedInvoices);
 

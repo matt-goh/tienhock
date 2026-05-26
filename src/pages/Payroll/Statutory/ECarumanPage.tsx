@@ -7,7 +7,6 @@ import {
   IconShieldCheck,
   IconReceipt,
   IconLoader2,
-  IconUmbrella,
   IconAlertTriangle,
   IconExternalLink,
 } from "@tabler/icons-react";
@@ -551,8 +550,8 @@ const ECarumanPage: React.FC = () => {
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
                           <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
                           <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">EM Share</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">EMP Share</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -593,9 +592,9 @@ const ECarumanPage: React.FC = () => {
               )}
             </div>
 
-            {/* SOCSO Preview Card */}
+            {/* SOCSO/SIP Preview Card */}
             <div
-              className={`relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-green-300 dark:hover:border-green-400 dark:bg-gray-800 ${loadingType === "socso" ? "opacity-70" : ""}`}
+              className={`relative md:col-span-2 border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-green-300 dark:hover:border-green-400 dark:bg-gray-800 ${loadingType === "socso" ? "opacity-70" : ""}`}
               onMouseEnter={() => handleCardMouseEnter("socso")}
               onMouseLeave={handleCardMouseLeave}
               onClick={() => handleDownload("socso")}
@@ -604,7 +603,7 @@ const ECarumanPage: React.FC = () => {
                 <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                   <IconShieldCheck size={20} className="text-green-600 dark:text-green-400" />
                 </div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">SOCSO / PERKESO</h3>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">SOCSO & SIP / EIS</h3>
                 <span
                   className="px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-[10px] font-medium uppercase tracking-wide"
                   title="Downloads the combined SOCSO + EIS + SKBBK file"
@@ -619,217 +618,225 @@ const ECarumanPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              {preview.socso ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{preview.socso.count}</span>
+              {preview.socso || preview.sip ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] md:gap-3">
+                  <div className="space-y-2 text-sm">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">SOCSO</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Keilatan + SKBBK</span>
+                    </div>
+                    {preview.socso ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">Employees:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{preview.socso.count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            RM {preview.socso.totals.socso_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            RM {preview.socso.totals.socso_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">
+                            RM {preview.socso.totals.socso_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No SOCSO data</p>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
-                      RM {preview.socso.totals.socso_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-                    </span>
+
+                  <div className="hidden self-stretch items-center justify-center md:flex" aria-hidden="true">
+                    <div className="h-36 w-px rounded-full bg-gray-200 dark:bg-gray-700" />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
-                      RM {preview.socso.totals.socso_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-                    </span>
+
+                  <div className="flex items-center justify-center text-3xl font-extralight leading-none text-gray-300 dark:text-gray-600 md:hidden" aria-hidden="true">
+                    |
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
-                    <span className="font-semibold text-green-600 dark:text-green-400">
-                      RM {preview.socso.totals.socso_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-                    </span>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">SIP / EIS</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Employment Insurance</span>
+                    </div>
+                    {preview.sip ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">Employees:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{preview.sip.count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            RM {preview.sip.totals.eis_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            RM {preview.sip.totals.eis_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">
+                            RM {preview.sip.totals.sip_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">No SIP data</p>
+                    )}
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-400 italic">No data available</p>
               )}
 
-              {/* SOCSO Detailed Tooltip */}
-              {hoveredCard === "socso" && preview.socso && preview.socso.data.length > 0 && (
+              {/* SOCSO/SIP Detailed Tooltip */}
+              {hoveredCard === "socso" &&
+                ((preview.socso && preview.socso.data.length > 0) ||
+                  (preview.sip && preview.sip.data.length > 0)) && (
                 <div
                   className="absolute left-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[760px]"
                   onMouseEnter={handleTooltipMouseEnter}
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO Preview (combined SOCSO-SIP{`{MMYY}`}.TXT)</h4>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.socso.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO & SIP Preview (combined SOCSO-SIP{`{MMYY}`}.TXT)</h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      SOCSO {preview.socso ? preview.socso.count : 0}{" "} records{" "}
+                      <span className="text-gray-300 dark:text-gray-600">|</span>{" "}
+                      SIP {preview.sip ? preview.sip.count : 0} records
+                    </span>
                   </div>
-                  <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Keilatan</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">SKBBK</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {preview.socso.data.map((row, index) => (
-                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.salary.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.socso_employer.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.keilatan_amount.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.skbbk_amount.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.socso_employee.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-green-50 dark:bg-gray-900 sticky bottom-0 z-10">
-                        <tr className="font-medium">
-                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
-                          <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.socso.totals.salary.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.socso.totals.socso_employer.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.socso.totals.keilatan_amount.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.socso.totals.skbbk_amount.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.socso.totals.socso_employee.toFixed(2)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
+                  <div className="max-h-80 space-y-4 overflow-auto">
+                    {preview.socso && preview.socso.data.length > 0 && (
+                      <div>
+                        <div className="mb-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                          SOCSO
+                        </div>
+                        <div className="border border-gray-100 dark:border-gray-700 rounded">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Keilatan</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">SKBBK</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                              {preview.socso.data.map((row, index) => (
+                                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                  <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
+                                  <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.salary.toFixed(2)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.socso_employer.toFixed(2)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.keilatan_amount.toFixed(2)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.skbbk_amount.toFixed(2)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.socso_employee.toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-green-50 dark:bg-gray-900 sticky bottom-0 z-10">
+                              <tr className="font-medium">
+                                <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                                <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.socso.totals.salary.toFixed(2)}
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.socso.totals.socso_employer.toFixed(2)}
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.socso.totals.keilatan_amount.toFixed(2)}
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.socso.totals.skbbk_amount.toFixed(2)}
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.socso.totals.socso_employee.toFixed(2)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
-            {/* SIP/EIS Preview Card */}
-            <div
-              className={`relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 dark:hover:border-purple-400 dark:bg-gray-800 ${loadingType === "sip" ? "opacity-70" : ""}`}
-              onMouseEnter={() => handleCardMouseEnter("sip")}
-              onMouseLeave={handleCardMouseLeave}
-              onClick={() => handleDownload("sip")}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                  <IconUmbrella size={20} className="text-purple-600 dark:text-purple-400" />
-                </div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">SIP / EIS</h3>
-                <span
-                  className="px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-medium uppercase tracking-wide"
-                  title="Downloads the combined SOCSO + EIS + SKBBK file"
-                >
-                  Combined file
-                </span>
-                <div className="ml-auto">
-                  {loadingType === "sip" ? (
-                    <IconLoader2 size={20} className="animate-spin text-purple-600 dark:text-purple-400" />
-                  ) : (
-                    <IconFileDownload size={20} className="text-gray-400 dark:text-gray-500" />
-                  )}
-                </div>
-              </div>
-              {preview.sip ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{preview.sip.count}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
-                      RM {preview.sip.totals.eis_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
-                      RM {preview.sip.totals.eis_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
-                    <span className="font-semibold text-purple-600 dark:text-purple-400">
-                      RM {preview.sip.totals.sip_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic">No data available</p>
-              )}
-
-              {/* SIP Detailed Tooltip */}
-              {hoveredCard === "sip" && preview.sip && preview.sip.data.length > 0 && (
-                <div
-                  className="absolute right-0 top-full mt-2 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-4 min-w-[640px]"
-                  onMouseEnter={handleTooltipMouseEnter}
-                  onMouseLeave={handleTooltipMouseLeave}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SIP Preview (combined SOCSO-SIP{`{MMYY}`}.TXT)</h4>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.sip.count} records</span>
-                  </div>
-                  <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {preview.sip.data.map((row, index) => (
-                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.eis_employer.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.eis_employee.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
-                              {row.sip_total.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-purple-50 dark:bg-gray-900 sticky bottom-0 z-10">
-                        <tr className="font-medium">
-                          <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
-                          <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.sip.totals.eis_employer.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.sip.totals.eis_employee.toFixed(2)}
-                          </td>
-                          <td className="px-2 py-1.5 text-right text-purple-600 dark:text-purple-400 font-mono border-t border-gray-200 dark:border-gray-700">
-                            {preview.sip.totals.sip_total.toFixed(2)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                    {preview.sip && preview.sip.data.length > 0 && (
+                      <div>
+                        <div className="mb-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                          SIP / EIS
+                        </div>
+                        <div className="border border-gray-100 dark:border-gray-700 rounded">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                              {preview.sip.data.map((row, index) => (
+                                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                  <td className="px-2 py-1.5 text-gray-700 dark:text-gray-200 font-mono">{formatIC(row.ic_no)}</td>
+                                  <td className="px-2 py-1.5 text-gray-900 dark:text-gray-100">{row.name}</td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.eis_employer.toFixed(2)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.eis_employee.toFixed(2)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono">
+                                    {row.sip_total.toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-green-50 dark:bg-gray-900 sticky bottom-0 z-10">
+                              <tr className="font-medium">
+                                <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.sip.totals.eis_employer.toFixed(2)}
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.sip.totals.eis_employee.toFixed(2)}
+                                </td>
+                                <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
+                                  {preview.sip.totals.sip_total.toFixed(2)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

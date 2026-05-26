@@ -103,8 +103,6 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
     }
   };
 
-  const isForeignOver60 = rate?.employee_type === "foreign_over_60";
-
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -168,20 +166,18 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
                     required
                   />
 
-                  {!isForeignOver60 && (
-                    <FormInput
-                      name="employer_rate_percentage"
-                      label="Employer Rate (%)"
-                      type="number"
-                      value={formData.employer_rate_percentage}
-                      onChange={(e) =>
-                        handleChange("employer_rate_percentage", e.target.value)
-                      }
-                      step="0.1"
-                      min={0}
-                      max={100}
-                    />
-                  )}
+                  <FormInput
+                    name="employer_rate_percentage"
+                    label="Employer Rate (%)"
+                    type="number"
+                    value={formData.employer_rate_percentage}
+                    onChange={(e) =>
+                      handleChange("employer_rate_percentage", e.target.value)
+                    }
+                    step="0.1"
+                    min={0}
+                    max={100}
+                  />
 
                   {error && (
                     <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-600">
