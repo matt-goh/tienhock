@@ -451,7 +451,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 2xl:flex-row 2xl:items-center 2xl:justify-between">
+      <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold text-default-900 dark:text-gray-100">
             {total > 0 && !loading ? `${total} ` : ""}General Purchases
