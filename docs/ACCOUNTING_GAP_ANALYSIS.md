@@ -1,6 +1,6 @@
 # Tien Hock ERP — Accounting Module: What's Missing
 
-Gap analysis requested in the handover. Two lists:
+Gap analysis requested in the handover, two lists:
 
 - **Type 1** — standard capabilities any Malaysian manufacturing Sdn Bhd's ERP should have.
 - **Type 2** — capabilities the legacy system had that the new ERP doesn't.
