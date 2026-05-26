@@ -11,6 +11,69 @@ Statuses verified against the repo (`src/routes/accounting/`, `src/pages/Account
 
 ---
 
+## What's already built *(the baseline)*
+
+Verified by code scan and a query against the dev DB on 26 May 2026. Grouped by capability area so the picture lines up with the gap tables further down. Anything missing from this section is a gap covered below.
+
+### Posting engine
+
+| Capability | Status | Where |
+|---|---|---|
+| Journal entries CRUD — header + lines, balanced double-entry, posted entries immutable | ✅ | [journal-entries.js](src/routes/accounting/journal-entries.js), [JournalEntryPage](src/pages/Accounting/JournalEntryPage.tsx) |
+| **Auto-posted entry types:** `REC` (customer receipts), `PUR` (material purchases), `JVDR` + `JVSL` (payroll director's & staff salary vouchers) | ✅ | [payment-journal.js](src/routes/accounting/payment-journal.js), [purchase-invoices.js](src/routes/accounting/purchase-invoices.js), [journal-vouchers.js](src/routes/accounting/journal-vouchers.js) |
+| Manual general-journal entries (`J` type) for ad-hoc postings | ✅ | [JournalEntryPage](src/pages/Accounting/JournalEntryPage.tsx) |
+
+### Customer / sales loop *(end-to-end)*
+
+| Capability | Status | Where |
+|---|---|---|
+| Sales invoices + order lines + MyInvois submission + monthly consolidation | ✅ | `invoices`, `order_details` |
+| Customer payments → auto-journal `REC` (DR Bank/Cash · CR Trade Receivables), routed by payment method to `CASH` / `BANK_PBB` / `BANK_ABB` | ✅ | [payment-journal.js](src/routes/accounting/payment-journal.js), [payment-helpers.js](src/utils/payment-helpers.js) |
+| Cash Receipt Voucher modal + printable PDF | ✅ | [CashReceiptVoucherModal.tsx](src/components/Accounting/CashReceiptVoucherModal.tsx), [CashReceiptVoucherPDF.tsx](src/utils/accounting/CashReceiptVoucherPDF.tsx) |
+| Debtors aging report + PDF | ✅ | [DebtorsReportPage](src/pages/Accounting/DebtorsReportPage.tsx), [DebtorsReportPDF.tsx](src/utils/accounting/DebtorsReportPDF.tsx) |
+| Customer Statement of Account PDF | ✅ | [CustomerStatementPDF.tsx](src/utils/accounting/CustomerStatementPDF.tsx) |
+| Credit / Debit / Refund Notes (Tien Hock + Jelly Polly) — atomic balance cascade, customer credit reversal, journal posting, MyInvois | ✅ | `adjustment_documents`, `jellypolly.adjustment_documents` |
+
+### Purchases / payables *(half-loop)*
+
+| Capability | Status | Where |
+|---|---|---|
+| Supplier master CRUD | ✅ | [SuppliersListPage](src/pages/Accounting/Purchases/SuppliersListPage.tsx), [SupplierFormPage](src/pages/Accounting/Purchases/SupplierFormPage.tsx) |
+| Material purchase invoice → auto-journal `PUR` (DR purchase account by category · CR Trade Payables) | ✅ | [MaterialPurchaseFormPage](src/pages/Accounting/Purchases/MaterialPurchaseFormPage.tsx), [purchase-invoices.js](src/routes/accounting/purchase-invoices.js) |
+| Material-category → GL-account mapping table (PUR / PM etc.) | ✅ | `material_purchase_account_mappings` |
+| Foreign General Purchase form + manual self-billed e-Invoice submission to MyInvois (FX rate, supporting documents, foreign supplier profiles) | ✅ | [GeneralPurchaseInvoiceFormPage](src/pages/Accounting/Purchases/GeneralPurchaseInvoiceFormPage.tsx), [self-billed-invoices.js](src/routes/accounting/self-billed-invoices.js) |
+| Local General Purchase form (utilities, stationery, services) | 🟡 | [LocalGeneralPurchaseFormPage](src/pages/Accounting/Purchases/LocalGeneralPurchaseFormPage.tsx) — writes the `self_billed_invoices` row but creates **no journal entry** *(= Type 1 / 1B-3, Type 2 / #2)* |
+| Supplier payment entry / AP aging / supplier statement | ❌ | *(= 1B-4 / 1B-5 / 1B-6)* |
+
+### Payroll → GL
+
+| Capability | Status | Where |
+|---|---|---|
+| Voucher Generator: monthly payroll → `JVDR` (Director's Remuneration) + `JVSL` (Staff Salary) journals, posted to GL with per-location splits | ✅ | [VoucherGeneratorPage](src/pages/Accounting/VoucherGeneratorPage.tsx), [journal-vouchers.js](src/routes/accounting/journal-vouchers.js) |
+| Location-account mappings — drives JVDR/JVSL account selection per location (01/02/04/06/07/08) | ✅ | [LocationAccountMappingsPage](src/pages/Accounting/LocationAccountMappingsPage.tsx) |
+
+### Financial reports *(single-period)*
+
+| Capability | Status | Where |
+|---|---|---|
+| Trial Balance + PDF (with `APPX` / `fs_note` column) | 🟡 | [TrialBalancePage](src/pages/Accounting/Reports/TrialBalancePage.tsx), [TrialBalancePDF.tsx](src/utils/accounting/TrialBalancePDF.tsx) |
+| Income Statement + PDF | 🟡 | [IncomeStatementPage](src/pages/Accounting/Reports/IncomeStatementPage.tsx), [IncomeStatementPDF.tsx](src/utils/accounting/IncomeStatementPDF.tsx) |
+| Balance Sheet + PDF | 🟡 | [BalanceSheetPage](src/pages/Accounting/Reports/BalanceSheetPage.tsx), [BalanceSheetPDF.tsx](src/utils/accounting/BalanceSheetPDF.tsx) |
+| Cost of Goods Manufactured + PDF | 🟡 | [CogmPage](src/pages/Accounting/Reports/CogmPage.tsx), [CogmPDF.tsx](src/utils/accounting/CogmPDF.tsx) |
+| Note 22 (Trade Receivables) + Note 7 (Revenue) calculated live from `invoices` — no `DEBTOR` / `SLS*` GL codes needed | ✅ | [financial-reports.js](src/routes/accounting/financial-reports.js) |
+
+All four statements render a single period only — no prior-year comparative column *(= 1A-3, Type 2 / #7)*. Note 5 is shown as one rolled-up number — no Schedule B itemisation *(= 1A-5, Type 2 / #4)*.
+
+### Master data
+
+| Capability | Status | Notes |
+|---|---|---|
+| Chart of Accounts CRUD | ✅ | **2,749 codes currently loaded, all marked active** — the full legacy list has been imported but the lean-GL pruning (§0 below) hasn't started. The "~60 vs 1,202" framing in §0 should be read against this real count. |
+| Financial-statement notes (33 notes) — the bridge between codes and statement lines, mapped via `account_codes.fs_note` (= legacy `APPX` column) | ✅ | `financial_statement_notes` |
+| Ledger types, materials + variants, material-stock entries, general-stock subledger | ✅ | `ledger_types`, `materials`, `material_variants`, `material_stock_entries`, `general_stock_categories`, `general_stock_adjustments` |
+
+---
+
 ## 0. The chart-of-accounts question (the decision underneath everything)
 
 You're stuck choosing between "~60 simplified codes" and "keep the 1,202 legacy codes." Reframe it: **that is a false choice.**
