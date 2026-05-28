@@ -36,6 +36,8 @@ import MaterialPurchaseFormPage from "./Accounting/Purchases/MaterialPurchaseFor
 import GeneralPurchaseInvoiceListPage from "./Accounting/Purchases/GeneralPurchaseInvoiceListPage";
 import GeneralPurchaseInvoiceFormPage from "./Accounting/Purchases/GeneralPurchaseInvoiceFormPage";
 import LocalGeneralPurchaseFormPage from "./Accounting/Purchases/LocalGeneralPurchaseFormPage";
+import SupplierPaymentListPage from "./Accounting/Purchases/SupplierPaymentListPage";
+import SupplierPaymentFormPage from "./Accounting/Purchases/SupplierPaymentFormPage";
 
 // Stock - Materials
 import MaterialsListPage from "./Stock/Materials/MaterialsListPage";
@@ -362,6 +364,18 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Voucher Generator",
         path: "/accounting/voucher-generator",
         component: VoucherGeneratorPage,
+      },
+      {
+        name: "Supplier Payments",
+        path: "/accounting/supplier-payments",
+        component: SupplierPaymentListPage,
+        subItems: [
+          {
+            name: "Payment Details",
+            path: "/accounting/supplier-payments/:id",
+            component: SupplierPaymentFormPage,
+          },
+        ],
       },
       {
         name: "Account Mappings",
