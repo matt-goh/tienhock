@@ -227,6 +227,7 @@ function sanitizeLines(lines, fxRate, purchaseKind = PURCHASE_KIND_FOREIGN) {
       general_stock_category_id: line.general_stock_category_id
         ? Number.parseInt(line.general_stock_category_id, 10)
         : null,
+      account_code: normalizeText(line.account_code),
       notes: normalizeText(line.notes),
     };
   });
@@ -304,6 +305,9 @@ function validateInvoice(input) {
     }
     if (input.purchase_kind !== PURCHASE_KIND_LOCAL && !line.tax_type) {
       errors.push(`${label}: tax type is required`);
+    }
+    if (!line.account_code) {
+      errors.push(`${label}: GL account is required`);
     }
   });
 
@@ -498,6 +502,9 @@ async function getFullInvoice(poolOrClient, id) {
     einvoice_status: row.einvoice_status,
     cancellation_reason: row.cancellation_reason,
     notes: row.notes,
+    journal_entry_id: row.journal_entry_id || null,
+    amount_paid: row.amount_paid !== undefined ? Number(row.amount_paid) : 0,
+    payment_status: row.payment_status || "unpaid",
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by: row.created_by,
@@ -513,8 +520,8 @@ async function insertLines(client, invoiceId, lines) {
       self_billed_invoice_id, line_number, description, quantity,
       balance_quantity, unit_price_foreign, amount_foreign, amount_myr, classification_code,
       tax_type, tax_rate, tax_amount_myr, tax_exemption_reason,
-      customs_form_reference, general_stock_category_id, notes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      customs_form_reference, general_stock_category_id, account_code, notes
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
   `;
 
   for (const line of lines) {
@@ -534,9 +541,266 @@ async function insertLines(client, invoiceId, lines) {
       line.tax_exemption_reason,
       line.customs_form_reference,
       line.general_stock_category_id,
+      line.account_code,
       line.notes,
     ]);
   }
+}
+
+async function generateGPReference(client, purchaseDate) {
+  const date = new Date(purchaseDate);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid purchase date: ${purchaseDate}`);
+  }
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const yearMonth = `${year}${month}`;
+  const pattern = `GP-${yearMonth}-%`;
+
+  const result = await client.query(
+    `SELECT reference_no
+     FROM journal_entries
+     WHERE reference_no LIKE $1 AND entry_type = 'GP'
+     ORDER BY reference_no DESC
+     LIMIT 1
+     FOR UPDATE SKIP LOCKED`,
+    [pattern]
+  );
+
+  let nextNumber = 1;
+  if (result.rows.length > 0) {
+    const match = result.rows[0].reference_no.match(/^GP-\d{6}-(\d+)$/);
+    if (match) nextNumber = Number.parseInt(match[1], 10) + 1;
+  }
+  return `GP-${yearMonth}-${String(nextNumber).padStart(4, "0")}`;
+}
+
+async function validateLineAccountCodes(client, lines) {
+  const codes = Array.from(
+    new Set(
+      lines
+        .map((line) => normalizeText(line.account_code))
+        .filter((code) => code !== null)
+    )
+  );
+  if (codes.length === 0) return;
+
+  const result = await client.query(
+    `SELECT code FROM account_codes WHERE code = ANY($1) AND is_active = true`,
+    [codes]
+  );
+  const found = new Set(result.rows.map((row) => row.code));
+  const missing = codes.filter((code) => !found.has(code));
+  if (missing.length > 0) {
+    const error = new Error(
+      `Unknown or inactive GL account code(s): ${missing.join(", ")}`
+    );
+    error.status = 400;
+    throw error;
+  }
+}
+
+function buildGPDescription(invoice, supplierName) {
+  const trimmedSupplier = normalizeText(supplierName, "Unknown supplier");
+  return `General purchase from ${trimmedSupplier} - ${invoice.self_billed_no}`;
+}
+
+async function createGPJournalEntry(
+  client,
+  invoice,
+  lines,
+  supplierName,
+  staffId
+) {
+  await validateLineAccountCodes(client, lines);
+
+  const totalAmount = Math.round(
+    parseFloat(invoice.payable_amount_myr || 0) * 100
+  ) / 100;
+  if (!(totalAmount > 0)) {
+    const error = new Error("Cannot post GP journal: payable amount must be greater than zero");
+    error.status = 400;
+    throw error;
+  }
+
+  // Verify Trade Payables exists (CR side)
+  const tpResult = await client.query(
+    `SELECT code FROM account_codes WHERE code = 'TP' AND is_active = true`
+  );
+  if (tpResult.rows.length === 0) {
+    throw new Error("Trade Payables account 'TP' not found or inactive");
+  }
+
+  const referenceNo = await generateGPReference(client, invoice.purchase_date);
+
+  const entryResult = await client.query(
+    `INSERT INTO journal_entries (
+       reference_no, entry_type, entry_date, description,
+       total_debit, total_credit, status, created_at, created_by
+     ) VALUES ($1, 'GP', $2, $3, $4, $5, 'posted', NOW(), $6)
+     RETURNING id`,
+    [
+      referenceNo,
+      invoice.purchase_date,
+      buildGPDescription(invoice, supplierName),
+      totalAmount,
+      totalAmount,
+      staffId || null,
+    ]
+  );
+  const journalEntryId = entryResult.rows[0].id;
+
+  // Group DR lines by account_code
+  const groups = new Map();
+  for (const line of lines) {
+    const code = line.account_code;
+    const amount = parseFloat(line.amount_myr || 0) +
+      parseFloat(line.tax_amount_myr || 0);
+    if (!groups.has(code)) groups.set(code, { total: 0, particulars: [] });
+    const group = groups.get(code);
+    group.total += amount;
+    if (line.description) group.particulars.push(line.description);
+  }
+
+  const insertLineQuery = `
+    INSERT INTO journal_entry_lines (
+      journal_entry_id, line_number, account_code,
+      debit_amount, credit_amount, reference, particulars, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+  `;
+
+  let lineNumber = 1;
+  for (const [accountCode, data] of groups.entries()) {
+    const amount = Math.round(data.total * 100) / 100;
+    const particulars =
+      data.particulars.join("; ").slice(0, 500) ||
+      `General purchase - ${invoice.self_billed_no}`;
+    await client.query(insertLineQuery, [
+      journalEntryId,
+      lineNumber,
+      accountCode,
+      amount,
+      0,
+      invoice.self_billed_no,
+      particulars,
+    ]);
+    lineNumber += 1;
+  }
+
+  await client.query(insertLineQuery, [
+    journalEntryId,
+    lineNumber,
+    "TP",
+    0,
+    totalAmount,
+    invoice.self_billed_no,
+    `Payable to ${normalizeText(supplierName, "supplier")}`,
+  ]);
+
+  return journalEntryId;
+}
+
+async function updateGPJournalEntry(
+  client,
+  invoice,
+  lines,
+  supplierName,
+  staffId
+) {
+  if (!invoice.journal_entry_id) {
+    return createGPJournalEntry(client, invoice, lines, supplierName, staffId);
+  }
+
+  await validateLineAccountCodes(client, lines);
+
+  const totalAmount = Math.round(
+    parseFloat(invoice.payable_amount_myr || 0) * 100
+  ) / 100;
+  if (!(totalAmount > 0)) {
+    const error = new Error("Cannot update GP journal: payable amount must be greater than zero");
+    error.status = 400;
+    throw error;
+  }
+
+  await client.query(
+    `UPDATE journal_entries
+     SET entry_date = $1, description = $2,
+         total_debit = $3, total_credit = $4,
+         status = 'posted', updated_at = NOW()
+     WHERE id = $5 AND entry_type = 'GP'`,
+    [
+      invoice.purchase_date,
+      buildGPDescription(invoice, supplierName),
+      totalAmount,
+      totalAmount,
+      invoice.journal_entry_id,
+    ]
+  );
+
+  await client.query(
+    `DELETE FROM journal_entry_lines WHERE journal_entry_id = $1`,
+    [invoice.journal_entry_id]
+  );
+
+  const groups = new Map();
+  for (const line of lines) {
+    const code = line.account_code;
+    const amount = parseFloat(line.amount_myr || 0) +
+      parseFloat(line.tax_amount_myr || 0);
+    if (!groups.has(code)) groups.set(code, { total: 0, particulars: [] });
+    const group = groups.get(code);
+    group.total += amount;
+    if (line.description) group.particulars.push(line.description);
+  }
+
+  const insertLineQuery = `
+    INSERT INTO journal_entry_lines (
+      journal_entry_id, line_number, account_code,
+      debit_amount, credit_amount, reference, particulars, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+  `;
+
+  let lineNumber = 1;
+  for (const [accountCode, data] of groups.entries()) {
+    const amount = Math.round(data.total * 100) / 100;
+    const particulars =
+      data.particulars.join("; ").slice(0, 500) ||
+      `General purchase - ${invoice.self_billed_no}`;
+    await client.query(insertLineQuery, [
+      invoice.journal_entry_id,
+      lineNumber,
+      accountCode,
+      amount,
+      0,
+      invoice.self_billed_no,
+      particulars,
+    ]);
+    lineNumber += 1;
+  }
+
+  await client.query(insertLineQuery, [
+    invoice.journal_entry_id,
+    lineNumber,
+    "TP",
+    0,
+    totalAmount,
+    invoice.self_billed_no,
+    `Payable to ${normalizeText(supplierName, "supplier")}`,
+  ]);
+
+  return invoice.journal_entry_id;
+}
+
+async function cancelGPJournalEntry(client, journalEntryId) {
+  if (!journalEntryId) return false;
+  const result = await client.query(
+    `UPDATE journal_entries
+     SET status = 'cancelled', updated_at = NOW()
+     WHERE id = $1 AND entry_type = 'GP' AND status = 'posted'
+     RETURNING id`,
+    [journalEntryId]
+  );
+  return result.rows.length > 0;
 }
 
 function statusFromDocumentDetails(documentDetails, fallbackStatus = "pending") {
@@ -1543,11 +1807,36 @@ export default function (pool, config) {
 
       const invoiceId = invoiceResult.rows[0].id;
       await insertLines(client, invoiceId, input.lines);
+
+      const supplierName =
+        input.purchase_kind === PURCHASE_KIND_LOCAL
+          ? input.local_supplier_name
+          : supplier?.supplier_name || input.supplier?.supplier_name;
+      const journalEntryId = await createGPJournalEntry(
+        client,
+        {
+          self_billed_no: selfBilledNo,
+          purchase_date: input.purchase_date,
+          payable_amount_myr: input.payable_amount_myr,
+        },
+        input.lines,
+        supplierName,
+        req.staffId
+      );
+      await client.query(
+        `UPDATE self_billed_invoices SET journal_entry_id = $1 WHERE id = $2`,
+        [journalEntryId, invoiceId]
+      );
       await client.query("COMMIT");
 
       res.status(201).json({
         message: "General purchase created successfully",
-        invoice: { id: invoiceId, self_billed_no: selfBilledNo, purchase_no: selfBilledNo },
+        invoice: {
+          id: invoiceId,
+          self_billed_no: selfBilledNo,
+          purchase_no: selfBilledNo,
+          journal_entry_id: journalEntryId,
+        },
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -1638,6 +1927,31 @@ export default function (pool, config) {
         [req.params.id]
       );
       await insertLines(client, req.params.id, input.lines);
+
+      const supplierName =
+        input.purchase_kind === PURCHASE_KIND_LOCAL
+          ? input.local_supplier_name
+          : supplier?.supplier_name ||
+            input.supplier?.supplier_name ||
+            existing.supplier?.supplier_name;
+      const journalEntryId = await updateGPJournalEntry(
+        client,
+        {
+          self_billed_no: existing.self_billed_no,
+          purchase_date: input.purchase_date,
+          payable_amount_myr: input.payable_amount_myr,
+          journal_entry_id: existing.journal_entry_id,
+        },
+        input.lines,
+        supplierName,
+        req.staffId
+      );
+      if (!existing.journal_entry_id) {
+        await client.query(
+          `UPDATE self_billed_invoices SET journal_entry_id = $1 WHERE id = $2`,
+          [journalEntryId, req.params.id]
+        );
+      }
       await client.query("COMMIT");
 
       res.json({
@@ -1645,6 +1959,7 @@ export default function (pool, config) {
         invoice: {
           id: Number.parseInt(req.params.id, 10),
           self_billed_no: existing.self_billed_no,
+          journal_entry_id: journalEntryId,
         },
       });
     } catch (error) {
@@ -1675,6 +1990,22 @@ export default function (pool, config) {
         });
       }
 
+      const paymentBlock = await client.query(
+        `SELECT 1 FROM supplier_payments
+         WHERE invoice_source = 'self_billed_invoices'
+           AND invoice_id = $1
+           AND status <> 'cancelled'
+         LIMIT 1`,
+        [req.params.id]
+      );
+      if (paymentBlock.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Cancel the linked supplier payment before deleting this invoice.",
+        });
+      }
+
+      await cancelGPJournalEntry(client, existing.journal_entry_id);
       await client.query("DELETE FROM self_billed_invoices WHERE id = $1", [
         req.params.id,
       ]);
@@ -1831,6 +2162,20 @@ export default function (pool, config) {
         return res.json({ message: "Self-billed invoice is already cancelled" });
       }
 
+      const paymentBlock = await pool.query(
+        `SELECT 1 FROM supplier_payments
+         WHERE invoice_source = 'self_billed_invoices'
+           AND invoice_id = $1
+           AND status <> 'cancelled'
+         LIMIT 1`,
+        [req.params.id]
+      );
+      if (paymentBlock.rows.length > 0) {
+        return res.status(400).json({
+          message: "Cancel the linked supplier payment before cancelling this invoice.",
+        });
+      }
+
       let apiMessage = "No MyInvois UUID; local status updated only.";
       let nextEInvoiceStatus = invoice.einvoice_status;
       if (invoice.uuid && invoice.einvoice_status !== "cancelled") {
@@ -1852,13 +2197,24 @@ export default function (pool, config) {
         }
       }
 
-      await pool.query(
-        `UPDATE self_billed_invoices
-         SET invoice_status = $1, einvoice_status = $2, cancellation_reason = $3,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $4`,
-        [LOCAL_STATUS_CANCELLED, nextEInvoiceStatus, reason, req.params.id]
-      );
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await cancelGPJournalEntry(client, invoice.journal_entry_id);
+        await client.query(
+          `UPDATE self_billed_invoices
+           SET invoice_status = $1, einvoice_status = $2, cancellation_reason = $3,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $4`,
+          [LOCAL_STATUS_CANCELLED, nextEInvoiceStatus, reason, req.params.id]
+        );
+        await client.query("COMMIT");
+      } catch (txError) {
+        await client.query("ROLLBACK");
+        throw txError;
+      } finally {
+        client.release();
+      }
 
       res.json({
         message: "Self-billed invoice cancelled",

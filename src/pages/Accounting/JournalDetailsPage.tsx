@@ -346,7 +346,7 @@ const JournalDetailsPage: React.FC = () => {
                   <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
                     Account
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-28">
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-48">
                     Reference
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">

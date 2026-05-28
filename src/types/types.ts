@@ -784,6 +784,7 @@ export interface OthersRecord {
   rate_unit: string;
   quantity: number;
   amount: number;
+  link_id: string | null;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
@@ -1681,6 +1682,7 @@ export interface SelfBilledInvoiceLine {
   tax_amount_myr: number;
   tax_exemption_reason?: string | null;
   customs_form_reference?: string | null;
+  account_code?: string | null;
   notes?: string | null;
 }
 
@@ -1754,6 +1756,9 @@ export interface SelfBilledInvoice extends SelfBilledInvoiceInput {
   invoice_status: SelfBilledInvoiceStatus;
   einvoice_status: SelfBilledEInvoiceStatus;
   cancellation_reason: string | null;
+  journal_entry_id?: number | null;
+  amount_paid?: number;
+  payment_status?: "unpaid" | "partial" | "paid";
   created_at: string;
   updated_at: string;
   created_by: string | null;

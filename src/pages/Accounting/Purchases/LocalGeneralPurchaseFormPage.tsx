@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconDownload,
   IconEye,
@@ -13,6 +13,14 @@ import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
+import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
+import SupplierPaymentInlineSection, {
+  buildSupplierPaymentPayload,
+  createDefaultSupplierPaymentDraft,
+  SupplierPaymentDraft,
+  syncSupplierPaymentDraftAmount,
+  validateSupplierPaymentDraft,
+} from "../../../components/Accounting/SupplierPaymentInlineSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import {
@@ -32,7 +40,20 @@ interface LocalGeneralPurchaseFormData {
   amount_myr: string;
   balance_quantity: string;
   general_stock_category_id: string;
+  account_code: string;
   notes: string;
+}
+
+interface SupplierPaymentSummary {
+  payment_id: number;
+  payment_date: string;
+  amount_paid: number;
+  payment_method: string;
+  bank_account: string | null;
+  payment_reference: string | null;
+  internal_reference: string | null;
+  journal_reference_no: string | null;
+  status: "active" | "pending" | "cancelled";
 }
 
 const today = new Date().toISOString().slice(0, 10);
@@ -90,6 +111,13 @@ const formatDateTime = (value?: string | null): string => {
   });
 };
 
+const formatCurrency = (amount: number): string =>
+  new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency: "MYR",
+    minimumFractionDigits: 2,
+  }).format(amount);
+
 const isViewable = (filename?: string | null, contentType?: string | null): boolean => {
   if (contentType) return contentType.startsWith("image/") || contentType === "application/pdf";
   if (!filename) return false;
@@ -112,6 +140,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     amount_myr: "",
     balance_quantity: "",
     general_stock_category_id: "",
+    account_code: "",
     notes: "",
   });
   const [existingInvoice, setExistingInvoice] = useState<SelfBilledInvoice | null>(null);
@@ -124,6 +153,11 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
   const [showDocViewer, setShowDocViewer] = useState<boolean>(false);
   const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPaymentSummary[]>([]);
+  const [supplierPayment, setSupplierPayment] = useState<SupplierPaymentDraft>(
+    () => createDefaultSupplierPaymentDraft(today, 0, !isEditMode)
+  );
+  const previousPayableAmountRef = useRef<number>(0);
 
   const categoryOptions = useMemo(
     () => [
@@ -135,6 +169,44 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     ],
     [categories]
   );
+  const payableAmount = useMemo<number>(
+    () => Math.round(toNumber(formData.amount_myr) * 100) / 100,
+    [formData.amount_myr]
+  );
+  const outstandingPaymentAmount = useMemo<number>(() => {
+    const alreadyPaid: number = toNumber(existingInvoice?.amount_paid || 0);
+    return Math.max(0, Math.round((payableAmount - alreadyPaid) * 100) / 100);
+  }, [existingInvoice?.amount_paid, payableAmount]);
+  const canRecordSupplierPayment: boolean =
+    !isEditMode ||
+    Boolean(
+      existingInvoice &&
+        existingInvoice.invoice_status !== "cancelled" &&
+        existingInvoice.payment_status !== "paid"
+    );
+  const canEdit: boolean =
+    !isEditMode ||
+    Boolean(
+      existingInvoice &&
+        existingInvoice.invoice_status !== "cancelled" &&
+        existingInvoice.payment_status !== "paid"
+    );
+  const canEditRecords: boolean = canEdit;
+  const canDelete: boolean =
+    isEditMode &&
+    existingInvoice?.invoice_status !== "cancelled" &&
+    existingInvoice?.payment_status === "unpaid";
+
+  useEffect(() => {
+    setSupplierPayment((previous: SupplierPaymentDraft) =>
+      syncSupplierPaymentDraftAmount(
+        previous,
+        outstandingPaymentAmount,
+        previousPayableAmountRef.current
+      )
+    );
+    previousPayableAmountRef.current = outstandingPaymentAmount;
+  }, [outstandingPaymentAmount]);
 
   const loadInvoice = useCallback(async (): Promise<void> => {
     if (!isEditMode || !id) return;
@@ -161,8 +233,23 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           ? ""
           : String(line.balance_quantity),
         general_stock_category_id: line?.general_stock_category_id ? String(line.general_stock_category_id) : "",
+        account_code: line?.account_code || "",
         notes: invoice.notes || "",
       });
+      setSupplierPayment((previous: SupplierPaymentDraft) => ({
+        ...previous,
+        payment_date: invoice.purchase_date?.slice(0, 10) || today,
+        payment_reference: invoice.payment_reference || "",
+      }));
+      try {
+        const payments: SupplierPaymentSummary[] = await api.get<SupplierPaymentSummary[]>(
+          `/api/supplier-payments/by-invoice?invoice_source=self_billed_invoices&invoice_id=${id}&include_cancelled=true`
+        );
+        setSupplierPayments(Array.isArray(payments) ? payments : []);
+      } catch (paymentError: unknown) {
+        console.error("Error loading local purchase payments:", paymentError);
+        setSupplierPayments([]);
+      }
     } catch (error: unknown) {
       console.error("Error loading local general purchase:", error);
       toast.error(error instanceof Error ? error.message : "Failed to load local general purchase");
@@ -197,6 +284,14 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       ...previous,
       [field]: value,
     }));
+
+    if (field === "purchase_date") {
+      setSupplierPayment((previous: SupplierPaymentDraft) =>
+        !previous.payment_date || previous.payment_date === formData.purchase_date
+          ? { ...previous, payment_date: value }
+          : previous
+      );
+    }
   };
 
   const validateBeforeSave = (): boolean => {
@@ -214,6 +309,18 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     }
     if (toNumber(formData.amount_myr) <= 0) {
       toast.error("Amount must be greater than zero");
+      return false;
+    }
+    if (!formData.account_code.trim()) {
+      toast.error("GL account is required");
+      return false;
+    }
+    const paymentError: string | null = validateSupplierPaymentDraft(
+      supplierPayment,
+      outstandingPaymentAmount
+    );
+    if (paymentError) {
+      toast.error(paymentError);
       return false;
     }
     return true;
@@ -239,6 +346,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       tax_amount_myr: 0,
       tax_exemption_reason: null,
       customs_form_reference: null,
+      account_code: formData.account_code.trim() || null,
       notes: null,
     };
 
@@ -251,7 +359,10 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       transaction_type: "Local general purchase",
       platform: null,
       order_no: formData.order_no.trim() || null,
-      payment_reference: formData.payment_reference.trim() || null,
+      payment_reference:
+        (supplierPayment.enabled
+          ? supplierPayment.payment_reference.trim()
+          : formData.payment_reference.trim()) || null,
       shipping_method: null,
       shipping_number: null,
       has_supporting_document: Boolean(existingInvoice?.supporting_document_filename),
@@ -287,6 +398,40 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     }
   };
 
+  const maybeRecordSupplierPayment = async (
+    invoiceId: number,
+    amountToSettle: number
+  ): Promise<boolean> => {
+    if (!supplierPayment.enabled) return false;
+
+    try {
+      await api.post(
+        "/api/supplier-payments",
+        buildSupplierPaymentPayload(
+          supplierPayment,
+          "self_billed_invoices",
+          invoiceId,
+          amountToSettle,
+          formData.payment_reference
+        )
+      );
+      setSupplierPayment((previous: SupplierPaymentDraft) => ({
+        ...previous,
+        enabled: false,
+        amount_paid: "0.00",
+        payment_reference: "",
+        internal_reference: "",
+        notes: "",
+      }));
+      return true;
+    } catch (error: unknown) {
+      const message: string =
+        error instanceof Error ? error.message : "Failed to record payment";
+      toast.error(`Purchase saved, but payment failed: ${message}`);
+      return false;
+    }
+  };
+
   const saveInvoice = async (): Promise<void> => {
     if (!validateBeforeSave()) return;
 
@@ -296,15 +441,34 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       if (isEditMode && id) {
         await api.put(`/api/general-purchases/${id}`, payload);
         await uploadSupportingDocument(Number.parseInt(id, 10));
-        toast.success("Local general purchase updated");
+        const paymentRecorded: boolean = await maybeRecordSupplierPayment(
+          Number.parseInt(id, 10),
+          outstandingPaymentAmount
+        );
+        toast.success(
+          paymentRecorded
+            ? "Local general purchase updated and paid"
+            : "Local general purchase updated"
+        );
         await loadInvoice();
         return;
       }
 
-      const response = await api.post("/api/general-purchases", payload);
-      const newId = response.invoice.id as number;
+      const response: { invoice: { id: number } } = await api.post(
+        "/api/general-purchases",
+        payload
+      );
+      const newId: number = response.invoice.id;
       await uploadSupportingDocument(newId);
-      toast.success("Local general purchase created");
+      const paymentRecorded: boolean = await maybeRecordSupplierPayment(
+        newId,
+        payableAmount
+      );
+      toast.success(
+        paymentRecorded
+          ? "Local general purchase created and paid"
+          : "Local general purchase created"
+      );
       navigate(`/stock/general-purchases/local/${newId}`, { replace: true });
     } catch (error: unknown) {
       console.error("Error saving local general purchase:", error);
@@ -405,7 +569,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          {isEditMode && (
+          {canDelete && (
             <Button
               type="button"
               color="rose"
@@ -422,13 +586,19 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             color="sky"
             variant="filled"
             size="sm"
-            disabled={saving || supportingDocumentUploading}
+            disabled={!canEdit || saving || supportingDocumentUploading}
             onClick={saveInvoice}
           >
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
+
+      {isEditMode && existingInvoice?.payment_status === "paid" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+          This purchase is fully paid and cannot be edited. Cancel the linked payment first if a correction is needed.
+        </div>
+      )}
 
       <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
@@ -443,6 +613,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               updateFormField("purchase_date", event.target.value)
             }
+            disabled={!canEdit}
             required
           />
           <FormInput
@@ -452,6 +623,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               updateFormField("supplier_name", event.target.value)
             }
+            disabled={!canEdit}
             required
           />
           <FormInput
@@ -461,14 +633,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               updateFormField("order_no", event.target.value)
             }
-          />
-          <FormInput
-            name="payment_reference"
-            label="Payment Reference"
-            value={formData.payment_reference}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              updateFormField("payment_reference", event.target.value)
-            }
+            disabled={!canEdit}
           />
         </div>
       </section>
@@ -487,12 +652,13 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
                 updateFormField("description", event.target.value)
               }
+              disabled={!canEdit}
               rows={4}
-              className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+              className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
               placeholder="Purchase details"
             />
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <FormInput
               name="amount_myr"
               label="Amount (MYR)"
@@ -503,7 +669,16 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 updateFormField("amount_myr", event.target.value)
               }
+              disabled={!canEdit}
               required
+            />
+            <AccountCodeCombobox
+              label="GL Account"
+              required
+              value={formData.account_code}
+              onChange={(value: string) => updateFormField("account_code", value)}
+              disabled={!canEdit}
+              placeholder="Pick the expense account to debit"
             />
             <FormInput
               name="balance_quantity"
@@ -515,6 +690,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 updateFormField("balance_quantity", event.target.value)
               }
+              disabled={!canEdit}
             />
             <FormListbox
               name="general_stock_category_id"
@@ -524,10 +700,84 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                 updateFormField("general_stock_category_id", value)
               }
               options={categoryOptions}
+              disabled={!canEdit}
             />
           </div>
         </div>
       </section>
+
+      {canRecordSupplierPayment && (
+        <SupplierPaymentInlineSection
+          draft={supplierPayment}
+          outstandingAmount={outstandingPaymentAmount}
+          onChange={setSupplierPayment}
+          disabled={saving || supportingDocumentUploading}
+        />
+      )}
+
+      {isEditMode && supplierPayments.length > 0 && (
+        <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
+            Payment Info
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-default-200 text-left text-xs uppercase tracking-wide text-default-500 dark:border-gray-700 dark:text-gray-400">
+                  <th className="px-2 py-2">Reference</th>
+                  <th className="px-2 py-2">Date</th>
+                  <th className="px-2 py-2">Method</th>
+                  <th className="px-2 py-2 text-right">Amount</th>
+                  <th className="px-2 py-2">Journal</th>
+                  <th className="px-2 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default-100 dark:divide-gray-700">
+                {supplierPayments.map((payment: SupplierPaymentSummary) => (
+                  <tr key={payment.payment_id}>
+                    <td className="px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(`/accounting/supplier-payments/${payment.payment_id}`)
+                        }
+                        className="font-mono text-sky-700 hover:text-sky-900 hover:underline dark:text-sky-300 dark:hover:text-sky-200"
+                      >
+                        {payment.internal_reference || `Payment #${payment.payment_id}`}
+                      </button>
+                      {payment.payment_reference && (
+                        <div className="text-xs text-default-500 dark:text-gray-400">
+                          {payment.payment_reference}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-default-700 dark:text-gray-200">
+                      {formatDateTime(payment.payment_date)}
+                    </td>
+                    <td className="px-2 py-2 capitalize text-default-700 dark:text-gray-200">
+                      {payment.payment_method.replace("_", " ")}
+                      {payment.bank_account && payment.bank_account !== "CASH" && (
+                        <span className="ml-1 text-xs text-default-500 dark:text-gray-400">
+                          ({payment.bank_account.replace("BANK_", "")})
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-right font-mono text-default-900 dark:text-gray-100">
+                      {formatCurrency(toNumber(payment.amount_paid))}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-default-700 dark:text-gray-200">
+                      {payment.journal_reference_no || "-"}
+                    </td>
+                    <td className="px-2 py-2 capitalize text-default-700 dark:text-gray-200">
+                      {payment.status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
@@ -578,7 +828,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             <div className="mt-auto flex flex-wrap gap-2 pt-3">
               <label
                 className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-default-300 px-3 text-sm font-medium text-default-700 hover:bg-default-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600 ${
-                  !s3Enabled ? "pointer-events-none opacity-60" : ""
+                  !canEditRecords || !s3Enabled ? "pointer-events-none opacity-60" : ""
                 }`}
               >
                 <IconUpload size={16} />
@@ -587,7 +837,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                   type="file"
                   accept=".pdf,.doc,.docx,image/*"
                   className="hidden"
-                  disabled={!s3Enabled}
+                  disabled={!canEditRecords || !s3Enabled}
                   onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                     setSupportingDocumentFile(event.target.files?.[0] || null);
                     event.target.value = "";
@@ -608,7 +858,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
                   Download
                 </Button>
               )}
-              {existingInvoice?.supporting_document_filename && (
+              {existingInvoice?.supporting_document_filename && canEditRecords && (
                 <Button type="button" icon={IconTrash} color="rose" variant="outline" size="sm" className="h-8 rounded-lg" onClick={removeSupportingDocument}>
                   Remove
                 </Button>
@@ -621,8 +871,9 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
             onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
               updateFormField("notes", event.target.value)
             }
+            disabled={!canEdit}
             placeholder="Optional notes"
-            className="min-h-[160px] rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="min-h-[160px] rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-400"
           />
         </div>
       </section>
