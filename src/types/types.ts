@@ -784,6 +784,7 @@ export interface OthersRecord {
   rate_unit: string;
   quantity: number;
   amount: number;
+  link_id: string | null;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
