@@ -1,5 +1,5 @@
 // src/pages/Payroll/AddOn/OthersListPage.tsx
-import React, { useState, useEffect, useMemo, Fragment } from "react";
+import React, { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { format } from "date-fns";
 import {
   IconPlus,
@@ -83,6 +83,7 @@ const OthersListPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [employeeQuery, setEmployeeQuery] = useState<string>("");
   const [payCodeQuery, setPayCodeQuery] = useState<string>("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Group expansion
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(
@@ -312,6 +313,46 @@ const OthersListPage: React.FC = () => {
     setEmployeeQuery("");
     setPayCodeQuery("");
   };
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+
+      const tagName = target.tagName.toLowerCase();
+      return (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target.isContentEditable
+      );
+    };
+
+    const handleSearchTypingShortcut = (event: KeyboardEvent): void => {
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.key.length !== 1 ||
+        !searchInputRef.current ||
+        showAddModal ||
+        showEditModal ||
+        showDeleteDialog ||
+        isEditableTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      searchInputRef.current.focus();
+      setSearchQuery((prev: string) => `${prev}${event.key}`);
+    };
+
+    document.addEventListener("keydown", handleSearchTypingShortcut);
+    return () => {
+      document.removeEventListener("keydown", handleSearchTypingShortcut);
+    };
+  }, [showAddModal, showEditModal, showDeleteDialog]);
 
   const deletingRecord = useMemo(
     () => records.find((r) => r.id === deletingId) || null,
@@ -594,6 +635,7 @@ const OthersListPage: React.FC = () => {
               className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
             />
             <input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
