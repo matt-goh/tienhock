@@ -1,5 +1,5 @@
 // src/pages/Payroll/AddOn/OthersListPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Fragment } from "react";
 import { format } from "date-fns";
 import {
   IconPlus,
@@ -7,11 +7,26 @@ import {
   IconTrash,
   IconClockHour4,
   IconRefresh,
+  IconLink,
+  IconSearch,
+  IconChevronDown,
+  IconChevronRight,
+  IconX,
+  IconCheck,
+  IconChevronsDown,
+  IconChevronsUp,
 } from "@tabler/icons-react";
+import {
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions,
+  Transition,
+} from "@headlessui/react";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
-import { getMonthName } from "../../../utils/payroll/payrollUtils";
 import YearNavigator from "../../../components/YearNavigator";
 import MonthNavigator from "../../../components/MonthNavigator";
 import AddOthersModal from "../../../components/Payroll/AddOthersModal";
@@ -21,6 +36,14 @@ import { OthersRecord } from "../../../types/types";
 import toast from "react-hot-toast";
 
 const DISPLAY_LABEL = "Others (Kerja Luar OT)";
+
+interface EmployeeGroup {
+  employeeId: string;
+  employeeName: string;
+  recordCount: number;
+  totalAmount: number;
+  rows: OthersRecord[];
+}
 
 const OthersListPage: React.FC = () => {
   const getInitialYear = (): number => {
@@ -53,6 +76,18 @@ const OthersListPage: React.FC = () => {
 
   const [currentYear, setCurrentYear] = useState(getInitialYear);
   const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+
+  // Filters
+  const [filterEmployee, setFilterEmployee] = useState<string>("");
+  const [filterPayCode, setFilterPayCode] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [employeeQuery, setEmployeeQuery] = useState<string>("");
+  const [payCodeQuery, setPayCodeQuery] = useState<string>("");
+
+  // Group expansion
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(
+    new Set(),
+  );
 
   const selectedMonth = useMemo(
     () => new Date(currentYear, currentMonth - 1, 1),
@@ -110,10 +145,188 @@ const OthersListPage: React.FC = () => {
       currency: "MYR",
     }).format(amount);
 
-  const totalAmount = records.reduce(
-    (sum, r) => sum + (Number(r.amount) || 0),
-    0,
+  const linkedGroupCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of records) {
+      if (r.link_id) counts[r.link_id] = (counts[r.link_id] || 0) + 1;
+    }
+    return counts;
+  }, [records]);
+
+  // Distinct employees and pay codes from the loaded month for the filter dropdowns.
+  const employeeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of records) {
+      if (!map.has(r.employee_id)) {
+        map.set(r.employee_id, r.employee_name || r.employee_id);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [records]);
+
+  const payCodeOptions = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const r of records) {
+      const pcId = r.pay_code_id || "";
+      if (!pcId) continue;
+      if (!map.has(pcId)) {
+        map.set(pcId, r.pay_code_description || null);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, desc]) => ({ id, description: desc }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }, [records]);
+
+  const filteredEmployeeOptions = useMemo(() => {
+    if (!employeeQuery) return employeeOptions;
+    const q = employeeQuery.toLowerCase();
+    return employeeOptions.filter(
+      (e) =>
+        e.id.toLowerCase().includes(q) || e.name.toLowerCase().includes(q),
+    );
+  }, [employeeOptions, employeeQuery]);
+
+  const filteredPayCodeOptions = useMemo(() => {
+    if (!payCodeQuery) return payCodeOptions;
+    const q = payCodeQuery.toLowerCase();
+    return payCodeOptions.filter(
+      (p) =>
+        p.id.toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q),
+    );
+  }, [payCodeOptions, payCodeQuery]);
+
+  // Apply filters. The search box is universal — it matches against employee
+  // name/ID, pay code id/description, date (both ISO and "dd MMM yyyy"
+  // formatted), description text, and amount (raw and formatted currency).
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return records.filter((r) => {
+      if (filterEmployee && r.employee_id !== filterEmployee) return false;
+      if (filterPayCode && (r.pay_code_id || "") !== filterPayCode) return false;
+      if (q) {
+        const dateFormatted = (() => {
+          try {
+            return format(new Date(r.record_date), "dd MMM yyyy");
+          } catch {
+            return "";
+          }
+        })();
+        const dateIso =
+          typeof r.record_date === "string"
+            ? r.record_date.slice(0, 10)
+            : "";
+        const amount = Number(r.amount) || 0;
+        const haystack = [
+          r.employee_name || "",
+          r.employee_id || "",
+          r.pay_code_id || "",
+          r.pay_code_description || "",
+          r.description || "",
+          dateFormatted,
+          dateIso,
+          amount.toString(),
+          amount.toFixed(2),
+          formatCurrency(amount),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [records, filterEmployee, filterPayCode, searchQuery]);
+
+  // Group filtered records by employee.
+  const grouped: EmployeeGroup[] = useMemo(() => {
+    const byEmployee = new Map<string, EmployeeGroup>();
+    for (const r of filteredRecords) {
+      const existing = byEmployee.get(r.employee_id);
+      if (existing) {
+        existing.rows.push(r);
+        existing.recordCount += 1;
+        existing.totalAmount += Number(r.amount) || 0;
+      } else {
+        byEmployee.set(r.employee_id, {
+          employeeId: r.employee_id,
+          employeeName: r.employee_name || r.employee_id,
+          recordCount: 1,
+          totalAmount: Number(r.amount) || 0,
+          rows: [r],
+        });
+      }
+    }
+    const list = Array.from(byEmployee.values());
+    list.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+    for (const g of list) {
+      g.rows.sort((a, b) => {
+        const da = new Date(a.record_date).getTime();
+        const db = new Date(b.record_date).getTime();
+        if (da !== db) return da - db;
+        return a.id - b.id;
+      });
+    }
+    return list;
+  }, [filteredRecords]);
+
+  const filteredTotalAmount = useMemo(
+    () => filteredRecords.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+    [filteredRecords],
   );
+
+  // Default to all groups expanded whenever new records are loaded (initial fetch,
+  // month change, refresh, post-save). User can still collapse individual groups;
+  // those manual collapses persist only until the next records refresh.
+  useEffect(() => {
+    const allIds = new Set<string>();
+    for (const r of records) allIds.add(r.employee_id);
+    setExpandedEmployees(allIds);
+  }, [records]);
+
+  const toggleEmployee = (employeeId: string): void => {
+    setExpandedEmployees((prev) => {
+      const next = new Set(prev);
+      if (next.has(employeeId)) next.delete(employeeId);
+      else next.add(employeeId);
+      return next;
+    });
+  };
+
+  const expandAll = (): void => {
+    setExpandedEmployees(new Set(grouped.map((g) => g.employeeId)));
+  };
+  const collapseAll = (): void => setExpandedEmployees(new Set());
+
+  const hasActiveFilter =
+    filterEmployee !== "" ||
+    filterPayCode !== "" ||
+    searchQuery.trim() !== "";
+
+  const clearFilters = (): void => {
+    setFilterEmployee("");
+    setFilterPayCode("");
+    setSearchQuery("");
+    setEmployeeQuery("");
+    setPayCodeQuery("");
+  };
+
+  const deletingRecord = useMemo(
+    () => records.find((r) => r.id === deletingId) || null,
+    [records, deletingId],
+  );
+  const deletingLinkedCount = deletingRecord?.link_id
+    ? linkedGroupCounts[deletingRecord.link_id] || 1
+    : 1;
+  const deletingLinkedDates = useMemo(() => {
+    if (!deletingRecord?.link_id) return [];
+    return records
+      .filter((r) => r.link_id === deletingRecord.link_id)
+      .map((r) => format(new Date(r.record_date), "d MMM"))
+      .sort();
+  }, [records, deletingRecord]);
 
   return (
     <div className="space-y-4">
@@ -141,7 +354,8 @@ const OthersListPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4 transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4 transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20 space-y-3">
+        {/* Row 1: Month/Year navigators + summary */}
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
             <YearNavigator
@@ -158,21 +372,286 @@ const OthersListPage: React.FC = () => {
               showGoToCurrentButton={false}
             />
           </div>
-          <div className="text-sm text-default-600 dark:text-gray-300">
-            <div className="font-medium">Total: {records.length} records</div>
-            <div className="font-medium">
-              Amount: {formatCurrency(totalAmount)}
+          <div className="text-sm text-default-600 dark:text-gray-300 text-right">
+            <div>
+              <span className="font-medium text-default-800 dark:text-gray-100">
+                {filteredRecords.length}
+              </span>
+              {filteredRecords.length !== records.length && (
+                <span> of {records.length}</span>
+              )}{" "}
+              records ·{" "}
+              <span className="font-medium text-default-800 dark:text-gray-100">
+                {formatCurrency(filteredTotalAmount)}
+              </span>
             </div>
           </div>
         </div>
+
+        {/* Row 2: Compact filters + expand/collapse */}
+        <div className="flex flex-wrap gap-2 items-center pt-3 border-t border-default-200 dark:border-gray-700">
+          {/* Employee filter */}
+          <div className="w-56">
+            <Combobox
+              value={filterEmployee}
+              onChange={(v: string | null) => setFilterEmployee(v || "")}
+            >
+              <div className="relative">
+                <ComboboxInput
+                  className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-3 pr-9 text-left text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  displayValue={(empId: string) => {
+                    if (!empId) return "";
+                    const sel = employeeOptions.find((e) => e.id === empId);
+                    return sel ? `${sel.name} (${sel.id})` : empId;
+                  }}
+                  onChange={(e) => setEmployeeQuery(e.target.value)}
+                  placeholder="All employees"
+                />
+                <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <IconChevronDown
+                    size={16}
+                    className="text-gray-400 dark:text-gray-500"
+                    aria-hidden="true"
+                  />
+                </ComboboxButton>
+              </div>
+              <Transition
+                as={Fragment}
+                leave="transition ease-in duration-100"
+                leaveFrom="opacity-100"
+                leaveTo="opacity-0"
+                afterLeave={() => setEmployeeQuery("")}
+              >
+                <ComboboxOptions
+                  anchor={{ to: "bottom start", gap: 4 }}
+                  className="z-50 max-h-60 w-[280px] overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none"
+                >
+                  <ComboboxOption
+                    value=""
+                    className={({ active }) =>
+                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                        active
+                          ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                          : "text-gray-900 dark:text-gray-100"
+                      }`
+                    }
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span className={selected ? "font-medium" : "font-normal"}>
+                          All employees
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
+                            <IconCheck size={18} />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ComboboxOption>
+                  {filteredEmployeeOptions.length === 0 ? (
+                    <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
+                      No employees in this month.
+                    </div>
+                  ) : (
+                    filteredEmployeeOptions.map((e) => (
+                      <ComboboxOption
+                        key={e.id}
+                        value={e.id}
+                        className={({ active }) =>
+                          `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                            active
+                              ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                              : "text-gray-900 dark:text-gray-100"
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>
+                              {e.name} ({e.id})
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
+                                <IconCheck size={18} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ComboboxOption>
+                    ))
+                  )}
+                </ComboboxOptions>
+              </Transition>
+            </Combobox>
+          </div>
+
+          {/* Pay code filter */}
+          <div className="w-56">
+            <Combobox
+              value={filterPayCode}
+              onChange={(v: string | null) => setFilterPayCode(v || "")}
+            >
+              <div className="relative">
+                <ComboboxInput
+                  className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-3 pr-9 text-left text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  displayValue={(code: string) => {
+                    if (!code) return "";
+                    const sel = payCodeOptions.find((p) => p.id === code);
+                    return sel
+                      ? sel.description
+                        ? `${sel.id} — ${sel.description}`
+                        : sel.id
+                      : code;
+                  }}
+                  onChange={(e) => setPayCodeQuery(e.target.value)}
+                  placeholder="All pay codes"
+                />
+                <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <IconChevronDown
+                    size={16}
+                    className="text-gray-400 dark:text-gray-500"
+                    aria-hidden="true"
+                  />
+                </ComboboxButton>
+              </div>
+              <Transition
+                as={Fragment}
+                leave="transition ease-in duration-100"
+                leaveFrom="opacity-100"
+                leaveTo="opacity-0"
+                afterLeave={() => setPayCodeQuery("")}
+              >
+                <ComboboxOptions
+                  anchor={{ to: "bottom start", gap: 4 }}
+                  className="z-50 max-h-60 w-[320px] overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none"
+                >
+                  <ComboboxOption
+                    value=""
+                    className={({ active }) =>
+                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                        active
+                          ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                          : "text-gray-900 dark:text-gray-100"
+                      }`
+                    }
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span className={selected ? "font-medium" : "font-normal"}>
+                          All pay codes
+                        </span>
+                        {selected && (
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
+                            <IconCheck size={18} />
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </ComboboxOption>
+                  {filteredPayCodeOptions.length === 0 ? (
+                    <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
+                      No pay codes in this month.
+                    </div>
+                  ) : (
+                    filteredPayCodeOptions.map((p) => (
+                      <ComboboxOption
+                        key={p.id}
+                        value={p.id}
+                        className={({ active }) =>
+                          `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                            active
+                              ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                              : "text-gray-900 dark:text-gray-100"
+                          }`
+                        }
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>
+                              {p.id}
+                              {p.description ? ` — ${p.description}` : ""}
+                            </span>
+                            {selected && (
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-300">
+                                <IconCheck size={18} />
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </ComboboxOption>
+                    ))
+                  )}
+                </ComboboxOptions>
+              </Transition>
+            </Combobox>
+          </div>
+
+          {/* Universal search: name, pay code, date, amount, description */}
+          <div className="relative flex-1 min-w-[180px]">
+            <IconSearch
+              size={15}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search name, pay code, date, amount, description..."
+              className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
+                title="Clear search"
+              >
+                <IconX size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Clear all filters */}
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-1.5 text-sm text-default-700 dark:text-gray-200 hover:bg-default-50 dark:hover:bg-gray-700"
+              title="Clear all filters"
+            >
+              <IconX size={14} />
+              Clear
+            </button>
+          )}
+
+          {/* Spacer + expand/collapse buttons */}
+          {grouped.length > 0 && (
+            <div className="ml-auto flex items-center gap-1 text-sm">
+              <button
+                type="button"
+                onClick={expandAll}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-default-600 hover:bg-default-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Expand all groups"
+              >
+                <IconChevronsDown size={16} />
+                Expand all
+              </button>
+              <button
+                type="button"
+                onClick={collapseAll}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-default-600 hover:bg-default-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                title="Collapse all groups"
+              >
+                <IconChevronsUp size={16} />
+                Collapse all
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20">
-        <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg">
-          <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
-            {getMonthName(currentMonth)} {currentYear}
-          </h2>
-        </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm transition-shadow duration-200 hover:shadow-md dark:hover:shadow-black/20 overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
@@ -185,19 +664,29 @@ const OthersListPage: React.FC = () => {
             </p>
             <p>Click &quot;Add {DISPLAY_LABEL}&quot; to create records</p>
           </div>
+        ) : grouped.length === 0 ? (
+          <div className="text-center py-12 text-default-500 dark:text-gray-400">
+            <IconSearch className="mx-auto h-12 w-12 text-default-300 mb-4" />
+            <p className="text-lg font-medium">
+              No records match the current filters
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-3 inline-flex items-center gap-1 rounded-md bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-600 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50"
+            >
+              <IconX size={14} />
+              Clear filters
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-8"></th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date
+                    Employee / Date
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Pay Code
@@ -219,62 +708,120 @@ const OthersListPage: React.FC = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {records.map((record) => (
-                  <tr
-                    key={record.id}
-                    className="group transition-colors duration-150 hover:bg-sky-50/60 dark:hover:bg-sky-900/20"
-                  >
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
-                      {record.employee_id}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
-                      {record.employee_name}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
-                      {format(new Date(record.record_date), "dd MMM yyyy")}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
-                      {record.pay_code_id || "-"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-default-700 dark:text-gray-300">
-                      {Number(record.rate).toFixed(2)}{" "}
-                      <span className="text-xs text-default-400 dark:text-gray-500">
-                        /{record.rate_unit}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-default-700 dark:text-gray-300">
-                      {Number(record.quantity)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
-                      {formatCurrency(Number(record.amount))}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-default-900 dark:text-gray-100">
-                      {record.description}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end space-x-3">
-                        <button
-                          onClick={() => handleEdit(record)}
-                          className="p-1.5 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-150"
-                          title="Edit"
+              <tbody className="bg-white dark:bg-gray-800">
+                {grouped.map((group) => {
+                  const isExpanded = expandedEmployees.has(group.employeeId);
+                  return (
+                    <Fragment key={group.employeeId}>
+                      <tr
+                        className="bg-default-50/70 dark:bg-gray-900/40 cursor-pointer hover:bg-default-100 dark:hover:bg-gray-700/50 transition-colors duration-150"
+                        onClick={() => toggleEmployee(group.employeeId)}
+                      >
+                        <td className="px-4 py-2 align-middle">
+                          {isExpanded ? (
+                            <IconChevronDown
+                              size={16}
+                              className="text-default-500 dark:text-gray-400"
+                            />
+                          ) : (
+                            <IconChevronRight
+                              size={16}
+                              className="text-default-500 dark:text-gray-400"
+                            />
+                          )}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
+                          {group.employeeName}{" "}
+                          <span className="text-default-500 dark:text-gray-400 font-normal">
+                            ({group.employeeId})
+                          </span>
+                        </td>
+                        <td
+                          className="px-4 py-2 text-xs text-default-500 dark:text-gray-400"
+                          colSpan={2}
                         >
-                          <IconEdit size={18} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeletingId(record.id);
-                            setShowDeleteDialog(true);
-                          }}
-                          className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors duration-150"
-                          title="Delete"
-                        >
-                          <IconTrash size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {group.recordCount} record
+                          {group.recordCount === 1 ? "" : "s"}
+                        </td>
+                        <td className="px-4 py-2"></td>
+                        <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-semibold text-default-900 dark:text-gray-100">
+                          {formatCurrency(group.totalAmount)}
+                        </td>
+                        <td className="px-4 py-2"></td>
+                        <td className="px-4 py-2"></td>
+                      </tr>
+                      {isExpanded &&
+                        group.rows.map((record) => (
+                          <tr
+                            key={record.id}
+                            className="group transition-colors duration-150 hover:bg-sky-50/60 dark:hover:bg-sky-900/20 border-t border-default-100 dark:border-gray-700/70"
+                          >
+                            <td className="px-4 py-3"></td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-700 dark:text-gray-300 pl-8">
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {format(
+                                    new Date(record.record_date),
+                                    "dd MMM yyyy",
+                                  )}
+                                </span>
+                                {record.link_id && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                                    title={`Linked across ${
+                                      linkedGroupCounts[record.link_id] || 1
+                                    } dates — edits and deletes apply to the whole group`}
+                                  >
+                                    <IconLink size={11} />
+                                    {linkedGroupCounts[record.link_id] || 1}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
+                              {record.pay_code_id || "-"}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-default-700 dark:text-gray-300">
+                              {Number(record.rate).toFixed(2)}{" "}
+                              <span className="text-xs text-default-400 dark:text-gray-500">
+                                /{record.rate_unit}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-default-700 dark:text-gray-300">
+                              {Number(record.quantity)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
+                              {formatCurrency(Number(record.amount))}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-default-900 dark:text-gray-100">
+                              {record.description}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right">
+                              <div className="flex items-center justify-end space-x-3">
+                                <button
+                                  onClick={() => handleEdit(record)}
+                                  className="p-1.5 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-150"
+                                  title="Edit"
+                                >
+                                  <IconEdit size={18} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setDeletingId(record.id);
+                                    setShowDeleteDialog(true);
+                                  }}
+                                  className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors duration-150"
+                                  title="Delete"
+                                >
+                                  <IconTrash size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -310,9 +857,21 @@ const OthersListPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDelete}
-        title={`Delete ${DISPLAY_LABEL}`}
-        message={`Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={
+          deletingLinkedCount > 1
+            ? `Delete ${deletingLinkedCount} linked ${DISPLAY_LABEL} records`
+            : `Delete ${DISPLAY_LABEL}`
+        }
+        message={
+          deletingLinkedCount > 1
+            ? `This record is linked across ${deletingLinkedCount} dates (${deletingLinkedDates.join(
+                ", ",
+              )}). Deleting will remove all ${deletingLinkedCount} linked records. This action cannot be undone.`
+            : `Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`
+        }
+        confirmButtonText={
+          deletingLinkedCount > 1 ? `Delete all ${deletingLinkedCount}` : "Delete"
+        }
         variant="danger"
       />
     </div>
