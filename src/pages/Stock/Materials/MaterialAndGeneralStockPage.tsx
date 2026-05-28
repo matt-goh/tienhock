@@ -1,6 +1,6 @@
 // src/pages/Stock/Materials/MaterialAndGeneralStockPage.tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -68,6 +68,40 @@ const stockTabs: { id: StockEntryTab; label: string; activeClass: string }[] = [
   { id: "shared", label: "SHARED", activeClass: "bg-teal-500 text-white shadow-sm" },
 ];
 
+const STOCK_TAB_STORAGE_KEY = "materialAndGeneralStock.activeTab";
+
+const isStockEntryTab = (value: string | null): value is StockEntryTab => {
+  return value === "general" || value === "mee" || value === "bihun" || value === "shared";
+};
+
+const readStoredStockEntryTab = (): StockEntryTab | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const storedTab: string | null = window.localStorage.getItem(STOCK_TAB_STORAGE_KEY);
+    return isStockEntryTab(storedTab) ? storedTab : null;
+  } catch (_error: unknown) {
+    return null;
+  }
+};
+
+const storeStockEntryTab = (tab: StockEntryTab): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(STOCK_TAB_STORAGE_KEY, tab);
+  } catch (_error: unknown) {
+    // URL tab preservation still works when browser storage is unavailable.
+  }
+};
+
+const getStockEntryTab = (searchParams: URLSearchParams): StockEntryTab => {
+  const tabParam: string | null = searchParams.get("tab");
+  if (isStockEntryTab(tabParam)) return tabParam;
+
+  return readStoredStockEntryTab() || "bihun";
+};
+
 const makeNumber = (value: number | string | null | undefined): number => {
   return parseFloat(String(value ?? "")) || 0;
 };
@@ -116,8 +150,9 @@ const makeNewVariantRow = (defaultUnitCost: number): StockEntryRow => ({
 
 const MaterialAndGeneralStockPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
-  const [activeTab, setActiveTab] = useState<StockEntryTab>("bihun");
+  const activeTab = useMemo<StockEntryTab>(() => getStockEntryTab(searchParams), [searchParams]);
   const [materials, setMaterials] = useState<MaterialWithStock[]>([]);
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -142,6 +177,19 @@ const MaterialAndGeneralStockPage: React.FC = () => {
 
   const year = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth() + 1;
+
+  useEffect(() => {
+    const tabParam: string | null = searchParams.get("tab");
+
+    if (isStockEntryTab(tabParam)) {
+      storeStockEntryTab(tabParam);
+      return;
+    }
+
+    const nextSearchParams: URLSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("tab", activeTab);
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [activeTab, searchParams, setSearchParams]);
 
   const fetchData = useCallback(async () => {
     if (activeTab === "general") {
@@ -457,10 +505,15 @@ const MaterialAndGeneralStockPage: React.FC = () => {
   }, [hasUnsavedChanges]);
 
   const handleTabChange = (tab: StockEntryTab): void => {
+    if (tab === activeTab) return;
     if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Do you want to discard them?")) {
       return;
     }
-    setActiveTab(tab);
+
+    const nextSearchParams: URLSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("tab", tab);
+    storeStockEntryTab(tab);
+    setSearchParams(nextSearchParams, { replace: true });
   };
 
   const handleAddGeneralCategory = async (): Promise<void> => {

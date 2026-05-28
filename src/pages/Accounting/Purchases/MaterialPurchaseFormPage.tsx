@@ -3,7 +3,18 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, Fragment } fr
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { IconPlus, IconTrash, IconChevronDown, IconCheck } from "@tabler/icons-react";
-import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOptions, Transition } from "@headlessui/react";
+import {
+  Combobox,
+  ComboboxButton,
+  ComboboxInput,
+  ComboboxOption,
+  ComboboxOptions,
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
 import { api } from "../../../routes/utils/api";
 import {
   PurchaseInvoiceWithLines,
@@ -16,6 +27,13 @@ import {
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import { FormInput } from "../../../components/FormComponents";
+import SupplierPaymentInlineSection, {
+  buildSupplierPaymentPayload,
+  createDefaultSupplierPaymentDraft,
+  SupplierPaymentDraft,
+  syncSupplierPaymentDraftAmount,
+  validateSupplierPaymentDraft,
+} from "../../../components/Accounting/SupplierPaymentInlineSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 
@@ -55,8 +73,7 @@ const formatCategory = (category: string): string => {
   }
 };
 
-const stockBucketOptions: { id: StockBucket | ""; name: string }[] = [
-  { id: "", name: "Accounting only" },
+const stockBucketOptions: { id: StockBucket; name: string }[] = [
   { id: "mee", name: "Mee" },
   { id: "bihun", name: "Bihun" },
   { id: "shared", name: "Shared" },
@@ -74,9 +91,97 @@ const isStockBucketAllowed = (
 
 const getStockBucketOptions = (
   appliesTo: MaterialAppliesTo | undefined
-): { id: StockBucket | ""; name: string }[] => {
+): { id: StockBucket; name: string }[] => {
   return stockBucketOptions.filter((option) =>
     isStockBucketAllowed(appliesTo, option.id)
+  );
+};
+
+const getNextStockBucket = (
+  appliesTo: MaterialAppliesTo | undefined,
+  currentBucket: StockBucket | ""
+): StockBucket | "" => {
+  const allowedOptions: { id: StockBucket; name: string }[] =
+    getStockBucketOptions(appliesTo);
+
+  if (
+    currentBucket &&
+    allowedOptions.some((option) => option.id === currentBucket)
+  ) {
+    return currentBucket;
+  }
+
+  return allowedOptions.length === 1 ? allowedOptions[0].id : "";
+};
+
+interface StockBucketListboxProps {
+  value: StockBucket | "";
+  options: { id: StockBucket; name: string }[];
+  onChange: (value: StockBucket | "") => void;
+  disabled?: boolean;
+}
+
+const StockBucketListbox: React.FC<StockBucketListboxProps> = ({
+  value,
+  options,
+  onChange,
+  disabled = false,
+}) => {
+  const selectedOption = options.find((option) => option.id === value);
+  const displayText =
+    selectedOption?.name ||
+    (disabled && !value ? "No stock bucket" : "") ||
+    (options.length === 0 ? "Select material first" : "Select stock");
+
+  return (
+    <Listbox value={value} onChange={onChange} disabled={disabled || options.length === 0}>
+      <div className="relative">
+        <ListboxButton className="flex w-full items-center justify-between rounded border border-transparent bg-transparent px-2 py-1.5 text-left text-sm text-default-900 hover:border-gray-300 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-100 dark:hover:border-gray-600 dark:focus:bg-gray-700">
+          <span className={selectedOption ? "truncate" : "truncate text-gray-400 dark:text-gray-500"}>
+            {displayText}
+          </span>
+          <IconChevronDown
+            className="ml-2 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
+            aria-hidden="true"
+          />
+        </ListboxButton>
+        <Transition
+          as={Fragment}
+          leave="transition ease-in duration-100"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <ListboxOptions className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none dark:bg-gray-800 dark:ring-white/10">
+            {options.map((option) => (
+              <ListboxOption
+                key={option.id}
+                value={option.id}
+                className={({ active, selected }) =>
+                  `relative cursor-pointer select-none py-2 pl-8 pr-3 ${
+                    active
+                      ? "bg-sky-50 text-sky-900 dark:bg-sky-900/30 dark:text-sky-100"
+                      : "text-default-900 dark:text-gray-100"
+                  } ${selected ? "bg-sky-100 dark:bg-sky-900/50" : ""}`
+                }
+              >
+                {({ selected }) => (
+                  <>
+                    {selected && (
+                      <span className="absolute inset-y-0 left-2 flex items-center text-sky-600 dark:text-sky-300">
+                        <IconCheck size={14} />
+                      </span>
+                    )}
+                    <span className={selected ? "block truncate font-medium" : "block truncate"}>
+                      {option.name}
+                    </span>
+                  </>
+                )}
+              </ListboxOption>
+            ))}
+          </ListboxOptions>
+        </Transition>
+      </div>
+    </Listbox>
   );
 };
 
@@ -417,6 +522,15 @@ const MaterialPurchaseFormPage: React.FC = () => {
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [supplierPayment, setSupplierPayment] = useState<SupplierPaymentDraft>(
+    () =>
+      createDefaultSupplierPaymentDraft(
+        new Date().toISOString().split("T")[0],
+        0,
+        !isEditMode
+      )
+  );
+  const previousPayableAmountRef = useRef<number>(0);
 
   // Fetch materials
   useEffect(() => {
@@ -507,6 +621,10 @@ const MaterialPurchaseFormPage: React.FC = () => {
 
       setFormData(fetchedFormData);
       setLines(displayedLines);
+      setSupplierPayment((previous: SupplierPaymentDraft) => ({
+        ...previous,
+        payment_date: fetchedFormData.invoice_date,
+      }));
 
       initialFormDataRef.current = { ...fetchedFormData };
       initialLinesRef.current = JSON.parse(JSON.stringify(displayedLines));
@@ -556,6 +674,14 @@ const MaterialPurchaseFormPage: React.FC = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "invoice_date") {
+      setSupplierPayment((previous: SupplierPaymentDraft) =>
+        !previous.payment_date || previous.payment_date === formData.invoice_date
+          ? { ...previous, payment_date: value }
+          : previous
+      );
+    }
   };
 
   const handleSupplierChange = (value: string | null) => {
@@ -583,9 +709,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
         variant_id: variantId,
         material_name: material?.name || "",
         material_category: material?.category || "",
-        stock_bucket: isStockBucketAllowed(material?.applies_to, currentBucket)
-          ? currentBucket
-          : "",
+        stock_bucket: getNextStockBucket(material?.applies_to, currentBucket),
         unit_cost: material?.default_unit_cost
           ? String(material.default_unit_cost)
           : "",
@@ -663,6 +787,23 @@ const MaterialPurchaseFormPage: React.FC = () => {
   const total = useMemo(() => {
     return lines.reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
   }, [lines]);
+  const outstandingPaymentAmount = useMemo<number>(() => {
+    const alreadyPaid: number = existingInvoice?.amount_paid
+      ? parseFloat(String(existingInvoice.amount_paid))
+      : 0;
+    return Math.max(0, Math.round((total - alreadyPaid) * 100) / 100);
+  }, [existingInvoice?.amount_paid, total]);
+
+  useEffect(() => {
+    setSupplierPayment((previous: SupplierPaymentDraft) =>
+      syncSupplierPaymentDraftAmount(
+        previous,
+        outstandingPaymentAmount,
+        previousPayableAmountRef.current
+      )
+    );
+    previousPayableAmountRef.current = outstandingPaymentAmount;
+  }, [outstandingPaymentAmount]);
 
   // Format currency
   const formatCurrency = (amount: number): string => {
@@ -670,6 +811,39 @@ const MaterialPurchaseFormPage: React.FC = () => {
       style: "currency",
       currency: "MYR",
     }).format(amount);
+  };
+
+  const maybeRecordSupplierPayment = async (
+    invoiceId: number,
+    amountToSettle: number
+  ): Promise<boolean> => {
+    if (!supplierPayment.enabled) return false;
+
+    try {
+      await api.post(
+        "/api/supplier-payments",
+        buildSupplierPaymentPayload(
+          supplierPayment,
+          "purchase_invoices",
+          invoiceId,
+          amountToSettle
+        )
+      );
+      setSupplierPayment((previous: SupplierPaymentDraft) => ({
+        ...previous,
+        enabled: false,
+        amount_paid: "0.00",
+        payment_reference: "",
+        internal_reference: "",
+        notes: "",
+      }));
+      return true;
+    } catch (error: unknown) {
+      const message: string =
+        error instanceof Error ? error.message : "Failed to record payment";
+      toast.error(`Purchase saved, but payment failed: ${message}`);
+      return false;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -698,6 +872,12 @@ const MaterialPurchaseFormPage: React.FC = () => {
       return;
     }
 
+    const missingStockLine = validLines.find((line) => !line.stock_bucket);
+    if (missingStockLine) {
+      toast.error(`${missingStockLine.material_name || "Selected material"} needs a stock bucket`);
+      return;
+    }
+
     const invalidStockLine = validLines.find((line) => {
       const selectedMaterial = materials.find(
         (material) => String(material.id) === line.material_option_id
@@ -707,6 +887,15 @@ const MaterialPurchaseFormPage: React.FC = () => {
 
     if (invalidStockLine) {
       toast.error(`${invalidStockLine.material_name || "Selected material"} cannot use the selected stock bucket`);
+      return;
+    }
+
+    const paymentError: string | null = validateSupplierPaymentDraft(
+      supplierPayment,
+      outstandingPaymentAmount
+    );
+    if (paymentError) {
+      toast.error(paymentError);
       return;
     }
 
@@ -734,10 +923,29 @@ const MaterialPurchaseFormPage: React.FC = () => {
 
       if (isEditMode) {
         await api.put(`/api/purchase-invoices/${id}`, payload);
-        toast.success("Material purchase updated successfully");
+        const paymentRecorded: boolean = await maybeRecordSupplierPayment(
+          Number.parseInt(id || "0", 10),
+          outstandingPaymentAmount
+        );
+        toast.success(
+          paymentRecorded
+            ? "Material purchase updated and paid"
+            : "Material purchase updated successfully"
+        );
       } else {
-        await api.post("/api/purchase-invoices", payload);
-        toast.success("Material purchase created successfully");
+        const response = (await api.post(
+          "/api/purchase-invoices",
+          payload
+        )) as { invoice: { id: number } };
+        const paymentRecorded: boolean = await maybeRecordSupplierPayment(
+          response.invoice.id,
+          total
+        );
+        toast.success(
+          paymentRecorded
+            ? "Material purchase created and paid"
+            : "Material purchase created successfully"
+        );
       }
 
       navigate("/stock/material-purchases");
@@ -790,6 +998,9 @@ const MaterialPurchaseFormPage: React.FC = () => {
   }
 
   const canEdit = !isEditMode || existingInvoice?.payment_status !== "paid";
+  const canRecordSupplierPayment: boolean =
+    !isEditMode ||
+    Boolean(existingInvoice && existingInvoice.payment_status !== "paid");
 
   return (
     <div className="space-y-3">
@@ -809,16 +1020,18 @@ const MaterialPurchaseFormPage: React.FC = () => {
             )}
           </div>
         </div>
-        {isEditMode && existingInvoice?.payment_status === "unpaid" && (
-          <Button
-            onClick={() => setShowDeleteDialog(true)}
-            color="red"
-            variant="outline"
-            size="sm"
-          >
-            Delete
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {isEditMode && existingInvoice?.payment_status === "unpaid" && (
+            <Button
+              onClick={() => setShowDeleteDialog(true)}
+              color="red"
+              variant="outline"
+              size="sm"
+            >
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Status Warning */}
@@ -938,20 +1151,14 @@ const MaterialPurchaseFormPage: React.FC = () => {
 
                     {/* Stock Bucket */}
                     <td className="px-1 py-1">
-                      <select
+                      <StockBucketListbox
                         value={line.stock_bucket}
-                        onChange={(e) =>
-                          handleLineChange(index, "stock_bucket", e.target.value)
+                        options={allowedStockBucketOptions}
+                        onChange={(value: StockBucket | "") =>
+                          handleLineChange(index, "stock_bucket", value)
                         }
                         disabled={!canEdit}
-                        className="w-full px-2 py-1.5 text-sm bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:bg-white dark:focus:bg-gray-700 rounded text-default-900 dark:text-gray-100 disabled:cursor-not-allowed"
-                      >
-                        {allowedStockBucketOptions.map((option) => (
-                          <option key={option.id || "none"} value={option.id}>
-                            {option.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </td>
 
                     {/* Quantity */}
@@ -1047,6 +1254,15 @@ const MaterialPurchaseFormPage: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {canRecordSupplierPayment && (
+          <SupplierPaymentInlineSection
+            draft={supplierPayment}
+            outstandingAmount={outstandingPaymentAmount}
+            onChange={setSupplierPayment}
+            disabled={isSaving}
+          />
+        )}
 
         {/* Notes */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-6">
