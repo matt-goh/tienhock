@@ -1,5 +1,6 @@
 // src/pages/Accounting/Purchases/MaterialPurchaseFormPage.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
+import { format } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { IconPlus, IconTrash, IconChevronDown, IconCheck } from "@tabler/icons-react";
@@ -488,7 +489,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
   const [formData, setFormData] = useState<PurchaseFormData>({
     supplier_id: "",
     invoice_number: "",
-    invoice_date: new Date().toISOString().split("T")[0],
+    invoice_date: format(new Date(), "yyyy-MM-dd"),
     notes: "",
   });
   const [lines, setLines] = useState<PurchaseLine[]>([
@@ -525,7 +526,7 @@ const MaterialPurchaseFormPage: React.FC = () => {
   const [supplierPayment, setSupplierPayment] = useState<SupplierPaymentDraft>(
     () =>
       createDefaultSupplierPaymentDraft(
-        new Date().toISOString().split("T")[0],
+        format(new Date(), "yyyy-MM-dd"),
         0,
         !isEditMode
       )

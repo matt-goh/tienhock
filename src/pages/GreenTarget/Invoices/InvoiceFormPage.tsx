@@ -1,5 +1,6 @@
 // src/pages/GreenTarget/Invoices/InvoiceFormPage.tsx
 import React, { useState, useEffect, useCallback, Fragment } from "react";
+import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -63,6 +64,14 @@ interface Invoice {
   date_issued: string; // YYYY-MM-DD
 }
 
+const toLocalDateInputValue = (value: string | null | undefined): string => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
+
 // Payment method options
 const paymentMethodOptions: SelectOption[] = [
   { id: "cash", name: "Cash" },
@@ -84,7 +93,7 @@ const InvoiceFormPage: React.FC = () => {
     customer_id: 0,
     amount_before_tax: 200, // Default value?
     tax_amount: 0,
-    date_issued: new Date().toISOString().split("T")[0],
+    date_issued: format(new Date(), "yyyy-MM-dd"),
     rental_ids: [], // Changed to array
   });
   const [initialFormData, setInitialFormData] = useState<Invoice | null>(null); // For change detection
@@ -137,7 +146,7 @@ const InvoiceFormPage: React.FC = () => {
         customer_id: 0,
         amount_before_tax: 200,
         tax_amount: 0,
-        date_issued: new Date().toISOString().split("T")[0],
+        date_issued: format(new Date(), "yyyy-MM-dd"),
         rental_ids: [], // Changed to array
       };
       setInitialFormData(defaultInitialState);
@@ -343,9 +352,7 @@ const InvoiceFormPage: React.FC = () => {
           : [],
         amount_before_tax: parseFloat(inv.amount_before_tax.toString()),
         tax_amount: parseFloat(inv.tax_amount.toString()),
-        date_issued: inv.date_issued
-          ? new Date(inv.date_issued).toISOString().split("T")[0]
-          : "",
+        date_issued: toLocalDateInputValue(inv.date_issued),
       };
       setFormData(parsed);
       setInitialFormData(parsed);
@@ -766,7 +773,7 @@ const InvoiceFormPage: React.FC = () => {
               const ref = `RV${y}/${m}/${n.toString().padStart(2, "0")}`;
               const pData = {
                 invoice_id: navId,
-                payment_date: new Date().toISOString().split("T")[0],
+                payment_date: format(new Date(), "yyyy-MM-dd"),
                 amount_paid: totalAmount,
                 payment_method: paymentMethod,
                 payment_reference: paymentReference || null,

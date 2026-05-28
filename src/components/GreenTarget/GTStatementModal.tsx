@@ -1,5 +1,6 @@
 // src/components/GreenTarget/GTStatementModal.tsx
 import React, { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { Dialog, TransitionChild, DialogTitle } from "@headlessui/react";
 import { IconX, IconChevronRight } from "@tabler/icons-react";
 import Button from "../Button";
@@ -31,6 +32,30 @@ interface CustomerWithInvoiceCounts extends SelectOption {
   totalInvoiceCount: number;
   additional_info?: string;
 }
+
+const toLocalDateString = (
+  value: string | number | Date | null | undefined
+): string => {
+  if (!value) return "";
+  if (value instanceof Date) return format(value, "yyyy-MM-dd");
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
+
+const parseLocalDateString = (value: string | number | Date): Date | null => {
+  const dateString = toLocalDateString(value);
+  if (!dateString) return null;
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const shouldPreOpenPrintPreview = (): boolean =>
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
 
 const GTStatementModal: React.FC<GTStatementModalProps> = ({
   isOpen,
@@ -215,6 +240,40 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     setIsLoadingDialogVisible(false);
   };
 
+  const openDevPrintPreviewWindow = (): Window | null => {
+    if (!shouldPreOpenPrintPreview()) return null;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return null;
+    printWindow.document.title = "Preparing Statement";
+    printWindow.document.body.innerHTML =
+      "<p style=\"font-family: sans-serif; padding: 24px;\">Preparing print preview...</p>";
+    return printWindow;
+  };
+
+  const openPdfFallback = (
+    pdfUrl: string,
+    fallbackWindow: Window | null
+  ): boolean => {
+    const printWindow =
+      fallbackWindow && !fallbackWindow.closed
+        ? fallbackWindow
+        : window.open(pdfUrl, "_blank");
+    if (!printWindow) {
+      setPrintError(
+        "Could not open print preview. Please allow pop-ups for this site."
+      );
+      toast.error("Could not open print preview. Please allow pop-ups.");
+      return false;
+    }
+    if (printWindow.location.href === "about:blank") {
+      printWindow.location.href = pdfUrl;
+    }
+    printWindow.focus();
+    setPrintError(null);
+    toast.success("Print preview opened in a new tab.");
+    return true;
+  };
+
   const generateMultipleStatementPDFs = async (
     statements: Array<{
       invoice: InvoiceGT;
@@ -225,7 +284,8 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         amount: number;
         balance: number;
       }>;
-    }>
+    }>,
+    fallbackWindow: Window | null = null
   ) => {
     try {
       // Generate PDF documents for all statements
@@ -243,7 +303,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
       // Generate a single document with all statements
       const pdfComponent = (
-        <Document title={`Statements_${new Date().toISOString().slice(0, 10)}`}>
+        <Document title={`Statements_${format(new Date(), "yyyy-MM-dd")}`}>
           {pages}
         </Document>
       );
@@ -271,11 +331,14 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             try {
               printFrame.contentWindow?.focus(); // Focus is important for print dialog
               printFrame.contentWindow?.print();
+              if (fallbackWindow && !fallbackWindow.closed) {
+                fallbackWindow.close();
+              }
               cleanup(); // Hide loading dialog, wait for user interaction
             } catch (printError) {
               console.error("Print dialog error:", printError);
-              setPrintError("Could not open print dialog.");
-              cleanup(true); // Full cleanup on error
+              const fallbackOpened = openPdfFallback(pdfUrl, fallbackWindow);
+              cleanup(!fallbackOpened);
             }
           }, 500);
 
@@ -305,6 +368,9 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
       printFrame.src = pdfUrl;
     } catch (error) {
+      if (fallbackWindow && !fallbackWindow.closed) {
+        fallbackWindow.close();
+      }
       console.error("Error generating PDFs for print:", error);
       setPrintError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Error preparing documents for print. Please try again.");
@@ -336,9 +402,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     setIsGenerating(true);
     setIsLoadingDialogVisible(true);
     setPrintError(null);
+    const printPreviewWindow = openDevPrintPreviewWindow();
 
     try {
-      // Convert month-year to ISO date string format for period
+      // Convert month-year to local date strings for period/API filters.
       const [startMonth, startYear] = startMonthYear.split("-").map(Number);
       // First day of the month
       const startDate = new Date(startYear, startMonth, 1);
@@ -355,9 +422,8 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         endDate = new Date(startYear, startMonth, lastDay);
       }
 
-      // Format as ISO strings for API
-      const startDateISO = startDate.toISOString();
-      const endDateISO = endDate.toISOString();
+      const startDateYmd = format(startDate, "yyyy-MM-dd");
+      const endDateYmd = format(endDate, "yyyy-MM-dd");
 
       // Create statement PDFs for all selected customers
       const allPDFs = [];
@@ -372,7 +438,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         // Add status parameter to exclude cancelled invoices
         const allInvoices = await greenTargetApi.getInvoices({
           customer_id: customer.id,
-          end_date: endDateISO,
+          end_date: endDateYmd,
           status: "active,overdue,paid,unpaid", // Explicitly include only valid statuses
         });
 
@@ -386,13 +452,13 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         // and those during the period (for statement details)
         const beforePeriodInvoices = validInvoices.filter(
           (invoice: { date_issued: string | number | Date }) =>
-            new Date(invoice.date_issued) < startDate
+            toLocalDateString(invoice.date_issued) < startDateYmd
         );
 
         const periodInvoices = validInvoices.filter(
           (invoice: { date_issued: string | number | Date }) =>
-            new Date(invoice.date_issued) >= startDate &&
-            new Date(invoice.date_issued) <= endDate
+            toLocalDateString(invoice.date_issued) >= startDateYmd &&
+            toLocalDateString(invoice.date_issued) <= endDateYmd
         );
 
         // Calculate opening balance (sum of all unpaid amounts before the period start)
@@ -427,10 +493,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             payment_date: string | number | Date;
             invoice_id: any;
           }) => {
-            const paymentDate = new Date(payment.payment_date);
+            const paymentDate = toLocalDateString(payment.payment_date);
             return (
-              paymentDate >= startDate &&
-              paymentDate <= endDate &&
+              paymentDate >= startDateYmd &&
+              paymentDate <= endDateYmd &&
               validInvoiceIds.includes(payment.invoice_id)
             );
           }
@@ -441,7 +507,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
         // Add opening balance entry
         statementDetails.push({
-          date: startDateISO,
+          date: startDateYmd,
           description: "Balance Brought Forward",
           invoiceNo: "-",
           amount: 0, // Not a transaction itself
@@ -498,7 +564,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               invoice_id: any;
               location_address: any;
             }) => ({
-              date: invoice.date_issued,
+              date: toLocalDateString(invoice.date_issued),
               description: generateInvoiceDescription(invoice),
               invoiceNo: invoice.invoice_number,
               amount: parseFloat(invoice.total_amount.toString()), // Debit (positive)
@@ -516,7 +582,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               amount_paid: number;
               invoice_id: any;
             }) => ({
-              date: payment.payment_date,
+              date: toLocalDateString(payment.payment_date),
               description: `Payment ${
                 payment.payment_reference
                   ? "- " + payment.payment_reference
@@ -528,9 +594,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               invoiceId: payment.invoice_id,
             })
           ),
-        ].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
+        ].sort((a, b) => a.date.localeCompare(b.date));
 
         // Calculate running balance - debits add, credits subtract
         let runningBalance = openingBalance;
@@ -565,8 +629,8 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           current_balance: runningBalance, // Current balance
           balance_due: runningBalance, // Current balance
           date_issued: new Date().toISOString(),
-          statement_period_start: startDateISO,
-          statement_period_end: endDateISO,
+          statement_period_start: startDateYmd,
+          statement_period_end: endDateYmd,
           status: "unpaid" as "unpaid" | "paid" | "cancelled" | "overdue",
           uuid: null,
           submission_uid: null,
@@ -597,8 +661,11 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       }
 
       // Generate and print all statements
-      await generateMultipleStatementPDFs(allPDFs);
+      await generateMultipleStatementPDFs(allPDFs, printPreviewWindow);
     } catch (error) {
+      if (printPreviewWindow && !printPreviewWindow.closed) {
+        printPreviewWindow.close();
+      }
       console.error("Error generating statement:", error);
       setPrintError(error instanceof Error ? error.message : "Unknown error");
       toast.error("Error generating statement. Please try again.");
@@ -621,7 +688,8 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     invoices.forEach((invoice) => {
       if (invoice.status === "cancelled") return; // Skip cancelled invoices
 
-      const invoiceDate = new Date(invoice.date_issued);
+      const invoiceDate = parseLocalDateString(invoice.date_issued);
+      if (!invoiceDate) return;
       const daysDifference = Math.floor(
         (referenceDate.getTime() - invoiceDate.getTime()) /
           (1000 * 60 * 60 * 24)

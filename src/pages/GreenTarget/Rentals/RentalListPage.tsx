@@ -1,5 +1,6 @@
 // src/pages/GreenTarget/Rentals/RentalListPage.tsx
 import { useState, useEffect, useMemo, Fragment } from "react";
+import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -57,6 +58,14 @@ interface Rental {
   addon_count?: number;
 }
 
+const toLocalDateString = (value: string): string => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
+
 const RentalCard = ({
   rental,
   onGenerateDeliveryOrder,
@@ -95,8 +104,8 @@ const RentalCard = ({
 
   const isActive = () => {
     if (!rental.date_picked) return true;
-    const todayStr = new Date().toISOString().split("T")[0];
-    const pickupDateStr = rental.date_picked.split("T")[0];
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const pickupDateStr = toLocalDateString(rental.date_picked);
     return pickupDateStr > todayStr;
   };
 
@@ -426,7 +435,7 @@ const RentalListPage = () => {
     }
 
     // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split("T")[0];
+    const today = format(new Date(), "yyyy-MM-dd");
 
     // Get placement date from the rental
     const placementDate = new Date(rentalToPickup.date_placed);
@@ -469,7 +478,7 @@ const RentalListPage = () => {
   };
 
   const filteredRentals = useMemo(() => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = format(new Date(), "yyyy-MM-dd");
 
     return rentals.filter((rental) => {
       // Filter by search term (customer name, location, driver or dumpster number)
@@ -484,7 +493,7 @@ const RentalListPage = () => {
 
       // Filter by active status - consider rentals with future pickup dates as active
       const isRentalActive =
-        !rental.date_picked || rental.date_picked.split("T")[0] > todayStr;
+        !rental.date_picked || toLocalDateString(rental.date_picked) > todayStr;
 
       const matchesStatus = activeOnly ? isRentalActive : true;
 

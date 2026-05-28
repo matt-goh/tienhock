@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -252,7 +253,7 @@ const JournalEntryPage: React.FC = () => {
   const [formData, setFormData] = useState<JournalEntryFormData>({
     reference_no: "",
     entry_type: "J",
-    entry_date: new Date().toISOString().split("T")[0],
+    entry_date: format(new Date(), "yyyy-MM-dd"),
     description: "",
     lines: [emptyLine(1), emptyLine(2)],
   });

@@ -1,5 +1,6 @@
 // src/pages/GreenTarget/Dumpsters/DumpsterListPage.tsx
 import React, { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -674,7 +675,7 @@ const DumpsterListPage: React.FC = () => {
                     </div>
                     <span className="text-xs text-default-500 dark:text-gray-400">
                       {formatDetailDate(
-                        tooltipData.date.toISOString().split("T")[0]
+                        format(tooltipData.date, "yyyy-MM-dd")
                       )}
                     </span>
                   </div>
