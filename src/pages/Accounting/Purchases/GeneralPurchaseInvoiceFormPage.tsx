@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconDownload,
   IconEye,
@@ -16,6 +16,14 @@ import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
+import AccountCodeCombobox from "../../../components/Accounting/AccountCodeCombobox";
+import SupplierPaymentInlineSection, {
+  buildSupplierPaymentPayload,
+  createDefaultSupplierPaymentDraft,
+  SupplierPaymentDraft,
+  syncSupplierPaymentDraftAmount,
+  validateSupplierPaymentDraft,
+} from "../../../components/Accounting/SupplierPaymentInlineSection";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { COUNTRY_OPTIONS, CURRENCY_OPTIONS } from "../../../constants/einvoiceCodes";
 import { api } from "../../../routes/utils/api";
@@ -98,6 +106,7 @@ const createDefaultLine = (lineNumber: number): SelfBilledInvoiceLine => ({
   tax_amount_myr: 0,
   tax_exemption_reason: "",
   customs_form_reference: "",
+  account_code: null,
   notes: "",
 });
 
@@ -218,16 +227,33 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
   const [showCancelDialog, setShowCancelDialog] = useState<boolean>(false);
   const [showDocViewer, setShowDocViewer] = useState<boolean>(false);
   const [docViewerUrl, setDocViewerUrl] = useState<string | null>(null);
+  const [supplierPayment, setSupplierPayment] = useState<SupplierPaymentDraft>(
+    () =>
+      createDefaultSupplierPaymentDraft(
+        defaultFormData.purchase_date,
+        0,
+        !isEditMode
+      )
+  );
+  const previousPayableAmountRef = useRef<number>(0);
 
-  const canEdit =
+  const canEdit: boolean =
     existingInvoice?.invoice_status !== "cancelled" &&
+    existingInvoice?.payment_status !== "paid" &&
     existingInvoice?.einvoice_status !== "pending" &&
     existingInvoice?.einvoice_status !== "valid" &&
     existingInvoice?.einvoice_status !== "cancelled";
-  const canEditRecords =
+  const canEditRecords: boolean =
     !isEditMode || existingInvoice?.invoice_status !== "cancelled";
-  const hasMultipleSavedLines = isEditMode && lines.length > 1;
-  const canEditSummary = canEdit && !hasMultipleSavedLines;
+  const hasMultipleSavedLines: boolean = isEditMode && lines.length > 1;
+  const canEditSummary: boolean = canEdit && !hasMultipleSavedLines;
+  const canRecordSupplierPayment: boolean =
+    !isEditMode ||
+    Boolean(
+      existingInvoice &&
+        existingInvoice.invoice_status !== "cancelled" &&
+        existingInvoice.payment_status !== "paid"
+    );
   const summaryLine = lines[0] || createDefaultLine(1);
   const canViewMyInvoisPortal =
     isEditMode &&
@@ -271,6 +297,11 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         fx_rate: String(invoice.fx_rate || "1"),
         notes: invoice.notes || "",
       });
+      setSupplierPayment((previous: SupplierPaymentDraft) => ({
+        ...previous,
+        payment_date: invoice.purchase_date?.slice(0, 10) || today,
+        payment_reference: invoice.payment_reference || "",
+      }));
       setLines(
         invoice.lines.length > 0
           ? invoice.lines.map((line: SelfBilledInvoiceLine) => ({
@@ -357,6 +388,25 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       { foreign: 0, myr: 0, tax: 0 }
     );
   }, [lines]);
+  const payableAmount = useMemo<number>(
+    () => Math.round((totals.myr + totals.tax) * 100) / 100,
+    [totals.myr, totals.tax]
+  );
+  const outstandingPaymentAmount = useMemo<number>(() => {
+    const alreadyPaid: number = toNumber(existingInvoice?.amount_paid || 0);
+    return Math.max(0, Math.round((payableAmount - alreadyPaid) * 100) / 100);
+  }, [existingInvoice?.amount_paid, payableAmount]);
+
+  useEffect(() => {
+    setSupplierPayment((previous: SupplierPaymentDraft) =>
+      syncSupplierPaymentDraftAmount(
+        previous,
+        outstandingPaymentAmount,
+        previousPayableAmountRef.current
+      )
+    );
+    previousPayableAmountRef.current = outstandingPaymentAmount;
+  }, [outstandingPaymentAmount]);
 
   const updateFormField = (
     field: keyof SelfBilledFormData,
@@ -366,6 +416,14 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       ...previous,
       [field]: value,
     }));
+
+    if (field === "purchase_date" && typeof value === "string") {
+      setSupplierPayment((previous: SupplierPaymentDraft) =>
+        !previous.payment_date || previous.payment_date === formData.purchase_date
+          ? { ...previous, payment_date: value }
+          : previous
+      );
+    }
 
     if (field === "fx_rate") {
       const newRate = toNumber(value as string);
@@ -446,6 +504,21 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       toast.error(`Line ${invalidLineIndex + 1} is incomplete`);
       return false;
     }
+    const missingAccountIndex = linesToValidate.findIndex(
+      (line: SelfBilledInvoiceLine) => !(line.account_code && line.account_code.trim())
+    );
+    if (missingAccountIndex >= 0) {
+      toast.error(`Line ${missingAccountIndex + 1}: GL account is required`);
+      return false;
+    }
+    const paymentError: string | null = validateSupplierPaymentDraft(
+      supplierPayment,
+      outstandingPaymentAmount
+    );
+    if (paymentError) {
+      toast.error(paymentError);
+      return false;
+    }
     return true;
   };
 
@@ -467,6 +540,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     tax_exemption_reason: line.tax_exemption_reason || null,
     balance_quantity: toNullableNumber(line.balance_quantity),
     general_stock_category_id: line.general_stock_category_id || null,
+    account_code: line.account_code ? line.account_code.trim() : null,
     notes: line.notes || null,
   });
 
@@ -490,6 +564,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       tax_exemption_reason: null,
       balance_quantity: toNullableNumber(line.balance_quantity),
       general_stock_category_id: line.general_stock_category_id || null,
+      account_code: line.account_code ? line.account_code.trim() : null,
       notes: line.notes || null,
     };
   };
@@ -520,7 +595,10 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       transaction_type: formData.transaction_type,
       platform: formData.platform.trim() || null,
       order_no: formData.order_no.trim() || null,
-      payment_reference: formData.payment_reference.trim() || null,
+      payment_reference:
+        (supplierPayment.enabled
+          ? supplierPayment.payment_reference.trim()
+          : formData.payment_reference.trim()) || null,
       shipping_method: formData.shipping_method.trim() || null,
       shipping_number: formData.shipping_number.trim() || null,
       has_supporting_document: formData.has_supporting_document,
@@ -563,6 +641,64 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     }
   };
 
+  const maybeRecordSupplierPayment = async (
+    invoiceId: number,
+    amountToSettle: number
+  ): Promise<boolean> => {
+    if (!supplierPayment.enabled) return false;
+
+    try {
+      await api.post(
+        "/api/supplier-payments",
+        buildSupplierPaymentPayload(
+          supplierPayment,
+          "self_billed_invoices",
+          invoiceId,
+          amountToSettle,
+          formData.payment_reference
+        )
+      );
+      setSupplierPayment((previous: SupplierPaymentDraft) => ({
+        ...previous,
+        enabled: false,
+        amount_paid: "0.00",
+        payment_reference: "",
+        internal_reference: "",
+        notes: "",
+      }));
+      return true;
+    } catch (error: unknown) {
+      const message: string =
+        error instanceof Error ? error.message : "Failed to record payment";
+      toast.error(`Purchase saved, but payment failed: ${message}`);
+      return false;
+    }
+  };
+
+  const recordExistingSupplierPayment = async (): Promise<void> => {
+    if (!id) return;
+
+    const paymentError: string | null = validateSupplierPaymentDraft(
+      supplierPayment,
+      outstandingPaymentAmount
+    );
+    if (paymentError) {
+      toast.error(paymentError);
+      return;
+    }
+
+    setSaving(true);
+    const recorded: boolean = await maybeRecordSupplierPayment(
+      Number.parseInt(id, 10),
+      outstandingPaymentAmount
+    );
+    if (recorded) {
+      toast.success("Supplier payment recorded");
+      await loadInvoice();
+    }
+    setSaving(false);
+  };
+
   const saveInvoice = async (): Promise<number | null> => {
     if (!validateBeforeSave()) return null;
 
@@ -572,15 +708,34 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       if (isEditMode && id) {
         await api.put(`/api/general-purchases/${id}`, payload);
         await uploadSupportingDocument(Number.parseInt(id, 10));
-        toast.success("General purchase updated");
+        const paymentRecorded: boolean = await maybeRecordSupplierPayment(
+          Number.parseInt(id, 10),
+          outstandingPaymentAmount
+        );
+        toast.success(
+          paymentRecorded
+            ? "General purchase updated and paid"
+            : "General purchase updated"
+        );
         await loadInvoice();
         return Number.parseInt(id, 10);
       }
 
-      const response = await api.post("/api/general-purchases", payload);
-      const newId = response.invoice.id as number;
+      const response: { invoice: { id: number } } = await api.post(
+        "/api/general-purchases",
+        payload
+      );
+      const newId: number = response.invoice.id;
       await uploadSupportingDocument(newId);
-      toast.success("General purchase created");
+      const paymentRecorded: boolean = await maybeRecordSupplierPayment(
+        newId,
+        payableAmount
+      );
+      toast.success(
+        paymentRecorded
+          ? "General purchase created and paid"
+          : "General purchase created"
+      );
       navigate(`/stock/general-purchases/${newId}`, { replace: true });
       return newId;
     } catch (error: unknown) {
@@ -929,7 +1084,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_500px]">
         <div className="space-y-2">
 
           {/* ── Purchase Information ── */}
@@ -970,15 +1125,6 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 value={formData.order_no}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateFormField("order_no", event.target.value)
-                }
-                disabled={!canEdit}
-              />
-              <FormInput
-                name="payment_reference"
-                label="Payment Reference"
-                value={formData.payment_reference}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  updateFormField("payment_reference", event.target.value)
                 }
                 disabled={!canEdit}
               />
@@ -1226,6 +1372,18 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                   />
                 </div>
+
+                {/* GL Account — row */}
+                <AccountCodeCombobox
+                  label="GL Account"
+                  required
+                  value={summaryLine.account_code || ""}
+                  onChange={(value: string) =>
+                    updateLineField(0, "account_code", value)
+                  }
+                  disabled={!canEditSummary}
+                  placeholder="Pick the expense account to debit"
+                />
 
                 {/* Tax + Balance — row */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -1507,6 +1665,30 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               </div>
             </div>
           </section>
+
+          {canRecordSupplierPayment && (
+            <SupplierPaymentInlineSection
+              draft={supplierPayment}
+              outstandingAmount={outstandingPaymentAmount}
+              onChange={setSupplierPayment}
+              disabled={saving || submitting}
+              footer={
+                isEditMode && !canEdit ? (
+                  <Button
+                    type="button"
+                    color="sky"
+                    variant="filled"
+                    size="sm"
+                    className="h-8 rounded-lg"
+                    disabled={saving || !supplierPayment.enabled}
+                    onClick={recordExistingSupplierPayment}
+                  >
+                    {saving ? "Saving..." : "Record Payment"}
+                  </Button>
+                ) : null
+              }
+            />
+          )}
 
           {isEditMode && canEdit && (
             <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
