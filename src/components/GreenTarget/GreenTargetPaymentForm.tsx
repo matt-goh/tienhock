@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { format } from "date-fns";
 import { IconX, IconTrash } from "@tabler/icons-react";
 import Button from "../Button";
 import { FormInput, FormListbox } from "../FormComponents";
@@ -51,7 +52,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
   >(null);
 
   const [formData, setFormData] = useState({
-    payment_date: new Date().toISOString().split("T")[0],
+    payment_date: format(new Date(), "yyyy-MM-dd"),
     payment_method: "cheque" as Payment["payment_method"],
     payment_reference: "",
     notes: "",
@@ -74,8 +75,8 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
 
       const [invoicesResponse, paymentsResponse] = await Promise.all([
         greenTargetApi.getInvoices({
-          start_date: startDate.toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
+          start_date: format(startDate, "yyyy-MM-dd"),
+          end_date: format(endDate, "yyyy-MM-dd"),
           status: "active", // Only active invoices
         }),
         greenTargetApi.getPayments({ includeCancelled: false }), // Get all active/pending payments

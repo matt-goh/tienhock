@@ -1,5 +1,6 @@
 // src/components/Invoice/PaymentForm.tsx
 import React, { useState, useEffect, useCallback } from "react";
+import { format } from "date-fns";
 import { IconX, IconTrash } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -55,7 +56,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   >(null);
 
   const [formData, setFormData] = useState({
-    payment_date: new Date().toISOString().split("T")[0],
+    payment_date: format(new Date(), "yyyy-MM-dd"),
     payment_method: "cheque" as Payment["payment_method"],
     payment_reference: "",
     bank_account: "BANK_PBB", // Default to Public Bank

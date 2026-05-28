@@ -1,5 +1,6 @@
 // src/components/Payroll/AddIncentiveModal.tsx
 import React, { useState, useMemo, Fragment, useEffect } from "react";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogPanel,
@@ -54,7 +55,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   const { locations } = useLocationMappingsCache();
   const { user } = useAuth();
   const [incentiveDate, setIncentiveDate] = useState(
-    new Date().toISOString().split("T")[0]
+    format(new Date(), "yyyy-MM-dd")
   );
   const [entries, setEntries] = useState<IncentiveEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,7 +85,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
       };
       setEntries([initialEntry]);
       setStaffQueries({});
-      setIncentiveDate(new Date().toISOString().split("T")[0]);
+      setIncentiveDate(format(new Date(), "yyyy-MM-dd"));
     }
   }, [isOpen, incentiveType, currentYear, currentMonth, displayLabel]);
 

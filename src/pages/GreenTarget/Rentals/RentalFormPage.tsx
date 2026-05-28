@@ -1,5 +1,6 @@
 // src/pages/GreenTarget/Rentals/RentalFormPage.tsx
 import React, { useState, useEffect, useCallback, Fragment } from "react";
+import { format } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -92,6 +93,7 @@ interface Rental {
 const formatDateForInput = (dateString: string | null): string => {
   /* ... same as before ... */
   if (!dateString) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return dateString;
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "";
@@ -115,7 +117,7 @@ const RentalFormPage: React.FC = () => {
     location_id: null,
     tong_no: "",
     driver: "",
-    date_placed: new Date().toISOString().split("T")[0],
+    date_placed: format(new Date(), "yyyy-MM-dd"),
     date_picked: null,
     remarks: null,
   });
