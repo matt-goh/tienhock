@@ -345,7 +345,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
   // Merge duplicates within commission_records / others_records by description
   // so a description repeated across multiple rows collapses into one display line.
-  type MergedAdvance<T> = T & { merged_amount: number; merged_count: number };
+  type MergedAdvance<T> = T & {
+    merged_amount: number;
+    merged_count: number;
+    merged_rows: T[];
+  };
   const mergeByDescription = <
     T extends { description: string; amount: number },
   >(
@@ -358,11 +362,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       if (existing) {
         existing.merged_amount += Number(row.amount) || 0;
         existing.merged_count += 1;
+        existing.merged_rows.push(row);
       } else {
         map.set(key, {
           ...row,
           merged_amount: Number(row.amount) || 0,
           merged_count: 1,
+          merged_rows: [row],
         });
       }
     });
@@ -534,6 +540,47 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       minimumFractionDigits: Number.isInteger(quantity) ? 0 : 2,
       maximumFractionDigits: 2,
     }).format(quantity);
+  };
+
+  const formatOthersRateQuantity = (
+    record: MergedAdvance<OthersRecord>,
+  ): string => {
+    const rows: OthersRecord[] =
+      record.merged_rows.length > 0 ? record.merged_rows : [record];
+    const rate: number = Number(rows[0].rate) || 0;
+    const rateUnit: string = rows[0].rate_unit;
+    const hasConsistentRate: boolean = rows.every(
+      (row: OthersRecord) =>
+        row.rate_unit === rateUnit && isMoneyEqual(Number(row.rate) || 0, rate),
+    );
+
+    if (!hasConsistentRate) return "Mixed rates";
+
+    if (rateUnit === "Fixed") {
+      const allDirectAmountFixed: boolean = rows.every((row: OthersRecord) => {
+        const quantity: number = Number(row.quantity) || 0;
+        const amount: number = Number(row.amount) || 0;
+        return amount > 0 && (rate === 0 || isMoneyEqual(quantity, amount));
+      });
+
+      if (allDirectAmountFixed) {
+        return rows.length === 1 ? "Ikut amaun" : `Ikut amaun × ${rows.length}`;
+      }
+
+      return rows.length === 1
+        ? `${formatCurrency(rate)}/Fixed`
+        : `${formatCurrency(rate)}/Fixed × ${rows.length}`;
+    }
+
+    const quantity: number = rows.reduce(
+      (sum: number, row: OthersRecord) =>
+        sum + (Number(row.quantity) || 0),
+      0,
+    );
+
+    return `${rate.toFixed(2)} × ${formatUnitQuantity(quantity)} ${
+      rateUnit
+    }`;
   };
 
   const getTotalUnitQuantity = (item: ConsolidatedPayrollItem): number => {
@@ -2305,9 +2352,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-right text-sm text-default-600 dark:text-gray-400">
-                        {record.merged_count === 1
-                          ? `${Number(record.rate).toFixed(2)} × ${Number(record.quantity)} ${record.rate_unit}`
-                          : "-"}
+                        {formatOthersRateQuantity(record)}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium text-default-800 dark:text-gray-100">
                         {formatCurrency(record.merged_amount)}
