@@ -298,7 +298,7 @@ const ProductStockMovementPage: React.FC = () => {
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
                   min={STOCK_SYSTEM_START_DATE_STRING}
-                  max={customEndDate || new Date().toISOString().split("T")[0]}
+                  max={customEndDate || formatDateLocal(new Date())}
                   className="flex-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
                 <span className="text-default-400 dark:text-gray-500">to</span>
@@ -307,7 +307,7 @@ const ProductStockMovementPage: React.FC = () => {
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
                   min={customStartDate || STOCK_SYSTEM_START_DATE_STRING}
-                  max={new Date().toISOString().split("T")[0]}
+                  max={formatDateLocal(new Date())}
                   className="flex-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
               </div>

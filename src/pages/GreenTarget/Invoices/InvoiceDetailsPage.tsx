@@ -1,5 +1,6 @@
 // src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, Fragment, useCallback } from "react"; // Added Fragment, useCallback
+import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   IconFileInvoice,
@@ -84,6 +85,14 @@ const paymentMethodOptions: SelectOption[] = [
 ];
 
 const MONEY_TOLERANCE: number = 0.005;
+
+const toLocalDateString = (value: string): string => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
 
 type GTDisplayStatus =
   | "cancelled"
@@ -213,7 +222,7 @@ const InvoiceDetailsPage: React.FC = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentFormData, setPaymentFormData] = useState<PaymentFormData>({
     amount_paid: 0,
-    payment_date: new Date().toISOString().split("T")[0],
+    payment_date: format(new Date(), "yyyy-MM-dd"),
     payment_method: "cash", // Default value
     payment_reference: "",
     internal_reference: "",
@@ -600,7 +609,9 @@ const InvoiceDetailsPage: React.FC = () => {
   const handleEditDateIssued = () => {
     setIsEditingDateIssued(true);
     // Convert the date to YYYY-MM-DD format for input
-    const dateOnly = invoice?.date_issued?.split("T")[0] || "";
+    const dateOnly = invoice?.date_issued
+      ? toLocalDateString(invoice.date_issued)
+      : "";
     setEditedDateIssued(dateOnly);
   };
 
@@ -610,7 +621,10 @@ const InvoiceDetailsPage: React.FC = () => {
   };
 
   const handleSaveDateIssued = async () => {
-    if (editedDateIssued === invoice?.date_issued?.split("T")[0]) {
+    if (
+      editedDateIssued ===
+      (invoice?.date_issued ? toLocalDateString(invoice.date_issued) : "")
+    ) {
       handleCancelDateIssuedEdit();
       return;
     }
@@ -961,10 +975,10 @@ const InvoiceDetailsPage: React.FC = () => {
 
     // Convert dates to YYYY-MM-DD format for reliable comparison
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    const todayStr = format(today, "yyyy-MM-dd");
 
     // Get just the date part
-    const pickupDateStr = datePickedStr.split("T")[0];
+    const pickupDateStr = toLocalDateString(datePickedStr);
 
     // If pickup date is today or in the past, consider it completed
     return pickupDateStr > todayStr;
@@ -1159,7 +1173,7 @@ const InvoiceDetailsPage: React.FC = () => {
       // Optionally reset form fields
       setPaymentFormData({
         amount_paid: 0,
-        payment_date: new Date().toISOString().split("T")[0],
+        payment_date: format(new Date(), "yyyy-MM-dd"),
         payment_method: "cash",
         payment_reference: "",
         internal_reference: "",

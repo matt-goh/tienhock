@@ -1,5 +1,6 @@
 // src/pages/JellyPolly/InvoiceDetailsPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { format } from "date-fns";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   AdjustmentDocument,
@@ -207,7 +208,7 @@ const InvoiceDetailsPage: React.FC = () => {
     Omit<Payment, "payment_id" | "invoice_id" | "created_at">
   >({
     amount_paid: 0,
-    payment_date: new Date().toISOString().split("T")[0], // Default to today
+    payment_date: format(new Date(), "yyyy-MM-dd"), // Default to today
     payment_method: "cheque", // Default method
     payment_reference: undefined,
     notes: undefined,

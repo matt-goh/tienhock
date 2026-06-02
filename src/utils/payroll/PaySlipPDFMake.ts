@@ -11,6 +11,7 @@ import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import {
   getMonthName,
   consolidatePayrollItems,
+  filterOutLeaveDayItems,
   groupConsolidatedItemsByType,
   ConsolidatedPayrollItem,
 } from "./payrollUtils";
@@ -28,16 +29,25 @@ interface IndividualJobPayroll {
   gross_pay_portion: number;
 }
 
+interface AdvanceRecord {
+  description?: string | null;
+  amount?: number | string | null;
+  rate?: number | string | null;
+  rate_unit?: string | null;
+  quantity?: number | string | null;
+}
+
 interface MergedAdvance {
   description: string;
   merged_amount: number;
   merged_count: number;
-  primary: any;
+  primary: AdvanceRecord;
+  rows: AdvanceRecord[];
 }
 
 // Merge records that share a description (case-insensitive) into a single line.
 // Used for both commission_records and others_records so duplicate rows collapse on display.
-const mergeByDescription = (rows: any[] = []): MergedAdvance[] => {
+const mergeByDescription = (rows: AdvanceRecord[] = []): MergedAdvance[] => {
   const map = new Map<string, MergedAdvance>();
   rows.forEach((row) => {
     const key = (row.description || "").trim().toLowerCase();
@@ -45,12 +55,14 @@ const mergeByDescription = (rows: any[] = []): MergedAdvance[] => {
     if (existing) {
       existing.merged_amount += Number(row.amount) || 0;
       existing.merged_count += 1;
+      existing.rows.push(row);
     } else {
       map.set(key, {
-        description: row.description,
+        description: row.description || "",
         merged_amount: Number(row.amount) || 0,
         merged_count: 1,
         primary: row,
+        rows: [row],
       });
     }
   });
@@ -93,6 +105,10 @@ const formatCurrency = (amount: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+};
+
+const isMoneyEqual = (left: number, right: number): boolean => {
+  return Math.abs(left - right) < 0.005;
 };
 
 const prettifyLeaveType = (leaveType: string): string => {
@@ -393,6 +409,62 @@ const formatUnitQuantity = (quantity: number): string => {
   }).format(quantity);
 };
 
+interface RateQuantityDisplay {
+  rate: string;
+  quantity: string;
+}
+
+const getOthersRateQuantityDisplay = (
+  record: MergedAdvance,
+): RateQuantityDisplay => {
+  const rows: AdvanceRecord[] =
+    record.rows.length > 0 ? record.rows : [record.primary];
+  const rate: number = Number(rows[0].rate) || 0;
+  const rateUnit: string = rows[0].rate_unit || "";
+  const hasConsistentRate: boolean = rows.every(
+    (row: AdvanceRecord) =>
+      (row.rate_unit || "") === rateUnit &&
+      isMoneyEqual(Number(row.rate) || 0, rate),
+  );
+
+  if (!hasConsistentRate) {
+    return {
+      rate: "Mixed rates",
+      quantity: "",
+    };
+  }
+
+  if (rateUnit === "Fixed") {
+    const allDirectAmountFixed: boolean = rows.every((row: AdvanceRecord) => {
+      const quantity: number = Number(row.quantity) || 0;
+      const amount: number = Number(row.amount) || 0;
+      return amount > 0 && (rate === 0 || isMoneyEqual(quantity, amount));
+    });
+
+    if (allDirectAmountFixed) {
+      return {
+        rate: "Ikut amaun",
+        quantity: rows.length === 1 ? "-" : `${rows.length} entries`,
+      };
+    }
+
+    return {
+      rate: rate.toFixed(2),
+      quantity: rows.length === 1 ? "Fixed" : `Fixed x ${rows.length}`,
+    };
+  }
+
+  const quantity: number = rows.reduce(
+    (sum: number, row: AdvanceRecord) => sum + (Number(row.quantity) || 0),
+    0,
+  );
+
+  return {
+    rate: rate.toFixed(2),
+    quantity: `${formatUnitQuantity(quantity)} ${rateUnit}`,
+  };
+};
+
 const getBaseRateSummaryUnits = (
   consolidatedBaseItems: ConsolidatedPayrollItem[],
 ): BaseRateSummaryUnit[] => {
@@ -658,8 +730,11 @@ const buildMainPayrollPage = (
     return null;
   };
 
-  // Consolidate items for cleaner PDF output
-  const consolidatedItems = consolidatePayrollItems(payroll.items || []);
+  // Consolidate items for cleaner PDF output (leave-day activities are excluded —
+  // their amount is shown in the Cuti section, and they pay nothing under base pay).
+  const consolidatedItems = consolidatePayrollItems(
+    filterOutLeaveDayItems(payroll.items || [], payroll.leave_records),
+  );
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -923,11 +998,13 @@ const buildMainPayrollPage = (
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
           : other.description;
+      const rateQuantityDisplay: RateQuantityDisplay =
+        getOthersRateQuantityDisplay(other);
       tableBody.push(
         createItemRow(
           desc,
-          "",
-          "Kerja Luar OT",
+          rateQuantityDisplay.rate,
+          rateQuantityDisplay.quantity,
           formatCurrency(other.merged_amount),
         ),
       );
@@ -1392,8 +1469,11 @@ const buildIndividualJobPage = (
 ): Content[] => {
   const employeeJobMapping = payroll.employee_job_mapping || {};
 
-  // Consolidate items for cleaner PDF output
-  const consolidatedItems = consolidatePayrollItems(individualJob.items || []);
+  // Consolidate items for cleaner PDF output (leave-day activities are excluded —
+  // their amount is shown in the Cuti section, and they pay nothing under base pay).
+  const consolidatedItems = consolidatePayrollItems(
+    filterOutLeaveDayItems(individualJob.items || [], individualJob.leave_records),
+  );
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -1567,11 +1647,13 @@ const buildIndividualJobPage = (
         other.merged_count > 1
           ? `${other.description} (x${other.merged_count})`
           : other.description;
+      const rateQuantityDisplay: RateQuantityDisplay =
+        getOthersRateQuantityDisplay(other);
       tableBody.push(
         createItemRow(
           desc,
-          "",
-          "Kerja Luar OT",
+          rateQuantityDisplay.rate,
+          rateQuantityDisplay.quantity,
           formatCurrency(other.merged_amount),
         ),
       );

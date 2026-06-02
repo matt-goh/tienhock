@@ -19,6 +19,26 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-03",
+    ms: "Memproses semula gaji bulanan kini menggunakan kadar semasa setiap kod gaji untuk semua hari dalam bulan, jadi perubahan kadar selepas jam kerja direkod akan digunakan untuk semua hari (sebelum ini sesetengah hari mengekalkan kadar lama).",
+    en: "Reprocessing a monthly payroll now applies each pay code's current rate to every day in the month, so a rate change made after hours were logged takes effect for all days (previously some days could keep the old rate).",
+  },
+  {
+    date: "2026-06-03",
+    ms: "Cuti dalam Log Harian kini menyimpan bayaran cuti tanpa menambah aktiviti kerja harian pada hari cuti — untuk semua pekerja, termasuk Salesman dan Salesman Ikut.",
+    en: "Daily Log leave now keeps the leave pay amount without adding daily work activities on the leave day — for all workers, including Salesman and Salesman Ikut.",
+  },
+  {
+    date: "2026-06-02",
+    ms: "Halaman Payroll kini dibuka pada bulan sebelumnya sepanjang 1 hingga 7 hari bulan jika tiada bulan dipilih, supaya pemprosesan gaji bulan lepas lebih mudah.",
+    en: "Payroll now opens to the previous month from the 1st through the 7th when no month is selected, making it easier to finish last month's payroll.",
+  },
+  {
+    date: "2026-06-02",
+    ms: "Halaman MEE Packing Cuti dan Bihun Packing Cuti kini ada pemilih tarikh supaya tarikh lebih awal boleh dibuka terus tanpa menekan butang hari sebelumnya berkali-kali.",
+    en: "MEE Packing Cuti and Bihun Packing Cuti now have a date picker so earlier dates can be opened directly without repeatedly pressing the previous-day button.",
+  },
+  {
     date: "2026-05-28",
     ms: "Halaman Others (Kerja Luar OT) kini menyokong entri pelbagai tarikh dan pelbagai staf dalam satu langkah. Pilih beberapa hari pada satu staf/paycode untuk menyimpannya sebagai entri berkait — kadar, kuantiti, paycode dan keterangan akan sentiasa selaras merentas semua tarikh berkait. Gunakan butang \"Add multiple staff\" untuk menambah baris yang sama untuk beberapa staf sekaligus (sesuai untuk FULL HARIAN, HADIR_MEETING, dan sebagainya). Entri berkait ditanda dengan ikon rantai 🔗 pada senarai, dan padam akan mengeluarkan semua tarikh berkait setelah disahkan. Pembetulan: tarikh dalam modal edit Others tidak lagi tersusut sehari lebih awal.",
     en: "The Others (Kerja Luar OT) page now supports multi-date and multi-staff entries in one step. Pick several days for one staff/paycode to save them as a linked entry — the rate, quantity, paycode, and description stay in sync across every linked date. Use the new \"Add multiple staff\" button to fan out the same row to many staff at once (e.g. FULL HARIAN, HADIR_MEETING). Linked entries show a 🔗 badge in the list, and deleting one prompts to remove all the linked dates together. Fix: the edit modal no longer shows the date one day earlier than what was saved.",
