@@ -165,10 +165,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const [leaveEmployeeActivities, setLeaveEmployeeActivities] = useState<
     Record<string, ActivityItem[]>
   >({});
-  const [showLeaveActivitiesModal, setShowLeaveActivitiesModal] =
-    useState(false);
-  const [selectedLeaveEmployee, setSelectedLeaveEmployee] =
-    useState<EmployeeWithHours | null>(null);
   const [isInitializationComplete, setIsInitializationComplete] =
     useState(false);
   const [leaveSelectAll, setLeaveSelectAll] = useState(false);
@@ -294,6 +290,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const productsLinkedRef = useRef<Record<string, string>>({});
   // Ref to track which SALESMAN_IKUT rowKeys have had their products copied (to avoid infinite loops)
   const ikutProductsLinkedRef = useRef<Record<string, string>>({});
+  const employeeActivitiesDateRef = useRef<Record<string, string>>({});
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -656,6 +653,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     if (ikutProductsLinkedRef.current) {
       ikutProductsLinkedRef.current = {};
     }
+    productsFetchedForDateRef.current = null;
 
     setFormData({
       ...formData,
@@ -1135,34 +1133,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     });
   };
 
-  // Add this function to open the leave activities modal
-  const handleManageLeaveActivities = (employee: Employee) => {
-    setSelectedLeaveEmployee(employee as EmployeeWithHours);
-    setShowLeaveActivitiesModal(true);
-  };
-
-  // Add this function to handle updates from the leave activities modal
-  const handleLeaveActivitiesUpdated = (activities: ActivityItem[]) => {
-    if (!selectedLeaveEmployee) return;
-
-    const employeeId = selectedLeaveEmployee.id;
-    const hours = jobConfig?.defaultHours || 8; // Use standard hours for recalculation
-
-    const recalculatedActivities = calculateActivitiesAmounts(
-      activities,
-      hours,
-      {},
-      undefined,
-      formData.logDate
-    );
-
-    setLeaveEmployeeActivities((prev) => ({
-      ...prev,
-      [employeeId]: recalculatedActivities,
-    }));
-    toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
-  };
-
   const getSelectedLeaveActivities = (employeeId: string): ActivityItem[] => {
     return (leaveEmployeeActivities[employeeId] || []).filter(
       (activity: ActivityItem) => activity.isSelected
@@ -1407,6 +1377,43 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     if (!rowKey) return;
 
     const [employeeId, jobType] = rowKey.split("-");
+    const isSelecting =
+      !(employeeSelectionState.selectedJobs[employeeId] || []).includes(jobType);
+
+    if (isSelecting) {
+      const rowKeysToCheck: string[] = [rowKey];
+
+      if (jobType === "SALESMAN") {
+        (followedBySalesman[employeeId] || []).forEach((ikutEmployeeId) => {
+          rowKeysToCheck.push(`${ikutEmployeeId}-SALESMAN_IKUT`);
+        });
+      }
+
+      const staleRowKeys = rowKeysToCheck.filter(
+        (key) => employeeActivitiesDateRef.current[key] !== formData.logDate
+      );
+
+      if (staleRowKeys.length > 0) {
+        staleRowKeys.forEach((key) => {
+          delete productsLinkedRef.current[key];
+          delete ikutProductsLinkedRef.current[key];
+        });
+
+        setEmployeeActivities((prev) => {
+          let hasChanges = false;
+          const nextActivities = { ...prev };
+
+          staleRowKeys.forEach((key) => {
+            if (nextActivities[key]) {
+              delete nextActivities[key];
+              hasChanges = true;
+            }
+          });
+
+          return hasChanges ? nextActivities : prev;
+        });
+      }
+    }
 
     setEmployeeSelectionState((prev) => {
       const currentSelectedJobs = prev.selectedJobs[employeeId] || [];
@@ -1731,6 +1738,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   useEffect(() => {
     // After salesmanProducts are updated, auto-link them to pay codes
     // Also clear products for salesmen who no longer have products on this date
+    if (productsFetchedForDateRef.current !== formData.logDate) return;
 
     // Get all SALESMAN rowKeys that should have products checked
     const salesmanRowKeys = Object.entries(employeeSelectionState.selectedJobs)
@@ -1839,6 +1847,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           formData.logDate
         );
 
+        employeeActivitiesDateRef.current[rowKey] = formData.logDate;
+
         return {
           ...prev,
           [rowKey]: recalculatedActivities,
@@ -1877,7 +1887,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     for (const [employeeId, leaveData] of Object.entries(leaveEmployees)) {
       if (!leaveData.selected) continue;
 
-      const activities: ActivityItem[] = getSelectedLeaveActivities(employeeId);
       const defaultAmount: number = getLeaveActivityAmount(employeeId);
       let amountPaid: number = defaultAmount;
       const customAmount: string | undefined = leaveData.customAmount?.trim();
@@ -1895,7 +1904,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         employeeId: employeeId,
         leaveType: leaveData.leaveType,
         amount_paid: amountPaid,
-        activities,
+        activities: [],
       });
     }
 
@@ -2421,6 +2430,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   // The ref tracking ensures we process when salesman/products/doubled changes.
   useEffect(() => {
     if (!isInitializationComplete) return;
+    if (productsFetchedForDateRef.current !== formData.logDate) return;
 
     // Get all DME/DWE paycodes for clearing
     const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
@@ -2734,9 +2744,13 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
           // Get existing activities for this employee/job if in edit mode
           // For originally saved employees, use the preserved ref to handle deselect/re-select cycles
-          const existingActivitiesForRow = wasOriginallySaved
-            ? savedEmployeeActivitiesRef.current[rowKey] || []
-            : employeeActivities[rowKey] || [];
+          const activitiesMatchCurrentDate =
+            employeeActivitiesDateRef.current[rowKey] === formData.logDate;
+          const existingActivitiesForRow = activitiesMatchCurrentDate
+            ? wasOriginallySaved
+              ? savedEmployeeActivitiesRef.current[rowKey] || []
+              : employeeActivities[rowKey] || []
+            : [];
 
           // Salesmen don't filter by hours since hours aren't applicable
           const filteredPayCodes = mergedPayCodes;
@@ -2877,9 +2891,47 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             };
           });
 
+          const activitiesWithCurrentProducts =
+            jobType === "SALESMAN"
+              ? activities.map((activity) => {
+                  const payCodeId = String(activity.payCodeId);
+                  const isProductPaycode = /^(\d|WE-)/.test(payCodeId);
+                  if (!isProductPaycode) return activity;
+
+                  const currentProducts =
+                    productsFetchedForDateRef.current === formData.logDate
+                      ? salesmanProducts[rowKey] || []
+                      : [];
+                  const product = currentProducts.find(
+                    (p) => String(p.product_id) === payCodeId
+                  );
+
+                  if (!product) {
+                    return {
+                      ...activity,
+                      unitsProduced: 0,
+                      unitsFOC: 0,
+                      isSelected: false,
+                      calculatedAmount: 0,
+                    };
+                  }
+
+                  const quantity = parseFloat(product.quantity) || 0;
+                  const focQuantity = parseFloat(product.foc_quantity) || 0;
+                  const hasQuantity = quantity > 0 || focQuantity > 0;
+
+                  return {
+                    ...activity,
+                    unitsProduced: quantity,
+                    unitsFOC: focQuantity,
+                    isSelected: hasQuantity,
+                  };
+                })
+              : activities;
+
           // Apply auto-deselection logic to all activities
           const processedActivities = calculateActivitiesAmounts(
-            activities,
+            activitiesWithCurrentProducts,
             0, // Salesmen don't track hours
             formData.contextData,
             undefined,
@@ -2968,7 +3020,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         if (!newEmployeeActivities[ikutRowKey] || newEmployeeActivities[ikutRowKey].length === 0) return;
 
         const salesmanRowKey = `${salesmanId}-SALESMAN`;
-        const salesmanProductList = salesmanProducts[salesmanRowKey] || [];
+        const salesmanProductList =
+          productsFetchedForDateRef.current === formData.logDate
+            ? salesmanProducts[salesmanRowKey] || []
+            : [];
         const isDoubled = ikutDoubled[ikutRowKey] || false;
 
         // Build paycode data map (initialize all to 0 first)
@@ -3116,6 +3171,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       setIkutBagCounts(newIkutBagCounts);
     }
 
+    Object.keys(newEmployeeActivities).forEach((rowKey) => {
+      employeeActivitiesDateRef.current[rowKey] = formData.logDate;
+    });
+
     // Update with paycode-applied activities (merge with existing to preserve deselected employees)
     setEmployeeActivities((prev) => ({
       ...prev,
@@ -3193,96 +3252,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     ]
   );
 
-  // Generate full activities list for leave employees with saved selections
-  const generateLeaveActivitiesWithSavedSelection = useCallback(
-    (employeeId: string, savedActivitiesMap: Map<string, any>) => {
-      const employee = allStaffs.find((s) => s.id === employeeId);
-      if (!employee) return;
-
-      const employeeJobs = employee.job || [];
-      const relevantJobTypes = employeeJobs.filter((jobId) =>
-        JOB_IDS.includes(jobId)
-      );
-      if (relevantJobTypes.length === 0) return;
-
-      const primaryJobType = relevantJobTypes[0];
-      const jobPayCodes = jobPayCodeDetails[primaryJobType] || [];
-      const employeePayCodes = employeeMappings[employeeId] || [];
-
-      // Combine job and employee-specific pay codes
-      const allPayCodes = new Map();
-      jobPayCodes.forEach((pc) =>
-        allPayCodes.set(pc.id, { ...pc, source: "job" })
-      );
-      employeePayCodes.forEach((pc) =>
-        allPayCodes.set(pc.id, { ...pc, source: "employee" })
-      );
-
-      // Create activities with proper selection state
-      const activities = Array.from(allPayCodes.values()).map((payCode) => {
-        const savedActivity = savedActivitiesMap.get(payCode.id);
-        const rate = payCode.override_rate_biasa || payCode.rate_biasa;
-        const hours = jobConfig?.defaultHours || 8;
-
-        // If this activity was saved, use the saved data
-        if (savedActivity) {
-          return {
-            ...savedActivity,
-            isDefault: payCode.is_default_setting,
-            source: payCode.source,
-          };
-        }
-
-        // Otherwise, create a new unselected activity
-        const isSelected =
-          payCode.is_default_setting && payCode.pay_type === "Base";
-        return {
-          payCodeId: payCode.id,
-          description: payCode.description,
-          payType: payCode.pay_type,
-          rateUnit: payCode.rate_unit,
-          rate,
-          isDefault: payCode.is_default_setting,
-          isSelected: false, // Default to unselected for unsaved activities
-          unitsProduced: payCode.requires_units_input ? 0 : undefined,
-          hoursApplied: (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") ? hours : null,
-          calculatedAmount: calculateActivityAmount(
-            {
-              payCodeId: payCode.id,
-              description: payCode.description,
-              payType: payCode.pay_type,
-              rateUnit: payCode.rate_unit,
-              rate,
-              isSelected: false,
-              unitsProduced: payCode.requires_units_input ? 0 : undefined,
-              hoursApplied: (payCode.rate_unit === "Hour" || payCode.rate_unit === "Bill") ? hours : null,
-            },
-            hours,
-            formData.contextData,
-            undefined,
-            formData.logDate
-          ),
-          isContextLinked: false,
-          source: payCode.source,
-        };
-      });
-
-      setLeaveEmployeeActivities((prev) => ({
-        ...prev,
-        [employeeId]: activities,
-      }));
-    },
-    [
-      allStaffs,
-      JOB_IDS,
-      jobPayCodeDetails,
-      employeeMappings,
-      jobConfig?.defaultHours,
-      formData.dayType,
-      formData.logDate,
-    ]
-  );
-
   useEffect(() => {
     if (
       mode === "edit" &&
@@ -3311,6 +3280,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       // Clear and populate the saved employee activities ref
       // This preserves original activities even after deselect/re-select cycles
       savedEmployeeActivitiesRef.current = {};
+      employeeActivitiesDateRef.current = {};
+      const restoredLogDate = format(
+        new Date(existingWorkLog.log_date),
+        "yyyy-MM-dd"
+      );
 
       existingWorkLog.employeeEntries.forEach((entry: any) => {
         const rowKey = `${entry.employee_id}-${entry.job_id}`;
@@ -3357,6 +3331,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           newEmployeeActivities[rowKey] = restoredActivities;
           // Also store in ref to preserve original state for deselect/re-select cycles
           savedEmployeeActivitiesRef.current[rowKey] = restoredActivities;
+          employeeActivitiesDateRef.current[rowKey] = restoredLogDate;
         }
 
         // Restore SALESMAN_IKUT specific data
@@ -3424,45 +3399,11 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             ),
           };
 
-          // Store saved activities for later processing
-          if (leaveRecord.activities && leaveRecord.activities.length > 0) {
-            // Create a map of saved activities by payCodeId for easy lookup
-            const savedActivitiesMap = new Map();
-            leaveRecord.activities.forEach((activity: any) => {
-              savedActivitiesMap.set(activity.pay_code_id, {
-                payCodeId: activity.pay_code_id,
-                description: activity.description,
-                payType: activity.pay_type,
-                rateUnit: activity.rate_unit,
-                rate: parseFloat(activity.rate_used),
-                unitsProduced: activity.units_produced
-                  ? parseFloat(activity.units_produced)
-                  : 0,
-                unitsFOC: activity.foc_units
-                  ? parseFloat(activity.foc_units)
-                  : 0,
-                hoursApplied: activity.hours_applied
-                  ? parseFloat(activity.hours_applied)
-                  : null,
-                calculatedAmount: parseFloat(activity.calculated_amount),
-                isSelected: true,
-                isContextLinked: false,
-              });
-            });
-
-            // Generate full activities list and mark saved ones as selected
-            setTimeout(() => {
-              generateLeaveActivitiesWithSavedSelection(
-                employeeId,
-                savedActivitiesMap
-              );
-            }, 0);
-          } else {
-            // No saved activities, generate default activities
-            setTimeout(() => {
-              fetchAndApplyActivitiesForLeave(employeeId);
-            }, 0);
-          }
+          // Keep leave pay calculation available, but do not restore saved
+          // activities from older salesman leave logs.
+          setTimeout(() => {
+            fetchAndApplyActivitiesForLeave(employeeId);
+          }, 0);
         });
 
         // Apply leave-related state
@@ -3526,7 +3467,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     loadingJobs,
     loadingPayCodeMappings,
     fetchAndApplyActivitiesForLeave,
-    generateLeaveActivitiesWithSavedSelection,
   ]);
 
   // Helper function to get the effective location type for any employee
@@ -3568,6 +3508,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       locationType,
       formData.logDate
     );
+
+    employeeActivitiesDateRef.current[rowKey] = formData.logDate;
 
     setEmployeeActivities((prev) => ({
       ...prev,
@@ -4338,12 +4280,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                     >
                       Amount
                     </th>
-                    <th
-                      scope="col"
-                      className="w-48 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                    >
-                      Actions
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -4554,30 +4490,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                             }`}
                           />
                         </td>
-                        <td className="w-48 px-6 py-2 whitespace-nowrap text-right text-sm font-medium">
-                          <ActivitiesTooltip
-                            activities={
-                              isSelected && !isSaving
-                                ? (
-                                    leaveEmployeeActivities[employee.id] || []
-                                  ).filter((a: ActivityItem) => a.isSelected)
-                                : [] // Show no activities when disabled
-                            }
-                            employeeName={employee.name}
-                            hasUnsavedChanges={hasUnsavedChanges}
-                            onNavigateAttempt={safeNavigate}
-                            className={
-                              !isSelected || isSaving
-                                ? "disabled:text-default-300 disabled:cursor-not-allowed"
-                                : ""
-                            }
-                            disabled={!isSelected || isSaving}
-                            onClick={() =>
-                              handleManageLeaveActivities(employee)
-                            }
-                            logDate={formData.logDate}
-                          />
-                        </td>
                       </tr>
                     );
                   })}
@@ -4623,24 +4535,6 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             ? ikutDoubled[selectedEmployee?.rowKey || ""] || false
             : false
         }
-      />
-      <ManageActivitiesModal
-        isOpen={showLeaveActivitiesModal}
-        onClose={() => setShowLeaveActivitiesModal(false)}
-        employee={selectedLeaveEmployee}
-        jobType={selectedLeaveEmployee?.jobType || ""}
-        jobName={selectedLeaveEmployee?.jobName || ""}
-        employeeHours={jobConfig?.defaultHours || 8}
-        dayType="Biasa" // Always use "Biasa" for leave pay calculation
-        onActivitiesUpdated={handleLeaveActivitiesUpdated}
-        existingActivities={
-          leaveEmployeeActivities[selectedLeaveEmployee?.id || ""]
-        }
-        contextLinkedPayCodes={contextLinkedPayCodes}
-        contextData={formData.contextData}
-        hasUnsavedChanges={hasUnsavedChanges}
-        onNavigateAttempt={safeNavigate}
-        logDate={formData.logDate}
       />
       {/* Confirmation Dialog for Unsaved Changes */}
       <ConfirmationDialog
