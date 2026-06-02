@@ -1655,7 +1655,6 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     for (const [employeeId, leaveData] of Object.entries(leaveEmployees)) {
       if (!leaveData.selected) continue;
 
-      const activities: ActivityItem[] = getSelectedLeaveActivities(employeeId);
       const defaultAmount: number = getLeaveActivityAmount(employeeId);
       let amountPaid: number = defaultAmount;
       const customAmount: string | undefined = leaveData.customAmount?.trim();
@@ -1669,11 +1668,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         amountPaid = Math.round(parsedAmount * 100) / 100;
       }
 
+      // Mirror the Salesman leave flow: leave rows save zero selected activities
+      // so no spurious work activities are created on a leave day. The leave
+      // amount still auto-calculates (and stays editable) via amount_paid.
       leaveEntries.push({
         employeeId: employeeId,
         leaveType: leaveData.leaveType,
         amount_paid: amountPaid,
-        activities,
+        activities: [],
       });
     }
 

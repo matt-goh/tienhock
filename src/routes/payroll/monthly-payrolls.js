@@ -478,13 +478,16 @@ export default function (pool) {
           // Daily work logs with activities
           client.query(
             `
-          SELECT dwl.id, dwl.log_date, dwle.employee_id, dwle.job_id, dwle.total_hours,
+          SELECT dwl.id, dwl.log_date, dwl.day_type, dwle.employee_id, dwle.job_id, dwle.total_hours,
             json_agg(json_build_object(
               'pay_code_id', dwla.pay_code_id,
               'description', pc.description,
               'pay_type', pc.pay_type,
               'rate_unit', pc.rate_unit,
               'rate_used', dwla.rate_used,
+              'rate_biasa', COALESCE(epc.override_rate_biasa, jpc.override_rate_biasa, pc.rate_biasa),
+              'rate_ahad', COALESCE(epc.override_rate_ahad, jpc.override_rate_ahad, pc.rate_ahad),
+              'rate_umum', COALESCE(epc.override_rate_umum, jpc.override_rate_umum, pc.rate_umum),
               'hours_applied', dwla.hours_applied,
               'units_produced', dwla.units_produced,
               'foc_units', dwla.foc_units,
@@ -494,8 +497,10 @@ export default function (pool) {
           JOIN daily_work_log_entries dwle ON dwl.id = dwle.work_log_id
           LEFT JOIN daily_work_log_activities dwla ON dwla.log_entry_id = dwle.id
           LEFT JOIN pay_codes pc ON dwla.pay_code_id = pc.id
+          LEFT JOIN job_pay_codes jpc ON jpc.job_id = dwle.job_id AND jpc.pay_code_id = dwla.pay_code_id
+          LEFT JOIN employee_pay_codes epc ON epc.employee_id = dwle.employee_id AND epc.pay_code_id = dwla.pay_code_id
           WHERE dwl.log_date BETWEEN $1 AND $2 AND dwl.status = 'Submitted'
-          GROUP BY dwl.id, dwl.log_date, dwle.employee_id, dwle.job_id, dwle.total_hours
+          GROUP BY dwl.id, dwl.log_date, dwl.day_type, dwle.employee_id, dwle.job_id, dwle.total_hours
         `,
             [startDate, endDate],
           ),
@@ -665,20 +670,52 @@ export default function (pool) {
         (log.activities || [])
           .filter((a) => a.pay_code_id)
           .forEach((activity) => {
+            const rateUnit = activity.rate_unit || "Fixed";
             const qty =
               activity.rate_unit === "Hour"
                 ? parseFloat(activity.hours_applied) || 0
                 : parseFloat(activity.units_produced) || 1;
+            const focUnits = parseFloat(activity.foc_units) || 0;
+
+            // Re-resolve the rate from the CURRENT pay code (employee/job
+            // overrides already applied via COALESCE), picking the variant for
+            // this day's day type, so a mid-month pay-code rate change applies to
+            // already-logged days on reprocess instead of keeping the frozen
+            // rate_used snapshot. Percent/Fixed keep their stored rate and amount
+            // (their amount is authoritative, not rate × quantity). When the fresh
+            // rate is unavailable (pay code/override removed) fall back to rate_used.
+            let rate = parseFloat(activity.rate_used) || 0;
+            let amount = parseFloat(activity.calculated_amount) || 0;
+            if (rateUnit !== "Percent" && rateUnit !== "Fixed") {
+              const biasaRate = parseFloat(activity.rate_biasa);
+              const ahadRate =
+                activity.rate_ahad == null
+                  ? biasaRate
+                  : parseFloat(activity.rate_ahad);
+              const umumRate =
+                activity.rate_umum == null
+                  ? biasaRate
+                  : parseFloat(activity.rate_umum);
+              const resolved =
+                log.day_type === "Umum"
+                  ? umumRate
+                  : log.day_type === "Ahad"
+                    ? ahadRate
+                    : biasaRate;
+              if (!Number.isNaN(resolved)) rate = resolved;
+              amount = Math.round(rate * (qty + focUnits) * 100) / 100;
+            }
+
             // Each activity becomes a separate item with source tracking
             workLogsByEmployeeJob[key].items.push({
               pay_code_id: activity.pay_code_id,
               description: activity.description || "",
               pay_type: activity.pay_type || "Tambahan",
-              rate: parseFloat(activity.rate_used) || 0,
-              rate_unit: activity.rate_unit || "Fixed",
+              rate: rate,
+              rate_unit: rateUnit,
               quantity: qty,
-              foc_units: parseFloat(activity.foc_units) || 0,
-              amount: parseFloat(activity.calculated_amount) || 0,
+              foc_units: focUnits,
+              amount: amount,
               source_date: formatDateToYMD(log.log_date), // Format as YYYY-MM-DD
               work_log_id: log.id, // daily_work_logs.id
               work_log_type: "daily",
