@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-02",
+    ms: "Halaman MEE Packing Cuti dan Bihun Packing Cuti kini ada pemilih tarikh supaya tarikh lebih awal boleh dibuka terus tanpa menekan butang hari sebelumnya berkali-kali.",
+    en: "MEE Packing Cuti and Bihun Packing Cuti now have a date picker so earlier dates can be opened directly without repeatedly pressing the previous-day button.",
+  },
+  {
     date: "2026-05-28",
     ms: "Pembetulan: Medan tarikh di borang pembayaran, invois, pembelian, sewaan, stok dan payroll kini mengekalkan tarikh tempatan yang dipilih, termasuk apabila rekod dibuka semula atau tarikh hari ini diisi secara automatik.",
     en: "Fix: Date fields across payment, invoice, purchase, rental, stock, and payroll screens now keep the selected local date, including when records are reopened or today is filled automatically.",
