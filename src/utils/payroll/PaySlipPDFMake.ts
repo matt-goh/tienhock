@@ -11,6 +11,7 @@ import { EmployeePayroll, MidMonthPayroll } from "../../types/types";
 import {
   getMonthName,
   consolidatePayrollItems,
+  filterOutLeaveDayItems,
   groupConsolidatedItemsByType,
   ConsolidatedPayrollItem,
 } from "./payrollUtils";
@@ -729,8 +730,11 @@ const buildMainPayrollPage = (
     return null;
   };
 
-  // Consolidate items for cleaner PDF output
-  const consolidatedItems = consolidatePayrollItems(payroll.items || []);
+  // Consolidate items for cleaner PDF output (leave-day activities are excluded —
+  // their amount is shown in the Cuti section, and they pay nothing under base pay).
+  const consolidatedItems = consolidatePayrollItems(
+    filterOutLeaveDayItems(payroll.items || [], payroll.leave_records),
+  );
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -1465,8 +1469,11 @@ const buildIndividualJobPage = (
 ): Content[] => {
   const employeeJobMapping = payroll.employee_job_mapping || {};
 
-  // Consolidate items for cleaner PDF output
-  const consolidatedItems = consolidatePayrollItems(individualJob.items || []);
+  // Consolidate items for cleaner PDF output (leave-day activities are excluded —
+  // their amount is shown in the Cuti section, and they pay nothing under base pay).
+  const consolidatedItems = consolidatePayrollItems(
+    filterOutLeaveDayItems(individualJob.items || [], individualJob.leave_records),
+  );
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 

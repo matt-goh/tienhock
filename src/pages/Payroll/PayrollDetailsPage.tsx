@@ -32,6 +32,7 @@ import {
   groupItemsByType,
   getMonthName,
   consolidatePayrollItems,
+  filterOutLeaveDayItems,
   groupConsolidatedItemsByType,
   ConsolidatedPayrollItem,
 } from "../../utils/payroll/payrollUtils";
@@ -377,15 +378,23 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const mergedCommissionRecords = mergeByDescription(commissionRecords);
   const mergedOthersRecords = mergeByDescription(othersRecords);
 
+  // Hide leave-day activities from base pay — on a leave day the employee did not
+  // actually work, so these rows pay nothing (quantity is 0) and the real leave
+  // payment is shown separately in the Cuti section (from leave_records).
+  const displayItems = filterOutLeaveDayItems(
+    payroll.items,
+    payroll.leave_records,
+  );
+
   const groupedItems = groupItemsByType(
-    payroll.items.map((item) => ({
+    displayItems.map((item) => ({
       ...item,
       id: item.id || 0, // Ensure id is always a number
     })),
   );
 
   // Consolidated items for the consolidated view
-  const consolidatedItems = consolidatePayrollItems(payroll.items);
+  const consolidatedItems = consolidatePayrollItems(displayItems);
   const groupedConsolidatedItems =
     groupConsolidatedItemsByType(consolidatedItems);
 
@@ -474,7 +483,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const itemsByJob = isCombinedPayroll
     ? uniqueJobTypes.reduce(
         (acc, jobType) => {
-          const jobItems = payroll.items.filter(
+          const jobItems = displayItems.filter(
             (item) => item.job_type === jobType,
           );
           acc[jobType as string] = groupItemsByType(
@@ -493,7 +502,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const consolidatedItemsByJob = isCombinedPayroll
     ? uniqueJobTypes.reduce(
         (acc, jobType) => {
-          const jobItems = payroll.items.filter(
+          const jobItems = displayItems.filter(
             (item) => item.job_type === jobType,
           );
           const consolidated = consolidatePayrollItems(jobItems);
