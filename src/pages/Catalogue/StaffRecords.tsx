@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { format } from "date-fns";
 import { IconUsers, IconArrowLeft, IconFileExport, IconLink } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { Employee } from "../../types/types";
@@ -177,7 +178,7 @@ const StaffRecords = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `staff-records-export-${new Date().toISOString().split('T')[0]}.txt`;
+      link.download = `staff-records-export-${format(new Date(), "yyyy-MM-dd")}.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

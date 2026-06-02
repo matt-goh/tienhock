@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { IconX } from "@tabler/icons-react";
@@ -143,12 +144,20 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+const toLocalDateInputValue = (value: string | null | undefined): string => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
+
 const SupplierPaymentFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const isEditMode = Boolean(id && id !== "new");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const queriedSource = searchParams.get("source") as InvoiceSource | null;
   const queriedInvoiceId = searchParams.get("invoice_id");
@@ -202,7 +211,7 @@ const SupplierPaymentFormPage: React.FC = () => {
         );
         setInvoice(inv);
         setFormData({
-          payment_date: payment.payment_date?.slice(0, 10) || today,
+          payment_date: toLocalDateInputValue(payment.payment_date) || today,
           amount_paid: toNumber(payment.amount_paid).toFixed(2),
           payment_method: payment.payment_method as
             | "cash"

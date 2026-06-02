@@ -10,7 +10,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconChevronsDown,
   IconChevronsUp,
-  IconBriefcase,
   IconCash,
   IconUsers,
   IconLock,
@@ -48,11 +47,83 @@ import PayrollUnifiedTable from "../../components/Payroll/PayrollUnifiedTable";
 import PayrollSectionPrintMenu from "../../components/Payroll/PayrollSectionPrintMenu";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
+const FIRST_WEEK_DAY_OF_MONTH: number = 7;
+const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
+
+const getDefaultPayrollMonth = (today: Date = new Date()): Date => {
+  const monthOffset: number =
+    today.getDate() <= FIRST_WEEK_DAY_OF_MONTH ? -1 : 0;
+
+  return new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+};
+
+const getPayrollJobGroupKey = (jobType: string): string => {
+  return jobType.includes(", ") ? `Grouped: ${jobType}` : jobType;
+};
+
+const readExpandedJobsFromStorage = (
+  storageKey: string
+): Record<string, boolean> | null => {
+  try {
+    const storedExpandedJobs: string | null = sessionStorage.getItem(storageKey);
+    if (!storedExpandedJobs) return null;
+
+    const parsedExpandedJobs: unknown = JSON.parse(storedExpandedJobs);
+    if (
+      !parsedExpandedJobs ||
+      typeof parsedExpandedJobs !== "object" ||
+      Array.isArray(parsedExpandedJobs)
+    ) {
+      return null;
+    }
+
+    return Object.entries(parsedExpandedJobs).reduce<Record<string, boolean>>(
+      (validExpandedJobs: Record<string, boolean>, [jobType, isExpanded]) => {
+        if (typeof isExpanded === "boolean") {
+          validExpandedJobs[jobType] = isExpanded;
+        }
+
+        return validExpandedJobs;
+      },
+      {}
+    );
+  } catch {
+    return null;
+  }
+};
+
+const saveExpandedJobsToStorage = (
+  storageKey: string,
+  expandedJobs: Record<string, boolean>
+): void => {
+  try {
+    sessionStorage.setItem(storageKey, JSON.stringify(expandedJobs));
+  } catch {
+    // Ignore storage failures so the payroll page remains usable.
+  }
+};
+
+const buildExpandedJobsState = (
+  employeePayrolls: Array<Pick<EmployeePayroll, "job_type">>,
+  savedExpandedJobs: Record<string, boolean> | null
+): Record<string, boolean> => {
+  const expandedJobs: Record<string, boolean> = {};
+
+  employeePayrolls.forEach(
+    (employeePayroll: Pick<EmployeePayroll, "job_type">) => {
+      const groupKey: string = getPayrollJobGroupKey(employeePayroll.job_type);
+      expandedJobs[groupKey] = savedExpandedJobs?.[groupKey] ?? true;
+    }
+  );
+
+  return expandedJobs;
+};
+
 const PayrollPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Initialize with URL params or current month
+  // Initialize with URL params or the payroll working month.
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const yearParam = searchParams.get("year");
     const monthParam = searchParams.get("month");
@@ -67,7 +138,7 @@ const PayrollPage: React.FC = () => {
       }
     }
 
-    return new Date();
+    return getDefaultPayrollMonth();
   });
   const [payroll, setPayroll] = useState<MonthlyPayroll | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,6 +181,9 @@ const PayrollPage: React.FC = () => {
     const month = selectedMonth.getMonth() + 1;
     return `payroll-page:${year}-${month}`;
   }, [selectedMonth]);
+  const expandedJobsStorageKey = useMemo(() => {
+    return `${EXPANDED_JOBS_STORAGE_PREFIX}${scrollKey}`;
+  }, [scrollKey]);
   useScrollRestoration(
     scrollKey,
     !isLoading && !!payroll,
@@ -165,7 +239,7 @@ const PayrollPage: React.FC = () => {
     fetchPayrollDetails();
   }, [selectedMonth]);
 
-  const fetchPayrollDetails = async () => {
+  const fetchPayrollDetails = async (): Promise<void> => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth() + 1; // JavaScript months are 0-indexed
 
@@ -174,24 +248,15 @@ const PayrollPage: React.FC = () => {
       const response = await getMonthlyPayrollByYearMonth(year, month);
       setPayroll(response);
 
-      // Initialize expandedJobs with all job types expanded
       if (response?.employeePayrolls) {
-        const jobTypes = new Set(
-          response.employeePayrolls.map(
-            (ep: { job_type: string }) => ep.job_type
-          )
-        );
-        const initialExpanded: Record<string, boolean> = {};
-        jobTypes.forEach((jobType) => {
-          // Create the group key that will be used in groupEmployeesByJobType
-          const groupKey = (jobType as string).includes(", ")
-            ? `Grouped: ${jobType}`
-            : (jobType as string);
+        const savedExpandedJobs: Record<string, boolean> | null =
+          readExpandedJobsFromStorage(expandedJobsStorageKey);
 
-          // Expand all sections by default
-          initialExpanded[groupKey] = true;
-        });
-        setExpandedJobs(initialExpanded);
+        setExpandedJobs(
+          buildExpandedJobsState(response.employeePayrolls, savedExpandedJobs)
+        );
+      } else {
+        setExpandedJobs({});
       }
     } catch (error) {
       console.error("Error fetching payroll details:", error);
@@ -242,23 +307,25 @@ const PayrollPage: React.FC = () => {
     [searchTerm]
   );
 
-  const handleToggleJobExpansion = (jobType: string) => {
-    setExpandedJobs((prev) => ({
-      ...prev,
-      [jobType]: !prev[jobType],
-    }));
+  const handleToggleJobExpansion = (jobType: string): void => {
+    const nextExpandedJobs: Record<string, boolean> = {
+      ...expandedJobs,
+      [jobType]: !expandedJobs[jobType],
+    };
+
+    saveExpandedJobsToStorage(expandedJobsStorageKey, nextExpandedJobs);
+    setExpandedJobs(nextExpandedJobs);
   };
 
-  const groupEmployeesByJobType = (employeePayrolls: EmployeePayroll[]) => {
+  const groupEmployeesByJobType = (
+    employeePayrolls: EmployeePayroll[]
+  ): Record<string, EmployeePayroll[]> => {
     const grouped: Record<string, EmployeePayroll[]> = {};
 
     employeePayrolls.forEach((employeePayroll) => {
       const { job_type } = employeePayroll;
 
-      // For grouped employees (job_type contains comma), create a special group key
-      const groupKey = job_type.includes(", ")
-        ? `Grouped: ${job_type}`
-        : job_type;
+      const groupKey: string = getPayrollJobGroupKey(job_type);
 
       if (!grouped[groupKey]) {
         grouped[groupKey] = [];
@@ -432,17 +499,17 @@ const PayrollPage: React.FC = () => {
     };
   }, [isStatusDialogOpen, showFinalizeDialog, showMissingTaxDialog]);
 
-  const handleToggleAllJobs = (expanded: boolean) => {
+  const handleToggleAllJobs = (expanded: boolean): void => {
     if (!payroll?.employeePayrolls) return;
 
-    const jobTypes = new Set(payroll.employeePayrolls.map((ep) => ep.job_type));
     const newExpanded: Record<string, boolean> = {};
-    jobTypes.forEach((jobType) => {
-      // Create the group key that matches what's used in groupEmployeesByJobType
-      const groupKey = jobType.includes(", ") ? `Grouped: ${jobType}` : jobType;
+    payroll.employeePayrolls.forEach((employeePayroll: EmployeePayroll) => {
+      const groupKey: string = getPayrollJobGroupKey(employeePayroll.job_type);
 
       newExpanded[groupKey] = expanded;
     });
+
+    saveExpandedJobsToStorage(expandedJobsStorageKey, newExpanded);
     setExpandedJobs(newExpanded);
   };
 

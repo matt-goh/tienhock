@@ -1,4 +1,5 @@
 // src/utils/payroll/payrollUtils.ts
+import { format } from "date-fns";
 import { api } from "../../routes/utils/api";
 import {
   EmployeePayroll,
@@ -427,6 +428,57 @@ export const consolidatePayrollItems = (items: PayrollItem[]): ConsolidatedPayro
     }
     // Then sort by description
     return a.description.localeCompare(b.description);
+  });
+};
+
+/**
+ * Removes daily work-log items that fall on a leave day from a payroll item list.
+ *
+ * On a leave day the employee did not actually work, but the daily-log leave flow
+ * historically still recorded that day's regular activities (with 0 hours and a
+ * leftover amount). Those rows pay nothing — gross is rate × quantity and the
+ * quantity is 0 — while the real leave payment is shown separately in the Cuti
+ * section from `leave_records`. Listing them under base pay is therefore misleading
+ * (and can surface a stale rate from before a mid-month rate change), so they are
+ * filtered out before consolidation/display. Matching is by `source_date` against
+ * the leave dates; only daily items carry a `source_date`, so monthly items are
+ * always kept.
+ *
+ * @param items Array of payroll items
+ * @param leaveRecords Leave records for this payslip (each with a `date` field, YYYY-MM-DD)
+ * @returns Items with leave-day daily items removed
+ */
+export const filterOutLeaveDayItems = (
+  items: PayrollItem[],
+  leaveRecords?: Array<{ date?: string | null }> | null,
+): PayrollItem[] => {
+  if (!items || items.length === 0) return items ?? [];
+  if (!leaveRecords || leaveRecords.length === 0) return items;
+
+  const toYMD = (value: string | null | undefined): string | null => {
+    if (!value) return null;
+    // A bare YYYY-MM-DD (e.g. leave dates from to_char, or date-only source_date)
+    // is used as-is to avoid any timezone round-trip. Full timestamps are
+    // normalised in local time (Asia/Kuala_Lumpur) — never via toISOString.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    try {
+      return format(new Date(value), "yyyy-MM-dd");
+    } catch {
+      return null;
+    }
+  };
+
+  const leaveDates = new Set<string>();
+  leaveRecords.forEach((record) => {
+    const ymd = toYMD(record?.date);
+    if (ymd) leaveDates.add(ymd);
+  });
+  if (leaveDates.size === 0) return items;
+
+  return items.filter((item) => {
+    if (item.work_log_type !== "daily" || !item.source_date) return true;
+    const ymd = toYMD(item.source_date);
+    return ymd === null || !leaveDates.has(ymd);
   });
 };
 

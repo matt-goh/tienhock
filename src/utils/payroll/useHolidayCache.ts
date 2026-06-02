@@ -1,5 +1,6 @@
 // src/utils/payroll/useHolidayCache.ts
 import { useState, useEffect, useCallback } from "react";
+import { format } from "date-fns";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 
@@ -19,6 +20,14 @@ interface CachedHolidays {
 const CACHE_KEY = "holidays_cache_v3";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const HOLIDAYS_UPDATED_EVENT = "holidays-updated";
+
+const toLocalDateString = (value: string): string => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
 
 // Create a global function to trigger cache refresh
 export const refreshHolidaysCache = async () => {
@@ -140,11 +149,9 @@ export const useHolidayCache = () => {
   // Helper function to check if a date is a holiday
   const isHoliday = useCallback(
     (date: Date): boolean => {
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = format(date, "yyyy-MM-dd");
       return holidays.some((holiday) => {
-        const holidayDate = new Date(holiday.holiday_date)
-          .toISOString()
-          .split("T")[0];
+        const holidayDate = toLocalDateString(holiday.holiday_date);
         return holidayDate === dateStr && holiday.is_active;
       });
     },
@@ -154,11 +161,9 @@ export const useHolidayCache = () => {
   // Helper function to get holiday description for a date
   const getHolidayDescription = useCallback(
     (date: Date): string | null => {
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = format(date, "yyyy-MM-dd");
       const holiday = holidays.find((holiday) => {
-        const holidayDate = new Date(holiday.holiday_date)
-          .toISOString()
-          .split("T")[0];
+        const holidayDate = toLocalDateString(holiday.holiday_date);
         return holidayDate === dateStr && holiday.is_active;
       });
       return holiday ? holiday.description : null;

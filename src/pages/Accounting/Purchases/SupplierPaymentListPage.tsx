@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
@@ -56,14 +57,11 @@ function formatDate(value: string | null): string {
 const SupplierPaymentListPage: React.FC = () => {
   const navigate = useNavigate();
   const today = new Date();
-  const defaultStart = new Date(
-    today.getFullYear(),
-    today.getMonth() - 2,
-    1
-  )
-    .toISOString()
-    .slice(0, 10);
-  const defaultEnd = today.toISOString().slice(0, 10);
+  const defaultStart = format(
+    new Date(today.getFullYear(), today.getMonth() - 2, 1),
+    "yyyy-MM-dd"
+  );
+  const defaultEnd = format(today, "yyyy-MM-dd");
 
   const [rows, setRows] = useState<SupplierPaymentRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);

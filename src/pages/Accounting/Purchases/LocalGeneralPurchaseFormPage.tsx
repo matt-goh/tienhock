@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { format } from "date-fns";
 import {
   IconDownload,
   IconEye,
@@ -56,7 +57,15 @@ interface SupplierPaymentSummary {
   status: "active" | "pending" | "cancelled";
 }
 
-const today = new Date().toISOString().slice(0, 10);
+const today = format(new Date(), "yyyy-MM-dd");
+
+const toLocalDateInputValue = (value: string | null | undefined): string => {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd");
+};
 
 const localSupplierStub: SelfBilledForeignSupplier = {
   supplier_name: "",
@@ -223,7 +232,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       setS3Enabled(fetchedS3Enabled);
       setCategories(fetchedCategories || []);
       setFormData({
-        purchase_date: invoice.purchase_date?.slice(0, 10) || today,
+        purchase_date: toLocalDateInputValue(invoice.purchase_date) || today,
         supplier_name: invoice.local_supplier_name || "",
         order_no: invoice.order_no || "",
         payment_reference: invoice.payment_reference || "",
@@ -238,7 +247,7 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
       });
       setSupplierPayment((previous: SupplierPaymentDraft) => ({
         ...previous,
-        payment_date: invoice.purchase_date?.slice(0, 10) || today,
+        payment_date: toLocalDateInputValue(invoice.purchase_date) || today,
         payment_reference: invoice.payment_reference || "",
       }));
       try {

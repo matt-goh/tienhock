@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  IconCalendar,
   IconDeviceFloppy,
   IconRefresh,
   IconSearch,
@@ -171,6 +172,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
     jobType === "MEE_PACKING" ? "MEE Packing Cuti" : "Bihun Packing Cuti";
   const pageSubtitle =
     jobType === "MEE_PACKING" ? "Packing Mee" : "Packing Bihun";
+  const dateInputId: string = `packing-cuti-date-${jobType.toLowerCase()}`;
 
   useEffect(() => {
     if (isValidDateString(queryDateParam)) {
@@ -285,6 +287,14 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
 
   const handleDateChange = (date: Date): void => {
     setSelectedDate(formatDateLocal(date));
+  };
+
+  const handleDateInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ): void => {
+    const nextDate: string = event.target.value;
+    if (!isValidDateString(nextDate)) return;
+    setSelectedDate(nextDate);
   };
 
   const updateRow = (employeeId: string, next: Partial<RowState>): void => {
@@ -427,12 +437,30 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
             {pageSubtitle}
           </p>
         </div>
-        <div className="w-full md:w-80">
-          <DateNavigator
-            selectedDate={parseLocalDate(selectedDate)}
-            onChange={handleDateChange}
-            allowFutureDates
-          />
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:w-auto">
+          <div className="flex h-10 items-center gap-2 rounded-lg border border-default-300 bg-white px-3 dark:border-gray-600 dark:bg-gray-700">
+            <IconCalendar
+              size={16}
+              className="shrink-0 text-default-500 dark:text-gray-400"
+            />
+            <label htmlFor={dateInputId} className="sr-only">
+              Select packing cuti date
+            </label>
+            <input
+              id={dateInputId}
+              type="date"
+              value={selectedDate}
+              onChange={handleDateInputChange}
+              className="h-full min-w-0 bg-transparent text-sm text-default-900 outline-none [color-scheme:light] dark:text-gray-100 dark:[color-scheme:dark]"
+            />
+          </div>
+          <div className="min-w-0 sm:w-80">
+            <DateNavigator
+              selectedDate={parseLocalDate(selectedDate)}
+              onChange={handleDateChange}
+              allowFutureDates
+            />
+          </div>
         </div>
       </div>
 
