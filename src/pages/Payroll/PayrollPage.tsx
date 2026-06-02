@@ -10,7 +10,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconChevronsDown,
   IconChevronsUp,
-  IconBriefcase,
   IconCash,
   IconUsers,
   IconLock,
