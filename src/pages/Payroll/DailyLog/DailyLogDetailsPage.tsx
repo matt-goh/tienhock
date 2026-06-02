@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   IconPencil,
+  IconTrash,
   IconClock,
   IconLock,
   IconSun,
@@ -13,6 +14,7 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import BackButton from "../../../components/BackButton";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -72,6 +74,14 @@ interface DailyWorkLog {
   leaveRecords?: LeaveRecord[];
 }
 
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   jobType,
 }) => {
@@ -83,6 +93,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   const [expandedEntries, setExpandedEntries] = useState<
     Record<string, boolean>
   >({});
+  const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
 
   useEffect(() => {
     fetchWorkLogDetails();
@@ -109,6 +120,26 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
 
   const handleEdit = () => {
     navigate(`/payroll/${jobType.toLowerCase()}-production/${id}/edit`);
+  };
+
+  const handleDeleteLog = async (): Promise<void> => {
+    if (!workLog) return;
+
+    try {
+      await api.delete(`/api/daily-work-logs/${workLog.id}`);
+      toast.success("Work log deleted successfully");
+      navigate(`/payroll/${jobType.toLowerCase()}-production`, {
+        replace: true,
+      });
+    } catch (error: unknown) {
+      const deleteError = error as ApiError;
+      console.error("Error deleting work log:", error);
+      toast.error(
+        deleteError.response?.data?.message || "Failed to delete work log"
+      );
+    } finally {
+      setShowDeleteDialog(false);
+    }
   };
 
   const getDayTypeColor = (dayType: string, logDate?: string) => {
@@ -322,16 +353,26 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </div>
           </div>
 
-          {/* Right: Edit Button */}
+          {/* Right: Actions */}
           {workLog.status !== "Processed" && (
-            <Button
-              onClick={handleEdit}
-              icon={IconPencil}
-              variant="filled"
-              color="sky"
-            >
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleEdit}
+                icon={IconPencil}
+                variant="filled"
+                color="sky"
+              >
+                Edit
+              </Button>
+              <Button
+                onClick={() => setShowDeleteDialog(true)}
+                icon={IconTrash}
+                variant="filled"
+                color="rose"
+              >
+                Delete
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -694,6 +735,16 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
           </table>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteLog}
+        title="Delete Work Log"
+        message="Are you sure you want to delete this work log? This action cannot be undone."
+        confirmButtonText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };
