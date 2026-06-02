@@ -20,6 +20,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-06-02",
+    ms: "Halaman Payroll kini dibuka pada bulan sebelumnya sepanjang 1 hingga 7 hari bulan jika tiada bulan dipilih, supaya pemprosesan gaji bulan lepas lebih mudah.",
+    en: "Payroll now opens to the previous month from the 1st through the 7th when no month is selected, making it easier to finish last month's payroll.",
+  },
+  {
+    date: "2026-06-02",
     ms: "Halaman MEE Packing Cuti dan Bihun Packing Cuti kini ada pemilih tarikh supaya tarikh lebih awal boleh dibuka terus tanpa menekan butang hari sebelumnya berkali-kali.",
     en: "MEE Packing Cuti and Bihun Packing Cuti now have a date picker so earlier dates can be opened directly without repeatedly pressing the previous-day button.",
   },
