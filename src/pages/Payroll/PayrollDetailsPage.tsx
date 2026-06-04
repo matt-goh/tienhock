@@ -780,6 +780,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     const isNewDay =
       prevItem && prevItem.source_date !== item.source_date && item.source_date;
     const colCount = showDeleteButton && isEditable ? 6 : 5;
+    const focUnits: number = Number(item.foc_units) || 0;
 
     return (
       <React.Fragment key={item.id}>
@@ -841,9 +842,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             ) : (
               <>
                 {item.quantity}
-                {item.foc_units > 0 && (
+                {focUnits > 0 && (
                   <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
-                    (+{Math.round(item.foc_units)})
+                    (+{Math.round(focUnits)})
                   </span>
                 )}
               </>
