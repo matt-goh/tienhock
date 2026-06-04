@@ -19,6 +19,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-04",
+    ms: "Pembetulan: Jumlah Bank dan Pinjam dalam Salary Report kini menggunakan gaji yang telah digenapkan sebelum menolak pinjam bulanan, supaya jumlah bayaran sepadan dengan Payroll Details dan halaman Pinjam.",
+    en: "Fix: Bank and Pinjam totals in Salary Report now use the rounded salary before monthly pinjam is deducted, so payment amounts match Payroll Details and the Pinjam page.",
+  },
+  {
     date: "2026-06-03",
     ms: "Memproses semula gaji bulanan kini menggunakan kadar semasa setiap kod gaji untuk semua hari dalam bulan, jadi perubahan kadar selepas jam kerja direkod akan digunakan untuk semua hari (sebelum ini sesetengah hari mengekalkan kadar lama).",
     en: "Reprocessing a monthly payroll now applies each pay code's current rate to every day in the month, so a rate change made after hours were logged takes effect for all days (previously some days could keep the old rate).",
