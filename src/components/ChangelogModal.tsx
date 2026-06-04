@@ -30,11 +30,6 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-06-05",
-    ms: "Pembetulan paparan: lajur Kuantiti dalam Butiran Gaji (paparan terperinci) tidak lagi menambah '0' tambahan di belakang jam — contohnya 3 jam yang dulu dipaparkan sebagai '30' kini betul sebagai '3'. Amaun bayaran tidak berubah; ini hanya pembetulan paparan.",
-    en: "Display fix: the Quantity column in Payroll Details (detailed view) no longer adds a stray '0' after the hours — e.g. 3 hours that previously showed as '30' now correctly shows as '3'. Payment amounts were never affected; this is display-only.",
-  },
-  {
-    date: "2026-06-05",
     ms: "Pembetulan kerja lebih masa Bihun: apabila pekerja ada jam dalam ruangan OT 'jaga stim' di samping kerja lebih masa biasa, setiap baris OT kini dibayar mengikut jamnya sendiri, bukan kedua-dua baris dibayar mengikut jumlah gabungan. Ini membetulkan jumlah OT yang terlebih bayar dalam Payroll Details.",
     en: "Fixed Bihun overtime: when a worker has hours in the 'jaga stim' OT column on top of normal overtime, each overtime line is now paid for its own hours instead of both lines being paid the combined total. This corrects overstated OT amounts in Payroll Details.",
   },
