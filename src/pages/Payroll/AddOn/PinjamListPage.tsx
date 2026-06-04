@@ -41,6 +41,7 @@ interface PinjamRecord {
   pinjam_type: "mid_month" | "monthly";
   created_by: string;
   created_at: string;
+  updated_at: string | null;
 }
 
 interface MidMonthPayroll {
@@ -71,6 +72,20 @@ interface PinjamSummary {
   };
 }
 
+interface EmployeePinjamData {
+  employee_id: string;
+  employee_name: string;
+  latestPinjamTime: number;
+  midMonthPay: number;
+  netPay: number;
+  setelahDigenapkan?: number;
+  midMonthPinjam: number;
+  midMonthPinjamDetails: string[];
+  monthlyPinjam: number;
+  monthlyPinjamDetails: string[];
+  gajiGenap: number;
+}
+
 // Default to the previous month during the first week (1st-7th), else current month
 const getDefaultPinjamMonth = (
   today: Date = new Date()
@@ -78,6 +93,14 @@ const getDefaultPinjamMonth = (
   const monthOffset = today.getDate() <= 7 ? -1 : 0;
   const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
+};
+
+const getPinjamActivityTime = (
+  record: Pick<PinjamRecord, "created_at" | "updated_at">
+): number => {
+  const activityDate = record.updated_at || record.created_at;
+  const parsedTime = Date.parse(activityDate);
+  return Number.isNaN(parsedTime) ? 0 : parsedTime;
 };
 
 const PinjamListPage: React.FC = () => {
@@ -220,20 +243,31 @@ const PinjamListPage: React.FC = () => {
     handleModalClose();
   };
 
-  const employeeData = useMemo(() => {
+  const sortedPinjamRecords = useMemo<PinjamRecord[]>(() => {
+    return [...pinjamRecords].sort((a: PinjamRecord, b: PinjamRecord) => {
+      const activityTimeDiff =
+        getPinjamActivityTime(b) - getPinjamActivityTime(a);
+      if (activityTimeDiff !== 0) return activityTimeDiff;
+      return b.id - a.id;
+    });
+  }, [pinjamRecords]);
+
+  const employeeData = useMemo<EmployeePinjamData[]>(() => {
+    const latestPinjamTimesByEmployee = new Map<string, number>();
+
+    pinjamRecords.forEach((record: PinjamRecord) => {
+      const latestTime = getPinjamActivityTime(record);
+      const currentLatestTime =
+        latestPinjamTimesByEmployee.get(record.employee_id) ?? 0;
+
+      if (latestTime > currentLatestTime) {
+        latestPinjamTimesByEmployee.set(record.employee_id, latestTime);
+      }
+    });
+
     const employeeMap = new Map<
       string,
-      {
-        employee_id: string;
-        employee_name: string;
-        midMonthPay: number;
-        netPay: number;
-        setelahDigenapkan?: number;
-        midMonthPinjam: number;
-        midMonthPinjamDetails: string[];
-        monthlyPinjam: number;
-        monthlyPinjamDetails: string[];
-      }
+      Omit<EmployeePinjamData, "gajiGenap">
     >();
 
     // 1. Iterate through pinjamSummary as the source of truth for employees with pinjam
@@ -251,6 +285,7 @@ const PinjamListPage: React.FC = () => {
       employeeMap.set(employeeId, {
         employee_id: employeeId,
         employee_name: pinjamRecord.employee_name,
+        latestPinjamTime: latestPinjamTimesByEmployee.get(employeeId) ?? 0,
         midMonthPay: midMonthRecord?.amount || 0,
         netPay: payrollRecord?.net_pay || 0,
         setelahDigenapkan: payrollRecord?.setelah_digenapkan,
@@ -261,15 +296,21 @@ const PinjamListPage: React.FC = () => {
       });
     });
 
-    // 2. Convert map to array, calculate gajiGenap, and sort
+    // 2. Convert map to array, calculate gajiGenap, and sort by latest activity
     return Array.from(employeeMap.values())
-      .map((emp) => ({
-        ...emp,
-        gajiGenap:
-          emp.setelahDigenapkan ?? Math.ceil(emp.netPay - emp.midMonthPay),
-      }))
-      .sort((a, b) => a.employee_name.localeCompare(b.employee_name));
-  }, [midMonthPayrolls, pinjamSummary, employeePayrolls]);
+      .map(
+        (emp: Omit<EmployeePinjamData, "gajiGenap">): EmployeePinjamData => ({
+          ...emp,
+          gajiGenap:
+            emp.setelahDigenapkan ?? Math.ceil(emp.netPay - emp.midMonthPay),
+        })
+      )
+      .sort((a: EmployeePinjamData, b: EmployeePinjamData) => {
+        const activityTimeDiff = b.latestPinjamTime - a.latestPinjamTime;
+        if (activityTimeDiff !== 0) return activityTimeDiff;
+        return a.employee_name.localeCompare(b.employee_name);
+      });
+  }, [midMonthPayrolls, pinjamSummary, employeePayrolls, pinjamRecords]);
 
   // Filter employees by name / staff ID (case-insensitive)
   const filteredEmployeeData = useMemo(() => {
@@ -822,7 +863,7 @@ const PinjamListPage: React.FC = () => {
                     Description
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Created
+                    Last Changed
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
@@ -830,7 +871,7 @@ const PinjamListPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
-                {pinjamRecords.map((record) => (
+                {sortedPinjamRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-default-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-default-900 dark:text-gray-100">
                       <div>
@@ -860,7 +901,10 @@ const PinjamListPage: React.FC = () => {
                       {record.description}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
-                      {format(new Date(record.created_at), "dd MMM yyyy")}
+                      {format(
+                        new Date(record.updated_at || record.created_at),
+                        "dd MMM yyyy"
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end space-x-3">
