@@ -346,8 +346,14 @@ export default function (pool) {
                 let hoursApplied = null;
                 if (activity.rateUnit === "Hour") {
                   if (activity.payType === "Overtime") {
-                    // Total OT = natural OT + forced OT
-                    hoursApplied = Math.max(0, hours - overtimeThreshold) + forceOT;
+                    // BH_OT_STIM (JAGA STIM) uses ONLY the forced-OT column; all
+                    // other OT pay codes use ONLY natural OT (hours beyond the
+                    // day's threshold). Mirrors calculateActivityAmount.ts so
+                    // hours_applied matches calculated_amount.
+                    hoursApplied =
+                      activity.payCodeId === "BH_OT_STIM"
+                        ? forceOT
+                        : Math.max(0, hours - overtimeThreshold);
                   } else {
                     // Regular hours capped at OT threshold so OT hours
                     // are not double-counted in base pay quantity.
@@ -622,8 +628,14 @@ export default function (pool) {
                 let hoursApplied = null;
                 if (activity.rateUnit === "Hour") {
                   if (activity.payType === "Overtime") {
-                    // Total OT = natural OT + forced OT
-                    hoursApplied = Math.max(0, hours - overtimeThreshold) + forceOT;
+                    // BH_OT_STIM (JAGA STIM) uses ONLY the forced-OT column; all
+                    // other OT pay codes use ONLY natural OT (hours beyond the
+                    // day's threshold). Mirrors calculateActivityAmount.ts so
+                    // hours_applied matches calculated_amount.
+                    hoursApplied =
+                      activity.payCodeId === "BH_OT_STIM"
+                        ? forceOT
+                        : Math.max(0, hours - overtimeThreshold);
                   } else {
                     // Regular hours capped at OT threshold so OT hours
                     // are not double-counted in base pay quantity.
