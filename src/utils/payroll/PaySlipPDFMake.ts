@@ -359,12 +359,16 @@ const createJobCategoryRow = (
 };
 
 // Create job subtotal row (only for combined payrolls)
-const createJobSubtotalRow = (jobType: string, total: string): TableCell[] => {
+const createJobSubtotalRow = (
+  jobType: string,
+  total: string,
+  subtotalLabel: string = "Subtotal",
+): TableCell[] => {
   return [
     { text: "", fillColor: "#f0f0f0", fontSize: 8 },
     { text: "", fillColor: "#f0f0f0", fontSize: 8 },
     {
-      text: `${jobType} Subtotal`,
+      text: `${jobType} ${subtotalLabel}`,
       bold: true,
       fillColor: "#f0f0f0",
       fontSize: 8,
@@ -695,7 +699,7 @@ const appendBasePayRows = (
   });
 
   if (otherItems.length > 0 && baseRateSummaryUnits.length > 0) {
-    tableBody.push(createBaseSubtotalRow("Jumlah lain-lain", otherTotalAmount));
+    tableBody.push(createBaseSubtotalRow("Jumlah Lain-lain", otherTotalAmount));
   }
 
   const shouldShowFinalSubtotal: boolean =
@@ -1025,7 +1029,7 @@ const buildMainPayrollPage = (
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         {
-          text: "Jumlah lain-lain",
+          text: "Jumlah Lain-lain",
           bold: true,
           fillColor: "#f8f9fa",
           fontSize: 8,
@@ -1060,7 +1064,7 @@ const buildMainPayrollPage = (
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Jumlah cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah Cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
         {
           text: formatCurrency(leaveTotalAmount),
           alignment: "right",
@@ -1115,7 +1119,11 @@ const buildMainPayrollPage = (
       // Add job subtotal row for combined payrolls (only when there are items)
       if (isGroupedPayroll && jobItems.length > 0) {
         tableBody.push(
-          createJobSubtotalRow(jobTypeLabel, formatCurrency(overtimeJobTotal)),
+          createJobSubtotalRow(
+            jobTypeLabel,
+            formatCurrency(overtimeJobTotal),
+            "Jumlah OT",
+          ),
         );
       }
     });
@@ -1125,7 +1133,7 @@ const buildMainPayrollPage = (
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Subtotal", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah OT", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
         {
           text: formatCurrency(overtimeTotalAmount),
           alignment: "right",
@@ -1289,7 +1297,12 @@ const buildMainPayrollPage = (
     tableBody.push([
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
       { text: "", fontSize: 8, fillColor: "#f8f9fa" },
-      { text: "Jumlah", bold: true, fontSize: 8, fillColor: "#f8f9fa" },
+      {
+        text: "Jumlah Selepas Advances",
+        bold: true,
+        fontSize: 8,
+        fillColor: "#f8f9fa",
+      },
       {
         text: formatCurrency(finalPayment),
         alignment: "right",
@@ -1394,8 +1407,9 @@ const buildMainPayrollPage = (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
                 descText === "Subtotal" ||
-                descText === "Jumlah cuti" ||
-                descText === "Jumlah lain-lain" ||
+                descText.endsWith("Jumlah OT") ||
+                descText === "Jumlah Cuti" ||
+                descText === "Jumlah Lain-lain" ||
                 descText === "Jumlah Base" ||
                 descText === "Jumlah Gaji Kasar")
             ) {
@@ -1674,7 +1688,7 @@ const buildIndividualJobPage = (
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         {
-          text: "Jumlah lain-lain",
+          text: "Jumlah Lain-lain",
           bold: true,
           fillColor: "#f8f9fa",
           fontSize: 8,
@@ -1708,7 +1722,7 @@ const buildIndividualJobPage = (
       tableBody.push([
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
         { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-        { text: "Jumlah cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+        { text: "Jumlah Cuti", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
         {
           text: formatCurrency(leaveTotalAmount),
           alignment: "right",
@@ -1740,7 +1754,7 @@ const buildIndividualJobPage = (
     tableBody.push([
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
       { text: "", fillColor: "#f8f9fa", fontSize: 8 },
-      { text: "Subtotal", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
+      { text: "Jumlah OT", bold: true, fillColor: "#f8f9fa", fontSize: 8 },
       {
         text: formatCurrency(overtimeTotalAmount),
         alignment: "right",
@@ -1832,8 +1846,9 @@ const buildIndividualJobPage = (
               typeof descText === "string" &&
               (descText.includes("Rate/") ||
                 descText === "Subtotal" ||
-                descText === "Jumlah cuti" ||
-                descText === "Jumlah lain-lain" ||
+                descText.endsWith("Jumlah OT") ||
+                descText === "Jumlah Cuti" ||
+                descText === "Jumlah Lain-lain" ||
                 descText === "Jumlah Base" ||
                 descText.includes("Gross Pay") ||
                 descText === "Jumlah Gaji Kasar")
