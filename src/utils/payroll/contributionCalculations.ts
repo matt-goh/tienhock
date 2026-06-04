@@ -216,9 +216,12 @@ export const findIncomeTaxRate = (
   incomeTaxRates: IncomeTaxRate[],
   wageAmount: number
 ): IncomeTaxRate | null => {
+  const lookupWageAmount: number = Math.ceil(wageAmount);
+
   return (
     incomeTaxRates.find(
-      (rate) => wageAmount >= rate.wage_from && wageAmount <= rate.wage_to
+      (rate) =>
+        lookupWageAmount >= rate.wage_from && lookupWageAmount <= rate.wage_to
     ) || null
   );
 };
