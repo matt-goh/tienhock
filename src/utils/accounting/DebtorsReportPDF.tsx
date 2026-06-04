@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // A refined color palette focusing on text and borders for a classic report look
 const colors = {
@@ -549,11 +550,9 @@ export const generateDebtorsReportPDF = async (
       document.body.appendChild(printFrame);
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
-          try {
-            printFrame.contentWindow.print();
-          } catch (e) {
-            console.error("Print failed:", e);
-          }
+          printPdfFrameWithFallback(printFrame, url, {
+            logLabel: "debtors report PDF",
+          });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {
               document.body.removeChild(printFrame);

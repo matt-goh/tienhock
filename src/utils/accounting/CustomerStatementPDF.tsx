@@ -11,6 +11,7 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Types for the statement data
 interface Transaction {
@@ -420,11 +421,9 @@ export const generateCustomerStatementPDF = async (
       document.body.appendChild(printFrame);
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
-          try {
-            printFrame.contentWindow.print();
-          } catch (e) {
-            console.error("Print failed:", e);
-          }
+          printPdfFrameWithFallback(printFrame, url, {
+            logLabel: "customer statement PDF",
+          });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {
               document.body.removeChild(printFrame);

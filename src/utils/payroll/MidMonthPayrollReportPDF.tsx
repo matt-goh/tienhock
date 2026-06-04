@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -504,11 +505,9 @@ export const generateMidMonthPayrollReportPDF = async (
 
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
-          try {
-            printFrame.contentWindow.print();
-          } catch (e) {
-            console.error("Print failed:", e);
-          }
+          printPdfFrameWithFallback(printFrame, url, {
+            logLabel: "mid-month payroll report PDF",
+          });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {
               document.body.removeChild(printFrame);
