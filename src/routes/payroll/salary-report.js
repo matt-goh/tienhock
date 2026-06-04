@@ -486,6 +486,8 @@ export default function (pool) {
             );
 
             const jumlah = commAmount - midMonthAmount;
+            const setelahDigenapkan = Math.ceil(jumlah);
+            const digenapkan = setelahDigenapkan - jumlah;
 
             const commissionEmployeeData = {
               employee_payroll_id: baseEmp?.employee_payroll_id || null,
@@ -510,10 +512,12 @@ export default function (pool) {
               gaji_bersih: commAmount,
               setengah_bulan: midMonthAmount,
               jumlah: jumlah,
+              digenapkan: digenapkan,
+              setelah_digenapkan: setelahDigenapkan,
               // For Bank/Pinjam tabs
-              gaji_genap: commAmount - midMonthAmount,
+              gaji_genap: setelahDigenapkan,
               total_pinjam: 0,
-              final_total: commAmount - midMonthAmount,
+              final_total: setelahDigenapkan,
               net_pay: commAmount,
               mid_month_amount: midMonthAmount,
             };
@@ -524,6 +528,9 @@ export default function (pool) {
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.setengah_bulan += midMonthAmount;
             locationData[locCode].totals.jumlah += jumlah;
+            locationData[locCode].totals.digenapkan += digenapkan;
+            locationData[locCode].totals.setelah_digenapkan +=
+              setelahDigenapkan;
 
             // Track commission-only employees for main data response
             if (!hasRegularPayroll) {
@@ -539,17 +546,27 @@ export default function (pool) {
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.setengah_bulan += midMonthAmount;
                 grandTotals.jumlah += jumlah;
+                grandTotals.digenapkan += digenapkan;
+                grandTotals.setelah_digenapkan += setelahDigenapkan;
               } else {
                 // Update existing commission-only employee
+                const previousDigenapkan = existingCommOnly.digenapkan || 0;
+                const previousSetelahDigenapkan =
+                  existingCommOnly.setelah_digenapkan || 0;
                 existingCommOnly.comm += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
                 existingCommOnly.jumlah =
                   existingCommOnly.gaji_bersih -
                   existingCommOnly.setengah_bulan;
+                existingCommOnly.setelah_digenapkan = Math.ceil(
+                  existingCommOnly.jumlah,
+                );
+                existingCommOnly.digenapkan =
+                  existingCommOnly.setelah_digenapkan -
+                  existingCommOnly.jumlah;
                 existingCommOnly.gaji_genap =
-                  existingCommOnly.gaji_bersih -
-                  existingCommOnly.mid_month_amount;
+                  existingCommOnly.setelah_digenapkan;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 // Update grand totals
@@ -557,6 +574,11 @@ export default function (pool) {
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.jumlah += commAmount;
+                grandTotals.digenapkan +=
+                  existingCommOnly.digenapkan - previousDigenapkan;
+                grandTotals.setelah_digenapkan +=
+                  existingCommOnly.setelah_digenapkan -
+                  previousSetelahDigenapkan;
               }
             }
           } else {
@@ -1241,6 +1263,8 @@ export default function (pool) {
 
           if (!existingEmployee) {
             const jumlah = commAmount - midMonthAmount;
+            const setelahDigenapkan = Math.ceil(jumlah);
+            const digenapkan = setelahDigenapkan - jumlah;
 
             const commissionEmployeeData = {
               employee_payroll_id: null,
@@ -1265,9 +1289,11 @@ export default function (pool) {
               gaji_bersih: commAmount,
               setengah_bulan: midMonthAmount,
               jumlah: jumlah,
-              gaji_genap: commAmount - midMonthAmount,
+              digenapkan: digenapkan,
+              setelah_digenapkan: setelahDigenapkan,
+              gaji_genap: setelahDigenapkan,
               total_pinjam: 0,
-              final_total: commAmount - midMonthAmount,
+              final_total: setelahDigenapkan,
               net_pay: commAmount,
               mid_month_amount: midMonthAmount,
             };
@@ -1278,6 +1304,9 @@ export default function (pool) {
             locationData[locCode].totals.gaji_bersih += commAmount;
             locationData[locCode].totals.setengah_bulan += midMonthAmount;
             locationData[locCode].totals.jumlah += jumlah;
+            locationData[locCode].totals.digenapkan += digenapkan;
+            locationData[locCode].totals.setelah_digenapkan +=
+              setelahDigenapkan;
 
             if (!hasRegularPayroll) {
               const existingCommOnly = commissionOnlyEmployees.find(
@@ -1290,22 +1319,37 @@ export default function (pool) {
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.setengah_bulan += midMonthAmount;
                 grandTotals.jumlah += jumlah;
+                grandTotals.digenapkan += digenapkan;
+                grandTotals.setelah_digenapkan += setelahDigenapkan;
               } else {
+                const previousDigenapkan = existingCommOnly.digenapkan || 0;
+                const previousSetelahDigenapkan =
+                  existingCommOnly.setelah_digenapkan || 0;
                 existingCommOnly.comm += commAmount;
                 existingCommOnly.gaji_kasar += commAmount;
                 existingCommOnly.gaji_bersih += commAmount;
                 existingCommOnly.jumlah =
                   existingCommOnly.gaji_bersih -
                   existingCommOnly.setengah_bulan;
+                existingCommOnly.setelah_digenapkan = Math.ceil(
+                  existingCommOnly.jumlah,
+                );
+                existingCommOnly.digenapkan =
+                  existingCommOnly.setelah_digenapkan -
+                  existingCommOnly.jumlah;
                 existingCommOnly.gaji_genap =
-                  existingCommOnly.gaji_bersih -
-                  existingCommOnly.mid_month_amount;
+                  existingCommOnly.setelah_digenapkan;
                 existingCommOnly.final_total = existingCommOnly.gaji_genap;
                 existingCommOnly.net_pay = existingCommOnly.gaji_bersih;
                 grandTotals.comm += commAmount;
                 grandTotals.gaji_kasar += commAmount;
                 grandTotals.gaji_bersih += commAmount;
                 grandTotals.jumlah += commAmount;
+                grandTotals.digenapkan +=
+                  existingCommOnly.digenapkan - previousDigenapkan;
+                grandTotals.setelah_digenapkan +=
+                  existingCommOnly.setelah_digenapkan -
+                  previousSetelahDigenapkan;
               }
             }
           } else {
