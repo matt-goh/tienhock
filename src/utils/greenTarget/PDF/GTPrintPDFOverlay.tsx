@@ -6,6 +6,10 @@ import toast from "react-hot-toast";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { generateGTPDFFilename } from "./generateGTPDFFilename";
 import { generateQRDataUrl } from "../../invoice/einvoice/generateQRCode";
+import {
+  printPdfFrameWithFallback,
+  type PrintPdfFrameResult,
+} from "../../pdfPrintFallback";
 
 const GTPrintPDFOverlay = ({
   invoices,
@@ -107,12 +111,17 @@ const GTPrintPDFOverlay = ({
             hasPrintedRef.current = true;
             // Small delay for content rendering in iframe
             setTimeout(() => {
-              try {
-                printFrame.contentWindow?.focus(); // Focus is important for print dialog
-                printFrame.contentWindow?.print();
+              const printResult: PrintPdfFrameResult = printPdfFrameWithFallback(
+                printFrame,
+                pdfUrl,
+                {
+                  focusBeforePrint: true,
+                  logLabel: "Green Target invoice PDF",
+                }
+              );
+              if (printResult.opened) {
                 cleanup(); // Hide loading dialog, wait for user interaction
-              } catch (printError) {
-                console.error("Print dialog error:", printError);
+              } else {
                 setError("Could not open print dialog.");
                 cleanup(true); // Full cleanup on error
               }

@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
 import { preparePDFDataFromInvoice } from "../../../services/einvoice-pdf.service";
 import { generateQRDataUrl } from "../einvoice/generateQRCode";
+import { printPdfFrameWithFallback } from "../../pdfPrintFallback";
 
 interface InvoiceSoloPrintOverlayProps {
   invoices: ExtendedInvoiceData[];
@@ -158,7 +159,9 @@ const InvoiceSoloPrintOverlay: React.FC<InvoiceSoloPrintOverlayProps> = ({
             hasPrintedRef.current = true;
             // Use a slight delay to ensure content is fully loaded
             setTimeout(() => {
-              printFrame.contentWindow?.print();
+              printPdfFrameWithFallback(printFrame, pdfUrl, {
+                logLabel: "invoice PDF",
+              });
               cleanup(); // Hide loading dialog only
             }, 500);
 

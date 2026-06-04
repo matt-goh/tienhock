@@ -6,6 +6,7 @@ import { InvoiceData } from "../../../types/types";
 import toast from "react-hot-toast";
 import { generatePDFFilename } from "./generatePDFFilename";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import { printPdfFrameWithFallback } from "../../pdfPrintFallback";
 
 const PrintPDFOverlay = ({
   invoices,
@@ -103,7 +104,9 @@ const PrintPDFOverlay = ({
             hasPrintedRef.current = true;
             // Use a slight delay to ensure content is fully loaded
             setTimeout(() => {
-              printFrame.contentWindow?.print();
+              printPdfFrameWithFallback(printFrame, pdfUrl, {
+                logLabel: "invoice PDF",
+              });
               cleanup(); // Hide loading dialog only
             }, 500);
 
