@@ -8,6 +8,7 @@ import {
   StyleSheet,
   pdf,
 } from "@react-pdf/renderer";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Types for the general statement data
 interface CustomerRow {
@@ -340,11 +341,9 @@ export const generateGeneralStatementPDF = async (
       document.body.appendChild(printFrame);
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
-          try {
-            printFrame.contentWindow.print();
-          } catch (e) {
-            console.error("Print failed:", e);
-          }
+          printPdfFrameWithFallback(printFrame, url, {
+            logLabel: "general statement PDF",
+          });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {
               document.body.removeChild(printFrame);

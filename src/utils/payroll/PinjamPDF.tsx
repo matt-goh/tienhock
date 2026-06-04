@@ -9,6 +9,10 @@ import {
 } from "@react-pdf/renderer";
 import React from "react";
 import { getMonthName } from "./payrollUtils";
+import {
+  printPdfFrameWithFallback,
+  type PrintPdfFrameResult,
+} from "../pdfPrintFallback";
 
 interface PinjamEmployee {
   employee_id: string;
@@ -478,19 +482,38 @@ export const generatePinjamPDF = async (
       iframe.onload = () => {
         setTimeout(() => {
           try {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
+            const printResult: PrintPdfFrameResult = printPdfFrameWithFallback(
+              iframe,
+              url,
+              {
+                focusBeforePrint: true,
+                logLabel: "pinjam summary PDF",
+              }
+            );
 
             // Listen for print dialog events
-            iframe.contentWindow?.addEventListener("afterprint", () => {
-              // Cleanup after user finishes printing
+            if (printResult.opened && !printResult.usedFallback) {
+              try {
+                iframe.contentWindow?.addEventListener("afterprint", () => {
+                  // Cleanup after user finishes printing
+                  setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                      document.body.removeChild(iframe);
+                    }
+                    URL.revokeObjectURL(url);
+                  }, 500);
+                });
+              } catch (afterPrintError) {
+                console.warn("Could not attach afterprint cleanup:", afterPrintError);
+              }
+            } else if (!printResult.opened) {
               setTimeout(() => {
                 if (document.body.contains(iframe)) {
                   document.body.removeChild(iframe);
                 }
                 URL.revokeObjectURL(url);
-              }, 500);
-            });
+              }, 1000);
+            }
           } catch (e) {
             console.error("Print failed:", e);
             // Fallback: open in new window if iframe print fails

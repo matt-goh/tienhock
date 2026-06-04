@@ -11,6 +11,10 @@ import { pdf, Document } from "@react-pdf/renderer";
 import GTStatementPDF from "../../utils/greenTarget/PDF/GTStatementPDF";
 import LoadingSpinner from "../LoadingSpinner";
 import { InvoiceGT } from "../../types/types";
+import {
+  printPdfFrameWithFallback,
+  type PrintPdfFrameResult,
+} from "../../utils/pdfPrintFallback";
 
 interface GTStatementModalProps {
   isOpen: boolean;
@@ -250,30 +254,6 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     return printWindow;
   };
 
-  const openPdfFallback = (
-    pdfUrl: string,
-    fallbackWindow: Window | null
-  ): boolean => {
-    const printWindow =
-      fallbackWindow && !fallbackWindow.closed
-        ? fallbackWindow
-        : window.open(pdfUrl, "_blank");
-    if (!printWindow) {
-      setPrintError(
-        "Could not open print preview. Please allow pop-ups for this site."
-      );
-      toast.error("Could not open print preview. Please allow pop-ups.");
-      return false;
-    }
-    if (printWindow.location.href === "about:blank") {
-      printWindow.location.href = pdfUrl;
-    }
-    printWindow.focus();
-    setPrintError(null);
-    toast.success("Print preview opened in a new tab.");
-    return true;
-  };
-
   const generateMultipleStatementPDFs = async (
     statements: Array<{
       invoice: InvoiceGT;
@@ -328,17 +308,27 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           hasPrintedRef.current = true;
           // Small delay for content rendering in iframe
           setTimeout(() => {
-            try {
-              printFrame.contentWindow?.focus(); // Focus is important for print dialog
-              printFrame.contentWindow?.print();
+            const printResult: PrintPdfFrameResult =
+              printPdfFrameWithFallback(printFrame, pdfUrl, {
+                fallbackWindow,
+                focusBeforePrint: true,
+                logLabel: "Green Target statement PDF",
+              });
+
+            if (printResult.opened && !printResult.usedFallback) {
               if (fallbackWindow && !fallbackWindow.closed) {
                 fallbackWindow.close();
               }
               cleanup(); // Hide loading dialog, wait for user interaction
-            } catch (printError) {
-              console.error("Print dialog error:", printError);
-              const fallbackOpened = openPdfFallback(pdfUrl, fallbackWindow);
-              cleanup(!fallbackOpened);
+            } else if (printResult.opened) {
+              setPrintError(null);
+              toast.success("Print preview opened in a new tab.");
+              cleanup();
+            } else {
+              setPrintError(
+                "Could not open print preview. Please allow pop-ups for this site."
+              );
+              cleanup(true);
             }
           }, 500);
 

@@ -417,6 +417,28 @@ const SalaryReportPage: React.FC = () => {
   const activeReportData = periodType === 'yearly' ? yearlyReportData : reportData;
   const activeComprehensiveData = periodType === 'yearly' ? yearlyComprehensiveSalaryData : comprehensiveSalaryData;
   const activeLoading = periodType === 'yearly' ? isLoadingYearly : isLoading;
+  const bankPinjamTabsUseMonthlyData: boolean = activeTab === 2 || activeTab === 3;
+  const displayedReportData: SalaryReportResponse | null =
+    bankPinjamTabsUseMonthlyData ? reportData : activeReportData;
+  const displayedLoading: boolean =
+    bankPinjamTabsUseMonthlyData ? isLoading : activeLoading;
+  const displayedHeaderTotal: number = bankPinjamTabsUseMonthlyData
+    ? displayedReportData?.summary.total_final ?? 0
+    : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const displayedGajiGenapTotal: number = bankPinjamTabsUseMonthlyData
+    ? displayedReportData?.summary.total_gaji_genap ?? 0
+    : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const displayedFinalTotal: number = bankPinjamTabsUseMonthlyData
+    ? displayedReportData?.summary.total_final ?? 0
+    : displayedReportData?.employees_grand_totals?.setelah_digenapkan ?? 0;
+  const refreshDisplayedReport = (): void => {
+    if (bankPinjamTabsUseMonthlyData || periodType === 'monthly') {
+      void fetchSalaryReport();
+      return;
+    }
+
+    void fetchYearlySalaryReport();
+  };
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat("en-MY", {
@@ -2193,15 +2215,15 @@ const SalaryReportPage: React.FC = () => {
                   />
                 )}
               </div>
-              {activeReportData && (
+              {displayedReportData && (
                 <>
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="flex items-center gap-4 text-sm text-default-600 dark:text-gray-300">
                     <span className="font-medium">
-                      {activeReportData.total_records} employees
+                      {displayedReportData.total_records} employees
                     </span>
                     <span className="font-medium">
-                      Total: {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                      Total: {formatCurrency(displayedHeaderTotal)}
                     </span>
                   </div>
                 </>
@@ -2209,10 +2231,10 @@ const SalaryReportPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <Button
-                onClick={periodType === 'yearly' ? fetchYearlySalaryReport : fetchSalaryReport}
+                onClick={refreshDisplayedReport}
                 icon={IconRefresh}
                 variant="outline"
-                disabled={activeLoading}
+                disabled={displayedLoading}
                 size="sm"
               >
                 Refresh
@@ -2228,8 +2250,8 @@ const SalaryReportPage: React.FC = () => {
                   color="green"
                   variant="outline"
                   disabled={
-                    !activeReportData ||
-                    activeReportData.data.length === 0 ||
+                    !displayedReportData ||
+                    displayedReportData.data.length === 0 ||
                     isGeneratingPDF
                   }
                   size="sm"
@@ -2244,7 +2266,7 @@ const SalaryReportPage: React.FC = () => {
                           setIsPrintDropdownOpen(false);
                           generatePDF("print");
                         }}
-                        disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                        disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                         className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Print
@@ -2254,7 +2276,7 @@ const SalaryReportPage: React.FC = () => {
                           setIsPrintDropdownOpen(false);
                           generatePDF("download");
                         }}
-                        disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                        disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                         className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Download PDF
@@ -2271,8 +2293,8 @@ const SalaryReportPage: React.FC = () => {
                     color="purple"
                     variant="outline"
                     disabled={
-                      !activeReportData ||
-                      activeReportData.data.length === 0 ||
+                      !displayedReportData ||
+                      displayedReportData.data.length === 0 ||
                       isGeneratingExport
                     }
                     size="sm"
@@ -2350,10 +2372,10 @@ const SalaryReportPage: React.FC = () => {
               {/* Action buttons on the right */}
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={periodType === 'yearly' ? fetchYearlySalaryReport : fetchSalaryReport}
+                  onClick={refreshDisplayedReport}
                   icon={IconRefresh}
                   variant="outline"
-                  disabled={activeLoading}
+                  disabled={displayedLoading}
                   size="sm"
                 >
                   Refresh
@@ -2369,8 +2391,8 @@ const SalaryReportPage: React.FC = () => {
                     color="green"
                     variant="outline"
                     disabled={
-                      !activeReportData ||
-                      activeReportData.data.length === 0 ||
+                      !displayedReportData ||
+                      displayedReportData.data.length === 0 ||
                       isGeneratingPDF
                     }
                     size="sm"
@@ -2385,7 +2407,7 @@ const SalaryReportPage: React.FC = () => {
                             setIsPrintDropdownOpen(false);
                             generatePDF("print");
                           }}
-                          disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                          disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                           className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Print
@@ -2395,7 +2417,7 @@ const SalaryReportPage: React.FC = () => {
                             setIsPrintDropdownOpen(false);
                             generatePDF("download");
                           }}
-                          disabled={!activeReportData || activeReportData.data.length === 0 || isGeneratingPDF}
+                          disabled={!displayedReportData || displayedReportData.data.length === 0 || isGeneratingPDF}
                           className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Download PDF
@@ -2412,8 +2434,8 @@ const SalaryReportPage: React.FC = () => {
                       color="purple"
                       variant="outline"
                       disabled={
-                        !activeReportData ||
-                        activeReportData.data.length === 0 ||
+                        !displayedReportData ||
+                        displayedReportData.data.length === 0 ||
                         isGeneratingExport
                       }
                       size="sm"
@@ -2478,15 +2500,15 @@ const SalaryReportPage: React.FC = () => {
                   />
                 )}
               </div>
-              {activeReportData && (
+              {displayedReportData && (
                 <>
                   <span className="hidden sm:inline text-default-300 dark:text-gray-600">|</span>
                   <div className="flex items-center gap-2 sm:gap-4 text-sm text-default-600 dark:text-gray-300">
                     <span className="font-medium">
-                      {activeReportData.total_records} employees
+                      {displayedReportData.total_records} employees
                     </span>
                     <span className="font-medium">
-                      Total: {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                      Total: {formatCurrency(displayedHeaderTotal)}
                     </span>
                   </div>
                 </>
@@ -2495,11 +2517,11 @@ const SalaryReportPage: React.FC = () => {
           </div>
         </div>
 
-        {activeLoading ? (
+        {displayedLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : !activeReportData || activeReportData.data.length === 0 ? (
+        ) : !displayedReportData || displayedReportData.data.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconFileText className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">No salary data found</p>
@@ -2525,25 +2547,25 @@ const SalaryReportPage: React.FC = () => {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
                 <div className="text-sm text-default-600 dark:text-gray-300">
                   <span className="font-medium">Total Records:</span>{" "}
-                  {activeReportData.total_records}
+                  {displayedReportData.total_records}
                 </div>
                 <div className="flex flex-col md:flex-row space-y-1 md:space-y-0 md:space-x-6 text-sm">
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Gaji/Genap:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                      {formatCurrency(displayedGajiGenapTotal)}
                     </span>
                   </div>
                   <div className="text-default-700 dark:text-gray-200">
                     <span className="font-medium">Total Pinjam:</span>{" "}
                     <span className="text-default-900 dark:text-gray-100">
-                      {formatCurrency(activeReportData.summary.total_pinjam)}
+                      {formatCurrency(displayedReportData.summary.total_pinjam)}
                     </span>
                   </div>
                   <div className="text-sky-700 dark:text-sky-400">
                     <span className="font-semibold">Grand Total:</span>{" "}
                     <span className="font-bold text-sky-800 dark:text-sky-300">
-                      {formatCurrency(activeReportData.employees_grand_totals?.setelah_digenapkan || 0)}
+                      {formatCurrency(displayedFinalTotal)}
                     </span>
                   </div>
                 </div>

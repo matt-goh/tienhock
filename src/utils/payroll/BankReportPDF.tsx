@@ -10,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Color palette for professional appearance
 const colors = {
@@ -525,11 +526,9 @@ export const generateBankReportPDF = async (
 
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
-          try {
-            printFrame.contentWindow.print();
-          } catch (e) {
-            console.error("Print failed:", e);
-          }
+          printPdfFrameWithFallback(printFrame, url, {
+            logLabel: "bank report PDF",
+          });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {
               document.body.removeChild(printFrame);

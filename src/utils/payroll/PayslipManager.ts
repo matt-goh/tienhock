@@ -7,6 +7,7 @@ import {
   getEmployeePayrollDetailsBatch,
 } from "./payrollUtils";
 import { getPaySlipPDFBlob, getBatchPaySlipPDFBlob } from "./PaySlipPDFMake";
+import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Types
 export interface StaffDetails {
@@ -261,7 +262,9 @@ export const printPayslip = async (
         hasPrinted = true;
         // Use a slight delay to ensure content is fully loaded
         setTimeout(() => {
-          printFrame?.contentWindow?.print();
+          if (printFrame && pdfUrl) {
+            printPdfFrameWithFallback(printFrame, pdfUrl);
+          }
         }, 500);
         
         // Note: Auto cleanup removed - print dialog will stay open until user closes it
@@ -362,7 +365,9 @@ export const printBatchPayslips = async (
         hasPrinted = true;
         // Use a slight delay to ensure content is fully loaded
         setTimeout(() => {
-          printFrame?.contentWindow?.print();
+          if (printFrame && pdfUrl) {
+            printPdfFrameWithFallback(printFrame, pdfUrl);
+          }
         }, 500);
 
         // Note: Auto cleanup removed - print dialog will stay open until user closes it
