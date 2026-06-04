@@ -1607,11 +1607,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               ) : null;
             })()}
 
-            {/* Take Home Pay - Highlighted */}
+            {/* Jumlah Digenapkan - Highlighted */}
             <div className="bg-sky-100 dark:bg-sky-900/30 -mx-4 -mb-4 mt-4 px-4 py-4 border-t border-sky-200 dark:border-sky-800/50 rounded-b-lg">
               <div className="flex justify-between items-center">
                 <span className="text-sky-800 dark:text-sky-300 font-bold text-base">
-                  Take Home Pay
+                  Jumlah Digenapkan
                 </span>
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
                   {formatCurrency(
