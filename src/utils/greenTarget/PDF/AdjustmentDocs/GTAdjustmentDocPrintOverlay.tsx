@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { GTAdjustmentDocFull } from "../../../../services/gt-adjustment-doc-pdf.service";
 import { generateGTAdjustmentDocPDFBlob } from "./GTAdjustmentDocPDFHandler";
+import { printPdfFrameWithFallback } from "../../../pdfPrintFallback";
 
 const GTAdjustmentDocPrintOverlay = ({
   docs,
@@ -63,23 +64,9 @@ const GTAdjustmentDocPrintOverlay = ({
           if (!hasPrintedRef.current && printFrame?.contentWindow) {
             hasPrintedRef.current = true;
             setTimeout(() => {
-              try {
-                printFrame.contentWindow?.print();
-              } catch (printError) {
-                // Chrome's PDF viewer sometimes loads the blob on a separate
-                // origin, blocking access to contentWindow.print. Fall back
-                // to opening the PDF in a new tab so the user can Ctrl+P.
-                console.warn(
-                  "Direct iframe print blocked, opening in new tab:",
-                  printError
-                );
-                const w = window.open(pdfUrl, "_blank");
-                if (!w) {
-                  toast.error(
-                    "Couldn't open print preview. Please allow pop-ups for this site."
-                  );
-                }
-              }
+              printPdfFrameWithFallback(printFrame, pdfUrl, {
+                logLabel: "Green Target adjustment document PDF",
+              });
               cleanup();
             }, 500);
 

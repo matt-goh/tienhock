@@ -780,6 +780,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     const isNewDay =
       prevItem && prevItem.source_date !== item.source_date && item.source_date;
     const colCount = showDeleteButton && isEditable ? 6 : 5;
+    const focUnits: number = Number(item.foc_units) || 0;
 
     return (
       <React.Fragment key={item.id}>
@@ -841,9 +842,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             ) : (
               <>
                 {item.quantity}
-                {item.foc_units && item.foc_units > 0 && (
+                {focUnits > 0 && (
                   <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
-                    (+{Math.round(item.foc_units)})
+                    (+{Math.round(focUnits)})
                   </span>
                 )}
               </>
@@ -1607,11 +1608,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               ) : null;
             })()}
 
-            {/* Take Home Pay - Highlighted */}
+            {/* Jumlah Digenapkan - Highlighted */}
             <div className="bg-sky-100 dark:bg-sky-900/30 -mx-4 -mb-4 mt-4 px-4 py-4 border-t border-sky-200 dark:border-sky-800/50 rounded-b-lg">
               <div className="flex justify-between items-center">
                 <span className="text-sky-800 dark:text-sky-300 font-bold text-base">
-                  Take Home Pay
+                  Jumlah Digenapkan
                 </span>
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
                   {formatCurrency(

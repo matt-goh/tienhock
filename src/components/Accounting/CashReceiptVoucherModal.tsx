@@ -22,6 +22,7 @@ import {
   downloadCashReceiptVoucherPDF,
 } from "../../utils/accounting/CashReceiptVoucherPDF";
 import toast from "react-hot-toast";
+import { printPdfFrameWithFallback } from "../../utils/pdfPrintFallback";
 
 interface CashReceiptVoucherModalProps {
   isOpen: boolean;
@@ -87,7 +88,9 @@ const CashReceiptVoucherModal: React.FC<CashReceiptVoucherModalProps> = ({
       printFrame.onload = () => {
         if (printFrame.contentWindow) {
           setTimeout(() => {
-            printFrame.contentWindow?.print();
+            printPdfFrameWithFallback(printFrame, pdfUrl, {
+              logLabel: "cash receipt voucher PDF",
+            });
             setIsPrinting(false);
           }, 500);
 

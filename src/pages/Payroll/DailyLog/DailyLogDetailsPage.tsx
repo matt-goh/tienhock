@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   IconPencil,
+  IconTrash,
   IconClock,
   IconLock,
   IconSun,
@@ -13,6 +14,7 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import BackButton from "../../../components/BackButton";
+import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -46,7 +48,26 @@ interface EmployeeEntry {
   employee_name: string;
   job_name: string;
   following_salesman_name?: string | null;
-  activities: any[];
+  activities: DailyActivity[];
+}
+
+interface DailyActivity {
+  id: number;
+  pay_code_id: string;
+  description: string;
+  pay_type: string;
+  source?: string | null;
+  rate_unit: string;
+  rate_used: number;
+  hours_applied: number | null;
+  units_produced: number | null;
+  foc_units: number | null;
+  calculated_amount: number;
+}
+
+interface SeparatedActivities {
+  contextLinked: DailyActivity[];
+  regular: DailyActivity[];
 }
 
 interface LeaveRecord {
@@ -72,6 +93,14 @@ interface DailyWorkLog {
   leaveRecords?: LeaveRecord[];
 }
 
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   jobType,
 }) => {
@@ -83,6 +112,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
   const [expandedEntries, setExpandedEntries] = useState<
     Record<string, boolean>
   >({});
+  const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
 
   useEffect(() => {
     fetchWorkLogDetails();
@@ -111,6 +141,26 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     navigate(`/payroll/${jobType.toLowerCase()}-production/${id}/edit`);
   };
 
+  const handleDeleteLog = async (): Promise<void> => {
+    if (!workLog) return;
+
+    try {
+      await api.delete(`/api/daily-work-logs/${workLog.id}`);
+      toast.success("Work log deleted successfully");
+      navigate(`/payroll/${jobType.toLowerCase()}-production`, {
+        replace: true,
+      });
+    } catch (error: unknown) {
+      const deleteError = error as ApiError;
+      console.error("Error deleting work log:", error);
+      toast.error(
+        deleteError.response?.data?.message || "Failed to delete work log"
+      );
+    } finally {
+      setShowDeleteDialog(false);
+    }
+  };
+
   const getDayTypeColor = (dayType: string, logDate?: string) => {
     if (dayType === "Umum") return "text-red-600 dark:text-red-400";
     if (dayType === "Ahad") return "text-amber-600 dark:text-amber-400";
@@ -136,9 +186,11 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     }));
   };
 
-  const separateActivities = (activities: any[]) => {
-    const contextLinked: any[] = [];
-    const regular: any[] = [];
+  const separateActivities = (
+    activities: DailyActivity[]
+  ): SeparatedActivities => {
+    const contextLinked: DailyActivity[] = [];
+    const regular: DailyActivity[] = [];
 
     activities.forEach((activity) => {
       const isContextLinked = jobConfig?.contextFields.some(
@@ -153,6 +205,21 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     });
 
     return { contextLinked, regular };
+  };
+
+  const renderPayCodeLabel = (activity: DailyActivity): JSX.Element => {
+    const payCodeId: string = activity.pay_code_id.trim();
+
+    return (
+      <>
+        {activity.description}
+        {payCodeId && (
+          <span className="ml-1 font-mono text-xs font-semibold text-default-500 dark:text-gray-400">
+            ({payCodeId})
+          </span>
+        )}
+      </>
+    );
   };
 
   const formatCurrency = (amount: number) => {
@@ -188,7 +255,8 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
     (sum: number, entry: EmployeeEntry) =>
       sum +
       entry.activities.reduce(
-        (actSum: number, activity: any) => actSum + activity.calculated_amount,
+        (actSum: number, activity: DailyActivity) =>
+          actSum + activity.calculated_amount,
         0
       ),
     0
@@ -322,16 +390,26 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
             </div>
           </div>
 
-          {/* Right: Edit Button */}
+          {/* Right: Actions */}
           {workLog.status !== "Processed" && (
-            <Button
-              onClick={handleEdit}
-              icon={IconPencil}
-              variant="filled"
-              color="sky"
-            >
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleEdit}
+                icon={IconPencil}
+                variant="filled"
+                color="sky"
+              >
+                Edit
+              </Button>
+              <Button
+                onClick={() => setShowDeleteDialog(true)}
+                icon={IconTrash}
+                variant="filled"
+                color="rose"
+              >
+                Delete
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -353,7 +431,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
               })
               .map((entry: EmployeeEntry) => {
                 const employeeTotal = entry.activities.reduce(
-                  (sum: number, activity: any) =>
+                  (sum: number, activity: DailyActivity) =>
                     sum + activity.calculated_amount,
                   0
                 );
@@ -459,7 +537,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-default-50 dark:divide-gray-700/50">
-                          {displayActivities.map((activity: any) => {
+                          {displayActivities.map((activity: DailyActivity) => {
                             const isContextLinkedActivity = contextLinked.some(
                               (a) => a.id === activity.id
                             );
@@ -471,7 +549,7 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                 <td className="py-1.5 pr-2">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-medium text-default-700 dark:text-gray-200">
-                                      {activity.description}
+                                      {renderPayCodeLabel(activity)}
                                     </span>
                                     <span className="text-xs px-1.5 py-0.5 rounded bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400">
                                       {activity.pay_type}
@@ -523,12 +601,18 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
                                       activity.rate_unit !== "Bill"
                                     ? (
                                       <>
-                                        {activity.foc_units > 0 && (
+                                        {(activity.foc_units ?? 0) > 0 && (
                                           <span className="text-emerald-600 dark:text-emerald-400 text-xs">
-                                            {Math.round(activity.foc_units)} FOC +{" "}
+                                            {Math.round(
+                                              activity.foc_units ?? 0
+                                            )}{" "}
+                                            FOC +{" "}
                                           </span>
                                         )}
-                                        {activity.units_produced} {activity.rate_unit === "Percent" ? "" : activity.rate_unit}
+                                        {activity.units_produced}{" "}
+                                        {activity.rate_unit === "Percent"
+                                          ? ""
+                                          : activity.rate_unit}
                                       </>
                                     )
                                     : "-"}
@@ -694,6 +778,16 @@ const DailyLogDetailsPage: React.FC<DailyLogDetailsPageProps> = ({
           </table>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteLog}
+        title="Delete Work Log"
+        message="Are you sure you want to delete this work log? This action cannot be undone."
+        confirmButtonText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

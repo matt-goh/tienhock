@@ -12,6 +12,7 @@ import { generateQRDataUrl } from "./generateQRCode";
 import EInvoicePDF from "./EInvoicePDF";
 import { ExtendedInvoiceData } from "../../../types/types";
 import { api } from "../../../routes/utils/api";
+import { printPdfFrameWithFallback } from "../../pdfPrintFallback";
 
 interface PrintHandlerProps {
   einvoice?: any; // Single einvoice in original format
@@ -144,7 +145,9 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
           if (printFrame?.contentWindow) {
             // Use a slight delay to ensure content is fully loaded
             setTimeout(() => {
-              printFrame.contentWindow?.print();
+              printPdfFrameWithFallback(printFrame, pdfUrl, {
+                logLabel: "e-invoice PDF",
+              });
               setIsGenerating(false);
               setIsLoadingDialogVisible(false);
               toast.success("Print dialog opened");
@@ -204,7 +207,9 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
         printFrame.onload = () => {
           if (printFrame?.contentWindow) {
             setTimeout(() => {
-              printFrame.contentWindow?.print();
+              printPdfFrameWithFallback(printFrame, pdfUrl, {
+                logLabel: "e-invoice PDF",
+              });
               setIsGenerating(false);
               setIsLoadingDialogVisible(false);
               toast.success("Print dialog opened");

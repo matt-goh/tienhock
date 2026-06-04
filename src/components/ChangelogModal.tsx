@@ -19,6 +19,31 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-05",
+    ms: "Pembetulan PCB: gaji dengan sen kini dipadankan kepada julat PCB yang betul, contohnya RM5,975.78 menggunakan julat RM5,976-RM5,980 supaya potongan PCB muncul dalam payslip.",
+    en: "PCB fix: salary amounts with cents now match the correct PCB range, for example RM5,975.78 uses the RM5,976-RM5,980 range so the PCB deduction appears on the payslip.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Pembetulan Sistem Pinjam: rekod pinjam kini boleh disimpan untuk ID staf yang panjang seperti JASSON_ROLL.",
+    en: "Pinjam System fix: pinjam records can now be saved for longer staff IDs such as JASSON_ROLL.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Pembetulan kerja lebih masa Bihun: apabila pekerja ada jam dalam ruangan OT 'jaga stim' di samping kerja lebih masa biasa, setiap baris OT kini dibayar mengikut jamnya sendiri, bukan kedua-dua baris dibayar mengikut jumlah gabungan. Ini membetulkan jumlah OT yang terlebih bayar dalam Payroll Details.",
+    en: "Fixed Bihun overtime: when a worker has hours in the 'jaga stim' OT column on top of normal overtime, each overtime line is now paid for its own hours instead of both lines being paid the combined total. This corrects overstated OT amounts in Payroll Details.",
+  },
+  {
+    date: "2026-06-04",
+    ms: "Halaman Sistem Pinjam dikemas kini: ada kotak carian (atau terus menaip) untuk mencari pekerja dengan cepat mengikut nama atau ID kakitangan, kad pekerja kini lebih padat (hanya bahagian yang ada pinjam dipaparkan), butang tindakan kekal kelihatan di bahagian atas semasa menatal, dan halaman dibuka pada bulan sebelumnya sepanjang 1 hingga 7 hari bulan.",
+    en: "The Pinjam System page has been refreshed: a search box — or just start typing — lets you quickly find an employee by name or staff ID, employee cards are now more compact (only the sections that have pinjam are shown), the action buttons stay visible at the top while you scroll, and the page opens to the previous month from the 1st through the 7th.",
+  },
+  {
+    date: "2026-06-04",
+    ms: "Pembetulan: Jumlah Bank dan Pinjam dalam Salary Report kini menggunakan gaji yang telah digenapkan sebelum menolak pinjam bulanan, supaya jumlah bayaran sepadan dengan Payroll Details dan halaman Pinjam.",
+    en: "Fix: Bank and Pinjam totals in Salary Report now use the rounded salary before monthly pinjam is deducted, so payment amounts match Payroll Details and the Pinjam page.",
+  },
+  {
     date: "2026-06-03",
     ms: "Memproses semula gaji bulanan kini menggunakan kadar semasa setiap kod gaji untuk semua hari dalam bulan, jadi perubahan kadar selepas jam kerja direkod akan digunakan untuk semua hari (sebelum ini sesetengah hari mengekalkan kadar lama).",
     en: "Reprocessing a monthly payroll now applies each pay code's current rate to every day in the month, so a rate change made after hours were logged takes effect for all days (previously some days could keep the old rate).",
