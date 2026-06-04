@@ -841,7 +841,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             ) : (
               <>
                 {item.quantity}
-                {item.foc_units && item.foc_units > 0 && (
+                {item.foc_units > 0 && (
                   <span className="text-emerald-600 dark:text-emerald-400 text-xs ml-1">
                     (+{Math.round(item.foc_units)})
                   </span>

@@ -19,6 +19,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-05",
+    ms: "Pembetulan paparan: lajur Kuantiti dalam Butiran Gaji (paparan terperinci) tidak lagi menambah '0' tambahan di belakang jam — contohnya 3 jam yang dulu dipaparkan sebagai '30' kini betul sebagai '3'. Amaun bayaran tidak berubah; ini hanya pembetulan paparan.",
+    en: "Display fix: the Quantity column in Payroll Details (detailed view) no longer adds a stray '0' after the hours — e.g. 3 hours that previously showed as '30' now correctly shows as '3'. Payment amounts were never affected; this is display-only.",
+  },
+  {
+    date: "2026-06-05",
+    ms: "Pembetulan kerja lebih masa Bihun: apabila pekerja ada jam dalam ruangan OT 'jaga stim' di samping kerja lebih masa biasa, setiap baris OT kini dibayar mengikut jamnya sendiri, bukan kedua-dua baris dibayar mengikut jumlah gabungan. Ini membetulkan jumlah OT yang terlebih bayar dalam Payroll Details.",
+    en: "Fixed Bihun overtime: when a worker has hours in the 'jaga stim' OT column on top of normal overtime, each overtime line is now paid for its own hours instead of both lines being paid the combined total. This corrects overstated OT amounts in Payroll Details.",
+  },
+  {
     date: "2026-06-04",
     ms: "Halaman Sistem Pinjam dikemas kini: ada kotak carian (atau terus menaip) untuk mencari pekerja dengan cepat mengikut nama atau ID kakitangan, kad pekerja kini lebih padat (hanya bahagian yang ada pinjam dipaparkan), butang tindakan kekal kelihatan di bahagian atas semasa menatal, dan halaman dibuka pada bulan sebelumnya sepanjang 1 hingga 7 hari bulan.",
     en: "The Pinjam System page has been refreshed: a search box — or just start typing — lets you quickly find an employee by name or staff ID, employee cards are now more compact (only the sections that have pinjam are shown), the action buttons stay visible at the top while you scroll, and the page opens to the previous month from the 1st through the 7th.",
